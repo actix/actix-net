@@ -1,5 +1,14 @@
 # Changes
 
+## [0.2.5] - 2018-12-12
+
+### Fixed
+
+* Fix back-pressure for concurrent ssl handshakes
+
+* Drop completed future for .then and .and_then combinators
+
+
 ## [0.2.4] - 2018-11-21
 
 ### Added

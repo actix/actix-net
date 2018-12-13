@@ -63,7 +63,7 @@ where
 {
     b: Cell<B>,
     fut_b: Option<B::Future>,
-    fut_a: A::Future,
+    fut_a: Option<A::Future>,
 }
 
 impl<A, B> AndThenFuture<A, B>
@@ -71,10 +71,10 @@ where
     A: Service,
     B: Service<Request = A::Response, Error = A::Error>,
 {
-    fn new(fut_a: A::Future, b: Cell<B>) -> Self {
+    fn new(a: A::Future, b: Cell<B>) -> Self {
         AndThenFuture {
             b,
-            fut_a,
+            fut_a: Some(a),
             fut_b: None,
         }
     }
@@ -94,8 +94,9 @@ where
             return fut.poll();
         }
 
-        match self.fut_a.poll() {
+        match self.fut_a.as_mut().expect("actix-net bug").poll() {
             Ok(Async::Ready(resp)) => {
+                let _ = self.fut_a.take();
                 self.fut_b = Some(self.b.borrow_mut().call(resp));
                 self.poll()
             }
