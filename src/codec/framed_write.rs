@@ -254,7 +254,8 @@ where
                     io::ErrorKind::WriteZero,
                     "failed to \
                      write frame to transport",
-                ).into());
+                )
+                .into());
             }
 
             // TODO: Add a way to `bytes` to do this w/o returning the drained

@@ -167,7 +167,8 @@ impl Worker {
                 .map_err(|e| {
                     error!("Can not start worker: {:?}", e);
                     Arbiter::current().do_send(StopArbiter(0));
-                }).and_then(move |services| {
+                })
+                .and_then(move |services| {
                     for item in services {
                         for (idx, token, service) in item {
                             while token.0 >= wrk.services.len() {

@@ -1,5 +1,12 @@
 # Changes
 
+## [0.2.6] - 2018-12-21
+
+### Fixed
+
+* Fix back-pressure handling for concurrent connections
+
+
 ## [0.2.5] - 2018-12-12
 
 ### Fixed
