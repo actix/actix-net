@@ -10,6 +10,7 @@ pub(crate) enum ServerCommand {
     WorkerDied(usize),
     Pause(oneshot::Sender<()>),
     Resume(oneshot::Sender<()>),
+    Restart(oneshot::Sender<()>),
     Signal(Signal),
     /// Whether to try and shut down gracefully
     Stop {
@@ -53,6 +54,13 @@ impl Server {
     pub fn resume(&self) -> impl Future<Item = (), Error = ()> {
         let (tx, rx) = oneshot::channel();
         let _ = self.0.unbounded_send(ServerCommand::Resume(tx));
+        rx.map_err(|_| ())
+    }
+
+    /// Restart server
+    pub fn restart(&self) -> impl Future<Item = (), Error = ()> {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.0.unbounded_send(ServerCommand::Restart(tx));
         rx.map_err(|_| ())
     }
 

@@ -16,6 +16,7 @@ use super::Token;
 pub(crate) enum Command {
     Pause,
     Resume,
+    Restart,
     Stop,
     Worker(WorkerClient),
 }
@@ -310,6 +311,26 @@ impl Accept {
                             } else {
                                 info!(
                                     "Accepting connections on {} has been resumed",
+                                    info.addr
+                                );
+                            }
+                        }
+                    }
+                    Command::Restart => {
+                        for (token, info) in self.sockets.iter_mut() {
+                            if let Err(err) = self.poll.deregister(&info.sock) {
+                                error!("Can not restart server socket {}", err);
+                            }
+                            if let Err(err) = self.poll.reregister(
+                                &info.sock,
+                                mio::Token(token + DELTA),
+                                mio::Ready::readable(),
+                                mio::PollOpt::edge(),
+                            ) {
+                                error!("Can not restart socket accept process: {}", err);
+                            } else {
+                                info!(
+                                    "Accepting connections on {} has been restarted",
                                     info.addr
                                 );
                             }

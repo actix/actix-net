@@ -287,6 +287,10 @@ impl ServerBuilder {
                 self.accept.send(Command::Resume);
                 let _ = tx.send(());
             }
+            ServerCommand::Restart(tx) => {
+                self.accept.send(Command::Restart);
+                let _ = tx.send(());
+            }
             ServerCommand::Signal(sig) => {
                 // Signals support
                 // Handle `SIGINT`, `SIGTERM`, `SIGQUIT` signals and stop actix system
