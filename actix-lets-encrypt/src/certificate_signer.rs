@@ -15,11 +15,15 @@ impl<'a> CertificateRequest<'a> {
         let account = directory.account_registration()
             .email(self.email)
             .register()?;
-        let authorization = account.authorization("example.com")?;
-        let http_challenge = authorization.get_http_challenge().ok_or("HTTP challenge not found")?;
+        let authorization = account.authorization(self.domain)?;
 
+        let http_challenge = authorization.get_http_challenge().ok_or("HTTP challenge failed")?;
         http_challenge.save_key_authorization("/var/www")?;
+        http_challenge.validate()?;
 
+        let cert = account.certificate_signer(&[self.domain]).sign_certificate()?;
+        cert.save_signed_certificate("certificate.pem")?;
+        cert.save_private_key("certificate.key")?;
 
         Ok(())
     }
