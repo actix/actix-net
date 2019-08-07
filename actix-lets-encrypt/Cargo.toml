@@ -1,0 +1,21 @@
+[package]
+name = "actix-lets-encrypt"
+version = "0.1.0"
+authors = ["Jordan Deitch <jd@rsa.pub>"]
+description = "Actix Let's Encrypt"
+keywords = ["network", "framework", "async", "futures"]
+homepage = "https://actix.rs"
+repository = "https://github.com/actix/actix-net.git"
+documentation = "https://docs.rs/actix-lets-encrypt/"
+categories = ["network-programming", "asynchronous"]
+license = "MIT/Apache-2.0"
+exclude = [".gitignore", ".travis.yml", ".cargo/config", "appveyor.yml"]
+edition = "2018"
+workspace = ".."
+
+[lib]
+name = "actix_lets_encrypt"
+path = "src/lib.rs"
+
+[dependencies]
+acme-client = {version = "0.5", default-features = false}

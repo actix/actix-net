@@ -17,6 +17,7 @@ edition = "2018"
 members = [
   "actix-codec",
   "actix-connect",
+  "actix-lets-encrypt",
   "actix-rt",
   "actix-service",
   "actix-server",
