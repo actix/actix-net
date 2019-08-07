@@ -1,5 +1,39 @@
 use acme_client::Directory;
 
+struct CertificateError {
+    message: String,
+}
+
+impl std::error::Error for CertificateError {
+    fn description(&self) -> &str { self.message.as_str() }
+    fn cause(&self) -> Option<&dyn std::error::Error> { None }
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
+}
+
+impl std::fmt::Display for CertificateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "An Error Occurred, Please Try Again!")
+    }
+}
+
+impl std::fmt::Debug for CertificateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{{ file: {}, line: {} }}", file!(), line!())
+    }
+}
+
+impl CertificateError {
+    fn new(message: String) -> Self {
+        CertificateError { message }
+    }
+}
+
+impl std::convert::From<acme_client::error::Error> for CertificateError {
+    fn from(e: acme_client::error::Error) -> Self {
+        return CertificateError::new(e.to_string());
+    }
+}
+
 struct CertificateRequest<'a> {
     domain: &'a str,
     email: &'a str,
@@ -10,7 +44,7 @@ impl<'a> CertificateRequest<'a> {
         return CertificateRequest { domain, email };
     }
 
-    fn sign(self: &self) -> Result<(), std::io::Error> {
+    fn sign(self: &Self) -> Result<(), CertificateError> {
         let directory = Directory::lets_encrypt()?;
         let account = directory.account_registration()
             .email(self.email)
