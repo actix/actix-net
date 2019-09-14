@@ -1,12 +1,13 @@
 //! Thread pool for blocking operations
 
-use std::fmt;
+use std::future::Future;
+use std::task::{Poll,Context};
 
 use derive_more::Display;
-use futures::sync::oneshot;
-use futures::{Async, Future, Poll};
+use futures::channel::oneshot;
 use parking_lot::Mutex;
 use threadpool::ThreadPool;
+use std::pin::Pin;
 
 /// Env variable for default cpu pool size
 const ENV_CPU_POOL_VAR: &str = "ACTIX_THREADPOOL";
@@ -41,20 +42,15 @@ thread_local! {
 
 /// Blocking operation execution error
 #[derive(Debug, Display)]
-pub enum BlockingError<E: fmt::Debug> {
-    #[display(fmt = "{:?}", _0)]
-    Error(E),
-    #[display(fmt = "Thread pool is gone")]
-    Canceled,
-}
+#[display(fmt = "Thread pool is gone")]
+pub struct Cancelled;
 
 /// Execute blocking function on a thread pool, returns future that resolves
 /// to result of the function execution.
-pub fn run<F, I, E>(f: F) -> CpuFuture<I, E>
+pub fn run<F, I>(f: F) -> CpuFuture<I>
 where
-    F: FnOnce() -> Result<I, E> + Send + 'static,
+    F: FnOnce() -> I + Send + 'static,
     I: Send + 'static,
-    E: Send + fmt::Debug + 'static,
 {
     let (tx, rx) = oneshot::channel();
     POOL.with(|pool| {
@@ -70,19 +66,17 @@ where
 
 /// Blocking operation completion future. It resolves with results
 /// of blocking function execution.
-pub struct CpuFuture<I, E> {
-    rx: oneshot::Receiver<Result<I, E>>,
+pub struct CpuFuture<I> {
+    rx: oneshot::Receiver<I>,
 }
 
-impl<I, E: fmt::Debug> Future for CpuFuture<I, E> {
-    type Item = I;
-    type Error = BlockingError<E>;
+impl<I> Future for CpuFuture<I> {
+    type Output = Result<I,Cancelled>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let res = futures::try_ready!(self.rx.poll().map_err(|_| BlockingError::Canceled));
-        match res {
-            Ok(val) => Ok(Async::Ready(val)),
-            Err(err) => Err(BlockingError::Error(err)),
-        }
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let rx  = Pin::new(&mut Pin::get_mut(self).rx);
+        let res = futures::ready!(rx.poll(cx));
+        Poll::Ready(res.map_err(|_| Cancelled))
     }
+
 }
