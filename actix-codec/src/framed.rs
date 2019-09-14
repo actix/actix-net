@@ -4,12 +4,14 @@ use std::fmt;
 use std::io::{self, Read, Write};
 
 use bytes::BytesMut;
-use futures::{Poll, Sink, StartSend, Stream};
+use futures::{Poll, Sink,  Stream};
 use tokio_codec::{Decoder, Encoder};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use super::framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
 use super::framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
+use std::pin::Pin;
+use std::task::Context;
 
 const LW: usize = 1024;
 const HW: usize = 8 * 1024;
@@ -226,36 +228,35 @@ where
     T: AsyncRead,
     U: Decoder,
 {
-    type Item = U::Item;
-    type Error = U::Error;
+    type Item = Result<U::Item,U::Error>;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.inner.poll()
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        unsafe { self.map_unchecked_mut(|s| &mut s.inner).poll_next(cx )}
     }
 }
 
-impl<T, U> Sink for Framed<T, U>
+impl<T, U> Sink<U::Item> for Framed<T, U>
 where
     T: AsyncWrite,
     U: Encoder,
     U::Error: From<io::Error>,
 {
-    type SinkItem = U::Item;
-    type SinkError = U::Error;
+    type Error = U::Error;
 
-    fn start_send(
-        &mut self,
-        item: Self::SinkItem,
-    ) -> StartSend<Self::SinkItem, Self::SinkError> {
-        self.inner.get_mut().start_send(item)
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        unsafe { self.map_unchecked_mut(|s| s.inner.get_mut()).poll_ready(cx)}
     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        self.inner.get_mut().poll_complete()
+    fn start_send(self: Pin<&mut Self>, item: <U as Encoder>::Item) -> Result<(), Self::Error> {
+        unsafe { self.map_unchecked_mut(|s| s.inner.get_mut()).start_send(item)}
     }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        self.inner.get_mut().close()
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        unsafe { self.map_unchecked_mut(|s| s.inner.get_mut()).poll_flush(cx)}
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        unsafe { self.map_unchecked_mut(|s| s.inner.get_mut()).poll_close(cx)}
     }
 }
 
@@ -284,6 +285,10 @@ impl<T: AsyncRead, U> AsyncRead for Fuse<T, U> {
     unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [u8]) -> bool {
         self.0.prepare_uninitialized_buffer(buf)
     }
+
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+        unsafe { self.map_unchecked_mut(|s| &mut s.0).poll_read(cx, buf)}
+    }
 }
 
 impl<T: Write, U> Write for Fuse<T, U> {
@@ -297,8 +302,16 @@ impl<T: Write, U> Write for Fuse<T, U> {
 }
 
 impl<T: AsyncWrite, U> AsyncWrite for Fuse<T, U> {
-    fn shutdown(&mut self) -> Poll<(), io::Error> {
-        self.0.shutdown()
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+        unsafe { self.map_unchecked_mut(|s| &mut s.0).poll_write(cx, buf)}
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        unsafe { self.map_unchecked_mut(|s|  &mut s.0).poll_flush(cx)}
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        unsafe { self.map_unchecked_mut(|s| &mut s.0).poll_shutdown(cx)}
     }
 }
 

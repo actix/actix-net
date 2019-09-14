@@ -19,7 +19,7 @@ path = "src/lib.rs"
 
 [dependencies]
 bytes = "0.4.12"
-futures = "0.1.24"
-tokio-io = "0.1.12"
-tokio-codec = "0.1.1"
+futures = { package = "futures-preview", version  = "0.3.0-alpha.18" }
+tokio-io = "0.2.0-alpha.4"
+tokio-codec = "0.2.0-alpha.4"
 log = "0.4"
