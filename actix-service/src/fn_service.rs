@@ -1,9 +1,14 @@
 use std::marker::PhantomData;
 
-use futures::future::{ok, Future, FutureResult};
-use futures::{try_ready, Async, IntoFuture, Poll};
+use crate::IntoFuture;
+use futures::future::{ok, Future, Ready};
+use futures::{ready, Poll};
 
 use crate::{IntoNewService, IntoService, NewService, Service};
+use std::pin::Pin;
+use std::task::Context;
+
+use pin_project::pin_project;
 
 /// Create `NewService` for function that can act as a Service
 pub fn service_fn<F, Req, Out, Cfg>(f: F) -> NewServiceFn<F, Req, Out, Cfg>
@@ -75,8 +80,11 @@ where
     type Error = Out::Error;
     type Future = Out::Future;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(Async::Ready(()))
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        _ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: Req) -> Self::Future {
@@ -135,7 +143,7 @@ where
     type Config = Cfg;
     type Service = ServiceFn<F, Req, Out>;
     type InitError = ();
-    type Future = FutureResult<Self::Service, Self::InitError>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: &Cfg) -> Self::Future {
         ok(ServiceFn::new(self.f.clone()))
@@ -210,12 +218,14 @@ where
     }
 }
 
+#[pin_project]
 pub struct FnNewServiceConfigFut<R, S, E>
 where
     R: IntoFuture<Error = E>,
     R::Item: IntoService<S>,
     S: Service,
 {
+    #[pin]
     fut: R::Future,
     _t: PhantomData<(S,)>,
 }
@@ -226,11 +236,10 @@ where
     R::Item: IntoService<S>,
     S: Service,
 {
-    type Item = S;
-    type Error = R::Error;
+    type Output = Result<S, R::Error>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        Ok(Async::Ready(try_ready!(self.fut.poll()).into_service()))
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Poll::Ready(Ok(ready!(self.project().fut.poll(cx))?.into_service()))
     }
 }
 
