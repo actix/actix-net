@@ -11,6 +11,8 @@ use tokio_rustls::{Accept, TlsAcceptor, TlsStream};
 use crate::counter::{Counter, CounterGuard};
 use crate::ssl::MAX_CONN_COUNTER;
 use crate::{Io, Protocol, ServerConfig as SrvConfig};
+use std::pin::Pin;
+use std::task::Context;
 
 /// Support `SSL` connections via rustls package
 ///
@@ -74,8 +76,11 @@ impl<T: AsyncRead + AsyncWrite, P> Service for RustlsAcceptorService<T, P> {
     type Error = io::Error;
     type Future = RustlsAcceptorServiceFut<T, P>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        if self.conns.available() {
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        if self.conns.available(cx) {
             Ok(Async::Ready(()))
         } else {
             Ok(Async::NotReady)

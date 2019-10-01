@@ -1,6 +1,6 @@
-use futures::sync::mpsc::UnboundedSender;
-use futures::sync::oneshot;
-use futures::Future;
+use futures::channel::mpsc::UnboundedSender;
+use futures::channel::oneshot;
+use futures::{Future, TryFutureExt};
 
 use crate::builder::ServerBuilder;
 use crate::signals::Signal;
@@ -43,14 +43,14 @@ impl Server {
     ///
     /// If socket contains some pending connection, they might be dropped.
     /// All opened connection remains active.
-    pub fn pause(&self) -> impl Future<Item = (), Error = ()> {
+    pub fn pause(&self) -> impl Future<Output = Result<(), ()>> {
         let (tx, rx) = oneshot::channel();
         let _ = self.0.unbounded_send(ServerCommand::Pause(tx));
         rx.map_err(|_| ())
     }
 
     /// Resume accepting incoming connections
-    pub fn resume(&self) -> impl Future<Item = (), Error = ()> {
+    pub fn resume(&self) -> impl Future<Output = Result<(), ()>> {
         let (tx, rx) = oneshot::channel();
         let _ = self.0.unbounded_send(ServerCommand::Resume(tx));
         rx.map_err(|_| ())
@@ -59,7 +59,7 @@ impl Server {
     /// Stop incoming connection processing, stop all workers and exit.
     ///
     /// If server starts with `spawn()` method, then spawned thread get terminated.
-    pub fn stop(&self, graceful: bool) -> impl Future<Item = (), Error = ()> {
+    pub fn stop(&self, graceful: bool) -> impl Future<Output = Result<(), ()>> {
         let (tx, rx) = oneshot::channel();
         let _ = self.0.unbounded_send(ServerCommand::Stop {
             graceful,

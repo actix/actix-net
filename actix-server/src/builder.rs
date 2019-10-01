@@ -2,14 +2,14 @@ use std::time::Duration;
 use std::{io, mem, net};
 
 use actix_rt::{spawn, Arbiter, System};
-use futures::future::{lazy, ok};
-use futures::stream::futures_unordered;
-use futures::sync::mpsc::{unbounded, UnboundedReceiver};
-use futures::{Async, Future, Poll, Stream};
+use futures::channel::mpsc::{unbounded, UnboundedReceiver};
+use futures::future::ready;
+use futures::stream::FuturesUnordered;
+use futures::{ready, Future, FutureExt, Poll, Stream, StreamExt};
 use log::{error, info};
 use net2::TcpBuilder;
 use num_cpus;
-use tokio_tcp::TcpStream;
+use tokio_net::tcp::TcpStream;
 use tokio_timer::sleep;
 
 use crate::accept::{AcceptLoop, AcceptNotify, Command};
@@ -20,6 +20,8 @@ use crate::signals::{Signal, Signals};
 use crate::socket::StdListener;
 use crate::worker::{self, Worker, WorkerAvailability, WorkerClient};
 use crate::{ssl, Token};
+use std::pin::Pin;
+use std::task::Context;
 
 /// Server builder
 pub struct ServerBuilder {
@@ -320,10 +322,12 @@ impl ServerBuilder {
         let services: Vec<Box<dyn InternalServiceFactory>> =
             self.services.iter().map(|v| v.clone_factory()).collect();
 
-        Arbiter::new().send(lazy(move || {
-            Worker::start(rx1, rx2, services, avail, timeout);
-            Ok::<_, ()>(())
-        }));
+        Arbiter::new().send(
+            async move {
+                Worker::start(rx1, rx2, services, avail, timeout);
+            }
+                .boxed(),
+        );
 
         worker
     }
@@ -381,31 +385,34 @@ impl ServerBuilder {
                 // stop workers
                 if !self.workers.is_empty() && graceful {
                     spawn(
-                        futures_unordered(
-                            self.workers
-                                .iter()
-                                .map(move |worker| worker.1.stop(graceful)),
-                        )
-                        .collect()
-                        .then(move |_| {
-                            if let Some(tx) = completion {
-                                let _ = tx.send(());
-                            }
-                            if exit {
-                                spawn(sleep(Duration::from_millis(300)).then(|_| {
-                                    System::current().stop();
-                                    ok(())
-                                }));
-                            }
-                            ok(())
-                        }),
+                        self.workers
+                            .iter()
+                            .map(move |worker| worker.1.stop(graceful))
+                            .collect::<FuturesUnordered<_>>()
+                            .collect::<Vec<_>>()
+                            .then(move |_| {
+                                if let Some(tx) = completion {
+                                    let _ = tx.send(());
+                                }
+                                if exit {
+                                    spawn(
+                                        async {
+                                            tokio_timer::sleep(Duration::from_millis(300))
+                                                .await;
+                                            System::current().stop();
+                                        }
+                                            .boxed(),
+                                    );
+                                }
+                                ready(())
+                            }),
                     )
                 } else {
                     // we need to stop system if server was spawned
                     if self.exit {
                         spawn(sleep(Duration::from_millis(300)).then(|_| {
                             System::current().stop();
-                            ok(())
+                            ready(())
                         }));
                     }
                     if let Some(tx) = completion {
@@ -447,15 +454,15 @@ impl ServerBuilder {
 }
 
 impl Future for ServerBuilder {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
-            match self.cmd.poll() {
-                Ok(Async::Ready(None)) | Err(_) => return Ok(Async::Ready(())),
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
-                Ok(Async::Ready(Some(item))) => self.handle_cmd(item),
+            match ready!(Pin::new(&mut self.cmd).poll_next(cx)) {
+                Some(it) => self.as_mut().get_mut().handle_cmd(it),
+                None => {
+                    return Poll::Pending;
+                }
             }
         }
     }
