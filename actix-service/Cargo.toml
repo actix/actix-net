@@ -23,7 +23,9 @@ name = "actix_service"
 path = "src/lib.rs"
 
 [dependencies]
-futures = "0.1.25"
+futures = { package = "futures-preview", version = "0.3.0-alpha.18" }
+pin-project = "0.4.0-alpha.11"
 
 [dev-dependencies]
+tokio = "0.2.0-alpha.4"
 actix-rt = "0.2"

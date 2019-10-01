@@ -4,6 +4,10 @@ use futures::{Future, Poll};
 
 use super::NewService;
 
+use pin_project::pin_project;
+use std::pin::Pin;
+use std::task::Context;
+
 /// `MapInitErr` service combinator
 pub struct MapInitErr<A, F, E> {
     a: A,
@@ -58,13 +62,14 @@ where
         MapInitErrFuture::new(self.a.new_service(cfg), self.f.clone())
     }
 }
-
+#[pin_project]
 pub struct MapInitErrFuture<A, F, E>
 where
     A: NewService,
     F: Fn(A::InitError) -> E,
 {
     f: F,
+    #[pin]
     fut: A::Future,
 }
 
@@ -83,10 +88,10 @@ where
     A: NewService,
     F: Fn(A::InitError) -> E,
 {
-    type Item = A::Service;
-    type Error = E;
+    type Output = Result<A::Service, E>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.fut.poll().map_err(&self.f)
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+        this.fut.poll(cx).map_err(this.f)
     }
 }

@@ -1,9 +1,11 @@
 use std::marker::PhantomData;
 
-use futures::future::{ok, FutureResult};
-use futures::{Async, Poll};
+use futures::future::{ok, Ready};
+use futures::Poll;
 
 use super::{NewService, Service};
+use std::pin::Pin;
+use std::task::Context;
 
 /// Empty service
 #[derive(Clone)]
@@ -34,10 +36,13 @@ impl<R, E> Service for Blank<R, E> {
     type Request = R;
     type Response = R;
     type Error = E;
-    type Future = FutureResult<R, E>;
+    type Future = Ready<Result<R, E>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(Async::Ready(()))
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        _ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: R) -> Self::Future {
@@ -76,7 +81,7 @@ impl<R, E1, E2> NewService for BlankNewService<R, E1, E2> {
     type Config = ();
     type Service = Blank<R, E1>;
     type InitError = E2;
-    type Future = FutureResult<Self::Service, Self::InitError>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: &()) -> Self::Future {
         ok(Blank::default())

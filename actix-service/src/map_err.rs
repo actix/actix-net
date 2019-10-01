@@ -1,14 +1,20 @@
 use std::marker::PhantomData;
 
-use futures::{Async, Future, Poll};
+use futures::{Future, Poll};
 
 use super::{NewService, Service};
+
+use pin_project::pin_project;
+use std::pin::Pin;
+use std::task::Context;
 
 /// Service for the `map_err` combinator, changing the type of a service's
 /// error.
 ///
 /// This is created by the `ServiceExt::map_err` method.
+#[pin_project]
 pub struct MapErr<A, F, E> {
+    #[pin]
     service: A,
     f: F,
     _t: PhantomData<E>,
@@ -53,8 +59,12 @@ where
     type Error = E;
     type Future = MapErrFuture<A, F, E>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.service.poll_ready().map_err(&self.f)
+    fn poll_ready(
+        mut self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        let mut this = self.project();
+        this.service.poll_ready(ctx).map_err(this.f)
     }
 
     fn call(&mut self, req: A::Request) -> Self::Future {
@@ -62,12 +72,14 @@ where
     }
 }
 
+#[pin_project]
 pub struct MapErrFuture<A, F, E>
 where
     A: Service,
     F: Fn(A::Error) -> E,
 {
     f: F,
+    #[pin]
     fut: A::Future,
 }
 
@@ -86,11 +98,11 @@ where
     A: Service,
     F: Fn(A::Error) -> E,
 {
-    type Item = A::Response;
-    type Error = E;
+    type Output = Result<A::Response, E>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.fut.poll().map_err(&self.f)
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+        this.fut.poll(cx).map_err(this.f)
     }
 }
 
@@ -156,11 +168,13 @@ where
     }
 }
 
+#[pin_project]
 pub struct MapErrNewServiceFuture<A, F, E>
 where
     A: NewService,
     F: Fn(A::Error) -> E,
 {
+    #[pin]
     fut: A::Future,
     f: F,
 }
@@ -180,24 +194,25 @@ where
     A: NewService,
     F: Fn(A::Error) -> E + Clone,
 {
-    type Item = MapErr<A::Service, F, E>;
-    type Error = A::InitError;
+    type Output = Result<MapErr<A::Service, F, E>, A::InitError>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if let Async::Ready(service) = self.fut.poll()? {
-            Ok(Async::Ready(MapErr::new(service, self.f.clone())))
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        if let Poll::Ready(svc) = this.fut.poll(cx)? {
+            Poll::Ready(Ok(MapErr::new(svc, this.f.clone())))
         } else {
-            Ok(Async::NotReady)
+            Poll::Pending
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use futures::future::{err, FutureResult};
+    use futures::future::{err, Ready};
 
     use super::*;
     use crate::{IntoNewService, NewService, Service, ServiceExt};
+    use tokio::future::ok;
 
     struct Srv;
 
@@ -205,10 +220,13 @@ mod tests {
         type Request = ();
         type Response = ();
         type Error = ();
-        type Future = FutureResult<(), ()>;
+        type Future = Ready<Result<(), ()>>;
 
-        fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-            Err(())
+        fn poll_ready(
+            self: Pin<&mut Self>,
+            ctx: &mut Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Err(()))
         }
 
         fn call(&mut self, _: ()) -> Self::Future {
@@ -216,32 +234,33 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_poll_ready() {
+    #[tokio::test]
+    async fn test_poll_ready() {
         let mut srv = Srv.map_err(|_| "error");
-        let res = srv.poll_ready();
-        assert!(res.is_err());
-        assert_eq!(res.err().unwrap(), "error");
-    }
-
-    #[test]
-    fn test_call() {
-        let mut srv = Srv.map_err(|_| "error");
-        let res = srv.call(()).poll();
-        assert!(res.is_err());
-        assert_eq!(res.err().unwrap(), "error");
-    }
-
-    #[test]
-    fn test_new_service() {
-        let blank = || Ok::<_, ()>(Srv);
-        let new_srv = blank.into_new_service().map_err(|_| "error");
-        if let Async::Ready(mut srv) = new_srv.new_service(&()).poll().unwrap() {
-            let res = srv.call(()).poll();
+        let res = srv.poll_once().await;
+        if let Poll::Ready(res) = res {
             assert!(res.is_err());
             assert_eq!(res.err().unwrap(), "error");
         } else {
-            panic!()
+            panic!("Should be ready");
         }
+    }
+
+    #[tokio::test]
+    async fn test_call() {
+        let mut srv = Srv.map_err(|_| "error");
+        let res = srv.call(()).await;
+        assert!(res.is_err());
+        assert_eq!(res.err().unwrap(), "error");
+    }
+
+    #[tokio::test]
+    async fn test_new_service() {
+        let blank = || ok::<_, ()>(Srv);
+        let new_srv = blank.into_new_service().map_err(|_| "error");
+        let mut srv = new_srv.new_service(&()).await.unwrap();
+        let res = srv.call(()).await;
+        assert!(res.is_err());
+        assert_eq!(res.err().unwrap(), "error");
     }
 }
