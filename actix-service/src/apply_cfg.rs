@@ -1,10 +1,14 @@
 use std::marker::PhantomData;
 
 use futures::future::Future;
-use futures::{try_ready, Async, IntoFuture, Poll};
+use futures::{ready, Poll};
 
 use crate::cell::Cell;
-use crate::{IntoService, NewService, Service};
+use crate::{IntoFuture, IntoService, NewService, Service};
+use std::pin::Pin;
+use std::task::Context;
+
+use pin_project::pin_project;
 
 /// Convert `Fn(&Config, &mut Service) -> Future<Service>` fn to a NewService
 pub fn apply_cfg<F, C, T, R, S>(
@@ -61,7 +65,8 @@ where
     }
 }
 
-/// Convert `Fn(&Config) -> Future<Service>` fn to NewService
+/// Convert `Fn(&Config) -> Future<Service>` fn to NewService\
+#[pin_project]
 struct ApplyConfigService<F, C, T, R, S>
 where
     F: FnMut(&C, &mut T) -> R,
@@ -71,6 +76,7 @@ where
     S: Service,
 {
     f: Cell<F>,
+    #[pin]
     srv: Cell<T>,
     _t: PhantomData<(C, R, S)>,
 }
@@ -118,12 +124,14 @@ where
     }
 }
 
+#[pin_project]
 struct FnNewServiceConfigFut<R, S>
 where
     R: IntoFuture,
     R::Item: IntoService<S>,
     S: Service,
 {
+    #[pin]
     fut: R::Future,
     _t: PhantomData<(S,)>,
 }
@@ -134,11 +142,10 @@ where
     R::Item: IntoService<S>,
     S: Service,
 {
-    type Item = S;
-    type Error = R::Error;
+    type Output = Result<S, R::Error>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        Ok(Async::Ready(try_ready!(self.fut.poll()).into_service()))
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Poll::Ready(Ok(ready!(self.project().fut.poll(cx))?.into_service()))
     }
 }
 
@@ -206,6 +213,7 @@ where
     }
 }
 
+#[pin_project]
 struct ApplyConfigNewServiceFut<F, C, T, R, S>
 where
     C: Clone,
@@ -218,8 +226,11 @@ where
 {
     cfg: C,
     f: Cell<F>,
+    #[pin]
     srv: Option<T::Service>,
+    #[pin]
     srv_fut: Option<T::Future>,
+    #[pin]
     fut: Option<R::Future>,
     _t: PhantomData<(S,)>,
 }
@@ -234,33 +245,38 @@ where
     R::Item: IntoService<S>,
     S: Service,
 {
-    type Item = S;
-    type Error = R::Error;
+    type Output = Result<S, R::Error>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if let Some(ref mut fut) = self.srv_fut {
-            match fut.poll()? {
-                Async::NotReady => return Ok(Async::NotReady),
-                Async::Ready(srv) => {
-                    let _ = self.srv_fut.take();
-                    self.srv = Some(srv);
-                    return self.poll();
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+        'poll: loop {
+            if let Some(fut) = this.srv_fut.as_mut().as_pin_mut() {
+                match fut.poll(cx)? {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(srv) => {
+                        this.srv_fut.set(None);
+                        this.srv.set(Some(srv));
+                        continue 'poll;
+                    }
                 }
             }
-        }
 
-        if let Some(ref mut fut) = self.fut {
-            Ok(Async::Ready(try_ready!(fut.poll()).into_service()))
-        } else if let Some(ref mut srv) = self.srv {
-            match srv.poll_ready()? {
-                Async::NotReady => Ok(Async::NotReady),
-                Async::Ready(_) => {
-                    self.fut = Some(self.f.get_mut()(&self.cfg, srv).into_future());
-                    return self.poll();
+            if let Some(fut) = this.fut.as_mut().as_pin_mut() {
+                return Poll::Ready(Ok(ready!(fut.poll(cx))?.into_service()));
+            } else if let Some(mut srv) = this.srv.as_mut().as_pin_mut() {
+                match srv.as_mut().poll_ready(cx)? {
+                    Poll::Ready(_) => {
+                        this.fut.set(Some(
+                            this.f.get_mut()(&this.cfg, unsafe { Pin::get_unchecked_mut(srv) })
+                                .into_future(),
+                        ));
+                        continue 'poll;
+                    }
+                    Poll::Pending => return Poll::Pending,
                 }
+            } else {
+                return Poll::Pending;
             }
-        } else {
-            Ok(Async::NotReady)
         }
     }
 }

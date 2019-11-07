@@ -1,10 +1,9 @@
 use std::marker::PhantomData;
 
-use futures::future::{ok, FutureResult};
-use futures::IntoFuture;
+use futures::future::{ok, Ready};
 
 use crate::apply::Apply;
-use crate::{IntoTransform, Service, Transform};
+use crate::{IntoFuture, IntoTransform, Service, Transform};
 
 /// Use function as transform service
 pub fn transform_fn<F, S, In, Out, Err>(
@@ -50,7 +49,7 @@ where
     type Error = Out::Error;
     type Transform = Apply<S, F, In, Out>;
     type InitError = Err;
-    type Future = FutureResult<Self::Transform, Self::InitError>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
         ok(Apply::new(service, self.f.clone()))

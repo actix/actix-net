@@ -1,10 +1,13 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use futures::{Async, Future, IntoFuture, Poll};
-
 use crate::transform_err::{TransformFromErr, TransformMapInitErr};
 use crate::{IntoNewService, NewService, Service};
+use futures::{Future, Poll};
+use std::pin::Pin;
+use std::task::Context;
+
+use pin_project::pin_project;
 
 /// The `Transform` trait defines the interface of a Service factory. `Transform`
 /// is often implemented for middleware, defining how to construct a
@@ -32,7 +35,7 @@ pub trait Transform<S> {
     type InitError;
 
     /// The future response value.
-    type Future: Future<Item = Self::Transform, Error = Self::InitError>;
+    type Future: Future<Output = Result<Self::Transform, Self::InitError>>;
 
     /// Creates and returns a new Service component, asynchronously
     fn new_transform(&self, service: S) -> Self::Future;
@@ -193,19 +196,21 @@ where
     fn new_service(&self, cfg: &S::Config) -> Self::Future {
         ApplyTransformFuture {
             t_cell: self.t.clone(),
-            fut_a: self.s.new_service(cfg).into_future(),
+            fut_a: self.s.new_service(cfg),
             fut_t: None,
         }
     }
 }
-
+#[pin_project]
 pub struct ApplyTransformFuture<T, S>
 where
     S: NewService,
     T: Transform<S::Service, InitError = S::InitError>,
 {
+    #[pin]
     fut_a: S::Future,
-    fut_t: Option<<T::Future as IntoFuture>::Future>,
+    #[pin]
+    fut_t: Option<T::Future>,
     t_cell: Rc<T>,
 }
 
@@ -214,19 +219,21 @@ where
     S: NewService,
     T: Transform<S::Service, InitError = S::InitError>,
 {
-    type Item = T::Transform;
-    type Error = T::InitError;
+    type Output = Result<T::Transform, T::InitError>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if self.fut_t.is_none() {
-            if let Async::Ready(service) = self.fut_a.poll()? {
-                self.fut_t = Some(self.t_cell.new_transform(service).into_future());
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+
+        if this.fut_t.as_mut().as_pin_mut().is_none() {
+            if let Poll::Ready(service) = this.fut_a.poll(cx)? {
+                this.fut_t.set(Some(this.t_cell.new_transform(service)));
             }
         }
-        if let Some(ref mut fut) = self.fut_t {
-            fut.poll()
+
+        if let Some(fut) = this.fut_t.as_mut().as_pin_mut() {
+            fut.poll(cx)
         } else {
-            Ok(Async::NotReady)
+            Poll::Pending
         }
     }
 }
