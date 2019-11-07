@@ -19,9 +19,13 @@ path = "src/lib.rs"
 
 [dependencies]
 actix-threadpool = "0.1.1"
-futures = "0.1.25"
-tokio-current-thread = "0.1"
-tokio-executor = "0.1.5"
-tokio-reactor = "0.1.7"
-tokio-timer = "0.2.8"
+futures = { package = "futures-preview", version  = "0.3.0-alpha.18" }
+
+
+# TODO: Replace this with dependency on tokio-runtime once it is ready
+tokio = { version = "0.2.0-alpha.4" }
+tokio-timer = "=0.3.0-alpha.4"
+tokio-executor = "=0.2.0-alpha.4"
+tokio-net = "=0.2.0-alpha.4"
+
 copyless = "0.1.4"

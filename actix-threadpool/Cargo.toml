@@ -19,7 +19,7 @@ path = "src/lib.rs"
 
 [dependencies]
 derive_more = "0.15"
-futures = "0.1.25"
+futures =  { package = "futures-preview", version  = "0.3.0-alpha.18" }
 parking_lot = "0.9"
 lazy_static = "1.2"
 log = "0.4"
