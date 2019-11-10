@@ -1,8 +1,13 @@
+use futures::future::{ready, LocalBoxFuture, Ready};
+use futures::{Future, Poll};
 use std::cell::RefCell;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::task;
+use std::task::Context;
 
-use futures::{Future, IntoFuture, Poll};
+mod cell;
 
 mod and_then;
 mod and_then_apply;
@@ -11,7 +16,6 @@ mod apply;
 mod apply_cfg;
 pub mod blank;
 pub mod boxed;
-mod cell;
 mod fn_service;
 mod fn_transform;
 mod from_err;
@@ -24,6 +28,9 @@ mod transform;
 mod transform_err;
 
 pub use self::and_then::{AndThen, AndThenNewService};
+
+use self::and_then_apply::AndThenTransform;
+use self::and_then_apply_fn::{AndThenApply, AndThenApplyNewService};
 pub use self::apply::{apply_fn, new_apply_fn, Apply, ApplyNewService};
 pub use self::apply_cfg::{apply_cfg, new_apply_cfg};
 pub use self::fn_service::{new_service_cfg, new_service_fn, service_fn, ServiceFn};
@@ -36,8 +43,34 @@ pub use self::map_init_err::MapInitErr;
 pub use self::then::{Then, ThenNewService};
 pub use self::transform::{apply_transform, IntoTransform, Transform};
 
-use self::and_then_apply::AndThenTransform;
-use self::and_then_apply_fn::{AndThenApply, AndThenApplyNewService};
+pub trait IntoFuture {
+    type Item;
+    type Error;
+    type Future: Future<Output = Result<Self::Item, Self::Error>>;
+    fn into_future(self) -> Self::Future;
+}
+
+impl<F: Future<Output = Result<I, E>>, I, E> IntoFuture for F {
+    type Item = I;
+    type Error = E;
+    type Future = F;
+
+    fn into_future(self) -> Self::Future {
+        self
+    }
+}
+
+/*
+impl <I,E> IntoFuture for Result<I,E> {
+    type Item = I;
+    type Error = E;
+    type Future = Ready<Self>;
+
+    fn into_future(self) -> Self::Future {
+        ready(self)
+    }
+}
+*/
 
 /// An asynchronous function from `Request` to a `Response`.
 pub trait Service {
@@ -51,7 +84,7 @@ pub trait Service {
     type Error;
 
     /// The future response value.
-    type Future: Future<Item = Self::Response, Error = Self::Error>;
+    type Future: Future<Output = Result<Self::Response, Self::Error>>;
 
     /// Returns `Ready` when the service is able to process requests.
     ///
@@ -62,7 +95,10 @@ pub trait Service {
     /// This is a **best effort** implementation. False positives are permitted.
     /// It is permitted for the service to return `Ready` from a `poll_ready`
     /// call and the next invocation of `call` results in an error.
-    fn poll_ready(&mut self) -> Poll<(), Self::Error>;
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        ctx: &mut task::Context<'_>,
+    ) -> Poll<Result<(), Self::Error>>;
 
     /// Process the request and return the response asynchronously.
     ///
@@ -74,6 +110,31 @@ pub trait Service {
     /// Calling `call` without calling `poll_ready` is permitted. The
     /// implementation must be resilient to this fact.
     fn call(&mut self, req: Self::Request) -> Self::Future;
+
+    #[cfg(test)]
+    fn poll_test(&mut self) -> Poll<Result<(), Self::Error>> {
+        // kinda stupid method, but works for our test purposes
+        unsafe {
+            let mut this = Pin::new_unchecked(self);
+            tokio::runtime::current_thread::Builder::new()
+                .build()
+                .unwrap()
+                .block_on(futures::future::poll_fn(move |cx| {
+                    let this = &mut this;
+                    Poll::Ready(this.as_mut().poll_ready(cx))
+                }))
+        }
+    }
+
+    fn poll_once<'a>(&'a mut self) -> LocalBoxFuture<'a, Poll<Result<(), Self::Error>>> {
+        unsafe {
+            let mut this = Pin::new_unchecked(self);
+            Pin::new_unchecked(Box::new(futures::future::poll_fn(move |cx| {
+                let this = &mut this;
+                Poll::Ready(this.as_mut().poll_ready(cx))
+            })))
+        }
+    }
 }
 
 /// An extension trait for `Service`s that provides a variety of convenient
@@ -206,7 +267,7 @@ pub trait NewService {
     type InitError;
 
     /// The future of the `Service` instance.
-    type Future: Future<Item = Self::Service, Error = Self::InitError>;
+    type Future: Future<Output = Result<Self::Service, Self::InitError>>;
 
     /// Create and return a new service value asynchronously.
     fn new_service(&self, cfg: &Self::Config) -> Self::Future;
@@ -343,8 +404,11 @@ where
     type Error = S::Error;
     type Future = S::Future;
 
-    fn poll_ready(&mut self) -> Poll<(), S::Error> {
-        (**self).poll_ready()
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        unsafe { self.map_unchecked_mut(|s| &mut **s).poll_ready(ctx) }
     }
 
     fn call(&mut self, request: Self::Request) -> S::Future {
@@ -361,8 +425,14 @@ where
     type Error = S::Error;
     type Future = S::Future;
 
-    fn poll_ready(&mut self) -> Poll<(), S::Error> {
-        (**self).poll_ready()
+    fn poll_ready(
+        mut self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), S::Error>> {
+        unsafe {
+            let p: &mut S = Pin::as_mut(&mut self).get_mut();
+            Pin::new_unchecked(p).poll_ready(ctx)
+        }
     }
 
     fn call(&mut self, request: Self::Request) -> S::Future {
@@ -379,12 +449,18 @@ where
     type Error = S::Error;
     type Future = S::Future;
 
-    fn poll_ready(&mut self) -> Poll<(), S::Error> {
-        self.borrow_mut().poll_ready()
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        unsafe {
+            let r = self.get_unchecked_mut();
+            Pin::new_unchecked(&mut (*(**r).borrow_mut())).poll_ready(ctx)
+        }
     }
 
     fn call(&mut self, request: Self::Request) -> S::Future {
-        self.borrow_mut().call(request)
+        (&mut (**self).borrow_mut()).call(request)
     }
 }
 

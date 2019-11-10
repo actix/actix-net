@@ -1,5 +1,15 @@
 # Changes
 
+## [0.4.7] - 2019-10-14
+
+* Re-register task on every framed transport poll.
+
+
+## [0.4.6] - 2019-10-08
+
+* Refactor `Counter` type. register current task in available method.
+
+
 ## [0.4.5] - 2019-07-19
 
 ### Removed

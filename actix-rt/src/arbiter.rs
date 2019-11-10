@@ -4,11 +4,11 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{fmt, thread};
 use std::pin::Pin;
-use std::task::Context;
+use std::task::{Context, Poll};
 
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot::{channel, Canceled, Sender};
-use futures::{future, Future, Poll, FutureExt, Stream};
+use futures::{future, Future, FutureExt, Stream};
 use tokio::runtime::current_thread::spawn;
 
 use crate::builder::Builder;
@@ -269,9 +269,11 @@ struct ArbiterController {
 impl Drop for ArbiterController {
     fn drop(&mut self) {
         if thread::panicking() {
-            eprintln!("Panic in Arbiter thread, shutting down system.");
             if System::current().stop_on_panic() {
+                eprintln!("Panic in Arbiter thread, shutting down system.");
                 System::current().stop_with_code(1)
+            } else {
+                eprintln!("Panic in Arbiter thread.");
             }
         }
     }
@@ -282,7 +284,6 @@ impl Future for ArbiterController {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
-
             match Pin::new(&mut self.rx).poll_next(cx) {
                 Poll::Ready(None) => {
                     return Poll::Ready(())

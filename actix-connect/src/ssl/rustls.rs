@@ -5,10 +5,7 @@ use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{NewService, Service};
 use futures::{future::ok, future::FutureResult, Async, Future, Poll};
 use std::sync::Arc;
-use tokio_rustls::{
-    rustls::{ClientConfig, ClientSession},
-    Connect, TlsConnector, TlsStream,
-};
+use tokio_rustls::{client::TlsStream, rustls::ClientConfig, Connect, TlsConnector};
 use webpki::DNSNameRef;
 
 use crate::{Address, Connection};
@@ -37,7 +34,7 @@ where
         connector: Arc<ClientConfig>,
     ) -> impl Service<
         Request = Connection<T, U>,
-        Response = Connection<T, TlsStream<U, ClientSession>>,
+        Response = Connection<T, TlsStream<U>>,
         Error = std::io::Error,
     > {
         RustlsConnectorService {
@@ -61,7 +58,7 @@ where
     U: AsyncRead + AsyncWrite + fmt::Debug,
 {
     type Request = Connection<T, U>;
-    type Response = Connection<T, TlsStream<U, ClientSession>>;
+    type Response = Connection<T, TlsStream<U>>;
     type Error = std::io::Error;
     type Config = ();
     type Service = RustlsConnectorService<T, U>;
@@ -86,7 +83,7 @@ where
     U: AsyncRead + AsyncWrite + fmt::Debug,
 {
     type Request = Connection<T, U>;
-    type Response = Connection<T, TlsStream<U, ClientSession>>;
+    type Response = Connection<T, TlsStream<U>>;
     type Error = std::io::Error;
     type Future = ConnectAsyncExt<T, U>;
 
@@ -97,7 +94,8 @@ where
     fn call(&mut self, stream: Connection<T, U>) -> Self::Future {
         trace!("SSL Handshake start for: {:?}", stream.host());
         let (io, stream) = stream.replace(());
-        let host = DNSNameRef::try_from_ascii_str(stream.host()).unwrap();
+        let host = DNSNameRef::try_from_ascii_str(stream.host())
+            .expect("rustls currently only handles hostname-based connections. See https://github.com/briansmith/webpki/issues/54");
         ConnectAsyncExt {
             fut: TlsConnector::from(self.connector.clone()).connect(host, io),
             stream: Some(stream),
@@ -114,7 +112,7 @@ impl<T: Address, U> Future for ConnectAsyncExt<T, U>
 where
     U: AsyncRead + AsyncWrite + fmt::Debug,
 {
-    type Item = Connection<T, TlsStream<U, ClientSession>>;
+    type Item = Connection<T, TlsStream<U>>;
     type Error = std::io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
