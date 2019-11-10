@@ -143,7 +143,7 @@ where
 {
     type Output = Result<S, R::Error>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Poll::Ready(Ok(ready!(self.project().fut.poll(cx))?.into_service()))
     }
 }
@@ -245,7 +245,7 @@ where
 {
     type Output = Result<S, R::Error>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
         'poll: loop {
             if let Some(fut) = this.srv_fut.as_mut().as_pin_mut() {

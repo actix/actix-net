@@ -221,7 +221,7 @@ where
 {
     type Output = Result<T::Transform, T::InitError>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
 
         if this.fut_t.as_mut().as_pin_mut().is_none() {

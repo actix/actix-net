@@ -22,9 +22,9 @@ actix-threadpool = "0.2"
 futures = "0.3.1"
 
 # TODO: Replace this with dependency on tokio-runtime once it is ready
-tokio = { version = "0.2.0-alpha.5" }
-tokio-timer = "=0.3.0-alpha.5"
-tokio-executor = "=0.2.0-alpha.5"
-tokio-net = "=0.2.0-alpha.5"
+tokio = { version = "0.2.0-alpha.6" }
+tokio-timer = "=0.3.0-alpha.6"
+tokio-executor = "=0.2.0-alpha.6"
+tokio-net = "=0.2.0-alpha.6"
 
 copyless = "0.1.4"

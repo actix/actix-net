@@ -234,7 +234,7 @@ where
 {
     type Output = Result<S, R::Error>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Poll::Ready(Ok(
             futures::ready!(self.project().fut.poll(cx))?.into_service()
         ))

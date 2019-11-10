@@ -73,6 +73,17 @@ impl<T: Service> Pipeline<T> {
     }
 }
 
+impl<T> Clone for Pipeline<T>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Pipeline {
+            service: self.service.clone(),
+        }
+    }
+}
+
 impl<T: Service> Service for Pipeline<T> {
     type Request = T::Request;
     type Response = T::Response;
@@ -132,6 +143,17 @@ impl<T: NewService> NewPipeline<T> {
     {
         NewPipeline {
             service: ThenNewService::new(self.service, new_service.into_new_service()),
+        }
+    }
+}
+
+impl<T> Clone for NewPipeline<T>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        NewPipeline {
+            service: self.service.clone(),
         }
     }
 }

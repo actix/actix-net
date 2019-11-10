@@ -4,12 +4,11 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::task::{self, Context, Poll};
 
-mod cell;
-
 mod and_then;
 mod apply;
 mod apply_cfg;
 pub mod boxed;
+mod cell;
 mod fn_service;
 mod map;
 mod map_config;
@@ -48,6 +47,22 @@ impl<F: Future<Output = Result<I, E>>, I, E> IntoFuture for F {
     }
 }
 
+pub fn service<T, U>(factory: U) -> T
+where
+    T: Service,
+    U: IntoService<T>,
+{
+    factory.into_service()
+}
+
+pub fn new_service<T, U>(factory: U) -> T
+where
+    T: NewService,
+    U: IntoNewService<T>,
+{
+    factory.into_new_service()
+}
+
 /// An asynchronous function from `Request` to a `Response`.
 pub trait Service {
     /// Requests handled by the service.
@@ -84,27 +99,27 @@ pub trait Service {
     /// implementation must be resilient to this fact.
     fn call(&mut self, req: Self::Request) -> Self::Future;
 
-    #[cfg(test)]
-    fn poll_test(&mut self) -> Poll<Result<(), Self::Error>> {
-        // kinda stupid method, but works for our test purposes
-        unsafe {
-            let mut this = Pin::new_unchecked(self);
-            tokio::runtime::current_thread::Builder::new()
-                .build()
-                .unwrap()
-                .block_on(futures::future::poll_fn(move |cx| {
-                    let this = &mut this;
-                    Poll::Ready(this.as_mut().poll_ready(cx))
-                }))
-        }
-    }
+    // #[cfg(test)]
+    // fn poll_test(&mut self) -> Poll<Result<(), Self::Error>> {
+    //     // kinda stupid method, but works for our test purposes
+    //     unsafe {
+    //         let mut this = Pin::new_unchecked(self);
+    //         tokio::runtime::current_thread::Builder::new()
+    //             .build()
+    //             .unwrap()
+    //             .block_on(futures::future::poll_fn(move |cx| {
+    //                 let this = &mut this;
+    //                 Poll::Ready(this.as_mut().poll_ready(cx))
+    //             }))
+    //     }
+    // }
 
     // fn poll_once<'a>(&'a mut self) -> LocalBoxFuture<'a, Poll<Result<(), Self::Error>>> {
     //     unsafe {
     //         let mut this = Pin::new_unchecked(self);
     //         Pin::new_unchecked(Box::new(futures::future::poll_fn(move |cx| {
-    //             let this = &mut this;
-    //             Poll::Ready(this.as_mut().poll_ready(cx))
+    //             //let this = &mut this;
+    //             Poll::Ready(this.get_unchecked_mut().poll_ready(cx))
     //         })))
     //     }
     // }

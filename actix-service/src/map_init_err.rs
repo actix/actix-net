@@ -89,7 +89,7 @@ where
 {
     type Output = Result<A::Service, E>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         this.fut.poll(cx).map_err(this.f)
     }
