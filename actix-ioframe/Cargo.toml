@@ -1,6 +1,6 @@
 [package]
 name = "actix-ioframe"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Actix framed service"
 keywords = ["network", "framework", "async", "futures"]
@@ -28,8 +28,8 @@ log = "0.4"
 
 [dev-dependencies]
 actix-rt = "0.2.2"
-actix-connect = "0.2.0"
-actix-testing = "0.1.0"
-actix-server-config = "0.1.1"
+actix-connect = "0.3.0"
+actix-testing = "0.2.0"
+actix-server-config = "0.2.0"
 tokio-tcp = "0.1"
 tokio-timer = "0.2"

@@ -147,13 +147,13 @@ where
                         }
                         Ok(Async::NotReady) => return false,
                         Ok(Async::Ready(None)) => {
+                            log::trace!("Client disconnected");
                             self.dispatch_state = FramedState::Stopping;
                             return true;
                         }
                     };
 
                     let mut cell = self.inner.clone();
-                    unsafe { cell.get_mut().task.register() };
                     tokio_current_thread::spawn(
                         self.service
                             .call(Item::new(self.state.clone(), self.sink.clone(), item))
@@ -274,6 +274,8 @@ where
     type Error = ServiceError<S::Error, U>;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        unsafe { self.inner.get_ref().task.register() };
+
         match mem::replace(&mut self.dispatch_state, FramedState::Processing) {
             FramedState::Processing => {
                 if self.poll_read() || self.poll_write() {

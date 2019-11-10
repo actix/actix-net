@@ -1,5 +1,12 @@
 # Changes
 
+## [0.7.0] - 2019-10-04
+
+### Changed
+
+* Update `rustls` to 0.16
+* Minimum required Rust version upped to 1.37.0
+
 ## [0.6.1] - 2019-09-25
 
 ### Added
