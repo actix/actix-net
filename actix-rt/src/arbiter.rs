@@ -4,11 +4,11 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{fmt, thread};
 use std::pin::Pin;
-use std::task::Context;
+use std::task::{Context, Poll};
 
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot::{channel, Canceled, Sender};
-use futures::{future, Future, Poll, FutureExt, Stream};
+use futures::{future, Future, FutureExt, Stream};
 use tokio::runtime::current_thread::spawn;
 
 use crate::builder::Builder;
