@@ -70,7 +70,7 @@ pub fn start_default_resolver() -> AsyncResolver {
 pub fn new_connector<T: Address>(
     resolver: AsyncResolver,
 ) -> impl Service<Request = Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError>
-         + Clone {
+       + Clone {
     Resolver::new(resolver).and_then(TcpConnector::new())
 }
 
@@ -90,7 +90,7 @@ pub fn new_connector_factory<T: Address>(
 /// Create connector service with default parameters
 pub fn default_connector<T: Address>(
 ) -> impl Service<Request = Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError>
-         + Clone {
+       + Clone {
     Resolver::default().and_then(TcpConnector::new())
 }
 

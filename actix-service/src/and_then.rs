@@ -1,21 +1,18 @@
-use futures::{Future, Poll};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use pin_project::pin_project;
 
 use super::{IntoNewService, NewService, Service};
 use crate::cell::Cell;
-
-use pin_project::pin_project;
-use std::pin::Pin;
-use std::task::Context;
 
 /// Service for the `and_then` combinator, chaining a computation onto the end
 /// of another service which completes successfully.
 ///
 /// This is created by the `ServiceExt::and_then` method.
-#[pin_project]
 pub struct AndThen<A, B> {
-    #[pin]
     a: A,
-    #[pin]
     b: Cell<B>,
 }
 
@@ -52,13 +49,9 @@ where
     type Error = A::Error;
     type Future = AndThenFuture<A, B>;
 
-    fn poll_ready(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
-        let this = self.project();
-        let not_ready = !this.a.poll_ready(cx)?.is_ready();
-        if !this.b.get_pin().poll_ready(cx)?.is_ready() || not_ready {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let not_ready = !self.a.poll_ready(cx)?.is_ready();
+        if !self.b.get_mut().poll_ready(cx)?.is_ready() || not_ready {
             Poll::Pending
         } else {
             Poll::Ready(Ok(()))

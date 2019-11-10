@@ -1,11 +1,11 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
 use crate::transform_err::{TransformFromErr, TransformMapInitErr};
 use crate::{IntoNewService, NewService, Service};
-use futures::{Future, Poll};
-use std::pin::Pin;
-use std::task::Context;
 
 use pin_project::pin_project;
 
@@ -221,7 +221,7 @@ where
 {
     type Output = Result<T::Transform, T::InitError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
 
         if this.fut_t.as_mut().as_pin_mut().is_none() {

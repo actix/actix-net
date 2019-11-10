@@ -1,14 +1,13 @@
+use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
-use futures::future::Future;
-use futures::{ready, Poll};
+use futures::ready;
+use pin_project::pin_project;
 
 use crate::cell::Cell;
 use crate::{IntoFuture, IntoService, NewService, Service};
-use std::pin::Pin;
-use std::task::Context;
-
-use pin_project::pin_project;
 
 /// Convert `Fn(&Config, &mut Service) -> Future<Service>` fn to a NewService
 pub fn apply_cfg<F, C, T, R, S>(
@@ -144,7 +143,7 @@ where
 {
     type Output = Result<S, R::Error>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Poll::Ready(Ok(ready!(self.project().fut.poll(cx))?.into_service()))
     }
 }
@@ -226,7 +225,6 @@ where
 {
     cfg: C,
     f: Cell<F>,
-    #[pin]
     srv: Option<T::Service>,
     #[pin]
     srv_fut: Option<T::Future>,
@@ -255,7 +253,7 @@ where
                     Poll::Pending => return Poll::Pending,
                     Poll::Ready(srv) => {
                         this.srv_fut.set(None);
-                        this.srv.set(Some(srv));
+                        *this.srv = Some(srv);
                         continue 'poll;
                     }
                 }
@@ -263,13 +261,11 @@ where
 
             if let Some(fut) = this.fut.as_mut().as_pin_mut() {
                 return Poll::Ready(Ok(ready!(fut.poll(cx))?.into_service()));
-            } else if let Some(mut srv) = this.srv.as_mut().as_pin_mut() {
-                match srv.as_mut().poll_ready(cx)? {
+            } else if let Some(ref mut srv) = this.srv {
+                match srv.poll_ready(cx)? {
                     Poll::Ready(_) => {
-                        this.fut.set(Some(
-                            this.f.get_mut()(&this.cfg, unsafe { Pin::get_unchecked_mut(srv) })
-                                .into_future(),
-                        ));
+                        this.fut
+                            .set(Some(this.f.get_mut()(&this.cfg, srv).into_future()));
                         continue 'poll;
                     }
                     Poll::Pending => return Poll::Pending,

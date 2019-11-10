@@ -1,20 +1,17 @@
+use std::future::Future;
 use std::marker::PhantomData;
-
-use futures::{Future, Poll};
-
-use super::{NewService, Service};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use pin_project::pin_project;
-use std::pin::Pin;
-use std::task::Context;
+
+use super::{NewService, Service};
 
 /// Service for the `map_err` combinator, changing the type of a service's
 /// error.
 ///
 /// This is created by the `ServiceExt::map_err` method.
-#[pin_project]
 pub struct MapErr<A, F, E> {
-    #[pin]
     service: A,
     f: F,
     _t: PhantomData<E>,
@@ -59,12 +56,8 @@ where
     type Error = E;
     type Future = MapErrFuture<A, F, E>;
 
-    fn poll_ready(
-        mut self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
-        let mut this = self.project();
-        this.service.poll_ready(ctx).map_err(this.f)
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.service.poll_ready(ctx).map_err(&self.f)
     }
 
     fn call(&mut self, req: A::Request) -> Self::Future {
@@ -101,8 +94,7 @@ where
     type Output = Result<A::Response, E>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
-        this.fut.poll(cx).map_err(this.f)
+        self.project().fut.poll(cx).map_err(&self.f)
     }
 }
 
@@ -196,7 +188,7 @@ where
 {
     type Output = Result<MapErr<A::Service, F, E>, A::InitError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         if let Poll::Ready(svc) = this.fut.poll(cx)? {
             Poll::Ready(Ok(MapErr::new(svc, this.f.clone())))

@@ -1,12 +1,11 @@
+use std::future::Future;
 use std::marker::PhantomData;
-
-use futures::{Future, Poll};
-
-use super::Transform;
 use std::pin::Pin;
-use std::task::Context;
+use std::task::{Context, Poll};
 
 use pin_project::pin_project;
+
+use super::Transform;
 
 /// Transform for the `map_err` combinator, changing the type of a new
 /// transform's init error.
@@ -85,7 +84,7 @@ where
 {
     type Output = Result<T::Transform, E>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         this.fut.poll(cx).map_err(this.f)
     }
@@ -162,7 +161,7 @@ where
 {
     type Output = Result<T::Transform, E>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         self.project().fut.poll(cx).map_err(E::from)
     }
 }

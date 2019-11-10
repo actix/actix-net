@@ -1,11 +1,13 @@
-use std::pin::Pin;
+#![allow(unused_imports, unused_variables, dead_code)]
 
-use crate::{IntoFuture, NewService, Service, ServiceExt};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use crate::{IntoFuture, NewService, Service};
 use futures::future::FutureExt;
 use futures::future::LocalBoxFuture;
 use futures::future::{err, ok, Either, Ready};
-use futures::{Future, Poll};
-use std::task::Context;
 
 pub type BoxedService<Req, Res, Err> = Box<
     dyn Service<
@@ -144,11 +146,8 @@ where
         LocalBoxFuture<'static, Result<Res, Err>>,
     >;
 
-    fn poll_ready(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
-        unimplemented!()
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.0.poll_ready(ctx)
     }
 
     fn call(&mut self, req: Self::Request) -> Self::Future {
@@ -156,10 +155,6 @@ where
     }
 
     /*
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.0.poll_ready()
-    }
-
     fn call(&mut self, req: Self::Request) -> Self::Future {
         let mut fut = self.0.call(req);
         match fut.poll() {

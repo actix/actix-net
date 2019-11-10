@@ -1,12 +1,11 @@
+use std::future::Future;
 use std::marker::PhantomData;
-
-use futures::{Future, Poll};
-
-use super::NewService;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use pin_project::pin_project;
-use std::pin::Pin;
-use std::task::Context;
+
+use super::NewService;
 
 /// `MapInitErr` service combinator
 pub struct MapInitErr<A, F, E> {
@@ -91,7 +90,7 @@ where
     type Output = Result<A::Service, E>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
+        let this = self.project();
         this.fut.poll(cx).map_err(this.f)
     }
 }

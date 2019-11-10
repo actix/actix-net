@@ -1,14 +1,13 @@
+use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use futures::future::{ok, Ready};
+use pin_project::pin_project;
 
 use crate::IntoFuture;
-use futures::future::{ok, Future, Ready};
-use futures::{ready, Poll};
-
 use crate::{IntoNewService, IntoService, NewService, Service};
-use std::pin::Pin;
-use std::task::Context;
-
-use pin_project::pin_project;
 
 /// Create `NewService` for function that can act as a Service
 pub fn service_fn<F, Req, Out, Cfg>(f: F) -> NewServiceFn<F, Req, Out, Cfg>
@@ -80,10 +79,7 @@ where
     type Error = Out::Error;
     type Future = Out::Future;
 
-    fn poll_ready(
-        self: Pin<&mut Self>,
-        _ctx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
@@ -238,8 +234,10 @@ where
 {
     type Output = Result<S, R::Error>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Ready(Ok(ready!(self.project().fut.poll(cx))?.into_service()))
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Poll::Ready(Ok(
+            futures::ready!(self.project().fut.poll(cx))?.into_service()
+        ))
     }
 }
 

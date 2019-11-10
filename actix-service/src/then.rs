@@ -1,21 +1,18 @@
-use futures::{Future, Poll};
+use std::future::Future;
 use std::pin::Pin;
-use std::task::Context;
+use std::task::{Context, Poll};
+
+use pin_project::pin_project;
 
 use super::{IntoNewService, NewService, Service};
 use crate::cell::Cell;
-
-use pin_project::pin_project;
 
 /// Service for the `then` combinator, chaining a computation onto the end of
 /// another service.
 ///
 /// This is created by the `ServiceExt::then` method.
-#[pin_project]
 pub struct Then<A, B> {
-    #[pin]
     a: A,
-    #[pin]
     b: Cell<B>,
 }
 
@@ -52,13 +49,9 @@ where
     type Error = B::Error;
     type Future = ThenFuture<A, B>;
 
-    fn poll_ready(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
-        let this = self.project();
-        let not_ready = !this.a.poll_ready(ctx)?.is_ready();
-        if !this.b.get_pin().poll_ready(ctx)?.is_ready() || not_ready {
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let not_ready = !self.a.poll_ready(ctx)?.is_ready();
+        if !self.b.get_mut().poll_ready(ctx)?.is_ready() || not_ready {
             Poll::Pending
         } else {
             Poll::Ready(Ok(()))
@@ -247,7 +240,7 @@ where
 {
     type Output = Result<Then<A::Service, B::Service>, A::InitError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         if this.a.is_none() {
             if let Poll::Ready(service) = this.fut_a.poll(cx)? {

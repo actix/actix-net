@@ -1,10 +1,10 @@
 use std::any::{Any, TypeId};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::{fmt, thread};
 use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
+use std::{fmt, thread};
 
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot::{channel, Canceled, Sender};
@@ -27,7 +27,7 @@ pub(crate) static COUNT: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) enum ArbiterCommand {
     Stop,
-    Execute(Box<dyn Future<Output=()> + Unpin + Send>),
+    Execute(Box<dyn Future<Output = ()> + Unpin + Send>),
     ExecuteFn(Box<dyn FnExec>),
 }
 
@@ -133,7 +133,7 @@ impl Arbiter {
             for fut in v.drain(..) {
                 // We pin the boxed future, so it can never again be moved.
                 let fut = unsafe { Pin::new_unchecked(fut) };
-                tokio_executor::current_thread::spawn( fut);
+                tokio_executor::current_thread::spawn(fut);
             }
         });
     }
@@ -146,8 +146,8 @@ impl Arbiter {
     /// or Arbiter address, it is simply a helper for spawning futures on the current
     /// thread.
     pub fn spawn<F>(future: F)
-        where
-            F: Future<Output=()> + 'static,
+    where
+        F: Future<Output = ()> + 'static,
     {
         RUNNING.with(move |cell| {
             if cell.get() {
@@ -156,9 +156,7 @@ impl Arbiter {
             } else {
                 // Box the future and push it to the queue, this results in double boxing
                 // because the executor boxes the future again, but works for now
-                Q.with(move |cell| {
-                    cell.borrow_mut().push(Box::alloc().init(future))
-                });
+                Q.with(move |cell| cell.borrow_mut().push(Box::alloc().init(future)));
             }
         });
     }
@@ -167,17 +165,17 @@ impl Arbiter {
     /// or Arbiter address, it is simply a helper for executing futures on the current
     /// thread.
     pub fn spawn_fn<F, R>(f: F)
-        where
-            F: FnOnce() -> R + 'static,
-            R: Future<Output=()> + 'static,
+    where
+        F: FnOnce() -> R + 'static,
+        R: Future<Output = ()> + 'static,
     {
         Arbiter::spawn(future::lazy(|_| f()).flatten())
     }
 
     /// Send a future to the Arbiter's thread, and spawn it.
     pub fn send<F>(&self, future: F)
-        where
-            F: Future<Output=()> + Send + Unpin + 'static,
+    where
+        F: Future<Output = ()> + Send + Unpin + 'static,
     {
         let _ = self
             .0
@@ -187,8 +185,8 @@ impl Arbiter {
     /// Send a function to the Arbiter's thread, and execute it. Any result from the function
     /// is discarded.
     pub fn exec_fn<F>(&self, f: F)
-        where
-            F: FnOnce() + Send + 'static,
+    where
+        F: FnOnce() + Send + 'static,
     {
         let _ = self
             .0
@@ -200,10 +198,10 @@ impl Arbiter {
     /// Send a function to the Arbiter's thread. This function will be executed asynchronously.
     /// A future is created, and when resolved will contain the result of the function sent
     /// to the Arbiters thread.
-    pub fn exec<F, R>(&self, f: F) -> impl Future<Output=Result<R, Canceled>>
-        where
-            F: FnOnce() -> R + Send + 'static,
-            R: Send + 'static,
+    pub fn exec<F, R>(&self, f: F) -> impl Future<Output = Result<R, Canceled>>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
     {
         let (tx, rx) = channel();
         let _ = self
@@ -230,8 +228,8 @@ impl Arbiter {
     ///
     /// Panics is item is not inserted
     pub fn get_item<T: 'static, F, R>(mut f: F) -> R
-        where
-            F: FnMut(&T) -> R,
+    where
+        F: FnMut(&T) -> R,
     {
         STORAGE.with(move |cell| {
             let st = cell.borrow();
@@ -247,8 +245,8 @@ impl Arbiter {
     ///
     /// Panics is item is not inserted
     pub fn get_mut_item<T: 'static, F, R>(mut f: F) -> R
-        where
-            F: FnMut(&mut T) -> R,
+    where
+        F: FnMut(&mut T) -> R,
     {
         STORAGE.with(move |cell| {
             let mut st = cell.borrow_mut();
@@ -285,28 +283,22 @@ impl Future for ArbiterController {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
             match Pin::new(&mut self.rx).poll_next(cx) {
-                Poll::Ready(None) => {
-                    return Poll::Ready(())
-                },
-                Poll::Ready(Some(item)) => {
-                    match item {
-                        ArbiterCommand::Stop => {
-                            if let Some(stop) = self.stop.take() {
-                                let _ = stop.send(0);
-                            };
-                            return Poll::Ready(());
-                        }
-                        ArbiterCommand::Execute(fut) => {
-                            spawn(fut);
-                        }
-                        ArbiterCommand::ExecuteFn(f) => {
-                            f.call_box();
-                        }
+                Poll::Ready(None) => return Poll::Ready(()),
+                Poll::Ready(Some(item)) => match item {
+                    ArbiterCommand::Stop => {
+                        if let Some(stop) = self.stop.take() {
+                            let _ = stop.send(0);
+                        };
+                        return Poll::Ready(());
                     }
-                }
-                Poll::Pending =>  {
-                    return Poll::Pending
+                    ArbiterCommand::Execute(fut) => {
+                        spawn(fut);
+                    }
+                    ArbiterCommand::ExecuteFn(f) => {
+                        f.call_box();
+                    }
                 },
+                Poll::Pending => return Poll::Pending,
             }
         }
     }
@@ -372,8 +364,8 @@ pub trait FnExec: Send + 'static {
 }
 
 impl<F> FnExec for F
-    where
-        F: FnOnce() + Send + 'static,
+where
+    F: FnOnce() + Send + 'static,
 {
     #[allow(clippy::boxed_local)]
     fn call_box(self: Box<Self>) {

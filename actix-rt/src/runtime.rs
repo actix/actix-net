@@ -3,8 +3,11 @@ use std::{fmt, io};
 
 use futures::Future;
 use tokio_executor::current_thread::{self, CurrentThread};
-use tokio_timer::{timer::{self, Timer}, clock::Clock};
-use tokio_net::driver::{Reactor, Handle as ReactorHandle};
+use tokio_net::driver::{Handle as ReactorHandle, Reactor};
+use tokio_timer::{
+    clock::Clock,
+    timer::{self, Timer},
+};
 
 use crate::builder::Builder;
 
@@ -95,7 +98,7 @@ impl Runtime {
     /// is currently at capacity and is unable to spawn a new future.
     pub fn spawn<F>(&mut self, future: F) -> &mut Self
     where
-        F: Future<Output = (),> + 'static,
+        F: Future<Output = ()> + 'static,
     {
         self.executor.spawn(future);
         self
@@ -149,7 +152,7 @@ impl Runtime {
 
         // WARN: We do not enter the executor here, since in tokio 0.2 the executor is entered
         // automatically inside its `block_on` and `run` methods
-        tokio_executor::with_default(&mut current_thread::TaskExecutor::current(),|| {
+        tokio_executor::with_default(&mut current_thread::TaskExecutor::current(), || {
             tokio_timer::clock::with_default(clock, || {
                 let _reactor_guard = tokio_net::driver::set_default(reactor_handle);
                 let _timer_guard = tokio_timer::set_default(timer_handle);

@@ -1,14 +1,14 @@
 use std::borrow::Cow;
 use std::io;
 
-use futures::{future, FutureExt};
-use futures::future::{lazy, Future};
 use futures::channel::mpsc::unbounded;
 use futures::channel::oneshot::{channel, Receiver};
+use futures::future::{lazy, Future};
+use futures::{future, FutureExt};
 
 use tokio::runtime::current_thread::Handle;
-use tokio_timer::{timer::Timer, clock::Clock};
 use tokio_net::driver::Reactor;
+use tokio_timer::{clock::Clock, timer::Timer};
 
 use crate::arbiter::{Arbiter, SystemArbiter};
 use crate::runtime::Runtime;
@@ -159,7 +159,7 @@ pub(crate) struct AsyncSystemRunner {
 impl AsyncSystemRunner {
     /// This function will start event loop and returns a future that
     /// resolves once the `System::stop()` function is called.
-    pub(crate) fn run_nonblocking(self) -> impl Future<Output = Result<(),io::Error>> + Send {
+    pub(crate) fn run_nonblocking(self) -> impl Future<Output = Result<(), io::Error>> + Send {
         let AsyncSystemRunner { stop, .. } = self;
 
         // run loop
@@ -182,7 +182,8 @@ impl AsyncSystemRunner {
                 Arbiter::stop_system();
                 return res;
             }
-        }).flatten()
+        })
+        .flatten()
     }
 }
 

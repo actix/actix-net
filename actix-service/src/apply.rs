@@ -1,13 +1,11 @@
-use std::marker::PhantomData;
-
-use futures::{ready, Future, Poll};
-
-use super::{IntoNewService, IntoService, NewService, Service};
-
-use crate::IntoFuture;
 use pin_project::pin_project;
+use std::future::Future;
+use std::marker::PhantomData;
 use std::pin::Pin;
-use std::task::Context;
+use std::task::{Context, Poll};
+
+use super::IntoFuture;
+use super::{IntoNewService, IntoService, NewService, Service};
 
 /// Apply tranform function to a service
 pub fn apply_fn<T, F, In, Out, U>(service: U, f: F) -> Apply<T, F, In, Out>
@@ -89,11 +87,8 @@ where
     type Error = Out::Error;
     type Future = Out::Future;
 
-    fn poll_ready(
-        mut self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(ready!(self.project().service.poll_ready(ctx)).map_err(|e| e.into()))
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(futures::ready!(self.service.poll_ready(ctx)).map_err(|e| e.into()))
     }
 
     fn call(&mut self, req: In) -> Self::Future {

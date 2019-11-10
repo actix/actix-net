@@ -85,10 +85,10 @@ where
     T: AsyncRead,
     D: Decoder,
 {
-    type Item = Result<D::Item,D::Error>;
+    type Item = Result<D::Item, D::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        unsafe { self.map_unchecked_mut(|s| &mut s.inner).poll_next(cx )}
+        unsafe { self.map_unchecked_mut(|s| &mut s.inner).poll_next(cx) }
     }
 }
 
@@ -99,21 +99,32 @@ where
     type Error = T::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        unsafe { self.map_unchecked_mut(|s| &mut s.inner.inner.0).poll_ready(cx)}
+        unsafe {
+            self.map_unchecked_mut(|s| &mut s.inner.inner.0)
+                .poll_ready(cx)
+        }
     }
 
     fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
-        unsafe { self.map_unchecked_mut(|s| &mut s.inner.inner.0).start_send(item)}
+        unsafe {
+            self.map_unchecked_mut(|s| &mut s.inner.inner.0)
+                .start_send(item)
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        unsafe { self.map_unchecked_mut(|s| &mut s.inner.inner.0).poll_flush(cx)}
+        unsafe {
+            self.map_unchecked_mut(|s| &mut s.inner.inner.0)
+                .poll_flush(cx)
+        }
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        unsafe { self.map_unchecked_mut(|s| &mut s.inner.inner.0).poll_close(cx)}
+        unsafe {
+            self.map_unchecked_mut(|s| &mut s.inner.inner.0)
+                .poll_close(cx)
+        }
     }
-
 }
 
 impl<T, D> fmt::Debug for FramedRead<T, D>
@@ -178,7 +189,7 @@ impl<T> Stream for FramedRead2<T>
 where
     T: tokio_io::AsyncRead + Decoder,
 {
-    type Item = Result<T::Item,T::Error>;
+    type Item = Result<T::Item, T::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = unsafe { self.get_unchecked_mut() };
@@ -196,7 +207,6 @@ where
                         Ok(None) => return Poll::Ready(None),
                         Err(e) => return Poll::Ready(Some(Err(e))),
                     }
-
                 }
 
                 trace!("attempting to decode a frame");
@@ -206,14 +216,11 @@ where
                         trace!("frame decoded from buffer");
                         return Poll::Ready(Some(Ok(frame)));
                     }
-                    Err(e) => {
-                        return Poll::Ready(Some(Err(e)))
-                    }
+                    Err(e) => return Poll::Ready(Some(Err(e))),
                     _ => {
                         // Need more data
                     }
                 }
-
 
                 this.is_readable = false;
             }
@@ -225,7 +232,6 @@ where
             // get a spurious 0 that looks like EOF
             this.buffer.reserve(1);
             unsafe {
-
                 match Pin::new_unchecked(&mut this.inner).poll_read(cx, &mut this.buffer) {
                     Poll::Pending => return Poll::Pending,
                     Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
