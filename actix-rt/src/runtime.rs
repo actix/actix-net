@@ -149,11 +149,12 @@ impl Runtime {
 
         // WARN: We do not enter the executor here, since in tokio 0.2 the executor is entered
         // automatically inside its `block_on` and `run` methods
-        let _reactor_guard = tokio_net::driver::set_default(reactor_handle);
-        let _timer_guard = tokio_timer::set_default(timer_handle);
-
-        tokio_timer::clock::with_default(clock , || {
-            f(executor)
+        tokio_executor::with_default(&mut current_thread::TaskExecutor::current(),|| {
+            tokio_timer::clock::with_default(clock, || {
+                let _reactor_guard = tokio_net::driver::set_default(reactor_handle);
+                let _timer_guard = tokio_timer::set_default(timer_handle);
+                f(executor)
+            })
         })
     }
 }

@@ -284,7 +284,7 @@ impl Future for ArbiterController {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
-            match unsafe { self.as_mut().map_unchecked_mut(|p| &mut p.rx) }.poll_next(cx) {
+            match Pin::new(&mut self.rx).poll_next(cx) {
                 Poll::Ready(None) => {
                     return Poll::Ready(())
                 },
@@ -341,7 +341,7 @@ impl Future for SystemArbiter {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
-            match unsafe { self.as_mut().map_unchecked_mut(|p| &mut p.commands) }.poll_next(cx) {
+            match Pin::new(&mut self.commands).poll_next(cx) {
                 Poll::Ready(None) => return Poll::Ready(()),
                 Poll::Ready(Some(cmd)) => match cmd {
                     SystemCommand::Exit(code) => {
