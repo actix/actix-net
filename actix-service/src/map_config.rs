@@ -9,7 +9,7 @@ pub enum MappedConfig<'a, T> {
 
 /// Adapt external config to a config for provided new service
 pub fn map_config<T, F, C>(
-    new_service: T,
+    factory: T,
     f: F,
 ) -> impl Factory<
     Config = C,
@@ -22,7 +22,7 @@ where
     T: Factory,
     F: Fn(&C) -> MappedConfig<T::Config>,
 {
-    MapConfig::new(new_service, f)
+    MapConfig::new(factory, f)
 }
 
 /// Replace config with unit

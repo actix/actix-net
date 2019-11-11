@@ -7,10 +7,10 @@ use futures::ready;
 use pin_project::pin_project;
 
 use crate::cell::Cell;
-use crate::{Factory, IntoFuture, IntoService, Service};
+use crate::{Factory, IntoService, Service};
 
 /// Convert `Fn(&Config, &mut Service) -> Future<Service>` fn to a NewService
-pub fn apply_cfg<F, C, T, R, S>(
+pub fn apply_cfg<F, C, T, R, S, E>(
     srv: T,
     f: F,
 ) -> impl Factory<
@@ -19,18 +19,17 @@ pub fn apply_cfg<F, C, T, R, S>(
     Response = S::Response,
     Error = S::Error,
     Service = S,
-    InitError = R::Error,
+    InitError = E,
 > + Clone
 where
     F: FnMut(&C, &mut T) -> R,
     T: Service,
-    R: IntoFuture,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, E>>,
     S: Service,
 {
     ApplyConfigService {
         f: Cell::new(f),
-        srv: Cell::new(srv.into_service()),
+        srv: Cell::new(srv),
         _t: PhantomData,
     }
 }
@@ -53,8 +52,7 @@ where
     F: FnMut(&C, &mut T::Service) -> R,
     T: Factory<Config = ()>,
     T::InitError: From<T::Error>,
-    R: IntoFuture<Error = T::InitError>,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, T::InitError>>,
     S: Service,
 {
     ApplyConfigNewService {
@@ -66,12 +64,11 @@ where
 
 /// Convert `Fn(&Config) -> Future<Service>` fn to NewService\
 #[pin_project]
-struct ApplyConfigService<F, C, T, R, S>
+struct ApplyConfigService<F, C, T, R, S, E>
 where
     F: FnMut(&C, &mut T) -> R,
     T: Service,
-    R: IntoFuture,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, E>>,
     S: Service,
 {
     f: Cell<F>,
@@ -80,12 +77,11 @@ where
     _t: PhantomData<(C, R, S)>,
 }
 
-impl<F, C, T, R, S> Clone for ApplyConfigService<F, C, T, R, S>
+impl<F, C, T, R, S, E> Clone for ApplyConfigService<F, C, T, R, S, E>
 where
     F: FnMut(&C, &mut T) -> R,
     T: Service,
-    R: IntoFuture,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, E>>,
     S: Service,
 {
     fn clone(&self) -> Self {
@@ -97,12 +93,11 @@ where
     }
 }
 
-impl<F, C, T, R, S> Factory for ApplyConfigService<F, C, T, R, S>
+impl<F, C, T, R, S, E> Factory for ApplyConfigService<F, C, T, R, S, E>
 where
     F: FnMut(&C, &mut T) -> R,
     T: Service,
-    R: IntoFuture,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, E>>,
     S: Service,
 {
     type Config = C;
@@ -111,37 +106,34 @@ where
     type Error = S::Error;
     type Service = S;
 
-    type InitError = R::Error;
-    type Future = FnNewServiceConfigFut<R, S>;
+    type InitError = E;
+    type Future = FnNewServiceConfigFut<R, S, E>;
 
     fn new_service(&self, cfg: &C) -> Self::Future {
         FnNewServiceConfigFut {
-            fut: unsafe { (self.f.get_mut_unsafe())(cfg, self.srv.get_mut_unsafe()) }
-                .into_future(),
+            fut: unsafe { (self.f.get_mut_unsafe())(cfg, self.srv.get_mut_unsafe()) },
             _t: PhantomData,
         }
     }
 }
 
 #[pin_project]
-struct FnNewServiceConfigFut<R, S>
+struct FnNewServiceConfigFut<R, S, E>
 where
-    R: IntoFuture,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, E>>,
     S: Service,
 {
     #[pin]
-    fut: R::Future,
+    fut: R,
     _t: PhantomData<(S,)>,
 }
 
-impl<R, S> Future for FnNewServiceConfigFut<R, S>
+impl<R, S, E> Future for FnNewServiceConfigFut<R, S, E>
 where
-    R: IntoFuture,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, E>>,
     S: Service,
 {
-    type Output = Result<S, R::Error>;
+    type Output = Result<S, E>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Poll::Ready(Ok(ready!(self.project().fut.poll(cx))?.into_service()))
@@ -154,8 +146,7 @@ where
     C: Clone,
     F: FnMut(&C, &mut T::Service) -> R,
     T: Factory<Config = ()>,
-    R: IntoFuture<Error = T::InitError>,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, T::InitError>>,
     S: Service,
 {
     f: Cell<F>,
@@ -168,8 +159,7 @@ where
     C: Clone,
     F: FnMut(&C, &mut T::Service) -> R,
     T: Factory<Config = ()>,
-    R: IntoFuture<Error = T::InitError>,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, T::InitError>>,
     S: Service,
 {
     fn clone(&self) -> Self {
@@ -187,8 +177,7 @@ where
     F: FnMut(&C, &mut T::Service) -> R,
     T: Factory<Config = ()>,
     T::InitError: From<T::Error>,
-    R: IntoFuture<Error = T::InitError>,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, T::InitError>>,
     S: Service,
 {
     type Config = C;
@@ -197,7 +186,7 @@ where
     type Error = S::Error;
     type Service = S;
 
-    type InitError = R::Error;
+    type InitError = T::InitError;
     type Future = ApplyConfigNewServiceFut<F, C, T, R, S>;
 
     fn new_service(&self, cfg: &C) -> Self::Future {
@@ -219,8 +208,7 @@ where
     F: FnMut(&C, &mut T::Service) -> R,
     T: Factory<Config = ()>,
     T::InitError: From<T::Error>,
-    R: IntoFuture<Error = T::InitError>,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, T::InitError>>,
     S: Service,
 {
     cfg: C,
@@ -229,7 +217,7 @@ where
     #[pin]
     srv_fut: Option<T::Future>,
     #[pin]
-    fut: Option<R::Future>,
+    fut: Option<R>,
     _t: PhantomData<(S,)>,
 }
 
@@ -239,11 +227,10 @@ where
     F: FnMut(&C, &mut T::Service) -> R,
     T: Factory<Config = ()>,
     T::InitError: From<T::Error>,
-    R: IntoFuture<Error = T::InitError>,
-    R::Item: IntoService<S>,
+    R: Future<Output = Result<S, T::InitError>>,
     S: Service,
 {
-    type Output = Result<S, R::Error>;
+    type Output = Result<S, T::InitError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
@@ -264,8 +251,7 @@ where
             } else if let Some(ref mut srv) = this.srv {
                 match srv.poll_ready(cx)? {
                     Poll::Ready(_) => {
-                        this.fut
-                            .set(Some(this.f.get_mut()(&this.cfg, srv).into_future()));
+                        this.fut.set(Some(this.f.get_mut()(&this.cfg, srv)));
                         continue 'poll;
                     }
                     Poll::Pending => return Poll::Pending,

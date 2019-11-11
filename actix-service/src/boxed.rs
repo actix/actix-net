@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 use futures::future::{err, ok, Either, Ready};
 use futures::future::{FutureExt, LocalBoxFuture};
 
-use crate::{Factory, IntoFuture, Service};
+use crate::{Factory, Service};
 
 pub type BoxedService<Req, Res, Err> = Box<
     dyn Service<

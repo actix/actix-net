@@ -22,28 +22,11 @@ mod transform_err;
 
 pub use self::apply::{apply_fn, apply_fn_factory};
 pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
-pub use self::fn_service::{factory_fn, new_service_cfg, service_fn};
+pub use self::fn_service::{service_fn, service_fn_config, service_fn_factory};
 pub use self::into::{into_factory, into_service, FactoryMapper, ServiceMapper};
 pub use self::map_config::{map_config, unit_config, MappedConfig};
 pub use self::pipeline::{pipeline, pipeline_factory, Pipeline, PipelineFactory};
 pub use self::transform::{apply_transform, IntoTransform, Transform};
-
-pub trait IntoFuture {
-    type Item;
-    type Error;
-    type Future: Future<Output = Result<Self::Item, Self::Error>>;
-    fn into_future(self) -> Self::Future;
-}
-
-impl<F: Future<Output = Result<I, E>>, I, E> IntoFuture for F {
-    type Item = I;
-    type Error = E;
-    type Future = F;
-
-    fn into_future(self) -> Self::Future {
-        self
-    }
-}
 
 /// An asynchronous function from `Request` to a `Response`.
 pub trait Service {
@@ -80,31 +63,6 @@ pub trait Service {
     /// Calling `call` without calling `poll_ready` is permitted. The
     /// implementation must be resilient to this fact.
     fn call(&mut self, req: Self::Request) -> Self::Future;
-
-    // #[cfg(test)]
-    // fn poll_test(&mut self) -> Poll<Result<(), Self::Error>> {
-    //     // kinda stupid method, but works for our test purposes
-    //     unsafe {
-    //         let mut this = Pin::new_unchecked(self);
-    //         tokio::runtime::current_thread::Builder::new()
-    //             .build()
-    //             .unwrap()
-    //             .block_on(futures::future::poll_fn(move |cx| {
-    //                 let this = &mut this;
-    //                 Poll::Ready(this.as_mut().poll_ready(cx))
-    //             }))
-    //     }
-    // }
-
-    // fn poll_once<'a>(&'a mut self) -> LocalBoxFuture<'a, Poll<Result<(), Self::Error>>> {
-    //     unsafe {
-    //         let mut this = Pin::new_unchecked(self);
-    //         Pin::new_unchecked(Box::new(futures::future::poll_fn(move |cx| {
-    //             //let this = &mut this;
-    //             Poll::Ready(this.get_unchecked_mut().poll_ready(cx))
-    //         })))
-    //     }
-    // }
 }
 
 /// Creates new `Service` values.
@@ -243,7 +201,7 @@ where
     fn into_service(self) -> T;
 }
 
-/// Trait for types that can be converted to a `ServiceFactory`
+/// Trait for types that can be converted to a `Factory`
 pub trait IntoFactory<T>
 where
     T: Factory,
