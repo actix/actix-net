@@ -1,15 +1,15 @@
 use std::fmt;
 use std::io::{self, Read};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use bytes::BytesMut;
-use futures::{ready, Poll, Sink, Stream};
+use futures::{ready, Sink, Stream};
 use log::trace;
 use tokio_codec::{Decoder, Encoder};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use super::framed::Fuse;
-use std::pin::Pin;
-use std::task::Context;
 
 /// A `Sink` of frames encoded to an `AsyncWrite`.
 pub struct FramedWrite<T, E> {

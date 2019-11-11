@@ -5,12 +5,12 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use super::{NewService, Service};
+use super::{Factory, Service};
 
 /// Service for the `map` combinator, changing the type of a service's response.
 ///
 /// This is created by the `ServiceExt::map` method.
-pub struct Map<A, F, Response> {
+pub(crate) struct Map<A, F, Response> {
     service: A,
     f: F,
     _t: PhantomData<Response>,
@@ -65,7 +65,7 @@ where
 }
 
 #[pin_project]
-pub struct MapFuture<A, F, Response>
+pub(crate) struct MapFuture<A, F, Response>
 where
     A: Service,
     F: FnMut(A::Response) -> Response,
@@ -103,7 +103,7 @@ where
 }
 
 /// `MapNewService` new service combinator
-pub struct MapNewService<A, F, Res> {
+pub(crate) struct MapNewService<A, F, Res> {
     a: A,
     f: F,
     r: PhantomData<Res>,
@@ -113,7 +113,7 @@ impl<A, F, Res> MapNewService<A, F, Res> {
     /// Create new `Map` new service instance
     pub fn new(a: A, f: F) -> Self
     where
-        A: NewService,
+        A: Factory,
         F: FnMut(A::Response) -> Res,
     {
         Self {
@@ -138,9 +138,9 @@ where
     }
 }
 
-impl<A, F, Res> NewService for MapNewService<A, F, Res>
+impl<A, F, Res> Factory for MapNewService<A, F, Res>
 where
-    A: NewService,
+    A: Factory,
     F: FnMut(A::Response) -> Res + Clone,
 {
     type Request = A::Request;
@@ -158,9 +158,9 @@ where
 }
 
 #[pin_project]
-pub struct MapNewServiceFuture<A, F, Res>
+pub(crate) struct MapNewServiceFuture<A, F, Res>
 where
-    A: NewService,
+    A: Factory,
     F: FnMut(A::Response) -> Res,
 {
     #[pin]
@@ -170,7 +170,7 @@ where
 
 impl<A, F, Res> MapNewServiceFuture<A, F, Res>
 where
-    A: NewService,
+    A: Factory,
     F: FnMut(A::Response) -> Res,
 {
     fn new(fut: A::Future, f: F) -> Self {
@@ -180,7 +180,7 @@ where
 
 impl<A, F, Res> Future for MapNewServiceFuture<A, F, Res>
 where
-    A: NewService,
+    A: Factory,
     F: FnMut(A::Response) -> Res,
 {
     type Output = Result<Map<A::Service, F, Res>, A::InitError>;
@@ -200,7 +200,7 @@ mod tests {
     use futures::future::{ok, Ready};
 
     use super::*;
-    use crate::{IntoNewService, Service};
+    use crate::{IntoFactory, Service};
 
     struct Srv;
 

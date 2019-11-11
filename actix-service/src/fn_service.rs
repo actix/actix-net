@@ -7,10 +7,18 @@ use futures::future::{ok, Ready};
 use pin_project::pin_project;
 
 use crate::IntoFuture;
-use crate::{IntoNewService, IntoService, NewService, Service};
+use crate::{Factory, IntoFactory, IntoService, Service};
 
 /// Create `NewService` for function that can act as a Service
-pub fn service_fn<F, Req, Out, Cfg>(f: F) -> NewServiceFn<F, Req, Out, Cfg>
+pub fn service_fn<F, Req, Out, Cfg>(
+    f: F,
+) -> impl Factory<
+    Config = Cfg,
+    Request = Req,
+    Response = Out::Item,
+    Error = Out::Error,
+    InitError = (),
+>
 where
     F: FnMut(Req) -> Out + Clone,
     Out: IntoFuture,
@@ -18,8 +26,17 @@ where
     NewServiceFn::new(f)
 }
 
-/// Create `NewService` for function that can produce services
-pub fn new_service_fn<F, C, R, S, E>(f: F) -> FnNewServiceNoConfig<F, C, R, S, E>
+/// Create `Factory` for function that can produce services
+pub fn factory_fn<F, C, R, S, E>(
+    f: F,
+) -> impl Factory<
+    Config = C,
+    Request = S::Request,
+    Response = S::Response,
+    Error = S::Error,
+    InitError = E,
+    Future = R::Future,
+>
 where
     F: Fn() -> R,
     R: IntoFuture<Item = S, Error = E>,
@@ -30,7 +47,15 @@ where
 }
 
 /// Create `NewService` for function that can produce services with configuration
-pub fn new_service_cfg<F, C, R, S, E>(f: F) -> FnNewServiceConfig<F, C, R, S, E>
+pub fn new_service_cfg<F, C, R, S, E>(
+    f: F,
+) -> impl Factory<
+    Config = C,
+    Request = S::Request,
+    Response = S::Response,
+    Error = S::Error,
+    InitError = E,
+>
 where
     F: Fn(&C) -> R,
     R: IntoFuture<Error = E>,
@@ -40,7 +65,7 @@ where
     FnNewServiceConfig::new(f)
 }
 
-pub struct ServiceFn<F, Req, Out>
+pub(crate) struct ServiceFn<F, Req, Out>
 where
     F: FnMut(Req) -> Out,
     Out: IntoFuture,
@@ -98,7 +123,7 @@ where
     }
 }
 
-pub struct NewServiceFn<F, Req, Out, Cfg>
+pub(crate) struct NewServiceFn<F, Req, Out, Cfg>
 where
     F: FnMut(Req) -> Out,
     Out: IntoFuture,
@@ -127,7 +152,7 @@ where
     }
 }
 
-impl<F, Req, Out, Cfg> NewService for NewServiceFn<F, Req, Out, Cfg>
+impl<F, Req, Out, Cfg> Factory for NewServiceFn<F, Req, Out, Cfg>
 where
     F: FnMut(Req) -> Out + Clone,
     Out: IntoFuture,
@@ -156,18 +181,18 @@ where
     }
 }
 
-impl<F, Req, Out, Cfg> IntoNewService<NewServiceFn<F, Req, Out, Cfg>> for F
+impl<F, Req, Out, Cfg> IntoFactory<NewServiceFn<F, Req, Out, Cfg>> for F
 where
     F: Fn(Req) -> Out + Clone,
     Out: IntoFuture,
 {
-    fn into_new_service(self) -> NewServiceFn<F, Req, Out, Cfg> {
+    fn into_factory(self) -> NewServiceFn<F, Req, Out, Cfg> {
         NewServiceFn::new(self)
     }
 }
 
 /// Convert `Fn(&Config) -> Future<Service>` fn to NewService
-pub struct FnNewServiceConfig<F, C, R, S, E>
+pub(crate) struct FnNewServiceConfig<F, C, R, S, E>
 where
     F: Fn(&C) -> R,
     R: IntoFuture<Error = E>,
@@ -190,7 +215,7 @@ where
     }
 }
 
-impl<F, C, R, S, E> NewService for FnNewServiceConfig<F, C, R, S, E>
+impl<F, C, R, S, E> Factory for FnNewServiceConfig<F, C, R, S, E>
 where
     F: Fn(&C) -> R,
     R: IntoFuture<Error = E>,
@@ -215,7 +240,7 @@ where
 }
 
 #[pin_project]
-pub struct FnNewServiceConfigFut<R, S, E>
+pub(crate) struct FnNewServiceConfigFut<R, S, E>
 where
     R: IntoFuture<Error = E>,
     R::Item: IntoService<S>,
@@ -254,7 +279,7 @@ where
 }
 
 /// Converter for `Fn() -> Future<Service>` fn
-pub struct FnNewServiceNoConfig<F, C, R, S, E>
+pub(crate) struct FnNewServiceNoConfig<F, C, R, S, E>
 where
     F: Fn() -> R,
     R: IntoFuture<Item = S, Error = E>,
@@ -275,7 +300,7 @@ where
     }
 }
 
-impl<F, C, R, S, E> NewService for FnNewServiceNoConfig<F, C, R, S, E>
+impl<F, C, R, S, E> Factory for FnNewServiceNoConfig<F, C, R, S, E>
 where
     F: Fn() -> R,
     R: IntoFuture<Item = S, Error = E>,
@@ -305,13 +330,13 @@ where
     }
 }
 
-impl<F, C, R, S, E> IntoNewService<FnNewServiceNoConfig<F, C, R, S, E>> for F
+impl<F, C, R, S, E> IntoFactory<FnNewServiceNoConfig<F, C, R, S, E>> for F
 where
     F: Fn() -> R,
     R: IntoFuture<Item = S, Error = E>,
     S: Service,
 {
-    fn into_new_service(self) -> FnNewServiceNoConfig<F, C, R, S, E> {
+    fn into_factory(self) -> FnNewServiceNoConfig<F, C, R, S, E> {
         FnNewServiceNoConfig::new(self)
     }
 }

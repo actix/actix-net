@@ -2,16 +2,16 @@
 
 use std::fmt;
 use std::io::{self, Read, Write};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use bytes::BytesMut;
-use futures::{Poll, Sink, Stream};
+use futures::{Sink, Stream};
 use tokio_codec::{Decoder, Encoder};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use super::framed_read::{framed_read2, framed_read2_with_buffer, FramedRead2};
 use super::framed_write::{framed_write2, framed_write2_with_buffer, FramedWrite2};
-use std::pin::Pin;
-use std::task::Context;
 
 const LW: usize = 1024;
 const HW: usize = 8 * 1024;

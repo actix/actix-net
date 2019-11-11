@@ -1,14 +1,14 @@
 use std::fmt;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use bytes::BytesMut;
-use futures::{Poll, Sink, Stream};
+use futures::{Sink, Stream};
 use log::trace;
 use tokio_codec::Decoder;
 use tokio_io::AsyncRead;
 
 use super::framed::Fuse;
-use std::pin::Pin;
-use std::task::Context;
 
 /// A `Stream` of messages decoded from an `AsyncRead`.
 pub struct FramedRead<T, D> {

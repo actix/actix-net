@@ -2,7 +2,7 @@ use std::task::{Context, Poll};
 
 use crate::and_then::{AndThen, AndThenNewService};
 use crate::then::{Then, ThenNewService};
-use crate::{IntoNewService, IntoService, NewService, Service};
+use crate::{Factory, IntoFactory, IntoService, Service};
 
 pub fn pipeline<F, T>(service: F) -> Pipeline<T>
 where
@@ -14,13 +14,13 @@ where
     }
 }
 
-pub fn new_pipeline<F, T>(new_service: F) -> NewPipeline<T>
+pub fn pipeline_factory<T, F>(factory: F) -> PipelineFactory<T>
 where
-    F: IntoNewService<T>,
-    T: NewService,
+    T: Factory,
+    F: IntoFactory<T>,
 {
-    NewPipeline {
-        service: new_service.into_new_service(),
+    PipelineFactory {
+        factory: factory.into_factory(),
     }
 }
 
@@ -102,25 +102,36 @@ impl<T: Service> Service for Pipeline<T> {
 }
 
 /// Pipeline constructor
-pub struct NewPipeline<T> {
-    service: T,
+pub struct PipelineFactory<T> {
+    factory: T,
 }
 
-impl<T: NewService> NewPipeline<T> {
+impl<T: Factory> PipelineFactory<T> {
     /// Call another service after call to this one has resolved successfully.
-    pub fn and_then<F, U>(self, new_service: U) -> NewPipeline<AndThenNewService<T, U>>
+    pub fn and_then<F, U>(
+        self,
+        factory: U,
+    ) -> PipelineFactory<
+        impl Factory<
+            Config = T::Config,
+            Request = T::Request,
+            Response = U::Response,
+            Error = T::Error,
+            InitError = T::InitError,
+        >,
+    >
     where
         Self: Sized,
-        F: IntoNewService<U>,
-        U: NewService<
+        F: IntoFactory<U>,
+        U: Factory<
             Config = T::Config,
             Request = T::Response,
             Error = T::Error,
             InitError = T::InitError,
         >,
     {
-        NewPipeline {
-            service: AndThenNewService::new(self.service, new_service.into_new_service()),
+        PipelineFactory {
+            factory: AndThenNewService::new(self.factory, factory.into_factory()),
         }
     }
 
@@ -130,35 +141,46 @@ impl<T: NewService> NewPipeline<T> {
     ///
     /// Note that this function consumes the receiving pipeline and returns a
     /// wrapped version of it.
-    pub fn then<F, U>(self, new_service: F) -> NewPipeline<ThenNewService<T, U>>
+    pub fn then<F, U>(
+        self,
+        factory: F,
+    ) -> PipelineFactory<
+        impl Factory<
+            Config = T::Config,
+            Request = T::Request,
+            Response = U::Response,
+            Error = T::Error,
+            InitError = T::InitError,
+        >,
+    >
     where
         Self: Sized,
-        F: IntoNewService<U>,
-        U: NewService<
+        F: IntoFactory<U>,
+        U: Factory<
             Config = T::Config,
             Request = Result<T::Response, T::Error>,
             Error = T::Error,
             InitError = T::InitError,
         >,
     {
-        NewPipeline {
-            service: ThenNewService::new(self.service, new_service.into_new_service()),
+        PipelineFactory {
+            factory: ThenNewService::new(self.factory, factory.into_factory()),
         }
     }
 }
 
-impl<T> Clone for NewPipeline<T>
+impl<T> Clone for PipelineFactory<T>
 where
     T: Clone,
 {
     fn clone(&self) -> Self {
-        NewPipeline {
-            service: self.service.clone(),
+        PipelineFactory {
+            factory: self.factory.clone(),
         }
     }
 }
 
-impl<T: NewService> NewService for NewPipeline<T> {
+impl<T: Factory> Factory for PipelineFactory<T> {
     type Config = T::Config;
     type Request = T::Request;
     type Response = T::Response;
@@ -169,6 +191,6 @@ impl<T: NewService> NewService for NewPipeline<T> {
 
     #[inline]
     fn new_service(&self, cfg: &T::Config) -> Self::Future {
-        self.service.new_service(cfg)
+        self.factory.new_service(cfg)
     }
 }

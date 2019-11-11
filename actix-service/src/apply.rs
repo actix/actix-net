@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use super::IntoFuture;
-use super::{IntoNewService, IntoService, NewService, Service};
+use super::{Factory, IntoFactory, IntoService, Service};
 
 /// Apply tranform function to a service
 pub fn apply_fn<T, F, In, Out, U>(service: U, f: F) -> Apply<T, F, In, Out>
@@ -20,15 +20,15 @@ where
 }
 
 /// Create factory for `apply` service.
-pub fn new_apply_fn<T, F, In, Out, U>(service: U, f: F) -> ApplyNewService<T, F, In, Out>
+pub fn apply_fn_factory<T, F, In, Out, U>(service: U, f: F) -> ApplyNewService<T, F, In, Out>
 where
-    T: NewService,
+    T: Factory,
     F: FnMut(In, &mut T::Service) -> Out + Clone,
     Out: IntoFuture,
     Out::Error: From<T::Error>,
-    U: IntoNewService<T>,
+    U: IntoFactory<T>,
 {
-    ApplyNewService::new(service.into_new_service(), f)
+    ApplyNewService::new(service.into_factory(), f)
 }
 
 #[doc(hidden)]
@@ -52,9 +52,9 @@ where
     Out::Error: From<T::Error>,
 {
     /// Create new `Apply` combinator
-    pub(crate) fn new<I: IntoService<T>>(service: I, f: F) -> Self {
+    pub(crate) fn new(service: T, f: F) -> Self {
         Self {
-            service: service.into_service(),
+            service,
             f,
             r: PhantomData,
         }
@@ -99,7 +99,7 @@ where
 /// `ApplyNewService` new service combinator
 pub struct ApplyNewService<T, F, In, Out>
 where
-    T: NewService,
+    T: Factory,
 {
     service: T,
     f: F,
@@ -108,16 +108,16 @@ where
 
 impl<T, F, In, Out> ApplyNewService<T, F, In, Out>
 where
-    T: NewService,
+    T: Factory,
     F: FnMut(In, &mut T::Service) -> Out + Clone,
     Out: IntoFuture,
     Out::Error: From<T::Error>,
 {
     /// Create new `ApplyNewService` new service instance
-    pub(crate) fn new<F1: IntoNewService<T>>(service: F1, f: F) -> Self {
+    pub(crate) fn new(service: T, f: F) -> Self {
         Self {
             f,
-            service: service.into_new_service(),
+            service,
             r: PhantomData,
         }
     }
@@ -125,7 +125,7 @@ where
 
 impl<T, F, In, Out> Clone for ApplyNewService<T, F, In, Out>
 where
-    T: NewService + Clone,
+    T: Factory + Clone,
     F: FnMut(In, &mut T::Service) -> Out + Clone,
     Out: IntoFuture,
 {
@@ -138,9 +138,9 @@ where
     }
 }
 
-impl<T, F, In, Out> NewService for ApplyNewService<T, F, In, Out>
+impl<T, F, In, Out> Factory for ApplyNewService<T, F, In, Out>
 where
-    T: NewService,
+    T: Factory,
     F: FnMut(In, &mut T::Service) -> Out + Clone,
     Out: IntoFuture,
     Out::Error: From<T::Error>,
@@ -162,7 +162,7 @@ where
 #[pin_project]
 pub struct ApplyNewServiceFuture<T, F, In, Out>
 where
-    T: NewService,
+    T: Factory,
     F: FnMut(In, &mut T::Service) -> Out + Clone,
     Out: IntoFuture,
 {
@@ -174,7 +174,7 @@ where
 
 impl<T, F, In, Out> ApplyNewServiceFuture<T, F, In, Out>
 where
-    T: NewService,
+    T: Factory,
     F: FnMut(In, &mut T::Service) -> Out + Clone,
     Out: IntoFuture,
 {
@@ -189,7 +189,7 @@ where
 
 impl<T, F, In, Out> Future for ApplyNewServiceFuture<T, F, In, Out>
 where
-    T: NewService,
+    T: Factory,
     F: FnMut(In, &mut T::Service) -> Out + Clone,
     Out: IntoFuture,
     Out::Error: From<T::Error>,

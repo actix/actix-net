@@ -10,6 +10,7 @@ mod apply_cfg;
 pub mod boxed;
 mod cell;
 mod fn_service;
+mod into;
 mod map;
 mod map_config;
 mod map_err;
@@ -19,15 +20,12 @@ mod then;
 mod transform;
 mod transform_err;
 
-pub use self::apply::{apply_fn, new_apply_fn};
-pub use self::apply_cfg::{apply_cfg, new_apply_cfg};
-pub use self::fn_service::{new_service_cfg, new_service_fn, service_fn, ServiceFn};
-pub use self::map::{Map, MapNewService};
-pub use self::map_config::{MapConfig, MappedConfig, UnitConfig};
-pub use self::map_err::{MapErr, MapErrNewService};
-pub use self::map_init_err::MapInitErr;
-pub use self::pipeline::{new_pipeline, pipeline, NewPipeline, Pipeline};
-pub use self::then::{Then, ThenNewService};
+pub use self::apply::{apply_fn, apply_fn_factory};
+pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
+pub use self::fn_service::{factory_fn, new_service_cfg, service_fn};
+pub use self::into::{into_factory, into_service, FactoryMapper, ServiceMapper};
+pub use self::map_config::{map_config, unit_config, MappedConfig};
+pub use self::pipeline::{pipeline, pipeline_factory, Pipeline, PipelineFactory};
 pub use self::transform::{apply_transform, IntoTransform, Transform};
 
 pub trait IntoFuture {
@@ -45,22 +43,6 @@ impl<F: Future<Output = Result<I, E>>, I, E> IntoFuture for F {
     fn into_future(self) -> Self::Future {
         self
     }
-}
-
-pub fn service<T, U>(factory: U) -> T
-where
-    T: Service,
-    U: IntoService<T>,
-{
-    factory.into_service()
-}
-
-pub fn new_service<T, U>(factory: U) -> T
-where
-    T: NewService,
-    U: IntoNewService<T>,
-{
-    factory.into_new_service()
 }
 
 /// An asynchronous function from `Request` to a `Response`.
@@ -130,11 +112,11 @@ pub trait Service {
 /// Acts as a service factory. This is useful for cases where new `Service`
 /// values must be produced. One case is a TCP server listener. The listener
 /// accepts new TCP streams, obtains a new `Service` value using the
-/// `NewService` trait, and uses that new `Service` value to process inbound
+/// `ServiceFactory` trait, and uses that new `Service` value to process inbound
 /// requests on that new TCP stream.
 ///
 /// `Config` is a service factory configuration type.
-pub trait NewService {
+pub trait Factory {
     /// Requests handled by the service.
     type Request;
 
@@ -218,9 +200,9 @@ where
     }
 }
 
-impl<S> NewService for Rc<S>
+impl<S> Factory for Rc<S>
 where
-    S: NewService,
+    S: Factory,
 {
     type Request = S::Request;
     type Response = S::Response;
@@ -235,9 +217,9 @@ where
     }
 }
 
-impl<S> NewService for Arc<S>
+impl<S> Factory for Arc<S>
 where
-    S: NewService,
+    S: Factory,
 {
     type Request = S::Request;
     type Response = S::Response;
@@ -261,13 +243,13 @@ where
     fn into_service(self) -> T;
 }
 
-/// Trait for types that can be converted to a `NewService`
-pub trait IntoNewService<T>
+/// Trait for types that can be converted to a `ServiceFactory`
+pub trait IntoFactory<T>
 where
-    T: NewService,
+    T: Factory,
 {
-    /// Convert to an `NewService`
-    fn into_new_service(self) -> T;
+    /// Convert `Self` an `ServiceFactory`
+    fn into_factory(self) -> T;
 }
 
 impl<T> IntoService<T> for T
@@ -279,11 +261,11 @@ where
     }
 }
 
-impl<T> IntoNewService<T> for T
+impl<T> IntoFactory<T> for T
 where
-    T: NewService,
+    T: Factory,
 {
-    fn into_new_service(self) -> T {
+    fn into_factory(self) -> T {
         self
     }
 }

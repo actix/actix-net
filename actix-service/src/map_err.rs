@@ -5,13 +5,13 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use super::{NewService, Service};
+use super::{Factory, Service};
 
 /// Service for the `map_err` combinator, changing the type of a service's
 /// error.
 ///
 /// This is created by the `ServiceExt::map_err` method.
-pub struct MapErr<A, F, E> {
+pub(crate) struct MapErr<A, F, E> {
     service: A,
     f: F,
     _t: PhantomData<E>,
@@ -66,7 +66,7 @@ where
 }
 
 #[pin_project]
-pub struct MapErrFuture<A, F, E>
+pub(crate) struct MapErrFuture<A, F, E>
 where
     A: Service,
     F: Fn(A::Error) -> E,
@@ -99,13 +99,13 @@ where
     }
 }
 
-/// NewService for the `map_err` combinator, changing the type of a new
+/// Factory for the `map_err` combinator, changing the type of a new
 /// service's error.
 ///
 /// This is created by the `NewServiceExt::map_err` method.
-pub struct MapErrNewService<A, F, E>
+pub(crate) struct MapErrNewService<A, F, E>
 where
-    A: NewService,
+    A: Factory,
     F: Fn(A::Error) -> E + Clone,
 {
     a: A,
@@ -115,11 +115,11 @@ where
 
 impl<A, F, E> MapErrNewService<A, F, E>
 where
-    A: NewService,
+    A: Factory,
     F: Fn(A::Error) -> E + Clone,
 {
     /// Create new `MapErr` new service instance
-    pub fn new(a: A, f: F) -> Self {
+    pub(crate) fn new(a: A, f: F) -> Self {
         Self {
             a,
             f,
@@ -130,7 +130,7 @@ where
 
 impl<A, F, E> Clone for MapErrNewService<A, F, E>
 where
-    A: NewService + Clone,
+    A: Factory + Clone,
     F: Fn(A::Error) -> E + Clone,
 {
     fn clone(&self) -> Self {
@@ -142,9 +142,9 @@ where
     }
 }
 
-impl<A, F, E> NewService for MapErrNewService<A, F, E>
+impl<A, F, E> Factory for MapErrNewService<A, F, E>
 where
-    A: NewService,
+    A: Factory,
     F: Fn(A::Error) -> E + Clone,
 {
     type Request = A::Request;
@@ -162,9 +162,9 @@ where
 }
 
 #[pin_project]
-pub struct MapErrNewServiceFuture<A, F, E>
+pub(crate) struct MapErrNewServiceFuture<A, F, E>
 where
-    A: NewService,
+    A: Factory,
     F: Fn(A::Error) -> E,
 {
     #[pin]
@@ -174,7 +174,7 @@ where
 
 impl<A, F, E> MapErrNewServiceFuture<A, F, E>
 where
-    A: NewService,
+    A: Factory,
     F: Fn(A::Error) -> E,
 {
     fn new(fut: A::Future, f: F) -> Self {
@@ -184,7 +184,7 @@ where
 
 impl<A, F, E> Future for MapErrNewServiceFuture<A, F, E>
 where
-    A: NewService,
+    A: Factory,
     F: Fn(A::Error) -> E + Clone,
 {
     type Output = Result<MapErr<A::Service, F, E>, A::InitError>;
@@ -201,28 +201,28 @@ where
 
 #[cfg(test)]
 mod tests {
-    use futures::future::{err, Ready};
+    // use futures::future::{err, Ready};
 
-    use super::*;
-    use crate::{IntoNewService, NewService, Service};
-    use tokio::future::ok;
+    // use super::*;
+    // use crate::{IntoNewService, NewService, Service};
+    // use tokio::future::ok;
 
-    struct Srv;
+    // struct Srv;
 
-    impl Service for Srv {
-        type Request = ();
-        type Response = ();
-        type Error = ();
-        type Future = Ready<Result<(), ()>>;
+    // impl Service for Srv {
+    //     type Request = ();
+    //     type Response = ();
+    //     type Error = ();
+    //     type Future = Ready<Result<(), ()>>;
 
-        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Err(()))
-        }
+    //     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    //         Poll::Ready(Err(()))
+    //     }
 
-        fn call(&mut self, _: ()) -> Self::Future {
-            err(())
-        }
-    }
+    //     fn call(&mut self, _: ()) -> Self::Future {
+    //         err(())
+    //     }
+    // }
 
     // #[tokio::test]
     // async fn test_poll_ready() {

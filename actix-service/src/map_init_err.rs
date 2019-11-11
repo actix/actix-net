@@ -5,22 +5,22 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use super::NewService;
+use super::Factory;
 
 /// `MapInitErr` service combinator
-pub struct MapInitErr<A, F, E> {
+pub(crate) struct MapInitErr<A, F, E> {
     a: A,
     f: F,
     e: PhantomData<E>,
 }
 
-impl<A, F, E> MapInitErr<A, F, E> {
+impl<A, F, E> MapInitErr<A, F, E>
+where
+    A: Factory,
+    F: Fn(A::InitError) -> E,
+{
     /// Create new `MapInitErr` combinator
-    pub fn new(a: A, f: F) -> Self
-    where
-        A: NewService,
-        F: Fn(A::InitError) -> E,
-    {
+    pub(crate) fn new(a: A, f: F) -> Self {
         Self {
             a,
             f,
@@ -43,9 +43,9 @@ where
     }
 }
 
-impl<A, F, E> NewService for MapInitErr<A, F, E>
+impl<A, F, E> Factory for MapInitErr<A, F, E>
 where
-    A: NewService,
+    A: Factory,
     F: Fn(A::InitError) -> E + Clone,
 {
     type Request = A::Request;
@@ -62,9 +62,9 @@ where
     }
 }
 #[pin_project]
-pub struct MapInitErrFuture<A, F, E>
+pub(crate) struct MapInitErrFuture<A, F, E>
 where
-    A: NewService,
+    A: Factory,
     F: Fn(A::InitError) -> E,
 {
     f: F,
@@ -74,7 +74,7 @@ where
 
 impl<A, F, E> MapInitErrFuture<A, F, E>
 where
-    A: NewService,
+    A: Factory,
     F: Fn(A::InitError) -> E,
 {
     fn new(fut: A::Future, f: F) -> Self {
@@ -84,7 +84,7 @@ where
 
 impl<A, F, E> Future for MapInitErrFuture<A, F, E>
 where
-    A: NewService,
+    A: Factory,
     F: Fn(A::InitError) -> E,
 {
     type Output = Result<A::Service, E>;

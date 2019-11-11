@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use super::{IntoNewService, NewService, Service};
+use super::{Factory, Service};
 use crate::cell::Cell;
 
 /// Service for the `and_then` combinator, chaining a computation onto the end
@@ -129,8 +129,8 @@ where
 /// `AndThenNewService` new service combinator
 pub struct AndThenNewService<A, B>
 where
-    A: NewService,
-    B: NewService,
+    A: Factory,
+    B: Factory,
 {
     a: A,
     b: B,
@@ -138,8 +138,8 @@ where
 
 impl<A, B> AndThenNewService<A, B>
 where
-    A: NewService,
-    B: NewService<
+    A: Factory,
+    B: Factory<
         Config = A::Config,
         Request = A::Response,
         Error = A::Error,
@@ -147,18 +147,15 @@ where
     >,
 {
     /// Create new `AndThen` combinator
-    pub fn new<F: IntoNewService<B>>(a: A, f: F) -> Self {
-        Self {
-            a,
-            b: f.into_new_service(),
-        }
+    pub fn new(a: A, b: B) -> Self {
+        Self { a, b }
     }
 }
 
-impl<A, B> NewService for AndThenNewService<A, B>
+impl<A, B> Factory for AndThenNewService<A, B>
 where
-    A: NewService,
-    B: NewService<
+    A: Factory,
+    B: Factory<
         Config = A::Config,
         Request = A::Response,
         Error = A::Error,
@@ -181,8 +178,8 @@ where
 
 impl<A, B> Clone for AndThenNewService<A, B>
 where
-    A: NewService + Clone,
-    B: NewService + Clone,
+    A: Factory + Clone,
+    B: Factory + Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -195,8 +192,8 @@ where
 #[pin_project]
 pub struct AndThenNewServiceFuture<A, B>
 where
-    A: NewService,
-    B: NewService<Request = A::Response>,
+    A: Factory,
+    B: Factory<Request = A::Response>,
 {
     #[pin]
     fut_b: B::Future,
@@ -209,8 +206,8 @@ where
 
 impl<A, B> AndThenNewServiceFuture<A, B>
 where
-    A: NewService,
-    B: NewService<Request = A::Response>,
+    A: Factory,
+    B: Factory<Request = A::Response>,
 {
     fn new(fut_a: A::Future, fut_b: B::Future) -> Self {
         AndThenNewServiceFuture {
@@ -224,8 +221,8 @@ where
 
 impl<A, B> Future for AndThenNewServiceFuture<A, B>
 where
-    A: NewService,
-    B: NewService<Request = A::Response, Error = A::Error, InitError = A::InitError>,
+    A: Factory,
+    B: Factory<Request = A::Response, Error = A::Error, InitError = A::InitError>,
 {
     type Output = Result<AndThen<A::Service, B::Service>, A::InitError>;
 

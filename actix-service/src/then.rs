@@ -4,14 +4,14 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use super::{IntoNewService, NewService, Service};
+use super::{Factory, Service};
 use crate::cell::Cell;
 
 /// Service for the `then` combinator, chaining a computation onto the end of
 /// another service.
 ///
 /// This is created by the `ServiceExt::then` method.
-pub struct Then<A, B> {
+pub(crate) struct Then<A, B> {
     a: A,
     b: Cell<B>,
 }
@@ -64,7 +64,7 @@ where
 }
 
 #[pin_project]
-pub struct ThenFuture<A, B>
+pub(crate) struct ThenFuture<A, B>
 where
     A: Service,
     B: Service<Request = Result<A::Response, A::Error>>,
@@ -126,36 +126,32 @@ where
     }
 }
 
-/// `ThenNewService` new service combinator
-pub struct ThenNewService<A, B> {
+/// `.then()` service factory combinator
+pub(crate) struct ThenNewService<A, B> {
     a: A,
     b: B,
 }
 
-impl<A, B> ThenNewService<A, B> {
+impl<A, B> ThenNewService<A, B>
+where
+    A: Factory,
+    B: Factory<
+        Config = A::Config,
+        Request = Result<A::Response, A::Error>,
+        Error = A::Error,
+        InitError = A::InitError,
+    >,
+{
     /// Create new `AndThen` combinator
-    pub fn new<F>(a: A, f: F) -> Self
-    where
-        A: NewService,
-        B: NewService<
-            Config = A::Config,
-            Request = Result<A::Response, A::Error>,
-            Error = A::Error,
-            InitError = A::InitError,
-        >,
-        F: IntoNewService<B>,
-    {
-        Self {
-            a,
-            b: f.into_new_service(),
-        }
+    pub fn new(a: A, b: B) -> Self {
+        Self { a, b }
     }
 }
 
-impl<A, B> NewService for ThenNewService<A, B>
+impl<A, B> Factory for ThenNewService<A, B>
 where
-    A: NewService,
-    B: NewService<
+    A: Factory,
+    B: Factory<
         Config = A::Config,
         Request = Result<A::Response, A::Error>,
         Error = A::Error,
@@ -190,10 +186,10 @@ where
 }
 
 #[pin_project]
-pub struct ThenNewServiceFuture<A, B>
+pub(crate) struct ThenNewServiceFuture<A, B>
 where
-    A: NewService,
-    B: NewService<
+    A: Factory,
+    B: Factory<
         Config = A::Config,
         Request = Result<A::Response, A::Error>,
         Error = A::Error,
@@ -210,8 +206,8 @@ where
 
 impl<A, B> ThenNewServiceFuture<A, B>
 where
-    A: NewService,
-    B: NewService<
+    A: Factory,
+    B: Factory<
         Config = A::Config,
         Request = Result<A::Response, A::Error>,
         Error = A::Error,
@@ -230,8 +226,8 @@ where
 
 impl<A, B> Future for ThenNewServiceFuture<A, B>
 where
-    A: NewService,
-    B: NewService<
+    A: Factory,
+    B: Factory<
         Config = A::Config,
         Request = Result<A::Response, A::Error>,
         Error = A::Error,
@@ -271,7 +267,7 @@ mod tests {
 
     use futures::future::{err, ok, ready, Ready};
 
-    use crate::{new_pipeline, new_service, pipeline, NewService, Service};
+    use crate::{pipeline, pipeline_factory, Factory, Service};
 
     #[derive(Clone)]
     struct Srv1(Rc<Cell<usize>>);
@@ -340,13 +336,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_new_service() {
+    async fn test_factory() {
         let cnt = Rc::new(Cell::new(0));
         let cnt2 = cnt.clone();
         let blank = move || ready(Ok::<_, ()>(Srv1(cnt2.clone())));
-        let new_srv =
-            new_pipeline(new_service(blank)).then(move || ready(Ok(Srv2(cnt.clone()))));
-        let mut srv = new_srv.clone().new_service(&()).await.unwrap();
+        let factory = pipeline_factory(blank).then(move || ready(Ok(Srv2(cnt.clone()))));
+        let mut srv = factory.new_service(&()).await.unwrap();
         let res = srv.call(Ok("srv1")).await;
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), (("srv1", "ok")));

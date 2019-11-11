@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use crate::transform_err::{TransformFromErr, TransformMapInitErr};
-use crate::{IntoNewService, NewService, Service};
+use crate::{Factory, IntoFactory, Service};
 
 use pin_project::pin_project;
 
@@ -133,7 +133,7 @@ where
 pub fn apply_transform<T, S, F, U>(
     t: F,
     service: U,
-) -> impl NewService<
+) -> impl Factory<
     Config = S::Config,
     Request = T::Request,
     Response = T::Response,
@@ -142,12 +142,12 @@ pub fn apply_transform<T, S, F, U>(
     InitError = S::InitError,
 > + Clone
 where
-    S: NewService,
+    S: Factory,
     T: Transform<S::Service, InitError = S::InitError>,
     F: IntoTransform<T, S::Service>,
-    U: IntoNewService<S>,
+    U: IntoFactory<S>,
 {
-    ApplyTransform::new(t.into_transform(), service.into_new_service())
+    ApplyTransform::new(t.into_transform(), service.into_factory())
 }
 
 /// `Apply` transform to new service
@@ -158,7 +158,7 @@ pub struct ApplyTransform<T, S> {
 
 impl<T, S> ApplyTransform<T, S>
 where
-    S: NewService,
+    S: Factory,
     T: Transform<S::Service, InitError = S::InitError>,
 {
     /// Create new `ApplyTransform` new service instance
@@ -179,9 +179,9 @@ impl<T, S> Clone for ApplyTransform<T, S> {
     }
 }
 
-impl<T, S> NewService for ApplyTransform<T, S>
+impl<T, S> Factory for ApplyTransform<T, S>
 where
-    S: NewService,
+    S: Factory,
     T: Transform<S::Service, InitError = S::InitError>,
 {
     type Request = T::Request;
@@ -204,7 +204,7 @@ where
 #[pin_project]
 pub struct ApplyTransformFuture<T, S>
 where
-    S: NewService,
+    S: Factory,
     T: Transform<S::Service, InitError = S::InitError>,
 {
     #[pin]
@@ -216,7 +216,7 @@ where
 
 impl<T, S> Future for ApplyTransformFuture<T, S>
 where
-    S: NewService,
+    S: Factory,
     T: Transform<S::Service, InitError = S::InitError>,
 {
     type Output = Result<T::Transform, T::InitError>;
