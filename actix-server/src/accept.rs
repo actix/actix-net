@@ -3,15 +3,16 @@ use std::time::{Duration, Instant};
 use std::{io, thread};
 
 use actix_rt::System;
-use futures::future::{lazy, Future};
+
 use log::{error, info};
 use slab::Slab;
-use tokio_timer::Delay;
+use tokio_timer::delay;
 
 use crate::server::Server;
 use crate::socket::{SocketAddr, SocketListener, StdListener};
 use crate::worker::{Conn, WorkerClient};
 use crate::Token;
+use futures::{Future, FutureExt};
 
 pub(crate) enum Command {
     Pause,
@@ -440,14 +441,13 @@ impl Accept {
                         info.timeout = Some(Instant::now() + Duration::from_millis(500));
 
                         let r = self.timer.1.clone();
-                        System::current().arbiter().send(lazy(move || {
-                            Delay::new(Instant::now() + Duration::from_millis(510))
-                                .map_err(|_| ())
-                                .and_then(move |_| {
-                                    let _ = r.set_readiness(mio::Ready::readable());
-                                    Ok(())
-                                })
-                        }));
+                        System::current().arbiter().send(
+                            async move {
+                                delay(Instant::now() + Duration::from_millis(510)).await;
+                                r.set_readiness(mio::Ready::readable());
+                            }
+                                .boxed(),
+                        );
                         return;
                     }
                 }

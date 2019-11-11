@@ -9,6 +9,8 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use crate::counter::{Counter, CounterGuard};
 use crate::ssl::MAX_CONN_COUNTER;
 use crate::{Io, Protocol, ServerConfig};
+use std::pin::Pin;
+use std::task::Context;
 
 /// Support `SSL` connections via native-tls package
 ///
@@ -72,6 +74,18 @@ impl<T: AsyncRead + AsyncWrite, P> Service for NativeTlsAcceptorService<T, P> {
     type Error = Error;
     type Future = Accept<T, P>;
 
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        if self.conns.available(ctx) {
+            Ok(Async::Ready(()))
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+
+    /*
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         if self.conns.available() {
             Ok(Async::Ready(()))
@@ -79,6 +93,7 @@ impl<T: AsyncRead + AsyncWrite, P> Service for NativeTlsAcceptorService<T, P> {
             Ok(Async::NotReady)
         }
     }
+    */
 
     fn call(&mut self, req: Self::Request) -> Self::Future {
         let (io, params, _) = req.into_parts();

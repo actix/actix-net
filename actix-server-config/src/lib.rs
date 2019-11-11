@@ -3,8 +3,8 @@ use std::net::SocketAddr;
 use std::rc::Rc;
 use std::{fmt, io, net, time};
 
-use tokio_io::{AsyncRead, AsyncWrite};
-use tokio_tcp::TcpStream;
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::tcp::TcpStream;
 
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
@@ -172,25 +172,25 @@ impl IoStream for TcpStream {
 }
 
 #[cfg(any(feature = "ssl"))]
-impl<T: IoStream> IoStream for tokio_openssl::SslStream<T> {
+impl<T: IoStream + Unpin> IoStream for tokio_openssl::SslStream<T> {
     #[inline]
     fn peer_addr(&self) -> Option<net::SocketAddr> {
-        self.get_ref().get_ref().peer_addr()
+        self.get_ref().peer_addr()
     }
 
     #[inline]
     fn set_nodelay(&mut self, nodelay: bool) -> io::Result<()> {
-        self.get_mut().get_mut().set_nodelay(nodelay)
+        self.get_mut().set_nodelay(nodelay)
     }
 
     #[inline]
     fn set_linger(&mut self, dur: Option<time::Duration>) -> io::Result<()> {
-        self.get_mut().get_mut().set_linger(dur)
+        self.get_mut().set_linger(dur)
     }
 
     #[inline]
     fn set_keepalive(&mut self, dur: Option<time::Duration>) -> io::Result<()> {
-        self.get_mut().get_mut().set_keepalive(dur)
+        self.get_mut().set_keepalive(dur)
     }
 }
 
@@ -218,7 +218,7 @@ impl<T: IoStream> IoStream for tokio_rustls::server::TlsStream<T> {
 }
 
 #[cfg(all(unix, feature = "uds"))]
-impl IoStream for tokio_uds::UnixStream {
+impl IoStream for t::UnixStream {
     #[inline]
     fn peer_addr(&self) -> Option<net::SocketAddr> {
         None

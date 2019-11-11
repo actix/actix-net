@@ -1,11 +1,11 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::{mem, time};
+use std::{mem, task, time};
 
-use actix_rt::{spawn, Arbiter};
-use futures::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use futures::sync::oneshot;
-use futures::{future, Async, Future, Poll, Stream};
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::channel::oneshot;
+use futures::{future, Future, Poll, Stream, TryFutureExt};
+use futures::{FutureExt, StreamExt};
 use log::{error, info, trace};
 use tokio_timer::{sleep, Delay};
 
@@ -14,6 +14,10 @@ use crate::counter::Counter;
 use crate::services::{BoxedServerService, InternalServiceFactory, ServerMessage};
 use crate::socket::{SocketAddr, StdStream};
 use crate::Token;
+use actix_rt::spawn;
+use futures::future::{LocalBoxFuture, MapOk};
+use std::pin::Pin;
+use std::task::Context;
 
 pub(crate) struct WorkerCommand(Conn);
 
@@ -153,31 +157,36 @@ impl Worker {
             state: WorkerState::Unavailable(Vec::new()),
         });
 
-        let mut fut = Vec::new();
+        let mut fut: Vec<MapOk<LocalBoxFuture<'static, _>, _>> = Vec::new();
         for (idx, factory) in wrk.factories.iter().enumerate() {
-            fut.push(factory.create().map(move |res| {
-                res.into_iter()
-                    .map(|(t, s)| (idx, t, s))
+            fut.push(factory.create().map_ok(move |r| {
+                r.into_iter()
+                    .map(|(t, s): (Token, _)| (idx, t, s))
                     .collect::<Vec<_>>()
             }));
         }
+
         spawn(
-            future::join_all(fut)
-                .map_err(|e| {
-                    error!("Can not start worker: {:?}", e);
-                    Arbiter::current().stop();
-                })
-                .and_then(move |services| {
-                    for item in services {
-                        for (idx, token, service) in item {
-                            while token.0 >= wrk.services.len() {
-                                wrk.services.push(None);
+            async {
+                let mut res = future::join_all(fut).await;
+                let res: Result<Vec<_>, _> = res.into_iter().collect();
+                match res {
+                    Ok(services) => {
+                        for item in services {
+                            for (idx, token, service) in item {
+                                while token.0 >= wrk.services.len() {
+                                    wrk.services.push(None);
+                                }
                             }
-                            wrk.services[token.0] = Some((idx, service));
                         }
+                        Ok::<_, ()>(wrk);
                     }
-                    wrk
-                }),
+                    Err(e) => {
+                        //return Err(e);
+                    }
+                }
+            }
+                .boxed_local(),
         );
     }
 
@@ -198,13 +207,18 @@ impl Worker {
         }
     }
 
-    fn check_readiness(&mut self, trace: bool) -> Result<bool, (Token, usize)> {
+    fn check_readiness(
+        &mut self,
+        trace: bool,
+        cx: &mut Context<'_>,
+    ) -> Result<bool, (Token, usize)> {
+        /*
         let mut ready = self.conns.available();
         let mut failed = None;
         for (token, service) in &mut self.services.iter_mut().enumerate() {
             if let Some(service) = service {
-                match service.1.poll_ready() {
-                    Ok(Async::Ready(_)) => {
+                match service.1.poll_ready(cx) {
+                    Poll::Ready(Ok(_)) => {
                         if trace {
                             trace!(
                                 "Service {:?} is available",
@@ -212,8 +226,8 @@ impl Worker {
                             );
                         }
                     }
-                    Ok(Async::NotReady) => ready = false,
-                    Err(_) => {
+                    Poll::NotReady => ready = false,
+                    Poll::Ready(Err(_)) => {
                         error!(
                             "Service {:?} readiness check returned error, restarting",
                             self.factories[service.0].name(Token(token))
@@ -227,7 +241,8 @@ impl Worker {
             Err(idx)
         } else {
             Ok(ready)
-        }
+        }*/
+        unimplemented!()
     }
 }
 
@@ -238,15 +253,19 @@ enum WorkerState {
     Restarting(
         usize,
         Token,
-        Box<dyn Future<Item = Vec<(Token, BoxedServerService)>, Error = ()>>,
+        Box<dyn Future<Output = Result<Vec<(Token, BoxedServerService)>, ()>>>,
     ),
     Shutdown(Delay, Delay, oneshot::Sender<bool>),
 }
 
 impl Future for Worker {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        unimplemented!()
+    }
+
+    /*
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         // `StopWorker` message handler
         if let Ok(Async::Ready(Some(StopCommand { graceful, result }))) = self.rx2.poll() {
@@ -435,4 +454,5 @@ impl Future for Worker {
             WorkerState::None => panic!(),
         };
     }
+    */
 }
