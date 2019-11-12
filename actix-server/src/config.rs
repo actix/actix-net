@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::{fmt, io, net};
 
 use actix_server_config::{Io, ServerConfig};
-use actix_service::{Factory, IntoFactory};
+use actix_service as actix;
 use futures::future::{Future, FutureExt, LocalBoxFuture};
 use log::error;
 use tokio_net::tcp::TcpStream;
 
 use super::builder::bind_addr;
-use super::services::{
+use super::service::{
     BoxedServerService, InternalServiceFactory, ServerMessage, StreamService,
 };
 use super::Token;
@@ -195,8 +195,8 @@ impl ServiceRuntime {
     /// *ServiceConfig::bind()* or *ServiceConfig::listen()* methods.
     pub fn service<T, F>(&mut self, name: &str, service: F)
     where
-        F: IntoFactory<T>,
-        T: Factory<Config = ServerConfig, Request = Io<TcpStream>> + 'static,
+        F: actix::IntoServiceFactory<T>,
+        T: actix::ServiceFactory<Config = ServerConfig, Request = Io<TcpStream>> + 'static,
         T::Future: 'static,
         T::Service: 'static,
         T::InitError: fmt::Debug,
@@ -224,7 +224,7 @@ impl ServiceRuntime {
 }
 
 type BoxedNewService = Box<
-    dyn Factory<
+    dyn actix::ServiceFactory<
         Request = (Option<CounterGuard>, ServerMessage),
         Response = (),
         Error = (),
@@ -239,9 +239,9 @@ struct ServiceFactory<T> {
     inner: T,
 }
 
-impl<T> Factory for ServiceFactory<T>
+impl<T> actix::ServiceFactory for ServiceFactory<T>
 where
-    T: Factory<Config = ServerConfig, Request = Io<TcpStream>>,
+    T: actix::ServiceFactory<Config = ServerConfig, Request = Io<TcpStream>>,
     T::Future: 'static,
     T::Service: 'static,
     T::Error: 'static,

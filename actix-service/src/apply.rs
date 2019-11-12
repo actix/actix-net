@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use super::{Factory, IntoFactory, IntoService, Service};
+use super::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
 /// Apply tranform function to a service
 pub fn apply_fn<T, F, R, In, Out, Err, U>(
@@ -24,12 +24,12 @@ where
 pub fn apply_fn_factory<T, F, R, In, Out, Err, U>(
     service: U,
     f: F,
-) -> impl Factory<Request = In, Response = Out, Error = Err>
+) -> impl ServiceFactory<Request = In, Response = Out, Error = Err>
 where
-    T: Factory<Error = Err>,
+    T: ServiceFactory<Error = Err>,
     F: FnMut(In, &mut T::Service) -> R + Clone,
     R: Future<Output = Result<Out, Err>>,
-    U: IntoFactory<T>,
+    U: IntoServiceFactory<T>,
 {
     ApplyNewService::new(service.into_factory(), f)
 }
@@ -86,7 +86,7 @@ where
 /// `ApplyNewService` new service combinator
 struct ApplyNewService<T, F, R, In, Out, Err>
 where
-    T: Factory<Error = Err>,
+    T: ServiceFactory<Error = Err>,
 {
     service: T,
     f: F,
@@ -95,7 +95,7 @@ where
 
 impl<T, F, R, In, Out, Err> ApplyNewService<T, F, R, In, Out, Err>
 where
-    T: Factory<Error = Err>,
+    T: ServiceFactory<Error = Err>,
     F: FnMut(In, &mut T::Service) -> R + Clone,
     R: Future<Output = Result<Out, Err>>,
 {
@@ -109,9 +109,9 @@ where
     }
 }
 
-impl<T, F, R, In, Out, Err> Factory for ApplyNewService<T, F, R, In, Out, Err>
+impl<T, F, R, In, Out, Err> ServiceFactory for ApplyNewService<T, F, R, In, Out, Err>
 where
-    T: Factory<Error = Err>,
+    T: ServiceFactory<Error = Err>,
     F: FnMut(In, &mut T::Service) -> R + Clone,
     R: Future<Output = Result<Out, Err>>,
 {
@@ -132,7 +132,7 @@ where
 #[pin_project]
 struct ApplyNewServiceFuture<T, F, R, In, Out, Err>
 where
-    T: Factory<Error = Err>,
+    T: ServiceFactory<Error = Err>,
     F: FnMut(In, &mut T::Service) -> R + Clone,
     R: Future<Output = Result<Out, Err>>,
 {
@@ -144,7 +144,7 @@ where
 
 impl<T, F, R, In, Out, Err> ApplyNewServiceFuture<T, F, R, In, Out, Err>
 where
-    T: Factory<Error = Err>,
+    T: ServiceFactory<Error = Err>,
     F: FnMut(In, &mut T::Service) -> R + Clone,
     R: Future<Output = Result<Out, Err>>,
 {
@@ -159,7 +159,7 @@ where
 
 impl<T, F, R, In, Out, Err> Future for ApplyNewServiceFuture<T, F, R, In, Out, Err>
 where
-    T: Factory<Error = Err>,
+    T: ServiceFactory<Error = Err>,
     F: FnMut(In, &mut T::Service) -> R + Clone,
     R: Future<Output = Result<Out, Err>>,
 {

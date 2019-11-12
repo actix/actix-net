@@ -2,7 +2,7 @@ use std::task::{Context, Poll};
 
 use crate::and_then::{AndThen, AndThenNewService};
 use crate::then::{Then, ThenNewService};
-use crate::{Factory, IntoFactory, IntoService, Service};
+use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
 pub fn pipeline<F, T>(service: F) -> Pipeline<T>
 where
@@ -16,8 +16,8 @@ where
 
 pub fn pipeline_factory<T, F>(factory: F) -> PipelineFactory<T>
 where
-    T: Factory,
-    F: IntoFactory<T>,
+    T: ServiceFactory,
+    F: IntoServiceFactory<T>,
 {
     PipelineFactory {
         factory: factory.into_factory(),
@@ -106,13 +106,13 @@ pub struct PipelineFactory<T> {
     factory: T,
 }
 
-impl<T: Factory> PipelineFactory<T> {
+impl<T: ServiceFactory> PipelineFactory<T> {
     /// Call another service after call to this one has resolved successfully.
     pub fn and_then<F, U>(
         self,
         factory: U,
     ) -> PipelineFactory<
-        impl Factory<
+        impl ServiceFactory<
             Config = T::Config,
             Request = T::Request,
             Response = U::Response,
@@ -122,8 +122,8 @@ impl<T: Factory> PipelineFactory<T> {
     >
     where
         Self: Sized,
-        F: IntoFactory<U>,
-        U: Factory<
+        F: IntoServiceFactory<U>,
+        U: ServiceFactory<
             Config = T::Config,
             Request = T::Response,
             Error = T::Error,
@@ -145,7 +145,7 @@ impl<T: Factory> PipelineFactory<T> {
         self,
         factory: F,
     ) -> PipelineFactory<
-        impl Factory<
+        impl ServiceFactory<
             Config = T::Config,
             Request = T::Request,
             Response = U::Response,
@@ -155,8 +155,8 @@ impl<T: Factory> PipelineFactory<T> {
     >
     where
         Self: Sized,
-        F: IntoFactory<U>,
-        U: Factory<
+        F: IntoServiceFactory<U>,
+        U: ServiceFactory<
             Config = T::Config,
             Request = Result<T::Response, T::Error>,
             Error = T::Error,
@@ -180,7 +180,7 @@ where
     }
 }
 
-impl<T: Factory> Factory for PipelineFactory<T> {
+impl<T: ServiceFactory> ServiceFactory for PipelineFactory<T> {
     type Config = T::Config;
     type Request = T::Request;
     type Response = T::Response;

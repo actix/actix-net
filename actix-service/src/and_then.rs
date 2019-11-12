@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use super::{Factory, Service};
+use super::{Service, ServiceFactory};
 use crate::cell::Cell;
 
 /// Service for the `and_then` combinator, chaining a computation onto the end
@@ -129,8 +129,8 @@ where
 /// `AndThenNewService` new service combinator
 pub struct AndThenNewService<A, B>
 where
-    A: Factory,
-    B: Factory,
+    A: ServiceFactory,
+    B: ServiceFactory,
 {
     a: A,
     b: B,
@@ -138,8 +138,8 @@ where
 
 impl<A, B> AndThenNewService<A, B>
 where
-    A: Factory,
-    B: Factory<
+    A: ServiceFactory,
+    B: ServiceFactory<
         Config = A::Config,
         Request = A::Response,
         Error = A::Error,
@@ -152,10 +152,10 @@ where
     }
 }
 
-impl<A, B> Factory for AndThenNewService<A, B>
+impl<A, B> ServiceFactory for AndThenNewService<A, B>
 where
-    A: Factory,
-    B: Factory<
+    A: ServiceFactory,
+    B: ServiceFactory<
         Config = A::Config,
         Request = A::Response,
         Error = A::Error,
@@ -178,8 +178,8 @@ where
 
 impl<A, B> Clone for AndThenNewService<A, B>
 where
-    A: Factory + Clone,
-    B: Factory + Clone,
+    A: ServiceFactory + Clone,
+    B: ServiceFactory + Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -192,8 +192,8 @@ where
 #[pin_project]
 pub struct AndThenNewServiceFuture<A, B>
 where
-    A: Factory,
-    B: Factory<Request = A::Response>,
+    A: ServiceFactory,
+    B: ServiceFactory<Request = A::Response>,
 {
     #[pin]
     fut_b: B::Future,
@@ -206,8 +206,8 @@ where
 
 impl<A, B> AndThenNewServiceFuture<A, B>
 where
-    A: Factory,
-    B: Factory<Request = A::Response>,
+    A: ServiceFactory,
+    B: ServiceFactory<Request = A::Response>,
 {
     fn new(fut_a: A::Future, fut_b: B::Future) -> Self {
         AndThenNewServiceFuture {
@@ -221,8 +221,8 @@ where
 
 impl<A, B> Future for AndThenNewServiceFuture<A, B>
 where
-    A: Factory,
-    B: Factory<Request = A::Response, Error = A::Error, InitError = A::InitError>,
+    A: ServiceFactory,
+    B: ServiceFactory<Request = A::Response, Error = A::Error, InitError = A::InitError>,
 {
     type Output = Result<AndThen<A::Service, B::Service>, A::InitError>;
 

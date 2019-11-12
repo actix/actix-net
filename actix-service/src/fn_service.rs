@@ -6,12 +6,13 @@ use std::task::{Context, Poll};
 use futures::future::{ok, Ready};
 use pin_project::pin_project;
 
-use crate::{Factory, IntoFactory, IntoService, Service};
+use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
-/// Create `Factory` for function that can act as a Service
+/// Create `ServiceFactory` for function that can act as a Service
 pub fn service_fn<F, Fut, Req, Res, Err, Cfg>(
     f: F,
-) -> impl Factory<Config = Cfg, Request = Req, Response = Res, Error = Err, InitError = ()> + Clone
+) -> impl ServiceFactory<Config = Cfg, Request = Req, Response = Res, Error = Err, InitError = ()>
+       + Clone
 where
     F: FnMut(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
@@ -19,10 +20,10 @@ where
     NewServiceFn::new(f)
 }
 
-/// Create `Factory` for function that can produce services
+/// Create `ServiceFactory` for function that can produce services
 pub fn service_fn_factory<S, F, Cfg, Fut, Err>(
     f: F,
-) -> impl Factory<
+) -> impl ServiceFactory<
     Config = Cfg,
     Request = S::Request,
     Response = S::Response,
@@ -38,10 +39,10 @@ where
     FnNewServiceNoConfig::new(f)
 }
 
-/// Create `Factory` for function that can produce services with configuration
+/// Create `ServiceFactory` for function that can produce services with configuration
 pub fn service_fn_config<F, Fut, Cfg, Srv, Err>(
     f: F,
-) -> impl Factory<
+) -> impl ServiceFactory<
     Config = Cfg,
     Request = Srv::Request,
     Response = Srv::Response,
@@ -143,7 +144,7 @@ where
     }
 }
 
-impl<F, Fut, Req, Res, Err, Cfg> Factory for NewServiceFn<F, Fut, Req, Res, Err, Cfg>
+impl<F, Fut, Req, Res, Err, Cfg> ServiceFactory for NewServiceFn<F, Fut, Req, Res, Err, Cfg>
 where
     F: FnMut(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
@@ -184,7 +185,7 @@ where
     }
 }
 
-impl<F, Fut, Cfg, Srv, Err> Factory for FnNewServiceConfig<F, Fut, Cfg, Srv, Err>
+impl<F, Fut, Cfg, Srv, Err> ServiceFactory for FnNewServiceConfig<F, Fut, Cfg, Srv, Err>
 where
     F: Fn(&Cfg) -> Fut,
     Fut: Future<Output = Result<Srv, Err>>,
@@ -252,7 +253,7 @@ where
     }
 }
 
-impl<F, C, R, S, E> Factory for FnNewServiceNoConfig<F, C, R, S, E>
+impl<F, C, R, S, E> ServiceFactory for FnNewServiceNoConfig<F, C, R, S, E>
 where
     F: Fn() -> R,
     R: Future<Output = Result<S, E>>,
@@ -282,7 +283,7 @@ where
     }
 }
 
-impl<F, C, R, S, E> IntoFactory<FnNewServiceNoConfig<F, C, R, S, E>> for F
+impl<F, C, R, S, E> IntoServiceFactory<FnNewServiceNoConfig<F, C, R, S, E>> for F
 where
     F: Fn() -> R,
     R: Future<Output = Result<S, E>>,

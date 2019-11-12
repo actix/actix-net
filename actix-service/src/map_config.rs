@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::Factory;
+use super::ServiceFactory;
 
 pub enum MappedConfig<'a, T> {
     Ref(&'a T),
@@ -11,7 +11,7 @@ pub enum MappedConfig<'a, T> {
 pub fn map_config<T, F, C>(
     factory: T,
     f: F,
-) -> impl Factory<
+) -> impl ServiceFactory<
     Config = C,
     Request = T::Request,
     Response = T::Response,
@@ -19,7 +19,7 @@ pub fn map_config<T, F, C>(
     InitError = T::InitError,
 >
 where
-    T: Factory,
+    T: ServiceFactory,
     F: Fn(&C) -> MappedConfig<T::Config>,
 {
     MapConfig::new(factory, f)
@@ -28,7 +28,7 @@ where
 /// Replace config with unit
 pub fn unit_config<T, C>(
     new_service: T,
-) -> impl Factory<
+) -> impl ServiceFactory<
     Config = C,
     Request = T::Request,
     Response = T::Response,
@@ -36,7 +36,7 @@ pub fn unit_config<T, C>(
     InitError = T::InitError,
 >
 where
-    T: Factory<Config = ()>,
+    T: ServiceFactory<Config = ()>,
 {
     UnitConfig::new(new_service)
 }
@@ -52,7 +52,7 @@ impl<A, F, C> MapConfig<A, F, C> {
     /// Create new `MapConfig` combinator
     pub fn new(a: A, f: F) -> Self
     where
-        A: Factory,
+        A: ServiceFactory,
         F: Fn(&C) -> MappedConfig<A::Config>,
     {
         Self {
@@ -77,9 +77,9 @@ where
     }
 }
 
-impl<A, F, C> Factory for MapConfig<A, F, C>
+impl<A, F, C> ServiceFactory for MapConfig<A, F, C>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(&C) -> MappedConfig<A::Config>,
 {
     type Request = A::Request;
@@ -107,7 +107,7 @@ pub(crate) struct UnitConfig<A, C> {
 
 impl<A, C> UnitConfig<A, C>
 where
-    A: Factory<Config = ()>,
+    A: ServiceFactory<Config = ()>,
 {
     /// Create new `UnitConfig` combinator
     pub(crate) fn new(a: A) -> Self {
@@ -127,9 +127,9 @@ where
     }
 }
 
-impl<A, C> Factory for UnitConfig<A, C>
+impl<A, C> ServiceFactory for UnitConfig<A, C>
 where
-    A: Factory<Config = ()>,
+    A: ServiceFactory<Config = ()>,
 {
     type Request = A::Request;
     type Response = A::Response;

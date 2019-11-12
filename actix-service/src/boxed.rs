@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 use futures::future::{err, ok, Either, Ready};
 use futures::future::{FutureExt, LocalBoxFuture};
 
-use crate::{Factory, Service};
+use crate::{Service, ServiceFactory};
 
 pub type BoxedService<Req, Res, Err> = Box<
     dyn Service<
@@ -28,7 +28,7 @@ pub fn factory<T>(
     factory: T,
 ) -> BoxedNewService<T::Config, T::Request, T::Response, T::Error, T::InitError>
 where
-    T: Factory + 'static,
+    T: ServiceFactory + 'static,
     T::Request: 'static,
     T::Response: 'static,
     T::Service: 'static,
@@ -52,7 +52,7 @@ where
 }
 
 type Inner<C, Req, Res, Err, InitErr> = Box<
-    dyn Factory<
+    dyn ServiceFactory<
         Config = C,
         Request = Req,
         Response = Res,
@@ -63,7 +63,7 @@ type Inner<C, Req, Res, Err, InitErr> = Box<
     >,
 >;
 
-impl<C, Req, Res, Err, InitErr> Factory for BoxedNewService<C, Req, Res, Err, InitErr>
+impl<C, Req, Res, Err, InitErr> ServiceFactory for BoxedNewService<C, Req, Res, Err, InitErr>
 where
     Req: 'static,
     Res: 'static,
@@ -84,18 +84,24 @@ where
     }
 }
 
-struct FactoryWrapper<C, T: Factory> {
+struct FactoryWrapper<C, T: ServiceFactory> {
     factory: T,
     _t: std::marker::PhantomData<C>,
 }
 
-impl<C, T, Req, Res, Err, InitErr> Factory for FactoryWrapper<C, T>
+impl<C, T, Req, Res, Err, InitErr> ServiceFactory for FactoryWrapper<C, T>
 where
     Req: 'static,
     Res: 'static,
     Err: 'static,
     InitErr: 'static,
-    T: Factory<Config = C, Request = Req, Response = Res, Error = Err, InitError = InitErr>,
+    T: ServiceFactory<
+        Config = C,
+        Request = Req,
+        Response = Res,
+        Error = Err,
+        InitError = InitErr,
+    >,
     T::Future: 'static,
     T::Service: 'static,
     <T::Service as Service>::Future: 'static,

@@ -14,7 +14,7 @@ use tokio_timer::{delay, Delay};
 
 use crate::accept::AcceptNotify;
 use crate::counter::Counter;
-use crate::services::{BoxedServerService, InternalServiceFactory, ServerMessage};
+use crate::service::{BoxedServerService, InternalServiceFactory, ServerMessage};
 use crate::socket::{SocketAddr, StdStream};
 use crate::Token;
 

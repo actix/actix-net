@@ -17,7 +17,7 @@ use tokio_timer::delay;
 use crate::accept::{AcceptLoop, AcceptNotify, Command};
 use crate::config::{ConfiguredService, ServiceConfig};
 use crate::server::{Server, ServerCommand};
-use crate::services::{InternalServiceFactory, ServiceFactory, StreamNewService};
+use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 // use crate::signals::{Signal, Signals};
 use crate::socket::StdListener;
 use crate::worker::{self, Worker, WorkerAvailability, WorkerClient};

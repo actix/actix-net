@@ -7,13 +7,13 @@ use futures::ready;
 use pin_project::pin_project;
 
 use crate::cell::Cell;
-use crate::{Factory, IntoService, Service};
+use crate::{IntoService, Service, ServiceFactory};
 
 /// Convert `Fn(&Config, &mut Service) -> Future<Service>` fn to a NewService
 pub fn apply_cfg<F, C, T, R, S, E>(
     srv: T,
     f: F,
-) -> impl Factory<
+) -> impl ServiceFactory<
     Config = C,
     Request = S::Request,
     Response = S::Response,
@@ -39,7 +39,7 @@ where
 pub fn apply_cfg_factory<F, C, T, R, S>(
     srv: T,
     f: F,
-) -> impl Factory<
+) -> impl ServiceFactory<
     Config = C,
     Request = S::Request,
     Response = S::Response,
@@ -50,7 +50,7 @@ pub fn apply_cfg_factory<F, C, T, R, S>(
 where
     C: Clone,
     F: FnMut(&C, &mut T::Service) -> R,
-    T: Factory<Config = ()>,
+    T: ServiceFactory<Config = ()>,
     T::InitError: From<T::Error>,
     R: Future<Output = Result<S, T::InitError>>,
     S: Service,
@@ -93,7 +93,7 @@ where
     }
 }
 
-impl<F, C, T, R, S, E> Factory for ApplyConfigService<F, C, T, R, S, E>
+impl<F, C, T, R, S, E> ServiceFactory for ApplyConfigService<F, C, T, R, S, E>
 where
     F: FnMut(&C, &mut T) -> R,
     T: Service,
@@ -145,7 +145,7 @@ struct ApplyConfigNewService<F, C, T, R, S>
 where
     C: Clone,
     F: FnMut(&C, &mut T::Service) -> R,
-    T: Factory<Config = ()>,
+    T: ServiceFactory<Config = ()>,
     R: Future<Output = Result<S, T::InitError>>,
     S: Service,
 {
@@ -158,7 +158,7 @@ impl<F, C, T, R, S> Clone for ApplyConfigNewService<F, C, T, R, S>
 where
     C: Clone,
     F: FnMut(&C, &mut T::Service) -> R,
-    T: Factory<Config = ()>,
+    T: ServiceFactory<Config = ()>,
     R: Future<Output = Result<S, T::InitError>>,
     S: Service,
 {
@@ -171,11 +171,11 @@ where
     }
 }
 
-impl<F, C, T, R, S> Factory for ApplyConfigNewService<F, C, T, R, S>
+impl<F, C, T, R, S> ServiceFactory for ApplyConfigNewService<F, C, T, R, S>
 where
     C: Clone,
     F: FnMut(&C, &mut T::Service) -> R,
-    T: Factory<Config = ()>,
+    T: ServiceFactory<Config = ()>,
     T::InitError: From<T::Error>,
     R: Future<Output = Result<S, T::InitError>>,
     S: Service,
@@ -206,7 +206,7 @@ struct ApplyConfigNewServiceFut<F, C, T, R, S>
 where
     C: Clone,
     F: FnMut(&C, &mut T::Service) -> R,
-    T: Factory<Config = ()>,
+    T: ServiceFactory<Config = ()>,
     T::InitError: From<T::Error>,
     R: Future<Output = Result<S, T::InitError>>,
     S: Service,
@@ -225,7 +225,7 @@ impl<F, C, T, R, S> Future for ApplyConfigNewServiceFut<F, C, T, R, S>
 where
     C: Clone,
     F: FnMut(&C, &mut T::Service) -> R,
-    T: Factory<Config = ()>,
+    T: ServiceFactory<Config = ()>,
     T::InitError: From<T::Error>,
     R: Future<Output = Result<S, T::InitError>>,
     S: Service,

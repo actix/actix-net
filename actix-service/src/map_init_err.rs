@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use super::Factory;
+use super::ServiceFactory;
 
 /// `MapInitErr` service combinator
 pub(crate) struct MapInitErr<A, F, E> {
@@ -16,7 +16,7 @@ pub(crate) struct MapInitErr<A, F, E> {
 
 impl<A, F, E> MapInitErr<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::InitError) -> E,
 {
     /// Create new `MapInitErr` combinator
@@ -43,9 +43,9 @@ where
     }
 }
 
-impl<A, F, E> Factory for MapInitErr<A, F, E>
+impl<A, F, E> ServiceFactory for MapInitErr<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::InitError) -> E + Clone,
 {
     type Request = A::Request;
@@ -64,7 +64,7 @@ where
 #[pin_project]
 pub(crate) struct MapInitErrFuture<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::InitError) -> E,
 {
     f: F,
@@ -74,7 +74,7 @@ where
 
 impl<A, F, E> MapInitErrFuture<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::InitError) -> E,
 {
     fn new(fut: A::Future, f: F) -> Self {
@@ -84,7 +84,7 @@ where
 
 impl<A, F, E> Future for MapInitErrFuture<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::InitError) -> E,
 {
     type Output = Result<A::Service, E>;

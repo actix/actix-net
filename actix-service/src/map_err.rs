@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use super::{Factory, Service};
+use super::{Service, ServiceFactory};
 
 /// Service for the `map_err` combinator, changing the type of a service's
 /// error.
@@ -105,7 +105,7 @@ where
 /// This is created by the `NewServiceExt::map_err` method.
 pub(crate) struct MapErrNewService<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::Error) -> E + Clone,
 {
     a: A,
@@ -115,7 +115,7 @@ where
 
 impl<A, F, E> MapErrNewService<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::Error) -> E + Clone,
 {
     /// Create new `MapErr` new service instance
@@ -130,7 +130,7 @@ where
 
 impl<A, F, E> Clone for MapErrNewService<A, F, E>
 where
-    A: Factory + Clone,
+    A: ServiceFactory + Clone,
     F: Fn(A::Error) -> E + Clone,
 {
     fn clone(&self) -> Self {
@@ -142,9 +142,9 @@ where
     }
 }
 
-impl<A, F, E> Factory for MapErrNewService<A, F, E>
+impl<A, F, E> ServiceFactory for MapErrNewService<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::Error) -> E + Clone,
 {
     type Request = A::Request;
@@ -164,7 +164,7 @@ where
 #[pin_project]
 pub(crate) struct MapErrNewServiceFuture<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::Error) -> E,
 {
     #[pin]
@@ -174,7 +174,7 @@ where
 
 impl<A, F, E> MapErrNewServiceFuture<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::Error) -> E,
 {
     fn new(fut: A::Future, f: F) -> Self {
@@ -184,7 +184,7 @@ where
 
 impl<A, F, E> Future for MapErrNewServiceFuture<A, F, E>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: Fn(A::Error) -> E + Clone,
 {
     type Output = Result<MapErr<A::Service, F, E>, A::InitError>;

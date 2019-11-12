@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use super::{Factory, Service};
+use super::{Service, ServiceFactory};
 use crate::cell::Cell;
 
 /// Service for the `then` combinator, chaining a computation onto the end of
@@ -134,8 +134,8 @@ pub(crate) struct ThenNewService<A, B> {
 
 impl<A, B> ThenNewService<A, B>
 where
-    A: Factory,
-    B: Factory<
+    A: ServiceFactory,
+    B: ServiceFactory<
         Config = A::Config,
         Request = Result<A::Response, A::Error>,
         Error = A::Error,
@@ -148,10 +148,10 @@ where
     }
 }
 
-impl<A, B> Factory for ThenNewService<A, B>
+impl<A, B> ServiceFactory for ThenNewService<A, B>
 where
-    A: Factory,
-    B: Factory<
+    A: ServiceFactory,
+    B: ServiceFactory<
         Config = A::Config,
         Request = Result<A::Response, A::Error>,
         Error = A::Error,
@@ -188,8 +188,8 @@ where
 #[pin_project]
 pub(crate) struct ThenNewServiceFuture<A, B>
 where
-    A: Factory,
-    B: Factory<
+    A: ServiceFactory,
+    B: ServiceFactory<
         Config = A::Config,
         Request = Result<A::Response, A::Error>,
         Error = A::Error,
@@ -206,8 +206,8 @@ where
 
 impl<A, B> ThenNewServiceFuture<A, B>
 where
-    A: Factory,
-    B: Factory<
+    A: ServiceFactory,
+    B: ServiceFactory<
         Config = A::Config,
         Request = Result<A::Response, A::Error>,
         Error = A::Error,
@@ -226,8 +226,8 @@ where
 
 impl<A, B> Future for ThenNewServiceFuture<A, B>
 where
-    A: Factory,
-    B: Factory<
+    A: ServiceFactory,
+    B: ServiceFactory<
         Config = A::Config,
         Request = Result<A::Response, A::Error>,
         Error = A::Error,
@@ -267,7 +267,7 @@ mod tests {
 
     use futures::future::{err, ok, ready, Ready};
 
-    use crate::{pipeline, pipeline_factory, Factory, Service};
+    use crate::{pipeline, pipeline_factory, Service, ServiceFactory};
 
     #[derive(Clone)]
     struct Srv1(Rc<Cell<usize>>);

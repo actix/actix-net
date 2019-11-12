@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use actix_rt::spawn;
 use actix_server_config::{Io, ServerConfig};
-use actix_service::{Factory, Service};
+use actix_service::{self as actix, Service, ServiceFactory as ActixServiceFactory};
 use futures::future::{err, ok, LocalBoxFuture, Ready};
 use futures::{FutureExt, TryFutureExt};
 use log::error;
@@ -25,7 +25,7 @@ pub(crate) enum ServerMessage {
 }
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
-    type NewService: Factory<Config = ServerConfig, Request = Io<Stream>>;
+    type NewService: actix::ServiceFactory<Config = ServerConfig, Request = Io<Stream>>;
 
     fn create(&self) -> Self::NewService;
 }
@@ -180,7 +180,7 @@ impl InternalServiceFactory for Box<dyn InternalServiceFactory> {
 impl<F, T, I> ServiceFactory<I> for F
 where
     F: Fn() -> T + Send + Clone + 'static,
-    T: Factory<Config = ServerConfig, Request = Io<I>>,
+    T: actix::ServiceFactory<Config = ServerConfig, Request = Io<I>>,
     I: FromStream,
 {
     type NewService = T;

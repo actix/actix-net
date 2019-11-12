@@ -23,7 +23,7 @@ mod transform_err;
 pub use self::apply::{apply_fn, apply_fn_factory};
 pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
 pub use self::fn_service::{service_fn, service_fn_config, service_fn_factory};
-pub use self::into::{into_factory, into_service, FactoryMapper, ServiceMapper};
+pub use self::into::{into_factory, into_service, ServiceFactoryMapper, ServiceMapper};
 pub use self::map_config::{map_config, unit_config, MappedConfig};
 pub use self::pipeline::{pipeline, pipeline_factory, Pipeline, PipelineFactory};
 pub use self::transform::{apply_transform, IntoTransform, Transform};
@@ -74,7 +74,7 @@ pub trait Service {
 /// requests on that new TCP stream.
 ///
 /// `Config` is a service factory configuration type.
-pub trait Factory {
+pub trait ServiceFactory {
     /// Requests handled by the service.
     type Request;
 
@@ -158,9 +158,9 @@ where
     }
 }
 
-impl<S> Factory for Rc<S>
+impl<S> ServiceFactory for Rc<S>
 where
-    S: Factory,
+    S: ServiceFactory,
 {
     type Request = S::Request;
     type Response = S::Response;
@@ -175,9 +175,9 @@ where
     }
 }
 
-impl<S> Factory for Arc<S>
+impl<S> ServiceFactory for Arc<S>
 where
-    S: Factory,
+    S: ServiceFactory,
 {
     type Request = S::Request;
     type Response = S::Response;
@@ -201,10 +201,10 @@ where
     fn into_service(self) -> T;
 }
 
-/// Trait for types that can be converted to a `Factory`
-pub trait IntoFactory<T>
+/// Trait for types that can be converted to a `ServiceFactory`
+pub trait IntoServiceFactory<T>
 where
-    T: Factory,
+    T: ServiceFactory,
 {
     /// Convert `Self` an `ServiceFactory`
     fn into_factory(self) -> T;
@@ -219,9 +219,9 @@ where
     }
 }
 
-impl<T> IntoFactory<T> for T
+impl<T> IntoServiceFactory<T> for T
 where
-    T: Factory,
+    T: ServiceFactory,
 {
     fn into_factory(self) -> T {
         self

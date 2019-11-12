@@ -3,7 +3,7 @@ use std::task::{Context, Poll};
 use crate::map::{Map, MapNewService};
 use crate::map_err::{MapErr, MapErrNewService};
 use crate::map_init_err::MapInitErr;
-use crate::{Factory, IntoFactory, IntoService, Service};
+use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
 #[inline]
 /// Convert object of type `U` to a service `T`
@@ -17,12 +17,12 @@ where
     }
 }
 
-pub fn into_factory<T, F>(factory: F) -> FactoryMapper<T>
+pub fn into_factory<T, F>(factory: F) -> ServiceFactoryMapper<T>
 where
-    T: Factory,
-    F: IntoFactory<T>,
+    T: ServiceFactory,
+    F: IntoServiceFactory<T>,
 {
-    FactoryMapper {
+    ServiceFactoryMapper {
         factory: factory.into_factory(),
     }
 }
@@ -31,7 +31,7 @@ pub struct ServiceMapper<T> {
     service: T,
 }
 
-pub struct FactoryMapper<T> {
+pub struct ServiceFactoryMapper<T> {
     factory: T,
 }
 
@@ -108,14 +108,14 @@ impl<T: Service> Service for ServiceMapper<T> {
     }
 }
 
-impl<T: Factory> FactoryMapper<T> {
+impl<T: ServiceFactory> ServiceFactoryMapper<T> {
     /// Map this service's output to a different type, returning a new service
     /// of the resulting type.
     pub fn map<F, R>(
         self,
         f: F,
-    ) -> FactoryMapper<
-        impl Factory<
+    ) -> ServiceFactoryMapper<
+        impl ServiceFactory<
             Config = T::Config,
             Request = T::Request,
             Response = R,
@@ -127,7 +127,7 @@ impl<T: Factory> FactoryMapper<T> {
         Self: Sized,
         F: FnMut(T::Response) -> R + Clone,
     {
-        FactoryMapper {
+        ServiceFactoryMapper {
             factory: MapNewService::new(self.factory, f),
         }
     }
@@ -136,8 +136,8 @@ impl<T: Factory> FactoryMapper<T> {
     pub fn map_err<F, E>(
         self,
         f: F,
-    ) -> FactoryMapper<
-        impl Factory<
+    ) -> ServiceFactoryMapper<
+        impl ServiceFactory<
             Config = T::Config,
             Request = T::Request,
             Response = T::Response,
@@ -149,7 +149,7 @@ impl<T: Factory> FactoryMapper<T> {
         Self: Sized,
         F: Fn(T::Error) -> E + Clone,
     {
-        FactoryMapper {
+        ServiceFactoryMapper {
             factory: MapErrNewService::new(self.factory, f),
         }
     }
@@ -158,8 +158,8 @@ impl<T: Factory> FactoryMapper<T> {
     pub fn map_init_err<F, E>(
         self,
         f: F,
-    ) -> FactoryMapper<
-        impl Factory<
+    ) -> ServiceFactoryMapper<
+        impl ServiceFactory<
             Config = T::Config,
             Request = T::Request,
             Response = T::Response,
@@ -171,24 +171,24 @@ impl<T: Factory> FactoryMapper<T> {
         Self: Sized,
         F: Fn(T::InitError) -> E + Clone,
     {
-        FactoryMapper {
+        ServiceFactoryMapper {
             factory: MapInitErr::new(self.factory, f),
         }
     }
 }
 
-impl<T> Clone for FactoryMapper<T>
+impl<T> Clone for ServiceFactoryMapper<T>
 where
     T: Clone,
 {
     fn clone(&self) -> Self {
-        FactoryMapper {
+        ServiceFactoryMapper {
             factory: self.factory.clone(),
         }
     }
 }
 
-impl<T: Factory> Factory for FactoryMapper<T> {
+impl<T: ServiceFactory> ServiceFactory for ServiceFactoryMapper<T> {
     type Config = T::Config;
     type Request = T::Request;
     type Response = T::Response;

@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use super::{Factory, Service};
+use super::{Service, ServiceFactory};
 
 /// Service for the `map` combinator, changing the type of a service's response.
 ///
@@ -113,7 +113,7 @@ impl<A, F, Res> MapNewService<A, F, Res> {
     /// Create new `Map` new service instance
     pub fn new(a: A, f: F) -> Self
     where
-        A: Factory,
+        A: ServiceFactory,
         F: FnMut(A::Response) -> Res,
     {
         Self {
@@ -138,9 +138,9 @@ where
     }
 }
 
-impl<A, F, Res> Factory for MapNewService<A, F, Res>
+impl<A, F, Res> ServiceFactory for MapNewService<A, F, Res>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: FnMut(A::Response) -> Res + Clone,
 {
     type Request = A::Request;
@@ -160,7 +160,7 @@ where
 #[pin_project]
 pub(crate) struct MapNewServiceFuture<A, F, Res>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: FnMut(A::Response) -> Res,
 {
     #[pin]
@@ -170,7 +170,7 @@ where
 
 impl<A, F, Res> MapNewServiceFuture<A, F, Res>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: FnMut(A::Response) -> Res,
 {
     fn new(fut: A::Future, f: F) -> Self {
@@ -180,7 +180,7 @@ where
 
 impl<A, F, Res> Future for MapNewServiceFuture<A, F, Res>
 where
-    A: Factory,
+    A: ServiceFactory,
     F: FnMut(A::Response) -> Res,
 {
     type Output = Result<Map<A::Service, F, Res>, A::InitError>;
@@ -200,7 +200,7 @@ mod tests {
     use futures::future::{ok, Ready};
 
     use super::*;
-    use crate::{IntoFactory, Service};
+    use crate::{IntoServiceFactory, Service};
 
     struct Srv;
 

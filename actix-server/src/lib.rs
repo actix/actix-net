@@ -5,7 +5,7 @@ mod builder;
 mod config;
 mod counter;
 mod server;
-mod services;
+mod service;
 // mod signals;
 mod socket;
 pub mod ssl;
@@ -16,13 +16,10 @@ pub use actix_server_config::{Io, IoStream, Protocol, ServerConfig};
 pub use self::builder::ServerBuilder;
 pub use self::config::{ServiceConfig, ServiceRuntime};
 pub use self::server::Server;
-pub use self::services::ServiceFactory;
+pub use self::service::ServiceFactory;
 
 #[doc(hidden)]
 pub use self::socket::FromStream;
-
-#[doc(hidden)]
-pub use self::services::ServiceFactory as StreamServiceFactory;
 
 /// Socket id token
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
