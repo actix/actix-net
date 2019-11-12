@@ -177,7 +177,7 @@ impl IoStream for TcpStream {
     }
 }
 
-#[cfg(feature = "ssl")]
+#[cfg(feature = "openssl")]
 impl<T: IoStream + Unpin> IoStream for tokio_openssl::SslStream<T> {
     #[inline]
     fn peer_addr(&self) -> Option<net::SocketAddr> {
@@ -200,7 +200,7 @@ impl<T: IoStream + Unpin> IoStream for tokio_openssl::SslStream<T> {
     }
 }
 
-#[cfg(feature = "rust-tls")]
+#[cfg(feature = "rustls")]
 impl<T: IoStream + Unpin> IoStream for tokio_rustls::server::TlsStream<T> {
     #[inline]
     fn peer_addr(&self) -> Option<net::SocketAddr> {
