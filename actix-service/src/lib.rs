@@ -22,7 +22,7 @@ mod transform_err;
 
 pub use self::apply::{apply_fn, apply_fn_factory};
 pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
-pub use self::fn_service::{service_fn, service_fn_config, service_fn_factory};
+pub use self::fn_service::{service_fn, service_fn2, service_fn_config, service_fn_factory};
 pub use self::into::{into_factory, into_service, ServiceFactoryMapper, ServiceMapper};
 pub use self::map_config::{map_config, unit_config, MappedConfig};
 pub use self::pipeline::{pipeline, pipeline_factory, Pipeline, PipelineFactory};

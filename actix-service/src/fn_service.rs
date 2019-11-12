@@ -8,7 +8,7 @@ use pin_project::pin_project;
 
 use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
-/// Create `ServiceFactory` for function that can act as a Service
+/// Create `ServiceFactory` for function that can act as a `Service`
 pub fn service_fn<F, Fut, Req, Res, Err, Cfg>(
     f: F,
 ) -> impl ServiceFactory<Config = Cfg, Request = Req, Response = Res, Error = Err, InitError = ()>
@@ -18,6 +18,16 @@ where
     Fut: Future<Output = Result<Res, Err>>,
 {
     NewServiceFn::new(f)
+}
+
+pub fn service_fn2<F, Fut, Req, Res, Err>(
+    f: F,
+) -> impl Service<Request = Req, Response = Res, Error = Err>
+where
+    F: FnMut(Req) -> Fut,
+    Fut: Future<Output = Result<Res, Err>>,
+{
+    ServiceFn::new(f)
 }
 
 /// Create `ServiceFactory` for function that can produce services
@@ -88,7 +98,7 @@ where
 
 impl<F, Fut, Req, Res, Err> Service for ServiceFn<F, Fut, Req, Res, Err>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: FnMut(Req) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     type Request = Req;
@@ -96,7 +106,7 @@ where
     type Error = Err;
     type Future = Fut;
 
-    fn poll_ready(&mut self, _ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
@@ -107,7 +117,7 @@ where
 
 impl<F, Fut, Req, Res, Err> IntoService<ServiceFn<F, Fut, Req, Res, Err>> for F
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: FnMut(Req) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn into_service(self) -> ServiceFn<F, Fut, Req, Res, Err> {

@@ -233,10 +233,7 @@ where
 {
     type Error = T::Error;
 
-    fn poll_ready(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let len = self.buffer.len();
         if len >= self.high_watermark {
             return Poll::Pending;
@@ -247,6 +244,7 @@ where
 
     fn start_send(self: Pin<&mut Self>, item: <T as Encoder>::Item) -> Result<(), Self::Error> {
         let this = unsafe { self.get_unchecked_mut() };
+
         // Check the buffer capacity
         let len = this.buffer.len();
         if len < this.low_watermark {
@@ -299,57 +297,6 @@ where
 
         Poll::Ready(Ok(()))
     }
-
-    /*
-    fn start_send(&mut self, item: T::Item) -> StartSend<T::Item, T::Error> {
-        // Check the buffer capacity
-        let len = self.buffer.len();
-        if len >= self.high_watermark {
-            return Ok(AsyncSink::NotReady(item));
-        }
-        if len < self.low_watermark {
-            self.buffer.reserve(self.high_watermark - len)
-        }
-
-        self.inner.encode(item, &mut self.buffer)?;
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        trace!("flushing framed transport");
-
-        while !self.buffer.is_empty() {
-            trace!("writing; remaining={}", self.buffer.len());
-
-            let n = try_ready!(self.inner.poll_write(&self.buffer));
-
-            if n == 0 {
-                return Err(io::Error::new(
-                    io::ErrorKind::WriteZero,
-                    "failed to \
-                     write frame to transport",
-                )
-                .into());
-            }
-
-            // TODO: Add a way to `bytes` to do this w/o returning the drained
-            // data.
-            let _ = self.buffer.split_to(n);
-        }
-
-        // Try flushing the underlying IO
-        try_ready!(self.inner.poll_flush());
-
-        trace!("framed transport flushed");
-        Ok(Async::Ready(()))
-    }
-
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        try_ready!(self.poll_complete());
-        Ok(self.inner.shutdown()?)
-    }
-    */
 }
 
 impl<T: Decoder> Decoder for FramedWrite2<T> {

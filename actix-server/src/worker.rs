@@ -185,6 +185,7 @@ impl Worker {
                         Arbiter::current().stop();
                     }
                 }
+                wrk.await
             }
                 .boxed_local(),
         );
