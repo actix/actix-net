@@ -1,17 +1,15 @@
+use std::future::Future;
 use std::io;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use actix_rt::spawn;
+use futures::future::LocalBoxFuture;
 use futures::stream::{futures_unordered, FuturesUnordered, LocalBoxStream};
-use futures::{
-    Future, FutureExt, Poll, Stream, StreamExt, TryFutureExt, TryStream, TryStreamExt,
-};
+use futures::{FutureExt, Stream, StreamExt, TryFutureExt, TryStream, TryStreamExt};
+use tokio_net::signal::unix::signal;
 
 use crate::server::Server;
-use actix_service::ServiceExt;
-use futures::future::LocalBoxFuture;
-use std::pin::Pin;
-use std::task::Context;
-use tokio_net::signal::unix::signal;
 
 /// Different types of process signals
 #[derive(PartialEq, Clone, Copy, Debug)]

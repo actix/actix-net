@@ -3,14 +3,14 @@ use futures::channel::oneshot;
 use futures::{Future, TryFutureExt};
 
 use crate::builder::ServerBuilder;
-use crate::signals::Signal;
+// use crate::signals::Signal;
 
 #[derive(Debug)]
 pub(crate) enum ServerCommand {
-    WorkerDied(usize),
+    WorkerFaulted(usize),
     Pause(oneshot::Sender<()>),
     Resume(oneshot::Sender<()>),
-    Signal(Signal),
+    // Signal(Signal),
     /// Whether to try and shut down gracefully
     Stop {
         graceful: bool,
@@ -31,12 +31,12 @@ impl Server {
         ServerBuilder::default()
     }
 
-    pub(crate) fn signal(&self, sig: Signal) {
-        let _ = self.0.unbounded_send(ServerCommand::Signal(sig));
-    }
+    // pub(crate) fn signal(&self, sig: Signal) {
+    //     let _ = self.0.unbounded_send(ServerCommand::Signal(sig));
+    // }
 
-    pub(crate) fn worker_died(&self, idx: usize) {
-        let _ = self.0.unbounded_send(ServerCommand::WorkerDied(idx));
+    pub(crate) fn worker_faulted(&self, idx: usize) {
+        let _ = self.0.unbounded_send(ServerCommand::WorkerFaulted(idx));
     }
 
     /// Pause accepting incoming connections

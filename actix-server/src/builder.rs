@@ -1,27 +1,27 @@
-use std::time::Duration;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 use std::{io, mem, net};
 
 use actix_rt::{spawn, Arbiter, System};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver};
 use futures::future::ready;
 use futures::stream::FuturesUnordered;
-use futures::{ready, Future, FutureExt, Poll, Stream, StreamExt};
+use futures::{ready, Future, FutureExt, Stream, StreamExt};
 use log::{error, info};
 use net2::TcpBuilder;
 use num_cpus;
 use tokio_net::tcp::TcpStream;
-use tokio_timer::sleep;
+use tokio_timer::delay;
 
 use crate::accept::{AcceptLoop, AcceptNotify, Command};
 use crate::config::{ConfiguredService, ServiceConfig};
 use crate::server::{Server, ServerCommand};
 use crate::services::{InternalServiceFactory, ServiceFactory, StreamNewService};
-use crate::signals::{Signal, Signals};
+// use crate::signals::{Signal, Signals};
 use crate::socket::StdListener;
 use crate::worker::{self, Worker, WorkerAvailability, WorkerClient};
 use crate::{ssl, Token};
-use std::pin::Pin;
-use std::task::Context;
 
 /// Server builder
 pub struct ServerBuilder {
@@ -303,7 +303,7 @@ impl ServerBuilder {
 
             // handle signals
             if !self.no_signals {
-                Signals::start(self.server.clone());
+                // Signals::start(self.server.clone());
             }
 
             // start http server actor
@@ -342,37 +342,37 @@ impl ServerBuilder {
                 self.accept.send(Command::Resume);
                 let _ = tx.send(());
             }
-            ServerCommand::Signal(sig) => {
-                // Signals support
-                // Handle `SIGINT`, `SIGTERM`, `SIGQUIT` signals and stop actix system
-                match sig {
-                    Signal::Int => {
-                        info!("SIGINT received, exiting");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: false,
-                            completion: None,
-                        })
-                    }
-                    Signal::Term => {
-                        info!("SIGTERM received, stopping");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: true,
-                            completion: None,
-                        })
-                    }
-                    Signal::Quit => {
-                        info!("SIGQUIT received, exiting");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: false,
-                            completion: None,
-                        })
-                    }
-                    _ => (),
-                }
-            }
+            // ServerCommand::Signal(sig) => {
+            // Signals support
+            // Handle `SIGINT`, `SIGTERM`, `SIGQUIT` signals and stop actix system
+            // match sig {
+            //     Signal::Int => {
+            //         info!("SIGINT received, exiting");
+            //         self.exit = true;
+            //         self.handle_cmd(ServerCommand::Stop {
+            //             graceful: false,
+            //             completion: None,
+            //         })
+            //     }
+            //     Signal::Term => {
+            //         info!("SIGTERM received, stopping");
+            //         self.exit = true;
+            //         self.handle_cmd(ServerCommand::Stop {
+            //             graceful: true,
+            //             completion: None,
+            //         })
+            //     }
+            //     Signal::Quit => {
+            //         info!("SIGQUIT received, exiting");
+            //         self.exit = true;
+            //         self.handle_cmd(ServerCommand::Stop {
+            //             graceful: false,
+            //             completion: None,
+            //         })
+            //     }
+            //     _ => (),
+            // }
+            // }
             ServerCommand::Stop {
                 graceful,
                 completion,
@@ -397,7 +397,7 @@ impl ServerBuilder {
                                 if exit {
                                     spawn(
                                         async {
-                                            tokio_timer::sleep(Duration::from_millis(300))
+                                            delay(Instant::now() + Duration::from_millis(300))
                                                 .await;
                                             System::current().stop();
                                         }
@@ -410,17 +410,19 @@ impl ServerBuilder {
                 } else {
                     // we need to stop system if server was spawned
                     if self.exit {
-                        spawn(sleep(Duration::from_millis(300)).then(|_| {
-                            System::current().stop();
-                            ready(())
-                        }));
+                        spawn(
+                            delay(Instant::now() + Duration::from_millis(300)).then(|_| {
+                                System::current().stop();
+                                ready(())
+                            }),
+                        );
                     }
                     if let Some(tx) = completion {
                         let _ = tx.send(());
                     }
                 }
             }
-            ServerCommand::WorkerDied(idx) => {
+            ServerCommand::WorkerFaulted(idx) => {
                 let mut found = false;
                 for i in 0..self.workers.len() {
                     if self.workers[i].0 == idx {

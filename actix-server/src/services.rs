@@ -1,19 +1,18 @@
 use std::marker::PhantomData;
 use std::net::SocketAddr;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use actix_rt::spawn;
 use actix_server_config::{Io, ServerConfig};
-use actix_service::{NewService, Service, ServiceExt};
+use actix_service::{Factory, Service};
 use futures::future::{err, ok, LocalBoxFuture, Ready};
-use futures::{Future, FutureExt, Poll, StreamExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt};
 use log::error;
 
 use super::Token;
 use crate::counter::CounterGuard;
 use crate::socket::{FromStream, StdStream};
-use std::pin::Pin;
-use std::task::Context;
 
 /// Server message
 pub(crate) enum ServerMessage {
@@ -26,7 +25,7 @@ pub(crate) enum ServerMessage {
 }
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
-    type NewService: NewService<Config = ServerConfig, Request = Io<Stream>>;
+    type NewService: Factory<Config = ServerConfig, Request = Io<Stream>>;
 
     fn create(&self) -> Self::NewService;
 }
@@ -70,18 +69,10 @@ where
     type Error = ();
     type Future = Ready<Result<(), ()>>;
 
-    fn poll_ready(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
-        unimplemented!()
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.service.poll_ready(ctx).map_err(|_| ())
     }
 
-    /*
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.service.poll_ready().map_err(|_| ())
-    }
-    */
     fn call(&mut self, (guard, req): (Option<CounterGuard>, ServerMessage)) -> Self::Future {
         match req {
             ServerMessage::Connect(stream) => {
@@ -93,7 +84,7 @@ where
                     let f = self.service.call(Io::new(stream));
                     spawn(
                         async move {
-                            f.await;
+                            let _ = f.await;
                             drop(guard);
                         }
                             .boxed_local(),
@@ -189,7 +180,7 @@ impl InternalServiceFactory for Box<dyn InternalServiceFactory> {
 impl<F, T, I> ServiceFactory<I> for F
 where
     F: Fn() -> T + Send + Clone + 'static,
-    T: NewService<Config = ServerConfig, Request = Io<I>>,
+    T: Factory<Config = ServerConfig, Request = Io<I>>,
     I: FromStream,
 {
     type NewService = T;

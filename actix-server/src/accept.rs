@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use std::{io, thread};
 
 use actix_rt::System;
-
+use futures::FutureExt;
 use log::{error, info};
 use slab::Slab;
 use tokio_timer::delay;
@@ -12,7 +12,6 @@ use crate::server::Server;
 use crate::socket::{SocketAddr, SocketListener, StdListener};
 use crate::worker::{Conn, WorkerClient};
 use crate::Token;
-use futures::{Future, FutureExt};
 
 pub(crate) enum Command {
     Pause,
@@ -371,7 +370,7 @@ impl Accept {
                 match self.workers[self.next].send(msg) {
                     Ok(_) => (),
                     Err(tmp) => {
-                        self.srv.worker_died(self.workers[self.next].idx);
+                        self.srv.worker_faulted(self.workers[self.next].idx);
                         msg = tmp;
                         self.workers.swap_remove(self.next);
                         if self.workers.is_empty() {
@@ -397,7 +396,7 @@ impl Accept {
                             return;
                         }
                         Err(tmp) => {
-                            self.srv.worker_died(self.workers[self.next].idx);
+                            self.srv.worker_faulted(self.workers[self.next].idx);
                             msg = tmp;
                             self.workers.swap_remove(self.next);
                             if self.workers.is_empty() {
@@ -444,7 +443,7 @@ impl Accept {
                         System::current().arbiter().send(
                             async move {
                                 delay(Instant::now() + Duration::from_millis(510)).await;
-                                r.set_readiness(mio::Ready::readable());
+                                let _ = r.set_readiness(mio::Ready::readable());
                             }
                                 .boxed(),
                         );

@@ -1,23 +1,22 @@
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::{mem, task, time};
+use std::task::{Context, Poll};
+use std::{mem, time};
 
+use actix_rt::{spawn, Arbiter};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
-use futures::{future, Future, Poll, Stream, TryFutureExt};
-use futures::{FutureExt, StreamExt};
+use futures::future::{join_all, LocalBoxFuture, MapOk};
+use futures::{Future, FutureExt, Stream, TryFutureExt};
 use log::{error, info, trace};
-use tokio_timer::{sleep, Delay};
+use tokio_timer::{delay, Delay};
 
 use crate::accept::AcceptNotify;
 use crate::counter::Counter;
 use crate::services::{BoxedServerService, InternalServiceFactory, ServerMessage};
 use crate::socket::{SocketAddr, StdStream};
 use crate::Token;
-use actix_rt::spawn;
-use futures::future::{LocalBoxFuture, MapOk};
-use std::pin::Pin;
-use std::task::Context;
 
 pub(crate) struct WorkerCommand(Conn);
 
@@ -167,8 +166,8 @@ impl Worker {
         }
 
         spawn(
-            async {
-                let mut res = future::join_all(fut).await;
+            async move {
+                let res = join_all(fut).await;
                 let res: Result<Vec<_>, _> = res.into_iter().collect();
                 match res {
                     Ok(services) => {
@@ -177,12 +176,13 @@ impl Worker {
                                 while token.0 >= wrk.services.len() {
                                     wrk.services.push(None);
                                 }
+                                wrk.services[token.0] = Some((idx, service));
                             }
                         }
-                        Ok::<_, ()>(wrk);
                     }
                     Err(e) => {
-                        //return Err(e);
+                        error!("Can not start worker: {:?}", e);
+                        Arbiter::current().stop();
                     }
                 }
             }
@@ -212,8 +212,7 @@ impl Worker {
         trace: bool,
         cx: &mut Context<'_>,
     ) -> Result<bool, (Token, usize)> {
-        /*
-        let mut ready = self.conns.available();
+        let mut ready = self.conns.available(cx);
         let mut failed = None;
         for (token, service) in &mut self.services.iter_mut().enumerate() {
             if let Some(service) = service {
@@ -226,7 +225,7 @@ impl Worker {
                             );
                         }
                     }
-                    Poll::NotReady => ready = false,
+                    Poll::Pending => ready = false,
                     Poll::Ready(Err(_)) => {
                         error!(
                             "Service {:?} readiness check returned error, restarting",
@@ -241,8 +240,7 @@ impl Worker {
             Err(idx)
         } else {
             Ok(ready)
-        }*/
-        unimplemented!()
+        }
     }
 }
 
@@ -253,7 +251,7 @@ enum WorkerState {
     Restarting(
         usize,
         Token,
-        Box<dyn Future<Output = Result<Vec<(Token, BoxedServerService)>, ()>>>,
+        Pin<Box<dyn Future<Output = Result<Vec<(Token, BoxedServerService)>, ()>>>>,
     ),
     Shutdown(Delay, Delay, oneshot::Sender<bool>),
 }
@@ -261,39 +259,36 @@ enum WorkerState {
 impl Future for Worker {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        unimplemented!()
-    }
-
-    /*
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // `StopWorker` message handler
-        if let Ok(Async::Ready(Some(StopCommand { graceful, result }))) = self.rx2.poll() {
+        if let Poll::Ready(Some(StopCommand { graceful, result })) =
+            Pin::new(&mut self.rx2).poll_next(cx)
+        {
             self.availability.set(false);
             let num = num_connections();
             if num == 0 {
                 info!("Shutting down worker, 0 connections");
                 let _ = result.send(true);
-                return Ok(Async::Ready(()));
+                return Poll::Ready(());
             } else if graceful {
                 self.shutdown(false);
                 let num = num_connections();
                 if num != 0 {
                     info!("Graceful worker shutdown, {} connections", num);
                     self.state = WorkerState::Shutdown(
-                        sleep(time::Duration::from_secs(1)),
-                        sleep(self.shutdown_timeout),
+                        delay(time::Instant::now() + time::Duration::from_secs(1)),
+                        delay(time::Instant::now() + self.shutdown_timeout),
                         result,
                     );
                 } else {
                     let _ = result.send(true);
-                    return Ok(Async::Ready(()));
+                    return Poll::Ready(());
                 }
             } else {
                 info!("Force shutdown worker, {} connections", num);
                 self.shutdown(true);
                 let _ = result.send(false);
-                return Ok(Async::Ready(()));
+                return Poll::Ready(());
             }
         }
 
@@ -301,13 +296,13 @@ impl Future for Worker {
 
         match state {
             WorkerState::Unavailable(mut conns) => {
-                match self.check_readiness(true) {
+                match self.check_readiness(true, cx) {
                     Ok(true) => {
                         self.state = WorkerState::Available;
 
                         // process requests from wait queue
                         while let Some(msg) = conns.pop() {
-                            match self.check_readiness(false) {
+                            match self.check_readiness(false, cx) {
                                 Ok(true) => {
                                     let guard = self.conns.get();
                                     let _ = self.services[msg.token.0]
@@ -319,7 +314,7 @@ impl Future for Worker {
                                 Ok(false) => {
                                     trace!("Worker is unavailable");
                                     self.state = WorkerState::Unavailable(conns);
-                                    return self.poll();
+                                    return self.poll(cx);
                                 }
                                 Err((token, idx)) => {
                                     trace!(
@@ -331,16 +326,16 @@ impl Future for Worker {
                                         token,
                                         self.factories[idx].create(),
                                     );
-                                    return self.poll();
+                                    return self.poll(cx);
                                 }
                             }
                         }
                         self.availability.set(true);
-                        return self.poll();
+                        return self.poll(cx);
                     }
                     Ok(false) => {
                         self.state = WorkerState::Unavailable(conns);
-                        return Ok(Async::NotReady);
+                        return Poll::Pending;
                     }
                     Err((token, idx)) => {
                         trace!(
@@ -349,13 +344,13 @@ impl Future for Worker {
                         );
                         self.state =
                             WorkerState::Restarting(idx, token, self.factories[idx].create());
-                        return self.poll();
+                        return self.poll(cx);
                     }
                 }
             }
             WorkerState::Restarting(idx, token, mut fut) => {
-                match fut.poll() {
-                    Ok(Async::Ready(item)) => {
+                match Pin::new(&mut fut).poll(cx) {
+                    Poll::Ready(Ok(item)) => {
                         for (token, service) in item {
                             trace!(
                                 "Service {:?} has been restarted",
@@ -365,55 +360,55 @@ impl Future for Worker {
                             self.state = WorkerState::Unavailable(Vec::new());
                         }
                     }
-                    Ok(Async::NotReady) => {
-                        self.state = WorkerState::Restarting(idx, token, fut);
-                        return Ok(Async::NotReady);
-                    }
-                    Err(_) => {
+                    Poll::Ready(Err(_)) => {
                         panic!(
                             "Can not restart {:?} service",
                             self.factories[idx].name(token)
                         );
                     }
+                    Poll::Pending => {
+                        self.state = WorkerState::Restarting(idx, token, fut);
+                        return Poll::Pending;
+                    }
                 }
-                return self.poll();
+                return self.poll(cx);
             }
             WorkerState::Shutdown(mut t1, mut t2, tx) => {
                 let num = num_connections();
                 if num == 0 {
                     let _ = tx.send(true);
                     Arbiter::current().stop();
-                    return Ok(Async::Ready(()));
+                    return Poll::Ready(());
                 }
 
                 // check graceful timeout
-                match t2.poll().unwrap() {
-                    Async::NotReady => (),
-                    Async::Ready(_) => {
+                match Pin::new(&mut t2).poll(cx) {
+                    Poll::Pending => (),
+                    Poll::Ready(_) => {
                         self.shutdown(true);
                         let _ = tx.send(false);
                         Arbiter::current().stop();
-                        return Ok(Async::Ready(()));
+                        return Poll::Ready(());
                     }
                 }
 
                 // sleep for 1 second and then check again
-                match t1.poll().unwrap() {
-                    Async::NotReady => (),
-                    Async::Ready(_) => {
-                        t1 = sleep(time::Duration::from_secs(1));
-                        let _ = t1.poll();
+                match Pin::new(&mut t1).poll(cx) {
+                    Poll::Pending => (),
+                    Poll::Ready(_) => {
+                        t1 = delay(time::Instant::now() + time::Duration::from_secs(1));
+                        let _ = Pin::new(&mut t1).poll(cx);
                     }
                 }
                 self.state = WorkerState::Shutdown(t1, t2, tx);
-                return Ok(Async::NotReady);
+                return Poll::Pending;
             }
             WorkerState::Available => {
                 loop {
-                    match self.rx.poll() {
+                    match Pin::new(&mut self.rx).poll_next(cx) {
                         // handle incoming tcp stream
-                        Ok(Async::Ready(Some(WorkerCommand(msg)))) => {
-                            match self.check_readiness(false) {
+                        Poll::Ready(Some(WorkerCommand(msg))) => {
+                            match self.check_readiness(false, cx) {
                                 Ok(true) => {
                                     let guard = self.conns.get();
                                     let _ = self.services[msg.token.0]
@@ -441,18 +436,17 @@ impl Future for Worker {
                                     );
                                 }
                             }
-                            return self.poll();
+                            return self.poll(cx);
                         }
-                        Ok(Async::NotReady) => {
+                        Poll::Pending => {
                             self.state = WorkerState::Available;
-                            return Ok(Async::NotReady);
+                            return Poll::Pending;
                         }
-                        Ok(Async::Ready(None)) | Err(_) => return Ok(Async::Ready(())),
+                        Poll::Ready(None) => return Poll::Ready(()),
                     }
                 }
             }
             WorkerState::None => panic!(),
         };
     }
-    */
 }

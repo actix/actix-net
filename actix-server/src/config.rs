@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 use std::{fmt, io, net};
 
-use crate::counter::CounterGuard;
 use actix_server_config::{Io, ServerConfig};
-use actix_service::{IntoNewService, NewService, ServiceExt};
-use futures::future::{join_all, Future, FutureExt, LocalBoxFuture, TryFutureExt};
+use actix_service::{Factory, IntoFactory};
+use futures::future::{Future, FutureExt, LocalBoxFuture};
 use log::error;
-use std::pin::Pin;
 use tokio_net::tcp::TcpStream;
 
 use super::builder::bind_addr;
@@ -14,7 +12,7 @@ use super::services::{
     BoxedServerService, InternalServiceFactory, ServerMessage, StreamService,
 };
 use super::Token;
-use std::process::Output;
+use crate::counter::CounterGuard;
 
 pub struct ServiceConfig {
     pub(crate) services: Vec<(String, net::TcpListener)>,
@@ -115,7 +113,7 @@ impl InternalServiceFactory for ConfiguredService {
         self.rt.configure(&mut rt);
         rt.validate();
 
-        let mut names = self.names.clone();
+        let names = self.names.clone();
 
         // construct services
         async move {
@@ -197,23 +195,20 @@ impl ServiceRuntime {
     /// *ServiceConfig::bind()* or *ServiceConfig::listen()* methods.
     pub fn service<T, F>(&mut self, name: &str, service: F)
     where
-        F: IntoNewService<T>,
-        T: NewService<Config = ServerConfig, Request = Io<TcpStream>> + 'static,
+        F: IntoFactory<T>,
+        T: Factory<Config = ServerConfig, Request = Io<TcpStream>> + 'static,
         T::Future: 'static,
         T::Service: 'static,
         T::InitError: fmt::Debug,
     {
         // let name = name.to_owned();
         if let Some(token) = self.names.get(name) {
-
-
             self.services.insert(
-                 token.clone(),
-                 Box::new(ServiceFactory {
-                     inner: service.into_new_service(),
-                 }),
-             );
-
+                token.clone(),
+                Box::new(ServiceFactory {
+                    inner: service.into_factory(),
+                }),
+            );
         } else {
             panic!("Unknown service: {:?}", name);
         }
@@ -229,7 +224,7 @@ impl ServiceRuntime {
 }
 
 type BoxedNewService = Box<
-    dyn NewService<
+    dyn Factory<
         Request = (Option<CounterGuard>, ServerMessage),
         Response = (),
         Error = (),
@@ -244,9 +239,9 @@ struct ServiceFactory<T> {
     inner: T,
 }
 
-impl<T> NewService for ServiceFactory<T>
+impl<T> Factory for ServiceFactory<T>
 where
-    T: NewService<Config = ServerConfig, Request = Io<TcpStream>>,
+    T: Factory<Config = ServerConfig, Request = Io<TcpStream>>,
     T::Future: 'static,
     T::Service: 'static,
     T::Error: 'static,
@@ -260,14 +255,15 @@ where
     type Service = BoxedServerService;
     type Future = LocalBoxFuture<'static, Result<BoxedServerService, ()>>;
 
-    // Box<dyn Future<Output=Result<Vec<(Token, BoxedServerService)>, ()>>>;
-
     fn new_service(&self, cfg: &ServerConfig) -> Self::Future {
         let fut = self.inner.new_service(cfg);
         async move {
             return match fut.await {
                 Ok(s) => Ok(Box::new(StreamService::new(s)) as BoxedServerService),
-                Err(e) => Err(()),
+                Err(e) => {
+                    error!("Can not construct service: {:?}", e);
+                    Err(())
+                }
             };
         }
             .boxed_local()
