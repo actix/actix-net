@@ -31,10 +31,11 @@ where
 }
 
 /// Create `ServiceFactory` for function that can produce services
-pub fn service_fn_factory<S, F, Cfg, Fut, Err>(
+pub fn factory_fn<S, F, Cfg, Fut, Err>(
     f: F,
 ) -> impl ServiceFactory<
     Config = Cfg,
+    Service = S,
     Request = S::Request,
     Response = S::Response,
     Error = S::Error,
@@ -50,10 +51,11 @@ where
 }
 
 /// Create `ServiceFactory` for function that can produce services with configuration
-pub fn service_fn_config<F, Fut, Cfg, Srv, Err>(
+pub fn factory_fn_cfg<F, Fut, Cfg, Srv, Err>(
     f: F,
 ) -> impl ServiceFactory<
     Config = Cfg,
+    Service = Srv,
     Request = Srv::Request,
     Response = Srv::Response,
     Error = Srv::Error,

@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use crate::transform_err::{TransformFromErr, TransformMapInitErr};
+use crate::transform_err::TransformMapInitErr;
 use crate::{IntoServiceFactory, Service, ServiceFactory};
 
 use pin_project::pin_project;
@@ -49,32 +49,6 @@ pub trait Transform<S> {
     {
         TransformMapInitErr::new(self, f)
     }
-
-    /// Map this service's init error to any error implementing `From` for
-    /// this service`s `Error`.
-    ///
-    /// Note that this function consumes the receiving transform and returns a
-    /// wrapped version of it.
-    fn from_err<E>(self) -> TransformFromErr<Self, S, E>
-    where
-        Self: Sized,
-        E: From<Self::InitError>,
-    {
-        TransformFromErr::new(self)
-    }
-
-    // /// Map this service's init error to service's init error
-    // /// if it is implementing `Into` to this service`s `InitError`.
-    // ///
-    // /// Note that this function consumes the receiving transform and returns a
-    // /// wrapped version of it.
-    // fn into_err<E>(self) -> TransformIntoErr<Self, S>
-    // where
-    //     Self: Sized,
-    //     Self::InitError: From<Self::InitError>,
-    // {
-    //     TransformFromErr::new(self)
-    // }
 }
 
 impl<T, S> Transform<S> for Rc<T>
@@ -127,10 +101,10 @@ where
     }
 }
 
-/// Apply transform to service factory. Function returns
+/// Apply transform to a service. Function returns
 /// services factory that in initialization creates
 /// service and applies transform to this service.
-pub fn apply_transform<T, S, F, U>(
+pub fn apply<T, S, F, U>(
     t: F,
     service: U,
 ) -> impl ServiceFactory<

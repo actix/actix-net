@@ -39,12 +39,11 @@ actix-utils = "0.4.0"
 actix-rt = "0.2.5"
 derive_more = "0.15"
 either = "1.5.2"
-futures = "0.1.25"
+futures = "0.3.1"
 http = { version = "0.1.17", optional = true }
 log = "0.4"
-tokio-tcp = "0.1.3"
-tokio-current-thread = "0.1.5"
-trust-dns-resolver = { version="0.11.0", default-features = false }
+tokio-net = "=0.2.0-alpha.6"
+trust-dns-resolver = { version="0.18.0-alpha.1", default-features = false }
 
 # openssl
 openssl = { version="0.10", optional = true }
