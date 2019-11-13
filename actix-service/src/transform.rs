@@ -83,29 +83,11 @@ where
     }
 }
 
-/// Trait for types that can be converted to a *transform service*
-pub trait IntoTransform<T, S>
-where
-    T: Transform<S>,
-{
-    /// Convert to a `TransformService`
-    fn into_transform(self) -> T;
-}
-
-impl<T, S> IntoTransform<T, S> for T
-where
-    T: Transform<S>,
-{
-    fn into_transform(self) -> T {
-        self
-    }
-}
-
 /// Apply transform to a service. Function returns
 /// services factory that in initialization creates
 /// service and applies transform to this service.
 pub fn apply<T, S, F, U>(
-    t: F,
+    t: T,
     service: U,
 ) -> impl ServiceFactory<
     Config = S::Config,
@@ -118,14 +100,13 @@ pub fn apply<T, S, F, U>(
 where
     S: ServiceFactory,
     T: Transform<S::Service, InitError = S::InitError>,
-    F: IntoTransform<T, S::Service>,
     U: IntoServiceFactory<S>,
 {
-    ApplyTransform::new(t.into_transform(), service.into_factory())
+    ApplyTransform::new(t, service.into_factory())
 }
 
 /// `Apply` transform to new service
-pub struct ApplyTransform<T, S> {
+struct ApplyTransform<T, S> {
     s: Rc<S>,
     t: Rc<T>,
 }
@@ -136,10 +117,10 @@ where
     T: Transform<S::Service, InitError = S::InitError>,
 {
     /// Create new `ApplyTransform` new service instance
-    pub fn new<F: IntoTransform<T, S::Service>>(t: F, service: S) -> Self {
+    fn new(t: T, service: S) -> Self {
         Self {
             s: Rc::new(service),
-            t: Rc::new(t.into_transform()),
+            t: Rc::new(t),
         }
     }
 }
@@ -175,8 +156,9 @@ where
         }
     }
 }
+
 #[pin_project]
-pub struct ApplyTransformFuture<T, S>
+struct ApplyTransformFuture<T, S>
 where
     S: ServiceFactory,
     T: Transform<S::Service, InitError = S::InitError>,
