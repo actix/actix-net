@@ -3,10 +3,7 @@ use std::marker::PhantomData;
 use std::task::{Context, Poll};
 
 use actix_service::{Service, ServiceFactory};
-use futures::{
-    future::{self, LocalBoxFuture},
-    FutureExt as _, TryFutureExt as _,
-};
+use futures::future::{self, FutureExt as _, LocalBoxFuture, TryFutureExt as _};
 use native_tls::Error;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tls::{TlsAcceptor, TlsStream};

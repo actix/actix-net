@@ -1,18 +1,18 @@
+use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
-use actix_service::{NewService, Service};
-use futures::{future::ok, future::Ready, Future, FutureExt, Poll};
-use openssl::ssl::SslAcceptor;
+use actix_service::{Service, ServiceFactory};
+use futures::future::{ok, FutureExt, LocalBoxFuture, Ready};
+use open_ssl::ssl::SslAcceptor;
+use pin_project::pin_project;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_openssl::{HandshakeError, SslStream};
 
 use crate::counter::{Counter, CounterGuard};
 use crate::ssl::MAX_CONN_COUNTER;
 use crate::{Io, Protocol, ServerConfig};
-use futures::future::LocalBoxFuture;
-use std::io;
-use std::pin::Pin;
-use std::task::Context;
 
 /// Support `SSL` connections via openssl package
 ///
@@ -41,7 +41,7 @@ impl<T: AsyncRead + AsyncWrite, P> Clone for OpensslAcceptor<T, P> {
     }
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin + 'static, P> NewService for OpensslAcceptor<T, P> {
+impl<T: AsyncRead + AsyncWrite + Unpin + 'static, P> ServiceFactory for OpensslAcceptor<T, P> {
     type Request = Io<T, P>;
     type Response = Io<SslStream<T>, P>;
     type Error = HandshakeError<T>;
@@ -75,22 +75,13 @@ impl<T: AsyncRead + AsyncWrite + Unpin + 'static, P> Service for OpensslAcceptor
     type Error = HandshakeError<T>;
     type Future = OpensslAcceptorServiceFut<T, P>;
 
-    fn poll_ready(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
-        unimplemented!()
-    }
-
-    /*
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        if self.conns.available() {
-            Ok(Async::Ready(()))
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.conns.available(ctx) {
+            Poll::Ready(Ok(()))
         } else {
-            Ok(Async::NotReady)
+            Poll::Pending
         }
     }
-    */
 
     fn call(&mut self, req: Self::Request) -> Self::Future {
         let (io, params, _) = req.into_parts();
@@ -107,10 +98,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin + 'static, P> Service for OpensslAcceptor
     }
 }
 
+#[pin_project]
 pub struct OpensslAcceptorServiceFut<T, P>
 where
     T: AsyncRead + AsyncWrite,
 {
+    #[pin]
     fut: LocalBoxFuture<'static, Result<SslStream<T>, HandshakeError<T>>>,
     params: Option<P>,
     _guard: CounterGuard,
@@ -120,16 +113,10 @@ impl<T: AsyncRead + AsyncWrite, P> Future for OpensslAcceptorServiceFut<T, P> {
     type Output = Result<Io<SslStream<T>, P>, HandshakeError<T>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        unimplemented!()
-    }
+        let this = self.project();
 
-    /*
-    type Item = Io<SslStream<T>, P>;
-    type Error = HandshakeError<T>;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let io = futures::ready!(self.fut.poll())?;
-        let proto = if let Some(protos) = io.get_ref().ssl().selected_alpn_protocol() {
+        let io = futures::ready!(this.fut.poll(cx))?;
+        let proto = if let Some(protos) = io.ssl().selected_alpn_protocol() {
             const H2: &[u8] = b"\x02h2";
             const HTTP10: &[u8] = b"\x08http/1.0";
             const HTTP11: &[u8] = b"\x08http/1.1";
@@ -146,11 +133,7 @@ impl<T: AsyncRead + AsyncWrite, P> Future for OpensslAcceptorServiceFut<T, P> {
         } else {
             Protocol::Unknown
         };
-        Ok(Async::Ready(Io::from_parts(
-            io,
-            self.params.take().unwrap(),
-            proto,
-        )))
+
+        Poll::Ready(Ok(Io::from_parts(io, this.params.take().unwrap(), proto)))
     }
-    */
 }

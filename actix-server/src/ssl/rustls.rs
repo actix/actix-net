@@ -1,18 +1,20 @@
+use std::future::Future;
 use std::io;
 use std::marker::PhantomData;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
-use actix_service::{NewService, Service};
-use futures::{future::ok, future::FutureResult, Async, Future, Poll};
-use rustls::ServerConfig;
+use actix_service::{Service, ServiceFactory};
+use futures::future::{ok, Ready};
+use pin_project::pin_project;
+use rust_tls::ServerConfig;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_rustls::{server::TlsStream, Accept, TlsAcceptor};
 
 use crate::counter::{Counter, CounterGuard};
 use crate::ssl::MAX_CONN_COUNTER;
 use crate::{Io, Protocol, ServerConfig as SrvConfig};
-use std::pin::Pin;
-use std::task::Context;
 
 /// Support `SSL` connections via rustls package
 ///
@@ -41,7 +43,7 @@ impl<T, P> Clone for RustlsAcceptor<T, P> {
     }
 }
 
-impl<T: AsyncRead + AsyncWrite, P> NewService for RustlsAcceptor<T, P> {
+impl<T: AsyncRead + AsyncWrite, P> ServiceFactory for RustlsAcceptor<T, P> {
     type Request = Io<T, P>;
     type Response = Io<TlsStream<T>, P>;
     type Error = io::Error;
@@ -49,7 +51,7 @@ impl<T: AsyncRead + AsyncWrite, P> NewService for RustlsAcceptor<T, P> {
     type Config = SrvConfig;
     type Service = RustlsAcceptorService<T, P>;
     type InitError = ();
-    type Future = FutureResult<Self::Service, Self::InitError>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, cfg: &SrvConfig) -> Self::Future {
         cfg.set_secure();
@@ -76,14 +78,11 @@ impl<T: AsyncRead + AsyncWrite, P> Service for RustlsAcceptorService<T, P> {
     type Error = io::Error;
     type Future = RustlsAcceptorServiceFut<T, P>;
 
-    fn poll_ready(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(cx) {
-            Ok(Async::Ready(()))
+            Poll::Ready(Ok(()))
         } else {
-            Ok(Async::NotReady)
+            Poll::Pending
         }
     }
 
@@ -97,24 +96,26 @@ impl<T: AsyncRead + AsyncWrite, P> Service for RustlsAcceptorService<T, P> {
     }
 }
 
+#[pin_project]
 pub struct RustlsAcceptorServiceFut<T, P>
 where
     T: AsyncRead + AsyncWrite,
 {
+    #[pin]
     fut: Accept<T>,
     params: Option<P>,
     _guard: CounterGuard,
 }
 
 impl<T: AsyncRead + AsyncWrite, P> Future for RustlsAcceptorServiceFut<T, P> {
-    type Item = Io<TlsStream<T>, P>;
-    type Error = io::Error;
+    type Output = Result<Io<TlsStream<T>, P>, io::Error>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let io = futures::try_ready!(self.fut.poll());
-        Ok(Async::Ready(Io::from_parts(
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let this = self.project();
+        let io = futures::ready!(this.fut.poll(cx));
+        Poll::Ready(Ok(Io::from_parts(
             io,
-            self.params.take().unwrap(),
+            this.params.take().unwrap(),
             Protocol::Unknown,
         )))
     }
