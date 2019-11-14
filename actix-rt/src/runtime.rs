@@ -84,9 +84,8 @@ impl Runtime {
     /// let mut rt = Runtime::new().unwrap();
     ///
     /// // Spawn a future onto the runtime
-    /// rt.spawn(future::lazy(|| {
+    /// rt.spawn(future::lazy(|_| {
     ///     println!("running on the runtime");
-    ///     Ok(())
     /// }));
     /// # }
     /// # pub fn main() {}

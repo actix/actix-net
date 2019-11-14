@@ -211,7 +211,6 @@ mod tests {
     use actix_service::Service;
     use futures::channel::oneshot;
     use futures::future::{lazy, LocalBoxFuture};
-    use futures::stream::{futures_unordered::FuturesUnordered, StreamExt};
 
     struct Srv;
 

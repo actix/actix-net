@@ -1,6 +1,6 @@
 [package]
 name = "actix-testing"
-version = "0.2.0"
+version = "0.3.0-alpha.1"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Actix testing utils"
 keywords = ["network", "framework", "async", "futures"]
@@ -18,8 +18,8 @@ path = "src/lib.rs"
 
 [dependencies]
 actix-rt = "1.0.0-alpha.1"
-actix-server = "0.7.0"
-actix-server-config = "0.2.0"
+actix-server = "0.8.0-alpha.1"
+actix-server-config = "0.3.0-alpha.1"
 actix-service = "1.0.0-alpha.1"
 
 log = "0.4"

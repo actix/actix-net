@@ -21,12 +21,12 @@ pub use self::rt::*;
 /// # Examples
 ///
 /// ```rust
-/// use actix_service::{service_fn, IntoNewService};
+/// use actix_service::{service_fn};
 /// use actix_testing::TestServer;
 ///
 /// fn main() {
 ///     let srv = TestServer::with(|| service_fn(
-///         |sock| {
+///         |sock| async move {
 ///             println!("New connection: {:?}", sock);
 ///             Ok::<_, ()>(())
 ///         }

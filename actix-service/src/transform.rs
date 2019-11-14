@@ -86,7 +86,7 @@ where
 /// Apply transform to a service. Function returns
 /// services factory that in initialization creates
 /// service and applies transform to this service.
-pub fn apply<T, S, F, U>(
+pub fn apply<T, S, U>(
     t: T,
     service: U,
 ) -> impl ServiceFactory<

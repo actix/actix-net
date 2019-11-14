@@ -1,6 +1,6 @@
 [package]
 name = "actix-server"
-version = "0.7.0"
+version = "0.8.0-alpha.1"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Actix server - General purpose tcp server"
 keywords = ["network", "framework", "async", "futures"]
@@ -32,7 +32,7 @@ rustls = ["rust-tls", "tokio-rustls", "webpki", "webpki-roots", "actix-server-co
 [dependencies]
 actix-rt = "1.0.0-alpha.1"
 actix-service = "1.0.0-alpha.1"
-actix-server-config = "0.2.0"
+actix-server-config = "0.3.0-alpha.1"
 
 log = "0.4"
 num_cpus = "1.0"
