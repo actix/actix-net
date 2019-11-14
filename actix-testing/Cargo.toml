@@ -17,10 +17,10 @@ name = "actix_testing"
 path = "src/lib.rs"
 
 [dependencies]
-actix-rt = "0.2.5"
+actix-rt = "1.0.0-alpha.1"
 actix-server = "0.7.0"
 actix-server-config = "0.2.0"
-actix-service = "0.4.2"
+actix-service = "1.0.0-alpha.1"
 
 log = "0.4"
 net2 = "0.2"

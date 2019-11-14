@@ -30,8 +30,8 @@ rustls = ["rust-tls", "tokio-rustls", "webpki", "webpki-roots", "actix-server-co
 # uds = ["mio-uds", "tokio-uds", "actix-server-config/uds"]
 
 [dependencies]
-actix-rt = "0.2.2"
-actix-service = "0.4.1"
+actix-rt = "1.0.0-alpha.1"
+actix-service = "1.0.0-alpha.1"
 actix-server-config = "0.2.0"
 
 log = "0.4"
@@ -67,5 +67,5 @@ webpki-roots = { version = "0.17", optional = true }
 
 [dev-dependencies]
 bytes = "0.4"
-actix-codec = "0.1.2"
+actix-codec = "0.2.0-alpha.1"
 env_logger = "0.6"

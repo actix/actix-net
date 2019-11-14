@@ -1,12 +1,16 @@
+use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::{fmt, io};
 
 use actix_codec::{AsyncRead, AsyncWrite};
-use actix_service::{NewService, Service};
-use futures::{future::ok, future::FutureResult, try_ready, Async, Future, Poll};
-use openssl::ssl::{HandshakeError, SslConnector};
+use actix_service::{Service, ServiceFactory};
+use futures::{future::ok, future::Ready, ready};
+use open_ssl::ssl::{HandshakeError, SslConnector};
+use pin_project::pin_project;
+use tokio_net::tcp::TcpStream;
 use tokio_openssl::{ConnectAsync, SslConnectorExt, SslStream};
-use tokio_tcp::TcpStream;
 use trust_dns_resolver::AsyncResolver;
 
 use crate::{
@@ -30,7 +34,7 @@ impl<T, U> OpensslConnector<T, U> {
 
 impl<T, U> OpensslConnector<T, U>
 where
-    T: Address,
+    T: Address + Unpin,
     U: AsyncRead + AsyncWrite + fmt::Debug,
 {
     pub fn service(
@@ -56,7 +60,7 @@ impl<T, U> Clone for OpensslConnector<T, U> {
     }
 }
 
-impl<T: Address, U> NewService for OpensslConnector<T, U>
+impl<T: Address + Unpin, U> ServiceFactory for OpensslConnector<T, U>
 where
     U: AsyncRead + AsyncWrite + fmt::Debug,
 {
@@ -66,7 +70,7 @@ where
     type Config = ();
     type Service = OpensslConnectorService<T, U>;
     type InitError = ();
-    type Future = FutureResult<Self::Service, Self::InitError>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: &()) -> Self::Future {
         ok(OpensslConnectorService {
@@ -90,7 +94,7 @@ impl<T, U> Clone for OpensslConnectorService<T, U> {
     }
 }
 
-impl<T: Address, U> Service for OpensslConnectorService<T, U>
+impl<T: Address + Unpin, U> Service for OpensslConnectorService<T, U>
 where
     U: AsyncRead + AsyncWrite + fmt::Debug,
 {
@@ -99,8 +103,8 @@ where
     type Error = HandshakeError<U>;
     type Future = ConnectAsyncExt<T, U>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(Async::Ready(()))
+    fn poll_ready(&mut self, _: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, stream: Connection<T, U>) -> Self::Future {
@@ -113,29 +117,33 @@ where
     }
 }
 
+#[pin_project]
 pub struct ConnectAsyncExt<T, U> {
+    #[pin]
     fut: ConnectAsync<U>,
     stream: Option<Connection<T, ()>>,
 }
 
-impl<T: Address, U> Future for ConnectAsyncExt<T, U>
+impl<T: Address + Unpin, U> Future for ConnectAsyncExt<T, U>
 where
     U: AsyncRead + AsyncWrite + fmt::Debug,
 {
-    type Item = Connection<T, SslStream<U>>;
-    type Error = HandshakeError<U>;
+    type Output = Result<Connection<T, SslStream<U>>, HandshakeError<U>>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        match self.fut.poll().map_err(|e| {
-            trace!("SSL Handshake error: {:?}", e);
-            e
-        })? {
-            Async::Ready(stream) => {
-                let s = self.stream.take().unwrap();
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let this = self.project();
+
+        match this.fut.poll(cx) {
+            Poll::Ready(Ok(stream)) => {
+                let s = this.stream.take().unwrap();
                 trace!("SSL Handshake success: {:?}", s.host());
-                Ok(Async::Ready(s.replace(stream).1))
+                Poll::Ready(Ok(s.replace(stream).1))
             }
-            Async::NotReady => Ok(Async::NotReady),
+            Poll::Ready(Err(e)) => {
+                trace!("SSL Handshake error: {:?}", e);
+                e
+            }
+            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -145,7 +153,7 @@ pub struct OpensslConnectServiceFactory<T> {
     openssl: OpensslConnector<T, TcpStream>,
 }
 
-impl<T> OpensslConnectServiceFactory<T> {
+impl<T: Unpin> OpensslConnectServiceFactory<T> {
     /// Construct new OpensslConnectService factory
     pub fn new(connector: SslConnector) -> Self {
         OpensslConnectServiceFactory {
@@ -183,14 +191,14 @@ impl<T> Clone for OpensslConnectServiceFactory<T> {
     }
 }
 
-impl<T: Address> NewService for OpensslConnectServiceFactory<T> {
+impl<T: Address + Unpin> ServiceFactory for OpensslConnectServiceFactory<T> {
     type Request = Connect<T>;
     type Response = SslStream<TcpStream>;
     type Error = ConnectError;
     type Config = ();
     type Service = OpensslConnectService<T>;
     type InitError = ();
-    type Future = FutureResult<Self::Service, Self::InitError>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: &()) -> Self::Future {
         ok(self.service())
@@ -203,14 +211,14 @@ pub struct OpensslConnectService<T> {
     openssl: OpensslConnectorService<T, TcpStream>,
 }
 
-impl<T: Address> Service for OpensslConnectService<T> {
+impl<T: Address + Unpin> Service for OpensslConnectService<T> {
     type Request = Connect<T>;
     type Response = SslStream<TcpStream>;
     type Error = ConnectError;
     type Future = OpensslConnectServiceResponse<T>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(Async::Ready(()))
+    fn poll_ready(&mut self, _: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: Connect<T>) -> Self::Future {
@@ -222,30 +230,36 @@ impl<T: Address> Service for OpensslConnectService<T> {
     }
 }
 
-pub struct OpensslConnectServiceResponse<T: Address> {
+pub struct OpensslConnectServiceResponse<T: Address + Unpin> {
     fut1: Option<<ConnectService<T> as Service>::Future>,
     fut2: Option<<OpensslConnectorService<T, TcpStream> as Service>::Future>,
     openssl: OpensslConnectorService<T, TcpStream>,
 }
 
-impl<T: Address> Future for OpensslConnectServiceResponse<T> {
-    type Item = SslStream<TcpStream>;
-    type Error = ConnectError;
+impl<T: Address + Unpin> Future for OpensslConnectServiceResponse<T> {
+    type Output = Result<SslStream<TcpStream>, ConnectError>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         if let Some(ref mut fut) = self.fut1 {
-            let res = try_ready!(fut.poll());
-            let _ = self.fut1.take();
-            self.fut2 = Some(self.openssl.call(res));
+            match ready!(Pin::new(fut).poll(cx)) {
+                Ok(res) => {
+                    let _ = self.fut1.take();
+                    self.fut2 = Some(self.openssl.call(res));
+                }
+                Err(e) => return Poll::Ready(Err(e.into())),
+            }
         }
 
         if let Some(ref mut fut) = self.fut2 {
-            let connect = try_ready!(fut
-                .poll()
-                .map_err(|e| ConnectError::Io(io::Error::new(io::ErrorKind::Other, e))));
-            Ok(Async::Ready(connect.into_parts().0))
+            match ready!(Pin::new(fut).poll(cx)) {
+                Ok(connect) => Poll::Ready(Ok(connect.into_parts().0)),
+                Err(e) => Poll::Ready(Err(ConnectError::Io(io::Error::new(
+                    io::ErrorKind::Other,
+                    e,
+                )))),
+            }
         } else {
-            Ok(Async::NotReady)
+            Poll::Pending
         }
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "actix-rt"
-version = "0.2.5"
+version = "1.0.0-alpha.1"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Actix runtime"
 keywords = ["network", "framework", "async", "futures"]

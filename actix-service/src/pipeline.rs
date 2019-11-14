@@ -110,7 +110,7 @@ impl<T: ServiceFactory> PipelineFactory<T> {
     /// Call another service after call to this one has resolved successfully.
     pub fn and_then<F, U>(
         self,
-        factory: U,
+        factory: F,
     ) -> PipelineFactory<
         impl ServiceFactory<
             Config = T::Config,
