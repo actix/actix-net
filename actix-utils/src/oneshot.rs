@@ -166,7 +166,7 @@ impl<T> Receiver<T> {
 
                 self.state = State::Closed(value);
             }
-            State::Closed(_) => {},
+            State::Closed(_) => {}
         };
     }
 }
