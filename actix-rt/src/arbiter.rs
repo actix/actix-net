@@ -98,41 +98,49 @@ impl Arbiter {
         let (arb_tx, arb_rx) = unbounded();
         let arb_tx2 = arb_tx.clone();
 
-        let handle = thread::Builder::new().name(name.clone()).spawn(move || {
-            let mut rt = Builder::new().build_rt().expect("Can not create Runtime");
-            let arb = Arbiter::with_sender(arb_tx);
+        let handle = thread::Builder::new()
+            .name(name.clone())
+            .spawn(move || {
+                let mut rt = Builder::new().build_rt().expect("Can not create Runtime");
+                let arb = Arbiter::with_sender(arb_tx);
 
-            let (stop, stop_rx) = channel();
-            RUNNING.with(|cell| cell.set(true));
-            STORAGE.with(|cell| cell.borrow_mut().clear());
+                let (stop, stop_rx) = channel();
+                RUNNING.with(|cell| cell.set(true));
+                STORAGE.with(|cell| cell.borrow_mut().clear());
 
-            System::set_current(sys);
+                System::set_current(sys);
 
-            // start arbiter controller
-            rt.spawn(ArbiterController {
-                stop: Some(stop),
-                rx: arb_rx,
+                // start arbiter controller
+                rt.spawn(ArbiterController {
+                    stop: Some(stop),
+                    rx: arb_rx,
+                });
+                ADDR.with(|cell| *cell.borrow_mut() = Some(arb.clone()));
+
+                // register arbiter
+                let _ = System::current()
+                    .sys()
+                    .unbounded_send(SystemCommand::RegisterArbiter(id, arb.clone()));
+
+                // run loop
+                let _ = match rt.block_on(stop_rx) {
+                    Ok(code) => code,
+                    Err(_) => 1,
+                };
+
+                // unregister arbiter
+                let _ = System::current()
+                    .sys()
+                    .unbounded_send(SystemCommand::UnregisterArbiter(id));
+            })
+            .unwrap_or_else(|err| {
+                panic!("Cannot spawn an arbiter's thread {:?}: {:?}", &name, err)
             });
-            ADDR.with(|cell| *cell.borrow_mut() = Some(arb.clone()));
 
-            // register arbiter
-            let _ = System::current()
-                .sys()
-                .unbounded_send(SystemCommand::RegisterArbiter(id, arb.clone()));
-
-            // run loop
-            let _ = match rt.block_on(stop_rx) {
-                Ok(code) => code,
-                Err(_) => 1,
-            };
-
-            // unregister arbiter
-            let _ = System::current()
-                .sys()
-                .unbounded_send(SystemCommand::UnregisterArbiter(id));
-        }).unwrap_or_else(|err| panic!("Cannot spawn an arbiter's thread {:?}: {:?}", &name, err));
-
-        Arbiter{sender: arb_tx2, thread_handle: Some(handle)}
+        Arbiter {
+            sender: arb_tx2,
+            thread_handle: Some(handle),
+        }
     }
 
     pub(crate) fn run_system() {
@@ -268,15 +276,17 @@ impl Arbiter {
     }
 
     fn with_sender(sender: UnboundedSender<ArbiterCommand>) -> Self {
-        Self{sender, thread_handle: None}
+        Self {
+            sender,
+            thread_handle: None,
+        }
     }
 
     /// Wait for the event loop to stop by joining the underlying thread (if have Some).
-    pub fn join(&mut self) -> thread::Result<()>{
+    pub fn join(&mut self) -> thread::Result<()> {
         if let Some(thread_handle) = self.thread_handle.take() {
             thread_handle.join()
-        }
-        else {
+        } else {
             Ok(())
         }
     }

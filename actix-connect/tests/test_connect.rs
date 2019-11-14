@@ -10,35 +10,39 @@ use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 
 use actix_connect::Connect;
 
-#[cfg(feature = "ssl")]
+#[cfg(feature = "openssl")]
 #[test]
 fn test_string() {
     let srv = TestServer::with(|| {
-        service_fn(|io: Io<tokio_tcp::TcpStream>| {
-            Framed::new(io.into_parts().0, BytesCodec)
-                .send(Bytes::from_static(b"test"))
-                .then(|_| Ok::<_, ()>(()))
+        service_fn(|io: Io<tokio_net::tcp::TcpStream>| {
+            async {
+                let mut framed = Framed::new(io.into_parts().0, BytesCodec);
+                framed.send(Bytes::from_static(b"test")).await?;
+                Ok::<_, io::Error>(())
+            }
         })
     });
 
-    let mut conn = default_connector();
+    let mut conn = actix_connect::default_connector();
     let addr = format!("localhost:{}", srv.port());
     let con = test::call_service(&mut conn, addr.into());
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(feature = "rust-tls")]
+#[cfg(feature = "rustls")]
 #[test]
 fn test_rustls_string() {
     let srv = TestServer::with(|| {
-        service_fn(|io: Io<tokio_tcp::TcpStream>| {
-            Framed::new(io.into_parts().0, BytesCodec)
-                .send(Bytes::from_static(b"test"))
-                .then(|_| Ok::<_, ()>(()))
+        service_fn(|io: Io<tokio_net::tcp::TcpStream>| {
+            async {
+                let mut framed = Framed::new(io.into_parts().0, BytesCodec);
+                framed.send(Bytes::from_static(b"test")).await?;
+                Ok::<_, io::Error>(())
+            }
         })
     });
 
-    let mut conn = default_connector();
+    let mut conn = actix_connect::default_connector();
     let addr = format!("localhost:{}", srv.port());
     let con = test::call_service(&mut conn, addr.into());
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
@@ -90,36 +94,44 @@ fn test_new_service() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(feature = "ssl")]
+#[cfg(feature = "openssl")]
 #[test]
 fn test_uri() {
+    use http::HttpTryFrom;
+
     let srv = TestServer::with(|| {
-        service_fn(|io: Io<tokio_tcp::TcpStream>| {
-            Framed::new(io.into_parts().0, BytesCodec)
-                .send(Bytes::from_static(b"test"))
-                .then(|_| Ok::<_, ()>(()))
+        service_fn(|io: Io<tokio_net::tcp::TcpStream>| {
+            async {
+                let mut framed = Framed::new(io.into_parts().0, BytesCodec);
+                framed.send(Bytes::from_static(b"test")).await?;
+                Ok::<_, io::Error>(())
+            }
         })
     });
 
-    let mut conn = default_connector();
-    let addr = Uri::try_from(format!("https://localhost:{}", srv.port())).unwrap();
+    let mut conn = actix_connect::default_connector();
+    let addr = http::Uri::try_from(format!("https://localhost:{}", srv.port())).unwrap();
     let con = test::call_service(&mut conn, addr.into());
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(feature = "rust-tls")]
+#[cfg(feature = "rustls")]
 #[test]
 fn test_rustls_uri() {
+    use http::HttpTryFrom;
+
     let srv = TestServer::with(|| {
-        service_fn(|io: Io<tokio_tcp::TcpStream>| {
-            Framed::new(io.into_parts().0, BytesCodec)
-                .send(Bytes::from_static(b"test"))
-                .then(|_| Ok::<_, ()>(()))
+        service_fn(|io: Io<tokio_net::tcp::TcpStream>| {
+            async {
+                let mut framed = Framed::new(io.into_parts().0, BytesCodec);
+                framed.send(Bytes::from_static(b"test")).await?;
+                Ok::<_, io::Error>(())
+            }
         })
     });
 
-    let mut conn = default_connector();
-    let addr = Uri::try_from(format!("https://localhost:{}", srv.port())).unwrap();
+    let mut conn = actix_connect::default_connector();
+    let addr = http::Uri::try_from(format!("https://localhost:{}", srv.port())).unwrap();
     let con = test::call_service(&mut conn, addr.into());
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
