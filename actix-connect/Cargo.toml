@@ -49,11 +49,12 @@ trust-dns-resolver = { version="0.18.0-alpha.1", default-features = false }
 
 # openssl
 open-ssl = { version="0.10", package = "openssl", optional = true }
-tokio-openssl = { version="0.3", optional = true }
+tokio-openssl = { version = "0.4.0-alpha.6", optional = true }
 
 #rustls
 rust-tls = { version = "0.16.0", package = "rustls", optional = true }
-tokio-rustls = { version = "0.10.0", optional = true }
+# tokio-rustls = { version = "0.10.0", optional = true }
+tokio-rustls = { git = "https://github.com/quininer/tokio-rustls.git", branch = "tokio-0.2", optional = true }
 webpki = { version = "0.21", optional = true }
 
 [dev-dependencies]

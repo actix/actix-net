@@ -6,7 +6,8 @@ mod openssl;
 pub use self::openssl::{
     OpensslConnectService, OpensslConnectServiceFactory, OpensslConnector,
 };
-// #[cfg(feature = "rustls")]
-// mod rustls;
-// #[cfg(feature = "rustls")]
-// pub use self::rustls::RustlsConnector;
+
+#[cfg(feature = "rustls")]
+mod rustls;
+#[cfg(feature = "rustls")]
+pub use self::rustls::RustlsConnector;
