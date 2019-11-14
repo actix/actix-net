@@ -183,60 +183,67 @@ where
 
 #[cfg(test)]
 mod tests {
-    // use futures::future::{ok, Ready};
-    // use futures::{Future, Poll, TryFutureExt};
+    use std::task::{Context, Poll};
 
-    // use super::*;
-    // use crate::{IntoService, NewService, Service, ServiceExt};
+    use futures::future::{lazy, ok, Ready};
 
-    // #[derive(Clone)]
-    // struct Srv;
+    use super::*;
+    use crate::{pipeline, pipeline_factory, Service, ServiceFactory};
 
-    // impl Service for Srv {
-    //     type Request = ();
-    //     type Response = ();
-    //     type Error = ();
-    //     type Future = Ready<Result<(), ()>>;
+    #[derive(Clone)]
+    struct Srv;
 
-    //     fn poll_ready(
-    //         self: Pin<&mut Self>,
-    //         ctx: &mut Context<'_>,
-    //     ) -> Poll<Result<(), Self::Error>> {
-    //         Poll::Ready(Ok(()))
-    //     }
+    impl Service for Srv {
+        type Request = ();
+        type Response = ();
+        type Error = ();
+        type Future = Ready<Result<(), ()>>;
 
-    //     fn call(&mut self, _: ()) -> Self::Future {
-    //         ok(())
-    //     }
-    // }
+        fn poll_ready(&mut self, _: &mut Context) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
 
-    // #[tokio::test]
-    // async fn test_call() {
-    //     let blank = |req| ok(req);
+        fn call(&mut self, _: ()) -> Self::Future {
+            ok(())
+        }
+    }
 
-    //     let mut srv = blank
-    //         .into_service()
-    //         .apply_fn(Srv, |req: &'static str, srv| {
-    //             srv.call(()).map_ok(move |res| (req, res))
-    //         });
-    //     assert_eq!(srv.poll_once().await, Poll::Ready(Ok(())));
-    //     let res = srv.call("srv").await;
-    //     assert!(res.is_ok());
-    //     assert_eq!(res.unwrap(), (("srv", ())));
-    // }
+    #[tokio::test]
+    async fn test_call() {
+        let mut srv = pipeline(apply_fn(Srv, |req: &'static str, srv| {
+            let fut = srv.call(());
+            async move {
+                let res = fut.await.unwrap();
+                Ok((req, res))
+            }
+        }));
 
-    // #[tokio::test]
-    // async fn test_new_service() {
-    //     let new_srv = ApplyNewService::new(
-    //         || ok::<_, ()>(Srv),
-    //         |req: &'static str, srv| srv.call(()).map_ok(move |res| (req, res)),
-    //     );
+        assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
 
-    //     let mut srv = new_srv.new_service(&()).await.unwrap();
+        let res = srv.call("srv").await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), (("srv", ())));
+    }
 
-    //     assert_eq!(srv.poll_once().await, Poll::Ready(Ok(())));
-    //     let res = srv.call("srv").await;
-    //     assert!(res.is_ok());
-    //     assert_eq!(res.unwrap(), (("srv", ())));
-    // }
+    #[tokio::test]
+    async fn test_new_service() {
+        let new_srv = pipeline_factory(apply_fn_factory(
+            || ok::<_, ()>(Srv),
+            |req: &'static str, srv| {
+                let fut = srv.call(());
+                async move {
+                    let res = fut.await.unwrap();
+                    Ok((req, res))
+                }
+            },
+        ));
+
+        let mut srv = new_srv.new_service(&()).await.unwrap();
+
+        assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
+
+        let res = srv.call("srv").await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), (("srv", ())));
+    }
 }

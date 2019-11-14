@@ -197,10 +197,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use futures::future::{ok, Ready};
+    use futures::future::{lazy, ok, Ready};
 
     use super::*;
-    use crate::{IntoServiceFactory, Service};
+    use crate::{into_factory, into_service, Service};
 
     struct Srv;
 
@@ -210,7 +210,7 @@ mod tests {
         type Error = ();
         type Future = Ready<Result<(), ()>>;
 
-        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(&mut self, _: &mut Context) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
 
@@ -219,28 +219,27 @@ mod tests {
         }
     }
 
-    // #[tokio::test]
-    // async fn test_poll_ready() {
-    //     let mut srv = Srv.map(|_| "ok");
-    //     let res = srv.poll_once().await;
-    //     assert_eq!(res, Poll::Ready(Ok(())));
-    // }
+    #[tokio::test]
+    async fn test_poll_ready() {
+        let mut srv = into_service(Srv).map(|_| "ok");
+        let res = lazy(|cx| srv.poll_ready(cx)).await;
+        assert_eq!(res, Poll::Ready(Ok(())));
+    }
 
-    // #[tokio::test]
-    // async fn test_call() {
-    //     let mut srv = Srv.map(|_| "ok");
-    //     let res = srv.call(()).await;
-    //     assert!(res.is_ok());
-    //     assert_eq!(res.unwrap(), "ok");
-    // }
+    #[tokio::test]
+    async fn test_call() {
+        let mut srv = into_service(Srv).map(|_| "ok");
+        let res = srv.call(()).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), "ok");
+    }
 
-    // #[tokio::test]
-    // async fn test_new_service() {
-    //     let blank = || ok::<_, ()>(Srv);
-    //     let new_srv = blank.into_new_service().map(|_| "ok");
-    //     let mut srv = new_srv.new_service(&()).await.unwrap();
-    //     let res = srv.call(()).await;
-    //     assert!(res.is_ok());
-    //     assert_eq!(res.unwrap(), ("ok"));
-    // }
+    #[tokio::test]
+    async fn test_new_service() {
+        let new_srv = into_factory(|| ok::<_, ()>(Srv)).map(|_| "ok");
+        let mut srv = new_srv.new_service(&()).await.unwrap();
+        let res = srv.call(()).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), ("ok"));
+    }
 }

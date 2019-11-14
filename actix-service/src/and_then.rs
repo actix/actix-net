@@ -251,86 +251,80 @@ where
 
 #[cfg(test)]
 mod tests {
-    // use futures::future::{ok, poll_fn, ready, Ready};
-    // use futures::Poll;
-    // use std::cell::Cell;
-    // use std::rc::Rc;
+    use std::cell::Cell;
+    use std::rc::Rc;
+    use std::task::{Context, Poll};
 
-    // use super::*;
-    // use crate::{NewService, Service, ServiceExt};
+    use futures::future::{lazy, ok, ready, Ready};
 
-    // struct Srv1(Rc<Cell<usize>>);
+    use crate::{factory_fn, pipeline, pipeline_factory, Service, ServiceFactory};
 
-    // impl Service for Srv1 {
-    //     type Request = &'static str;
-    //     type Response = &'static str;
-    //     type Error = ();
-    //     type Future = Ready<Result<Self::Response, ()>>;
+    struct Srv1(Rc<Cell<usize>>);
 
-    //     fn poll_ready(
-    //         self: Pin<&mut Self>,
-    //         cx: &mut Context<'_>,
-    //     ) -> Poll<Result<(), Self::Error>> {
-    //         self.0.set(self.0.get() + 1);
-    //         Poll::Ready(Ok(()))
-    //     }
+    impl Service for Srv1 {
+        type Request = &'static str;
+        type Response = &'static str;
+        type Error = ();
+        type Future = Ready<Result<Self::Response, ()>>;
 
-    //     fn call(&mut self, req: &'static str) -> Self::Future {
-    //         ok(req)
-    //     }
-    // }
+        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            self.0.set(self.0.get() + 1);
+            Poll::Ready(Ok(()))
+        }
 
-    // #[derive(Clone)]
-    // struct Srv2(Rc<Cell<usize>>);
+        fn call(&mut self, req: &'static str) -> Self::Future {
+            ok(req)
+        }
+    }
 
-    // impl Service for Srv2 {
-    //     type Request = &'static str;
-    //     type Response = (&'static str, &'static str);
-    //     type Error = ();
-    //     type Future = Ready<Result<Self::Response, ()>>;
+    #[derive(Clone)]
+    struct Srv2(Rc<Cell<usize>>);
 
-    //     fn poll_ready(
-    //         self: Pin<&mut Self>,
-    //         cx: &mut Context<'_>,
-    //     ) -> Poll<Result<(), Self::Error>> {
-    //         self.0.set(self.0.get() + 1);
-    //         Poll::Ready(Ok(()))
-    //     }
+    impl Service for Srv2 {
+        type Request = &'static str;
+        type Response = (&'static str, &'static str);
+        type Error = ();
+        type Future = Ready<Result<Self::Response, ()>>;
 
-    //     fn call(&mut self, req: &'static str) -> Self::Future {
-    //         ok((req, "srv2"))
-    //     }
-    // }
+        fn poll_ready(&mut self, _: &mut Context) -> Poll<Result<(), Self::Error>> {
+            self.0.set(self.0.get() + 1);
+            Poll::Ready(Ok(()))
+        }
 
-    // #[tokio::test]
-    // async fn test_poll_ready() {
-    //     let cnt = Rc::new(Cell::new(0));
-    //     let mut srv = Srv1(cnt.clone()).and_then(Srv2(cnt.clone()));
-    //     let res = srv.poll_once().await;
-    //     assert_eq!(res, Poll::Ready(Ok(())));
-    //     assert_eq!(cnt.get(), 2);
-    // }
+        fn call(&mut self, req: &'static str) -> Self::Future {
+            ok((req, "srv2"))
+        }
+    }
 
-    // #[tokio::test]
-    // async fn test_call() {
-    //     let cnt = Rc::new(Cell::new(0));
-    //     let mut srv = Srv1(cnt.clone()).and_then(Srv2(cnt));
-    //     let res = srv.call("srv1").await;
-    //     assert!(res.is_ok());
-    //     assert_eq!(res.unwrap(), (("srv1", "srv2")));
-    // }
+    #[tokio::test]
+    async fn test_poll_ready() {
+        let cnt = Rc::new(Cell::new(0));
+        let mut srv = pipeline(Srv1(cnt.clone())).and_then(Srv2(cnt.clone()));
+        let res = lazy(|cx| srv.poll_ready(cx)).await;
+        assert_eq!(res, Poll::Ready(Ok(())));
+        assert_eq!(cnt.get(), 2);
+    }
 
-    // #[tokio::test]
-    // async fn test_new_service() {
-    //     let cnt = Rc::new(Cell::new(0));
-    //     let cnt2 = cnt.clone();
-    //     let blank = move || ready(Ok::<_, ()>(Srv1(cnt2.clone())));
-    //     let new_srv = blank
-    //         .into_new_service()
-    //         .and_then(move || ready(Ok(Srv2(cnt.clone()))));
-    //     let mut srv = new_srv.new_service(&()).await.unwrap();
-    //     let res = srv.call("srv1").await;
-    //     assert!(res.is_ok());
-    //     assert_eq!(res.unwrap(), ("srv1", "srv2"));
-    // }
+    #[tokio::test]
+    async fn test_call() {
+        let cnt = Rc::new(Cell::new(0));
+        let mut srv = pipeline(Srv1(cnt.clone())).and_then(Srv2(cnt));
+        let res = srv.call("srv1").await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), (("srv1", "srv2")));
+    }
+
+    #[tokio::test]
+    async fn test_new_service() {
+        let cnt = Rc::new(Cell::new(0));
+        let cnt2 = cnt.clone();
+        let new_srv =
+            pipeline_factory(factory_fn(move || ready(Ok::<_, ()>(Srv1(cnt2.clone())))))
+                .and_then(move || ready(Ok(Srv2(cnt.clone()))));
+
+        let mut srv = new_srv.new_service(&()).await.unwrap();
+        let res = srv.call("srv1").await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), ("srv1", "srv2"));
+    }
 }

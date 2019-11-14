@@ -265,7 +265,7 @@ mod tests {
     use std::rc::Rc;
     use std::task::{Context, Poll};
 
-    use futures::future::{err, ok, ready, Ready};
+    use futures::future::{err, lazy, ok, ready, Ready};
 
     use crate::{pipeline, pipeline_factory, Service, ServiceFactory};
 
@@ -312,14 +312,14 @@ mod tests {
         }
     }
 
-    // #[tokio::test]
-    // async fn test_poll_ready() {
-    //     let cnt = Rc::new(Cell::new(0));
-    //     let mut srv = pipeline(Srv1(cnt.clone())).then(Srv2(cnt.clone()));
-    //     let res = srv.poll_ready().await;
-    //     assert_eq!(res, Poll::Ready(Err(())));
-    //     assert_eq!(cnt.get(), 2);
-    // }
+    #[tokio::test]
+    async fn test_poll_ready() {
+        let cnt = Rc::new(Cell::new(0));
+        let mut srv = pipeline(Srv1(cnt.clone())).then(Srv2(cnt.clone()));
+        let res = lazy(|cx| srv.poll_ready(cx)).await;
+        assert_eq!(res, Poll::Ready(Err(())));
+        assert_eq!(cnt.get(), 2);
+    }
 
     #[tokio::test]
     async fn test_call() {

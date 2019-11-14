@@ -8,7 +8,6 @@ use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use futures::future::{err, ok, Either, FutureExt, LocalBoxFuture, Ready};
 use open_ssl::ssl::SslConnector;
-use pin_project::pin_project;
 use tokio_net::tcp::TcpStream;
 use tokio_openssl::{HandshakeError, SslStream};
 use trust_dns_resolver::AsyncResolver;
@@ -124,9 +123,7 @@ where
     }
 }
 
-#[pin_project]
 pub struct ConnectAsyncExt<T, U> {
-    #[pin]
     fut: LocalBoxFuture<'static, Result<SslStream<U>, HandshakeError<U>>>,
     stream: Option<Connection<T, ()>>,
     _t: PhantomData<U>,
@@ -139,9 +136,9 @@ where
     type Output = Result<Connection<T, SslStream<U>>, io::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        let this = self.project();
+        let this = self.get_mut();
 
-        match this.fut.poll(cx) {
+        match Pin::new(&mut this.fut).poll(cx) {
             Poll::Ready(Ok(stream)) => {
                 let s = this.stream.take().unwrap();
                 trace!("SSL Handshake success: {:?}", s.host());

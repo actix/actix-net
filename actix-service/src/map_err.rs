@@ -201,56 +201,49 @@ where
 
 #[cfg(test)]
 mod tests {
-    // use futures::future::{err, Ready};
+    use futures::future::{err, lazy, ok, Ready};
 
-    // use super::*;
-    // use crate::{IntoNewService, NewService, Service};
-    // use tokio::future::ok;
+    use super::*;
+    use crate::{into_factory, into_service, Service};
 
-    // struct Srv;
+    struct Srv;
 
-    // impl Service for Srv {
-    //     type Request = ();
-    //     type Response = ();
-    //     type Error = ();
-    //     type Future = Ready<Result<(), ()>>;
+    impl Service for Srv {
+        type Request = ();
+        type Response = ();
+        type Error = ();
+        type Future = Ready<Result<(), ()>>;
 
-    //     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-    //         Poll::Ready(Err(()))
-    //     }
+        fn poll_ready(&mut self, _: &mut Context) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Err(()))
+        }
 
-    //     fn call(&mut self, _: ()) -> Self::Future {
-    //         err(())
-    //     }
-    // }
+        fn call(&mut self, _: ()) -> Self::Future {
+            err(())
+        }
+    }
 
-    // #[tokio::test]
-    // async fn test_poll_ready() {
-    //     let mut srv = Srv.map_err(|_| "error");
-    //     let res = srv.poll_once().await;
-    //     if let Poll::Ready(res) = res {
-    //         assert!(res.is_err());
-    //         assert_eq!(res.err().unwrap(), "error");
-    //     } else {
-    //         panic!("Should be ready");
-    //     }
-    // }
+    #[tokio::test]
+    async fn test_poll_ready() {
+        let mut srv = into_service(Srv).map_err(|_| "error");
+        let res = lazy(|cx| srv.poll_ready(cx)).await;
+        assert_eq!(res, Poll::Ready(Err("error")));
+    }
 
-    // #[tokio::test]
-    // async fn test_call() {
-    //     let mut srv = Srv.map_err(|_| "error");
-    //     let res = srv.call(()).await;
-    //     assert!(res.is_err());
-    //     assert_eq!(res.err().unwrap(), "error");
-    // }
+    #[tokio::test]
+    async fn test_call() {
+        let mut srv = into_service(Srv).map_err(|_| "error");
+        let res = srv.call(()).await;
+        assert!(res.is_err());
+        assert_eq!(res.err().unwrap(), "error");
+    }
 
-    // #[tokio::test]
-    // async fn test_new_service() {
-    //     let blank = || ok::<_, ()>(Srv);
-    //     let new_srv = blank.into_new_service().map_err(|_| "error");
-    //     let mut srv = new_srv.new_service(&()).await.unwrap();
-    //     let res = srv.call(()).await;
-    //     assert!(res.is_err());
-    //     assert_eq!(res.err().unwrap(), "error");
-    // }
+    #[tokio::test]
+    async fn test_new_service() {
+        let new_srv = into_factory(|| ok::<_, ()>(Srv)).map_err(|_| "error");
+        let mut srv = new_srv.new_service(&()).await.unwrap();
+        let res = srv.call(()).await;
+        assert!(res.is_err());
+        assert_eq!(res.err().unwrap(), "error");
+    }
 }
