@@ -1,4 +1,5 @@
 //! Framed dispatcher service and related utilities
+#![allow(type_alias_bounds)]
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -265,7 +266,7 @@ where
     loop {
         match srv.poll_ready(cx) {
             Poll::Ready(Ok(_)) => {
-                let item = match framed.poll_next_item(cx) {
+                let item = match framed.next_item(cx) {
                     Poll::Ready(Some(Ok(el))) => el,
                     Poll::Ready(Some(Err(err))) => {
                         *state =
@@ -365,16 +366,15 @@ where
         }
 
         if !framed.is_write_buf_empty() {
-            // match this.framed.poll_flush(cx) {
-            //     Poll::Pending => break,
-            //     Poll::Ready(Err(err)) => {
-            //         debug!("Error sending data: {:?}", err);
-            //         self.state =
-            //             TransportState::FramedError(FramedTransportError::Encoder(err));
-            //         return true;
-            //     }
-            //     Poll::Ready(Ok(_)) => (),
-            // }
+            match framed.flush(cx) {
+                Poll::Pending => break,
+                Poll::Ready(Err(err)) => {
+                    debug!("Error sending data: {:?}", err);
+                    *state = TransportState::FramedError(FramedTransportError::Encoder(err));
+                    return true;
+                }
+                Poll::Ready(Ok(_)) => (),
+            }
         } else {
             break;
         }

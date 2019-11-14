@@ -24,7 +24,13 @@ where
 pub fn apply_fn_factory<T, F, R, In, Out, Err, U>(
     service: U,
     f: F,
-) -> impl ServiceFactory<Request = In, Response = Out, Error = Err>
+) -> impl ServiceFactory<
+    Config = T::Config,
+    Request = In,
+    Response = Out,
+    Error = Err,
+    InitError = T::InitError,
+>
 where
     T: ServiceFactory<Error = Err>,
     F: FnMut(In, &mut T::Service) -> R + Clone,

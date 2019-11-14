@@ -223,16 +223,21 @@ impl<T, U> Framed<T, U> {
     }
 }
 
-impl<T, U> Framed<T, U>
-where
-    T: AsyncRead + Unpin,
-    U: Decoder + Unpin,
-{
-    pub fn poll_next_item(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<U::Item, U::Error>>> {
+impl<T, U> Framed<T, U> {
+    pub fn next_item(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<U::Item, U::Error>>>
+    where
+        T: AsyncRead + Unpin,
+        U: Decoder + Unpin,
+    {
         Pin::new(&mut self.inner).poll_next(cx)
+    }
+
+    pub fn flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
+    where
+        T: AsyncWrite + Unpin,
+        U: Encoder + Unpin,
+    {
+        Pin::new(self.inner.get_mut()).poll_flush(cx)
     }
 }
 
