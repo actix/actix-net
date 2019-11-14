@@ -1,10 +1,5 @@
-#![allow(unused_imports, unused_variables, dead_code)]
-
-use std::future::Future;
-use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::future::{err, ok, Either, Ready};
 use futures::future::{FutureExt, LocalBoxFuture};
 
 use crate::{Service, ServiceFactory};
@@ -18,8 +13,7 @@ pub type BoxedService<Req, Res, Err> = Box<
     >,
 >;
 
-pub type BoxedServiceResponse<Res, Err> =
-    Either<Ready<Result<Res, Err>>, LocalBoxFuture<'static, Result<Res, Err>>>;
+pub type BoxedServiceResponse<Res, Err> = LocalBoxFuture<'static, Result<Res, Err>>;
 
 pub struct BoxedNewService<C, Req, Res, Err, InitErr>(Inner<C, Req, Res, Err, InitErr>);
 
@@ -115,15 +109,10 @@ where
     type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, cfg: &C) -> Self::Future {
-        /* TODO: Figure out what the hell is hapenning here
-         Box::new(
-            self.service
-                .new_service(cfg)
-                .into_future()
-                .map(ServiceWrapper::boxed),
-        )
-        */
-        unimplemented!()
+        self.factory
+            .new_service(cfg)
+            .map(|res| res.map(ServiceWrapper::boxed))
+            .boxed_local()
     }
 }
 
@@ -147,27 +136,13 @@ where
     type Request = Req;
     type Response = Res;
     type Error = Err;
-    type Future = Either<
-        Ready<Result<Self::Response, Self::Error>>,
-        LocalBoxFuture<'static, Result<Res, Err>>,
-    >;
+    type Future = LocalBoxFuture<'static, Result<Res, Err>>;
 
     fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.0.poll_ready(ctx)
     }
 
     fn call(&mut self, req: Self::Request) -> Self::Future {
-        unimplemented!()
+        self.0.call(req).boxed_local()
     }
-
-    /*
-    fn call(&mut self, req: Self::Request) -> Self::Future {
-        let mut fut = self.0.call(req);
-        match fut.poll() {
-            Ok(Async::Ready(res)) => Either::A(ok(res)),
-            Err(e) => Either::A(err(e)),
-            Ok(Async::NotReady) => Either::B(Box::new(fut)),
-        }
-    }
-    */
 }
