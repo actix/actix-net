@@ -26,9 +26,6 @@ nativetls = ["native-tls", "tokio-tls"]
 openssl = ["open-ssl", "tokio-openssl", "actix-server-config/openssl"]
 rustls = ["rust-tls", "tokio-rustls", "webpki", "webpki-roots", "actix-server-config/rustls"]
 
-# uds
-# uds = ["mio-uds", "tokio-uds", "actix-server-config/uds"]
-
 [dependencies]
 actix-rt = "1.0.0-alpha.1"
 actix-service = "1.0.0-alpha.1"
@@ -49,7 +46,6 @@ tokio-timer = "0.3.0-alpha.6"
 
 # unix domain sockets
 mio-uds = { version = "0.6.7", optional = true }
-#tokio-uds = { version="0.2.5", optional = true }
 
 # nativetls
 native-tls = { version = "0.2", optional = true }
@@ -61,7 +57,8 @@ tokio-openssl = { version = "0.4.0-alpha.6", optional = true }
 
 # rustls
 rust-tls = { version = "0.16.0", package = "rustls", optional = true }
-tokio-rustls = { version = "0.12.0-alpha.2", optional = true }
+# tokio-rustls = { version = "0.12.0-alpha.2", optional = true }
+tokio-rustls = { git = "https://github.com/quininer/tokio-rustls.git", branch = "tokio-0.2", optional = true }
 webpki = { version = "0.21", optional = true }
 webpki-roots = { version = "0.17", optional = true }
 

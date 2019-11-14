@@ -43,7 +43,7 @@ impl<T, P> Clone for RustlsAcceptor<T, P> {
     }
 }
 
-impl<T: AsyncRead + AsyncWrite, P> ServiceFactory for RustlsAcceptor<T, P> {
+impl<T: AsyncRead + AsyncWrite + Unpin, P> ServiceFactory for RustlsAcceptor<T, P> {
     type Request = Io<T, P>;
     type Response = Io<TlsStream<T>, P>;
     type Error = io::Error;
@@ -72,13 +72,13 @@ pub struct RustlsAcceptorService<T, P> {
     conns: Counter,
 }
 
-impl<T: AsyncRead + AsyncWrite, P> Service for RustlsAcceptorService<T, P> {
+impl<T: AsyncRead + AsyncWrite + Unpin, P> Service for RustlsAcceptorService<T, P> {
     type Request = Io<T, P>;
     type Response = Io<TlsStream<T>, P>;
     type Error = io::Error;
     type Future = RustlsAcceptorServiceFut<T, P>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(cx) {
             Poll::Ready(Ok(()))
         } else {
@@ -99,7 +99,7 @@ impl<T: AsyncRead + AsyncWrite, P> Service for RustlsAcceptorService<T, P> {
 #[pin_project]
 pub struct RustlsAcceptorServiceFut<T, P>
 where
-    T: AsyncRead + AsyncWrite,
+    T: AsyncRead + AsyncWrite + Unpin,
 {
     #[pin]
     fut: Accept<T>,
@@ -107,16 +107,15 @@ where
     _guard: CounterGuard,
 }
 
-impl<T: AsyncRead + AsyncWrite, P> Future for RustlsAcceptorServiceFut<T, P> {
+impl<T: AsyncRead + AsyncWrite + Unpin, P> Future for RustlsAcceptorServiceFut<T, P> {
     type Output = Result<Io<TlsStream<T>, P>, io::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let this = self.project();
-        let io = futures::ready!(this.fut.poll(cx));
-        Poll::Ready(Ok(Io::from_parts(
-            io,
-            this.params.take().unwrap(),
-            Protocol::Unknown,
-        )))
+        let params = this.params.take().unwrap();
+        Poll::Ready(
+            futures::ready!(this.fut.poll(cx))
+                .map(move |io| Io::from_parts(io, params, Protocol::Unknown)),
+        )
     }
 }
