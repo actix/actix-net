@@ -3,7 +3,7 @@ use std::{fmt, io};
 
 use futures::Future;
 use tokio_executor::current_thread::{self, CurrentThread};
-use tokio_net::driver::{Handle as ReactorHandle, Reactor};
+use tokio::net::driver::{Handle as ReactorHandle, Reactor};
 use tokio_timer::{
     clock::Clock,
     timer::{self, Timer},
@@ -152,7 +152,7 @@ impl Runtime {
         // automatically inside its `block_on` and `run` methods
         tokio_executor::with_default(&mut current_thread::TaskExecutor::current(), || {
             tokio_timer::clock::with_default(clock, || {
-                let _reactor_guard = tokio_net::driver::set_default(reactor_handle);
+                let _reactor_guard = tokio::net::driver::set_default(reactor_handle);
                 let _timer_guard = tokio_timer::set_default(timer_handle);
                 f(executor)
             })

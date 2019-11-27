@@ -7,8 +7,8 @@ use actix_server::{Server, ServerBuilder, ServiceFactory};
 pub use actix_server_config::{Io, ServerConfig};
 
 use net2::TcpBuilder;
-use tokio_net::driver::Handle;
-use tokio_net::tcp::TcpStream;
+use tokio::net::driver::Handle;
+use tokio::net::tcp::TcpStream;
 
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub use actix_macros::test;

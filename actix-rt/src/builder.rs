@@ -7,8 +7,8 @@ use futures::future::{lazy, Future, FutureExt};
 
 use tokio::runtime::current_thread::Handle;
 use tokio_executor::current_thread::CurrentThread;
-use tokio_net::driver::Reactor;
-use tokio_timer::{clock::Clock, timer::Timer};
+use tokio::net::driver::Reactor;
+use tokio::time::{clock::Clock, timer::Timer};
 
 use crate::arbiter::{Arbiter, SystemArbiter};
 use crate::runtime::Runtime;

@@ -22,7 +22,7 @@ mod uri;
 
 use actix_rt::Arbiter;
 use actix_service::{pipeline, pipeline_factory, Service, ServiceFactory};
-use tokio_net::tcp::TcpStream;
+use tokio::net::tcp::TcpStream;
 
 pub use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 pub use trust_dns_resolver::system_conf::read_system_conf;

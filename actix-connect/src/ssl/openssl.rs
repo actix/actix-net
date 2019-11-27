@@ -8,7 +8,7 @@ use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use futures::future::{err, ok, Either, FutureExt, LocalBoxFuture, Ready};
 use open_ssl::ssl::SslConnector;
-use tokio_net::tcp::TcpStream;
+use tokio::net::tcp::TcpStream;
 use tokio_openssl::{HandshakeError, SslStream};
 use trust_dns_resolver::AsyncResolver;
 

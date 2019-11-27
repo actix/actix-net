@@ -8,7 +8,7 @@ use actix_server_config::Io;
 use actix_service::{apply_fn_factory, service_fn, Service};
 use actix_testing::TestServer;
 use futures::future::ok;
-use tokio_net::tcp::TcpStream;
+use tokio::net::tcp::TcpStream;
 
 use actix_ioframe::{Builder, Connect};
 
