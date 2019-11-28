@@ -8,7 +8,7 @@ use actix_service::{factory_fn_cfg, service_fn, service_fn2};
 use bytes::Bytes;
 use futures::{future::ok, SinkExt};
 use net2::TcpBuilder;
-use tokio_net::tcp::TcpStream;
+use tokio::net::TcpStream;
 
 fn unused_addr() -> net::SocketAddr {
     let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();

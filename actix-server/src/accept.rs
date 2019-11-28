@@ -2,7 +2,7 @@ use std::sync::mpsc as sync_mpsc;
 use std::time::{Duration, Instant};
 use std::{io, thread};
 
-use actix_rt::time::delay;
+use actix_rt::time::delay_for;
 use actix_rt::System;
 use futures::FutureExt;
 use log::{error, info};
@@ -442,7 +442,7 @@ impl Accept {
                         let r = self.timer.1.clone();
                         System::current().arbiter().send(
                             async move {
-                                delay(Instant::now() + Duration::from_millis(510)).await;
+                                delay_for(Duration::from_millis(510)).await;
                                 let _ = r.set_readiness(mio::Ready::readable());
                             }
                                 .boxed(),

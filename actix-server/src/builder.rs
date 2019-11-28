@@ -1,9 +1,9 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{io, mem, net};
 
-use actix_rt::{spawn, time::delay, Arbiter, System};
+use actix_rt::{spawn, time::delay_for, Arbiter, System};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver};
 use futures::channel::oneshot;
 use futures::future::ready;
@@ -12,7 +12,7 @@ use futures::{ready, Future, FutureExt, Stream, StreamExt};
 use log::{error, info};
 use net2::TcpBuilder;
 use num_cpus;
-use tokio_net::tcp::TcpStream;
+use tokio::net::TcpStream;
 
 use crate::accept::{AcceptLoop, AcceptNotify, Command};
 use crate::config::{ConfiguredService, ServiceConfig};
@@ -191,7 +191,7 @@ impl ServerBuilder {
     /// Add new unix domain service to the server.
     pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
-        F: ServiceFactory<tokio_net::uds::UnixStream>,
+        F: ServiceFactory<tokio::net::UnixStream>,
         N: AsRef<str>,
         U: AsRef<std::path::Path>,
     {
@@ -221,7 +221,7 @@ impl ServerBuilder {
         factory: F,
     ) -> io::Result<Self>
     where
-        F: ServiceFactory<tokio_net::uds::UnixStream>,
+        F: ServiceFactory<tokio::net::UnixStream>,
     {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
         let token = self.token.next();
@@ -406,7 +406,7 @@ impl ServerBuilder {
                                 if exit {
                                     spawn(
                                         async {
-                                            delay(Instant::now() + Duration::from_millis(300))
+                                            delay_for(Duration::from_millis(300))
                                                 .await;
                                             System::current().stop();
                                         }
@@ -420,7 +420,7 @@ impl ServerBuilder {
                     // we need to stop system if server was spawned
                     if self.exit {
                         spawn(
-                            delay(Instant::now() + Duration::from_millis(300)).then(|_| {
+                            delay_for(Duration::from_millis(300)).then(|_| {
                                 System::current().stop();
                                 ready(())
                             }),

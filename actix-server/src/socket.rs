@@ -1,8 +1,7 @@
 use std::{fmt, io, net};
 
 use actix_codec::{AsyncRead, AsyncWrite};
-use tokio_net::driver::Handle;
-use tokio_net::tcp::TcpStream;
+use tokio::net::TcpStream;
 
 pub(crate) enum StdListener {
     Tcp(net::TcpListener),
@@ -151,7 +150,7 @@ pub trait FromStream: AsyncRead + AsyncWrite + Sized {
 impl FromStream for TcpStream {
     fn from_stdstream(sock: StdStream) -> io::Result<Self> {
         match sock {
-            StdStream::Tcp(stream) => TcpStream::from_std(stream, &Handle::default()),
+            StdStream::Tcp(stream) => TcpStream::from_std(stream),
             #[cfg(all(unix))]
             StdStream::Uds(_) => {
                 panic!("Should not happen, bug in server impl");
@@ -161,12 +160,12 @@ impl FromStream for TcpStream {
 }
 
 #[cfg(all(unix))]
-impl FromStream for tokio_net::uds::UnixStream {
+impl FromStream for tokio::net::UnixStream {
     fn from_stdstream(sock: StdStream) -> io::Result<Self> {
         match sock {
             StdStream::Tcp(_) => panic!("Should not happen, bug in server impl"),
             StdStream::Uds(stream) => {
-                tokio_net::uds::UnixStream::from_std(stream, &Handle::default())
+                tokio::net::UnixStream::from_std(stream)
             }
         }
     }

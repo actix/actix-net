@@ -3,8 +3,6 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures_core::stream::Stream;
-
 use crate::server::Server;
 
 /// Different types of process signals
@@ -25,7 +23,7 @@ pub(crate) struct Signals {
     #[cfg(not(unix))]
     stream: tokio_net::signal::CtrlC,
     #[cfg(unix)]
-    streams: Vec<(Signal, tokio_net::signal::unix::Signal)>,
+    streams: Vec<(Signal, tokio::signal::unix::Signal)>,
 }
 
 impl Signals {
@@ -39,7 +37,7 @@ impl Signals {
 
             #[cfg(unix)]
             {
-                use tokio_net::signal::unix;
+                use tokio::signal::unix;
 
                 let mut streams = Vec::new();
 
@@ -80,7 +78,7 @@ impl Future for Signals {
         {
             for idx in 0..self.streams.len() {
                 loop {
-                    match Pin::new(&mut self.streams[idx].1).poll_next(cx) {
+                    match Pin::new(&mut self.streams[idx].1).poll_recv(cx) {
                         Poll::Ready(None) => return Poll::Ready(()),
                         Poll::Pending => break,
                         Poll::Ready(Some(_)) => {

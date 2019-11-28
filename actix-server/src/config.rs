@@ -5,7 +5,7 @@ use actix_server_config::{Io, ServerConfig};
 use actix_service as actix;
 use futures::future::{Future, FutureExt, LocalBoxFuture};
 use log::error;
-use tokio_net::tcp::TcpStream;
+use tokio::net::TcpStream;
 
 use super::builder::bind_addr;
 use super::service::{

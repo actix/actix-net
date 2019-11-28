@@ -38,7 +38,7 @@ mio = "0.6.19"
 net2 = "0.2"
 futures = "0.3.1"
 slab = "0.4"
-tokio-net = { version = "0.2.0-alpha.6", features = ["signal", "tcp", "uds"] }
+tokio = { version = "0.2", features = ["net", "uds", "signal"] }
 
 futures-core-preview = "0.3.0-alpha.19"
 
@@ -51,7 +51,7 @@ tokio-tls = { version = "0.3.0-alpha.6", optional = true }
 
 # openssl
 open-ssl = { version = "0.10", package = "openssl", optional = true }
-tokio-openssl = { version = "0.4.0-alpha.6", optional = true }
+tokio-openssl = { version = "0.4.0", optional = true }
 
 # rustls
 rust-tls = { version = "0.16.0", package = "rustls", optional = true }
@@ -61,6 +61,6 @@ webpki = { version = "0.21", optional = true }
 webpki-roots = { version = "0.17", optional = true }
 
 [dev-dependencies]
-bytes = "0.4"
+bytes = "0.5"
 actix-codec = "0.2.0-alpha.1"
 env_logger = "0.6"

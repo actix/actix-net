@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::{mem, time};
 
-use actix_rt::time::{delay, Delay};
+use actix_rt::time::{delay_for, Delay};
 use actix_rt::{spawn, Arbiter};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
@@ -277,8 +277,8 @@ impl Future for Worker {
                 if num != 0 {
                     info!("Graceful worker shutdown, {} connections", num);
                     self.state = WorkerState::Shutdown(
-                        delay(time::Instant::now() + time::Duration::from_secs(1)),
-                        delay(time::Instant::now() + self.shutdown_timeout),
+                        delay_for(time::Duration::from_secs(1)),
+                        delay_for(self.shutdown_timeout),
                         result,
                     );
                 } else {
@@ -397,7 +397,7 @@ impl Future for Worker {
                 match Pin::new(&mut t1).poll(cx) {
                     Poll::Pending => (),
                     Poll::Ready(_) => {
-                        t1 = delay(time::Instant::now() + time::Duration::from_secs(1));
+                        t1 = delay_for(time::Duration::from_secs(1));
                         let _ = Pin::new(&mut t1).poll(cx);
                     }
                 }
