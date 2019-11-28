@@ -1,7 +1,7 @@
 use std::io;
 
 use bytes::{Bytes, BytesMut};
-use tokio_codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 /// Bytes codec.
 ///
@@ -27,7 +27,7 @@ impl Decoder for BytesCodec {
         if src.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(src.take()))
+            Ok(Some(src.split()))
         }
     }
 }

@@ -8,8 +8,8 @@ use std::task::{Context, Poll};
 use bytes::BytesMut;
 use futures::{ready, Sink, Stream};
 use pin_project::pin_project;
-use tokio_codec::{Decoder, Encoder};
-use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_util::codec::{Decoder, Encoder};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 const LW: usize = 1024;
 const HW: usize = 8 * 1024;

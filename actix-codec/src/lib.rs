@@ -16,5 +16,5 @@ mod framed;
 pub use self::bcodec::BytesCodec;
 pub use self::framed::{Framed, FramedParts};
 
-pub use tokio_codec::{Decoder, Encoder};
-pub use tokio_io::{AsyncRead, AsyncWrite};
+pub use tokio_util::codec::{Decoder, Encoder};
+pub use tokio::io::{AsyncRead, AsyncWrite};
