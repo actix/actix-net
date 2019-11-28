@@ -4,10 +4,10 @@ use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use futures::channel::mpsc::UnboundedSender;
-use tokio::runtime::current_thread::Handle;
+use tokio::runtime::{Builder, Runtime};
 
 use crate::arbiter::{Arbiter, SystemCommand};
-use crate::builder::{Builder, SystemRunner};
+
 
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -53,23 +53,23 @@ impl System {
     /// Create new system.
     ///
     /// This method panics if it can not create tokio runtime
-    pub fn new<T: Into<String>>(name: T) -> SystemRunner {
-        Self::builder().name(name).build()
+    pub fn new<T: Into<String>>(name: T) -> Runtime {
+        Self::builder().thread_name(name).build().unwrap()
     }
 
     #[allow(clippy::new_ret_no_self)]
     /// Create new system using provided CurrentThread Handle.
     ///
     /// This method panics if it can not spawn system arbiter
-    pub fn run_in_executor<T: Into<String>>(
-        name: T,
-        executor: Handle,
-    ) -> impl Future<Output = Result<(), io::Error>> + Send {
-        Self::builder()
-            .name(name)
-            .build_async(executor)
-            .run_nonblocking()
-    }
+    // pub fn run_in_executor<T: Into<String>>(
+    //     name: T,
+    //     executor: Handle,
+    // ) -> impl Future<Output = Result<(), io::Error>> + Send {
+    //     Self::builder()
+    //         .name(name)
+    //         .build_async(executor)
+    //         .run_nonblocking()
+    // }
 
     /// Get current running system.
     pub fn current() -> System {
@@ -140,6 +140,24 @@ impl System {
     where
         F: FnOnce() + 'static,
     {
-        Self::builder().run(f)
+        // let (stop_tx, stop) = channel();
+        // let (sys_sender, sys_receiver) = unbounded();
+
+        // let system = System::construct(sys_sender, Arbiter::new_system(), self.stop_on_panic);
+
+        // // system arbiter
+        // let arb = SystemArbiter::new(stop_tx, sys_receiver);
+
+        // let mut rt = self.build_rt().unwrap();
+        // rt.spawn(arb);
+
+        // // init system arbiter and run configuration method
+        // let _ = rt.block_on(lazy(move |_| {
+        //    f();
+        //    Ok::<_, ()>(())
+        // }));
+        // FIXME
+        Ok(())
+        //Self::builder().run(f)
     }
 }

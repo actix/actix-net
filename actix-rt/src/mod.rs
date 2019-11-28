@@ -66,15 +66,8 @@
 //! [executor]: https://tokio.rs/docs/getting-started/runtime-model/#executors
 //! [timer]: ../../timer/index.html
 
-mod builder;
-mod runtime;
-
-pub use self::builder::Builder;
-pub use self::runtime::{Runtime, Handle};
-pub use tokio_current_thread::spawn;
-pub use tokio_current_thread::TaskExecutor;
-
 use futures::Future;
+use tokio::runtime;
 
 /// Run the provided future to completion using a runtime running on the current thread.
 ///
@@ -85,7 +78,11 @@ pub fn block_on_all<F>(future: F) -> Result<F::Item, F::Error>
 where
     F: Future,
 {
-    let mut r = Runtime::new().expect("failed to start runtime on current thread");
+    let mut r = runtime::Builder::new()
+                    .basic_scheduler()
+                    .enable_io()
+                    .build()
+                    .expect("failed to start runtime on current thread");
     let v = r.block_on(future)?;
     r.run().expect("failed to resolve remaining futures");
     Ok(v)

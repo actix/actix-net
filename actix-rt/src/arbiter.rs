@@ -9,9 +9,8 @@ use std::{fmt, thread};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot::{channel, Canceled, Sender};
 use futures::{future, Future, FutureExt, Stream};
-use tokio_executor::current_thread::spawn;
+use tokio::runtime::{Builder, Runtime};
 
-use crate::builder::Builder;
 use crate::system::System;
 
 use copyless::BoxHelper;
@@ -101,7 +100,7 @@ impl Arbiter {
         let handle = thread::Builder::new()
             .name(name.clone())
             .spawn(move || {
-                let mut rt = Builder::new().build_rt().expect("Can not create Runtime");
+                let mut rt = Builder::new().build().expect("Can not create Runtime");
                 let arb = Arbiter::with_sender(arb_tx);
 
                 let (stop, stop_rx) = channel();
@@ -150,7 +149,8 @@ impl Arbiter {
             for fut in v.drain(..) {
                 // We pin the boxed future, so it can never again be moved.
                 let fut = unsafe { Pin::new_unchecked(fut) };
-                tokio_executor::current_thread::spawn(fut);
+                // FIXME
+                //tokio_executor::current_thread::spawn(fut);
             }
         });
     }
@@ -169,7 +169,8 @@ impl Arbiter {
         RUNNING.with(move |cell| {
             if cell.get() {
                 // Spawn the future on running executor
-                spawn(future);
+                // FIXME
+                //spawn(future);
             } else {
                 // Box the future and push it to the queue, this results in double boxing
                 // because the executor boxes the future again, but works for now
@@ -325,7 +326,8 @@ impl Future for ArbiterController {
                         return Poll::Ready(());
                     }
                     ArbiterCommand::Execute(fut) => {
-                        spawn(fut);
+                        // FIXME
+                        //spawn(fut);
                     }
                     ArbiterCommand::ExecuteFn(f) => {
                         f.call_box();
