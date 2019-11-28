@@ -6,7 +6,7 @@ use std::rc::Rc;
 use std::{fmt, io, net, ops, time};
 
 use actix_codec::{AsyncRead, AsyncWrite};
-use tokio_net::tcp::TcpStream;
+use tokio::net::TcpStream;
 
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
@@ -226,7 +226,7 @@ impl<T: IoStream + Unpin> IoStream for tokio_rustls::server::TlsStream<T> {
 }
 
 #[cfg(unix)]
-impl IoStream for tokio_net::uds::UnixStream {
+impl IoStream for tokio::net::UnixStream {
     #[inline]
     fn peer_addr(&self) -> Option<net::SocketAddr> {
         None
