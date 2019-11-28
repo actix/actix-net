@@ -3,9 +3,9 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use actix_rt::time::{delay, Delay};
+use actix_rt::time::{delay_until, Delay, Instant};
 use actix_service::{Service, ServiceFactory};
 use futures::future::{ok, Ready};
 
@@ -87,7 +87,7 @@ where
             ka,
             time,
             expire,
-            delay: delay(expire),
+            delay: delay_until(expire),
             _t: PhantomData,
         }
     }

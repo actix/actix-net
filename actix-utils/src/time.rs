@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 use std::task::{Context, Poll};
-use std::time::{self, Duration, Instant};
+use std::time::{self, Duration};
 
-use actix_rt::time::delay_for;
+use actix_rt::time::{delay_for, Instant};
 use actix_service::{Service, ServiceFactory};
 use futures::future::{ok, ready, FutureExt, Ready};
 
