@@ -17,10 +17,10 @@ use quote::quote;
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(item as syn::ItemFn);
+    let mut input = syn::parse_macro_input!(item as syn::ItemFn);
     let attrs = &input.attrs;
     let vis = &input.vis;
-    let sig = &input.sig;
+    let sig = &mut input.sig;
     let body = &input.block;
     let name = &sig.ident;
 
@@ -29,6 +29,8 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
             .to_compile_error()
             .into();
     }
+
+    sig.asyncness = None;
 
     (quote! {
         #(#attrs)*
