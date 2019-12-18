@@ -11,7 +11,7 @@ members = [
   "actix-threadpool",
   "actix-tls",
   "actix-utils",
-  "router",
+  "actix-router",
   "string",
 ]
 
@@ -27,5 +27,5 @@ actix-testing = { path = "actix-testing" }
 actix-threadpool = { path = "actix-threadpool" }
 actix-tls = { path = "actix-tls" }
 actix-utils = { path = "actix-utils" }
-actix-router = { path = "router" }
+actix-router = { path = "actix-router" }
 bytestring = { path = "string" }
