@@ -124,7 +124,7 @@ where
     U: IntoServiceFactory<S>,
 {
     apply(
-        TracingTransform::<_, S, _>::new(make_span),
+        TracingTransform::new(make_span),
         service_factory.into_factory(),
     )
 }
