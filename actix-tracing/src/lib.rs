@@ -4,7 +4,9 @@
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
 
-use actix_service::{apply, IntoServiceFactory, Service, ServiceFactory, Transform};
+use actix_service::{
+    apply, dev::ApplyTransform, IntoServiceFactory, Service, ServiceFactory, Transform,
+};
 use futures_util::future::{ok, Either, Ready};
 use tracing_futures::{Instrument, Instrumented};
 
@@ -115,13 +117,7 @@ where
 pub fn trace<S, U, F>(
     service_factory: U,
     make_span: F,
-) -> impl ServiceFactory<
-    Config = S::Config,
-    Request = S::Request,
-    Response = S::Response,
-    Error = S::Error,
-    InitError = S::InitError,
->
+) -> ApplyTransform<TracingTransform<S::Service, S, F>, S>
 where
     S: ServiceFactory,
     F: Fn(&S::Request) -> Option<tracing::Span> + Clone,
