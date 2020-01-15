@@ -99,11 +99,8 @@ where
 /// Wraps the provided service factory with a transform that automatically
 /// enters/exits the given span.
 ///
-/// The span to be entered/exited can be provided via an implementation of
-/// the [`MakeSpan`] trait. A blanket implementation of [`MakeSpan`] for
-/// `Fn(&T) -> Option<Span>` allows you to pass a closure for the `make_span`
-/// argument. The closure is passed in a reference to the request being
-/// handled by the service.
+/// The span to be entered/exited can be provided via a closure. The closure
+/// is passed in a reference to the request being handled by the service.
 ///
 /// For example:
 /// ```rust,ignore
@@ -112,8 +109,6 @@ where
 ///     |req: &Request| Some(span!(Level::INFO, "request", req.id))
 /// );
 /// ```
-///
-/// [`MakeSpan`]: trait.MakeSpan.html
 pub fn trace<S, U, F>(
     service_factory: U,
     make_span: F,
