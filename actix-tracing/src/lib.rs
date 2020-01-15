@@ -8,56 +8,24 @@ use actix_service::{apply, IntoServiceFactory, Service, ServiceFactory, Transfor
 use futures_util::future::{ok, Either, Ready};
 use tracing_futures::{Instrument, Instrumented};
 
-/// Trait representing a type that is able to produce spans for a given value.
-///
-/// The generic argument `T` is typically the request type of a `Service`
-/// implementation.
-pub trait MakeSpan<T> {
-    /// Creates a new span for the given request value.
-    ///
-    /// By default, this function returns `None`.
-    fn span_for(&self, _req: &T) -> Option<tracing::Span> {
-        None
-    }
-}
-
-impl<T, F> MakeSpan<T> for F
-where
-    F: Fn(&T) -> Option<tracing::Span>,
-{
-    fn span_for(&self, req: &T) -> Option<tracing::Span> {
-        (self)(req)
-    }
-}
-
-impl<T> MakeSpan<T> for tracing::Span {
-    fn span_for(&self, _: &T) -> Option<tracing::Span> {
-        Some(self.clone())
-    }
-}
-
 /// A `Service` implementation that automatically enters/exits tracing spans
 /// for the wrapped inner service.
 #[derive(Clone)]
-pub struct TracingService<S, T> {
+pub struct TracingService<S, F> {
     inner: S,
-    make_span: T,
+    make_span: F,
 }
 
-impl<S, T> TracingService<S, T>
-where
-    S: Service,
-    T: MakeSpan<S::Request>,
-{
-    pub fn new(inner: S, make_span: T) -> Self {
+impl<S, F> TracingService<S, F> {
+    pub fn new(inner: S, make_span: F) -> Self {
         TracingService { inner, make_span }
     }
 }
 
-impl<S, T> Service for TracingService<S, T>
+impl<S, F> Service for TracingService<S, F>
 where
     S: Service,
-    T: MakeSpan<S::Request>,
+    F: Fn(&S::Request) -> Option<tracing::Span>,
 {
     type Request = S::Request;
     type Response = S::Response;
@@ -69,7 +37,7 @@ where
     }
 
     fn call(&mut self, req: Self::Request) -> Self::Future {
-        let span = self.make_span.span_for(&req);
+        let span = (self.make_span)(&req);
         let _enter = span.as_ref().map(|s| s.enter());
 
         let fut = self.inner.call(req);
@@ -89,13 +57,13 @@ where
 /// A `Transform` implementation that wraps services with a [`TracingService`].
 ///
 /// [`TracingService`]: struct.TracingService.html
-pub struct TracingTransform<S, U, T> {
-    make_span: T,
+pub struct TracingTransform<S, U, F> {
+    make_span: F,
     _p: PhantomData<fn(S, U)>,
 }
 
-impl<S, U, T> TracingTransform<S, U, T> {
-    pub fn new(make_span: T) -> Self {
+impl<S, U, F> TracingTransform<S, U, F> {
+    pub fn new(make_span: F) -> Self {
         TracingTransform {
             make_span,
             _p: PhantomData,
@@ -103,7 +71,7 @@ impl<S, U, T> TracingTransform<S, U, T> {
     }
 }
 
-impl<S, U, T> Transform<S> for TracingTransform<S, U, T>
+impl<S, U, F> Transform<S> for TracingTransform<S, U, F>
 where
     S: Service,
     U: ServiceFactory<
@@ -112,13 +80,13 @@ where
         Error = S::Error,
         Service = S,
     >,
-    T: MakeSpan<S::Request> + Clone,
+    F: Fn(&S::Request) -> Option<tracing::Span> + Clone,
 {
     type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
+    type Transform = TracingService<S, F>;
     type InitError = U::InitError;
-    type Transform = TracingService<S, T>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
@@ -144,9 +112,9 @@ where
 /// ```
 ///
 /// [`MakeSpan`]: trait.MakeSpan.html
-pub fn trace<S, U, T>(
+pub fn trace<S, U, F>(
     service_factory: U,
-    make_span: T,
+    make_span: F,
 ) -> impl ServiceFactory<
     Config = S::Config,
     Request = S::Request,
@@ -156,7 +124,7 @@ pub fn trace<S, U, T>(
 >
 where
     S: ServiceFactory,
-    T: MakeSpan<S::Request> + Clone,
+    F: Fn(&S::Request) -> Option<tracing::Span> + Clone,
     U: IntoServiceFactory<S>,
 {
     apply(
