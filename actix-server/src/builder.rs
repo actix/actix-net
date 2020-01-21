@@ -263,12 +263,12 @@ impl ServerBuilder {
             info!("Starting {} workers", self.threads);
 
             // start workers
-            let mut workers = Vec::new();
-            for idx in 0..self.threads {
+            let workers = (0..self.threads).map(|idx| {
                 let worker = self.start_worker(idx, self.accept.get_notify());
-                workers.push(worker.clone());
-                self.workers.push((idx, worker));
-            }
+                self.workers.push((idx, worker.clone()));
+
+                worker
+            }).collect();
 
             // start accept thread
             for sock in &self.sockets {
