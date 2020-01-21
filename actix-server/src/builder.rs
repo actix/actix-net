@@ -263,12 +263,14 @@ impl ServerBuilder {
             info!("Starting {} workers", self.threads);
 
             // start workers
-            let workers = (0..self.threads).map(|idx| {
-                let worker = self.start_worker(idx, self.accept.get_notify());
-                self.workers.push((idx, worker.clone()));
+            let workers = (0..self.threads)
+                .map(|idx| {
+                    let worker = self.start_worker(idx, self.accept.get_notify());
+                    self.workers.push((idx, worker.clone()));
 
-                worker
-            }).collect();
+                    worker
+                })
+                .collect();
 
             // start accept thread
             for sock in &self.sockets {
@@ -380,7 +382,7 @@ impl ServerBuilder {
                                             .await;
                                             System::current().stop();
                                         }
-                                        .boxed(),
+                                            .boxed(),
                                     );
                                 }
                                 ready(())
