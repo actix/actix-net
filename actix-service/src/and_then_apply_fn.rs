@@ -290,6 +290,7 @@ mod tests {
             Poll::Ready(Ok(()))
         }
 
+        #[allow(clippy::unit_arg)]
         fn call(&mut self, req: Self::Request) -> Self::Future {
             ok(req)
         }
@@ -297,7 +298,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_service() {
-        let mut srv = pipeline(|r: &'static str| ok(r))
+        let mut srv = pipeline(ok)
             .and_then_apply_fn(Srv, |req: &'static str, s| {
                 s.call(()).map_ok(move |res| (req, res))
             });
@@ -311,7 +312,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_service_factory() {
-        let new_srv = pipeline_factory(|| ok::<_, ()>(fn_service(|r: &'static str| ok(r))))
+        let new_srv = pipeline_factory(|| ok::<_, ()>(fn_service(ok)))
             .and_then_apply_fn(
                 || ok(Srv),
                 |req: &'static str, s| s.call(()).map_ok(move |res| (req, res)),

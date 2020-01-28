@@ -294,7 +294,7 @@ impl ResourceDef {
                     return false;
                 }
                 for idx in 0..idx {
-                    path.add(names[idx].clone(), segments[idx]);
+                    path.add(names[idx], segments[idx]);
                 }
                 path.skip((pos + len) as u16);
                 true
@@ -326,7 +326,7 @@ impl ResourceDef {
                         return false;
                     }
                     for idx in 0..idx {
-                        path.add(names[idx].clone(), segments[idx]);
+                        path.add(names[idx], segments[idx]);
                     }
                     path.skip((pos + len) as u16);
                     true
@@ -413,7 +413,7 @@ impl ResourceDef {
 
                 let path = res.resource_path();
                 for idx in 0..idx {
-                    path.add(names[idx].clone(), segments[idx]);
+                    path.add(names[idx], segments[idx]);
                 }
                 path.skip((pos + len) as u16);
                 true
@@ -452,7 +452,7 @@ impl ResourceDef {
 
                     let path = res.resource_path();
                     for idx in 0..idx {
-                        path.add(names[idx].clone(), segments[idx]);
+                        path.add(names[idx], segments[idx]);
                     }
                     path.skip((pos + len) as u16);
                     true
@@ -734,6 +734,7 @@ mod tests {
         assert_eq!(path.get("id").unwrap(), "012345");
     }
 
+    #[allow(clippy::cognitive_complexity)]
     #[test]
     fn test_dynamic_set() {
         let re = ResourceDef::new(vec![
@@ -899,31 +900,31 @@ mod tests {
     fn test_resource_path() {
         let mut s = String::new();
         let resource = ResourceDef::new("/user/{item1}/test");
-        assert!(resource.resource_path(&mut s, &mut (&["user1"]).into_iter()));
+        assert!(resource.resource_path(&mut s, &mut (&["user1"]).iter()));
         assert_eq!(s, "/user/user1/test");
 
         let mut s = String::new();
         let resource = ResourceDef::new("/user/{item1}/{item2}/test");
-        assert!(resource.resource_path(&mut s, &mut (&["item", "item2"]).into_iter()));
+        assert!(resource.resource_path(&mut s, &mut (&["item", "item2"]).iter()));
         assert_eq!(s, "/user/item/item2/test");
 
         let mut s = String::new();
         let resource = ResourceDef::new("/user/{item1}/{item2}");
-        assert!(resource.resource_path(&mut s, &mut (&["item", "item2"]).into_iter()));
+        assert!(resource.resource_path(&mut s, &mut (&["item", "item2"]).iter()));
         assert_eq!(s, "/user/item/item2");
 
         let mut s = String::new();
         let resource = ResourceDef::new("/user/{item1}/{item2}/");
-        assert!(resource.resource_path(&mut s, &mut (&["item", "item2"]).into_iter()));
+        assert!(resource.resource_path(&mut s, &mut (&["item", "item2"]).iter()));
         assert_eq!(s, "/user/item/item2/");
 
         let mut s = String::new();
-        assert!(!resource.resource_path(&mut s, &mut (&["item"]).into_iter()));
+        assert!(!resource.resource_path(&mut s, &mut (&["item"]).iter()));
 
         let mut s = String::new();
-        assert!(resource.resource_path(&mut s, &mut (&["item", "item2"]).into_iter()));
+        assert!(resource.resource_path(&mut s, &mut (&["item", "item2"]).iter()));
         assert_eq!(s, "/user/item/item2/");
-        assert!(!resource.resource_path(&mut s, &mut (&["item"]).into_iter()));
+        assert!(!resource.resource_path(&mut s, &mut (&["item"]).iter()));
 
         let mut s = String::new();
         assert!(resource.resource_path(&mut s, &mut vec!["item", "item2"].into_iter()));

@@ -107,7 +107,7 @@ mod tests {
             Poll::Pending
         );
         cond.notify();
-        assert_eq!(waiter.await, ());
+        waiter.await;
 
         let mut waiter = cond.wait();
         assert_eq!(
@@ -121,7 +121,7 @@ mod tests {
         );
 
         drop(cond);
-        assert_eq!(waiter.await, ());
-        assert_eq!(waiter2.await, ());
+        waiter.await;
+        waiter2.await;
     }
 }

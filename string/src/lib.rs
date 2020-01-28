@@ -204,7 +204,7 @@ mod test {
 
     #[test]
     fn test_from_static_str() {
-        const _S: ByteString = ByteString::from_static("hello");
+        static _S: ByteString = ByteString::from_static("hello");
         let _ = ByteString::from_static("str");
     }
 

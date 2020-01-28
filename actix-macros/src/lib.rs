@@ -14,6 +14,7 @@ use quote::quote;
 ///     println!("Hello world");
 /// }
 /// ```
+#[allow(clippy::needless_doctest_main)]
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {

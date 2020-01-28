@@ -213,7 +213,7 @@ where
                 // drain service responses
                 match Pin::new(&mut self.rx).poll_next(cx) {
                     Poll::Ready(Some(Ok(msg))) => {
-                        if let Err(_) = self.framed.write(msg) {
+                        if self.framed.write(msg).is_err() {
                             return Poll::Ready(Ok(()));
                         }
                     }

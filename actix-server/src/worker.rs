@@ -315,6 +315,8 @@ enum WorkerState {
 impl Future for Worker {
     type Output = ();
 
+    // FIXME: remove this attribute
+    #[allow(clippy::never_loop)]
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // `StopWorker` message handler
         if let Poll::Ready(Some(StopCommand { graceful, result })) =
@@ -368,11 +370,8 @@ impl Future for Worker {
                     Ok(false) => {
                         // push connection back to queue
                         if let Some(conn) = conn {
-                            match self.state {
-                                WorkerState::Unavailable(ref mut conns) => {
-                                    conns.push(conn);
-                                }
-                                _ => (),
+                            if let WorkerState::Unavailable(ref mut conns) = self.state {
+                                conns.push(conn);
                             }
                         }
                         Poll::Pending
