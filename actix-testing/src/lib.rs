@@ -1,6 +1,6 @@
 //! Various helpers for Actix applications to use during testing.
 #![deny(rust_2018_idioms, warnings)]
-#![allow(clippy::type_complexity)]
+#![allow(clippy::type_complexity, clippy::needless_doctest_main)]
 
 use std::sync::mpsc;
 use std::{net, thread};

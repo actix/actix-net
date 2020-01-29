@@ -86,7 +86,6 @@ impl Runtime {
     where
         F: Future + 'static,
     {
-        let res = self.local.block_on(&mut self.rt, f);
-        res
+        self.local.block_on(&mut self.rt, f)
     }
 }

@@ -220,7 +220,7 @@ impl ServerBuilder {
         self.services.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
-            factory.clone(),
+            factory,
             addr,
         ));
         self.sockets

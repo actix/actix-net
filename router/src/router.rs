@@ -104,6 +104,7 @@ mod tests {
     use crate::path::Path;
     use crate::router::{ResourceId, Router};
 
+    #[allow(clippy::cognitive_complexity)]
     #[test]
     fn test_recognizer_1() {
         let mut router = Router::<usize>::build();

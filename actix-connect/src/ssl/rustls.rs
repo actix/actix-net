@@ -38,7 +38,7 @@ where
 {
     pub fn service(connector: Arc<ClientConfig>) -> RustlsConnectorService<T, U> {
         RustlsConnectorService {
-            connector: connector,
+            connector,
             _t: PhantomData,
         }
     }

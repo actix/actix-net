@@ -69,7 +69,7 @@ impl<'a> IntoPattern for &'a str {
     }
 
     fn patterns(&self) -> Vec<String> {
-        vec![self.to_string()]
+        vec![(*self).to_string()]
     }
 }
 
@@ -79,7 +79,7 @@ impl<T: AsRef<str>> IntoPattern for Vec<T> {
     }
 
     fn patterns(&self) -> Vec<String> {
-        self.into_iter().map(|v| v.as_ref().to_string()).collect()
+        self.iter().map(|v| v.as_ref().to_string()).collect()
     }
 }
 
