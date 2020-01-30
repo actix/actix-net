@@ -1,6 +1,15 @@
-# Actix net [![Build Status](https://travis-ci.org/actix/actix-net.svg?branch=master)](https://travis-ci.org/actix/actix-net) [![codecov](https://codecov.io/gh/actix/actix-net/branch/master/graph/badge.svg)](https://codecov.io/gh/actix/actix-net) [![Join the chat at https://gitter.im/actix/actix](https://badges.gitter.im/actix/actix.svg)](https://gitter.im/actix/actix?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+# Actix net [![codecov](https://codecov.io/gh/actix/actix-net/branch/master/graph/badge.svg)](https://codecov.io/gh/actix/actix-net) [![Join the chat at https://gitter.im/actix/actix](https://badges.gitter.im/actix/actix.svg)](https://gitter.im/actix/actix?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Actix net - framework for composable network services
+
+## Build statuses
+
+| Platform         | Build Status |
+| ---------------- | ------------ |
+| Linux            | [![build status](https://github.com/actix/actix-net/workflows/CI%20%28Linux%29/badge.svg?branch=master&event=push)](https://github.com/actix/actix-net/actions?query=workflow%3A"CI+(Linux)") |
+| macOS            | [![build status](https://github.com/actix/actix-net/workflows/CI%20%28macOS%29/badge.svg?branch=master&event=push)](https://github.com/actix/actix-net/actions?query=workflow%3A"CI+(macOS)") |
+| Windows          | [![build status](https://github.com/actix/actix-net/workflows/CI%20%28Windows%29/badge.svg?branch=master&event=push)](https://github.com/actix/actix-net/actions?query=workflow%3A"CI+(Windows)") |
+| Windows (MinGW)  | [![build status](https://github.com/actix/actix-net/workflows/CI%20%28Windows-mingw%29/badge.svg?branch=master&event=push)](https://github.com/actix/actix-net/actions?query=workflow%3A"CI+(Windows-mingw)") |
 
 ## Documentation & community resources
 
