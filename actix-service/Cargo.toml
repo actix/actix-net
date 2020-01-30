@@ -11,10 +11,6 @@ categories = ["network-programming", "asynchronous"]
 license = "MIT/Apache-2.0"
 edition = "2018"
 
-[badges]
-travis-ci = { repository = "actix/actix-service", branch = "master" }
-codecov = { repository = "actix/actix-service", branch = "master", service = "github" }
-
 [lib]
 name = "actix_service"
 path = "src/lib.rs"
