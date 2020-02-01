@@ -1,4 +1,4 @@
-name: CI (Windows-gnu)
+name: CI (Windows-mingw)
 
 on: [push, pull_request]
 

@@ -10,6 +10,7 @@ jobs:
         with:
           toolchain: nightly
           components: clippy
+          profile: minimal
           override: true
       - uses: actions-rs/clippy-check@v1
         with:

@@ -1,15 +1,10 @@
-use std::io::Read;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::{mpsc, Arc};
 use std::{net, thread, time};
 
-use actix_codec::{BytesCodec, Framed};
-use actix_rt::net::TcpStream;
 use actix_server::Server;
 use actix_service::fn_service;
-use bytes::Bytes;
 use futures::future::{lazy, ok};
-use futures::SinkExt;
 use net2::TcpBuilder;
 
 fn unused_addr() -> net::SocketAddr {
@@ -73,6 +68,12 @@ fn test_listen() {
 #[test]
 #[cfg(unix)]
 fn test_start() {
+    use actix_codec::{BytesCodec, Framed};
+    use actix_rt::net::TcpStream;
+    use bytes::Bytes;
+    use futures::SinkExt;
+    use std::io::Read;
+
     let addr = unused_addr();
     let (tx, rx) = mpsc::channel();
 
