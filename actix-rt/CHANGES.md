@@ -4,6 +4,8 @@
 
 - Expose `System::is_set` to check if current system is running
 
+- Add `Arbiter::local_join` associated function to get be able to `await` for spawned futures
+
 ## [1.0.0] - 2019-12-11
 
 * Update dependencies

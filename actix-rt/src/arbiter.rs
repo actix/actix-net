@@ -15,10 +15,13 @@ use crate::system::System;
 
 use copyless::BoxHelper;
 
+pub use tokio::task::JoinHandle;
+
 thread_local!(
     static ADDR: RefCell<Option<Arbiter>> = RefCell::new(None);
     static RUNNING: Cell<bool> = Cell::new(false);
     static Q: RefCell<Vec<Pin<Box<dyn Future<Output = ()>>>>> = RefCell::new(Vec::new());
+    static PENDING: RefCell<Vec<JoinHandle<()>>> = RefCell::new(Vec::new());
     static STORAGE: RefCell<HashMap<TypeId, Box<dyn Any>>> = RefCell::new(HashMap::new());
 );
 
@@ -170,7 +173,9 @@ impl Arbiter {
         RUNNING.with(move |cell| {
             if cell.get() {
                 // Spawn the future on running executor
-                tokio::task::spawn_local(future);
+                PENDING.with(move |cell| {
+                    cell.borrow_mut().push(tokio::task::spawn_local(future));
+                })
             } else {
                 // Box the future and push it to the queue, this results in double boxing
                 // because the executor boxes the future again, but works for now
@@ -294,6 +299,15 @@ impl Arbiter {
             Ok(())
         }
     }
+
+    /// Returns a future that will be completed once all currently spawned futures
+    /// have completed.
+    pub fn local_join() -> impl Future<Output = ()> {
+        PENDING.with(move |cell| {
+            let current = cell.replace(Vec::new());
+            future::join_all(current).map(|_| ())
+        })
+    }
 }
 
 struct ArbiterController {
@@ -329,7 +343,9 @@ impl Future for ArbiterController {
                         return Poll::Ready(());
                     }
                     ArbiterCommand::Execute(fut) => {
-                        tokio::task::spawn_local(fut);
+                        PENDING.with(move |cell| {
+                            cell.borrow_mut().push(tokio::task::spawn_local(fut));
+                        });
                     }
                     ArbiterCommand::ExecuteFn(f) => {
                         f.call_box();
