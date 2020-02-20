@@ -21,3 +21,8 @@ pin-project = "0.4.6"
 
 [dev-dependencies]
 actix-rt = "1.0.0"
+criterion = "0.3"
+
+[[bench]]
+name = "unsafecell_vs_refcell"
+harness = false
