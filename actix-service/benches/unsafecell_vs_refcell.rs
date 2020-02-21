@@ -111,5 +111,7 @@ pub fn service_benches() {
         ::criterion::Criterion::default().configure_from_args();
     bench_async_service(&mut criterion, SrvUC::default(), "Service with UnsafeCell");
     bench_async_service(&mut criterion, SrvRC::default(), "Service with RefCell");
+    bench_async_service(&mut criterion, SrvUC::default(), "Service with UnsafeCell");
+    bench_async_service(&mut criterion, SrvRC::default(), "Service with RefCell");
 }
 criterion_main!(service_benches);
