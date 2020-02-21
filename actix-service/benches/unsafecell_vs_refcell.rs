@@ -60,7 +60,7 @@ impl Service for SrvRC {
 		Poll::Ready(Ok(()))
 	}
 
-	fn call(&mut self, req: ()) -> Self::Future {
+	fn call(&mut self, _: ()) -> Self::Future {
 		let prev = *self.0.borrow();
 		*(*self.0).borrow_mut() = prev + 1;
 		ok(*self.0.borrow())
