@@ -1,5 +1,9 @@
 # Changes
 
+## [TBD] - [TBD]
+
+- Expose `System::is_set` to check if current system is running
+
 ## [1.0.0] - 2019-12-11
 
 * Update dependencies

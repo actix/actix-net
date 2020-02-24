@@ -79,7 +79,7 @@ impl System {
         })
     }
 
-    /// Check current system is running.
+    /// Check if current system is running.
     pub fn is_set() -> bool {
         CURRENT.with(|cell| cell.borrow().is_some())
     }
