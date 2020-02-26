@@ -1,5 +1,13 @@
 # Changes
 
+## [1.0.2] - 2020-02-26
+
+### Fixed
+
+* Avoid error by calling `reregister()` on Windows [#103]
+
+[#103]: https://github.com/actix/actix-net/pull/103
+
 ## [1.0.1] - 2019-12-29
 
 ### Changed
