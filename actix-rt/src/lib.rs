@@ -25,7 +25,7 @@ pub use actix_threadpool as blocking;
 /// This function panics if actix system is not running.
 pub fn spawn<F>(f: F)
 where
-    F: futures::Future<Output = ()> + 'static,
+    F: futures_util::future::Future<Output = ()> + 'static,
 {
     if !System::is_set() {
         panic!("System is not running");

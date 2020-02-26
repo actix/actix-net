@@ -3,7 +3,7 @@ use std::future::Future;
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use futures::channel::mpsc::UnboundedSender;
+use futures_channel::mpsc::UnboundedSender;
 use tokio::task::LocalSet;
 
 use crate::arbiter::{Arbiter, SystemCommand};

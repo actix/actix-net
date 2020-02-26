@@ -6,9 +6,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
 use std::{fmt, thread};
 
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
-use futures::channel::oneshot::{channel, Canceled, Sender};
-use futures::{future, Future, FutureExt, Stream};
+use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures_channel::oneshot::{channel, Canceled, Sender};
+use futures_util::{future::{self, Future, FutureExt}, stream::Stream};
 
 use crate::runtime::Runtime;
 use crate::system::System;
