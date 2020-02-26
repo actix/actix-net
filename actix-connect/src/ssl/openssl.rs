@@ -11,7 +11,7 @@ use actix_codec::{AsyncRead, AsyncWrite};
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
 use futures::future::{err, ok, Either, FutureExt, LocalBoxFuture, Ready};
-use trust_dns_resolver::AsyncResolver;
+use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 
 use crate::{
     Address, Connect, ConnectError, ConnectService, ConnectServiceFactory, Connection,

@@ -25,7 +25,7 @@ use actix_rt::{net::TcpStream, Arbiter};
 use actix_service::{pipeline, pipeline_factory, Service, ServiceFactory};
 use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 use trust_dns_resolver::system_conf::read_system_conf;
-use trust_dns_resolver::AsyncResolver;
+use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 
 pub mod resolver {
     pub use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
@@ -39,17 +39,18 @@ pub use self::error::ConnectError;
 pub use self::resolve::{Resolver, ResolverFactory};
 pub use self::service::{ConnectService, ConnectServiceFactory, TcpConnectService};
 
-pub fn start_resolver(cfg: ResolverConfig, opts: ResolverOpts) -> AsyncResolver {
-    let (resolver, bg) = AsyncResolver::new(cfg, opts);
-    actix_rt::spawn(bg);
-    resolver
+pub async fn start_resolver(
+    cfg: ResolverConfig,
+    opts: ResolverOpts,
+) -> Result<AsyncResolver, ConnectError> {
+    Ok(AsyncResolver::tokio(cfg, opts).await?)
 }
 
 struct DefaultResolver(AsyncResolver);
 
-pub(crate) fn get_default_resolver() -> AsyncResolver {
+pub(crate) async fn get_default_resolver() -> Result<AsyncResolver, ConnectError> {
     if Arbiter::contains_item::<DefaultResolver>() {
-        Arbiter::get_item(|item: &DefaultResolver| item.0.clone())
+        Ok(Arbiter::get_item(|item: &DefaultResolver| item.0.clone()))
     } else {
         let (cfg, opts) = match read_system_conf() {
             Ok((cfg, opts)) => (cfg, opts),
@@ -59,16 +60,15 @@ pub(crate) fn get_default_resolver() -> AsyncResolver {
             }
         };
 
-        let (resolver, bg) = AsyncResolver::new(cfg, opts);
-        actix_rt::spawn(bg);
+        let resolver = AsyncResolver::tokio(cfg, opts).await?;
 
         Arbiter::set_item(DefaultResolver(resolver.clone()));
-        resolver
+        Ok(resolver)
     }
 }
 
-pub fn start_default_resolver() -> AsyncResolver {
-    get_default_resolver()
+pub async fn start_default_resolver() -> Result<AsyncResolver, ConnectError> {
+    get_default_resolver().await
 }
 
 /// Create tcp connector service

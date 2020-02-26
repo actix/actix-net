@@ -54,7 +54,7 @@ async fn test_static_str() {
         })
     });
 
-    let resolver = actix_connect::start_default_resolver();
+    let resolver = actix_connect::start_default_resolver().await.unwrap();
     let mut conn = actix_connect::new_connector(resolver.clone());
 
     let con = conn.call(Connect::with("10", srv.addr())).await.unwrap();
@@ -77,7 +77,9 @@ async fn test_new_service() {
     });
 
     let resolver =
-        actix_connect::start_resolver(ResolverConfig::default(), ResolverOpts::default());
+        actix_connect::start_resolver(ResolverConfig::default(), ResolverOpts::default())
+            .await
+            .unwrap();
 
     let factory = actix_connect::new_connector_factory(resolver);
 
