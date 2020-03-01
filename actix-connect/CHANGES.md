@@ -1,5 +1,12 @@
 # Changes
 
+## [1.0.3] - 2020-03-01
+
+### Changed
+
+* Update `rustls` dependency to 0.17
+* Update `tokio-rustls` dependency to 0.13
+
 ## [1.0.2] - 2020-01-15
 
 * Fix actix-service 1.0.3 compatibility
