@@ -1,6 +1,6 @@
 [package]
 name = "actix-tls"
-version = "1.0.0"
+version = "2.0.0-alpha.1"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Actix tls services"
 keywords = ["network", "framework", "async", "futures"]
@@ -48,7 +48,7 @@ tokio-openssl = { version = "0.4.0", optional = true }
 # rustls
 rust-tls = { version = "0.17.0", package = "rustls", optional = true }
 webpki = { version = "0.21", optional = true }
-webpki-roots = { version = "0.17", optional = true }
+webpki-roots = { version = "0.19", optional = true }
 tokio-rustls = { version = "0.13.0", optional = true }
 
 # native-tls
