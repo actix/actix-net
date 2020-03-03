@@ -27,5 +27,5 @@ pin-project = "0.4.6"
 log = "0.4"
 
 [dev-dependencies]
-actix-connect = "1.0.0"
+actix-connect = "2.0.0-alpha.1"
 actix-testing = "1.0.0"
