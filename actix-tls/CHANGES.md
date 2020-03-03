@@ -1,11 +1,12 @@
 # Changes
 
-## [1.0.1] - 2020-03-01
+## [2.0.0-alpha.1] - 2020-03-03
 
 ### Changed
 
 * Update `rustls` dependency to 0.17
 * Update `tokio-rustls` dependency to 0.13
+* Update `webpki-roots` dependency to 0.19
 
 ## [1.0.0] - 2019-12-11
 
