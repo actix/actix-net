@@ -42,6 +42,7 @@ where
 pub struct ConnectResult<Io, St, Codec: Encoder + Decoder, Out> {
     pub(crate) state: St,
     pub(crate) out: Option<Out>,
+    #[pin]
     pub(crate) framed: Framed<Io, Codec>,
 }
 
@@ -97,8 +98,8 @@ where
 {
     type Error = <Codec as Encoder>::Error;
 
-    fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.framed.is_write_ready() {
+    fn poll_ready(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.as_mut().project().framed.is_write_ready() {
             Poll::Ready(Ok(()))
         } else {
             Poll::Pending
@@ -112,11 +113,11 @@ where
         self.project().framed.write(item)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.get_mut().framed.flush(cx)
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.as_mut().project().framed.flush(cx)
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.get_mut().framed.close(cx)
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.as_mut().project().framed.close(cx)
     }
 }

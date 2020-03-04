@@ -6,6 +6,7 @@ use actix_codec::{AsyncRead, AsyncWrite, Decoder, Encoder, Framed};
 use actix_service::Service;
 use actix_utils::mpsc;
 use futures::Stream;
+use pin_project::pin_project;
 use log::debug;
 
 use crate::error::ServiceError;
@@ -15,6 +16,7 @@ type Response<U> = <U as Encoder>::Item;
 
 /// FramedTransport - is a future that reads frames from Framed object
 /// and pass then to the service.
+#[pin_project]
 pub(crate) struct Dispatcher<S, T, U, Out>
 where
     S: Service<Request = Request<U>, Response = Option<Response<U>>>,
@@ -29,6 +31,7 @@ where
     service: S,
     sink: Option<Out>,
     state: FramedState<S, U>,
+    #[pin]
     framed: Framed<T, U>,
     rx: mpsc::Receiver<Result<<U as Encoder>::Item, S::Error>>,
 }
@@ -90,26 +93,27 @@ where
     <U as Encoder>::Error: std::fmt::Debug,
     Out: Stream<Item = <U as Encoder>::Item> + Unpin,
 {
-    fn poll_read(&mut self, cx: &mut Context<'_>) -> bool {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> bool {
         loop {
-            match self.service.poll_ready(cx) {
+            let this = self.as_mut().project();
+            match this.service.poll_ready(cx) {
                 Poll::Ready(Ok(_)) => {
-                    let item = match self.framed.next_item(cx) {
+                    let item = match this.framed.next_item(cx) {
                         Poll::Ready(Some(Ok(el))) => el,
                         Poll::Ready(Some(Err(err))) => {
-                            self.state = FramedState::FramedError(ServiceError::Decoder(err));
+                            *this.state = FramedState::FramedError(ServiceError::Decoder(err));
                             return true;
                         }
                         Poll::Pending => return false,
                         Poll::Ready(None) => {
                             log::trace!("Client disconnected");
-                            self.state = FramedState::Stopping;
+                            *this.state = FramedState::Stopping;
                             return true;
                         }
                     };
 
-                    let tx = self.rx.sender();
-                    let fut = self.service.call(item);
+                    let tx = this.rx.sender();
+                    let fut = this.service.call(item);
                     actix_rt::spawn(async move {
                         let item = fut.await;
                         let item = match item {
@@ -122,7 +126,7 @@ where
                 }
                 Poll::Pending => return false,
                 Poll::Ready(Err(err)) => {
-                    self.state = FramedState::Error(ServiceError::Service(err));
+                    *this.state = FramedState::Error(ServiceError::Service(err));
                     return true;
                 }
             }
@@ -130,37 +134,38 @@ where
     }
 
     /// write to framed object
-    fn poll_write(&mut self, cx: &mut Context<'_>) -> bool {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> bool {
         loop {
-            while !self.framed.is_write_buf_full() {
-                match Pin::new(&mut self.rx).poll_next(cx) {
+            let mut this = self.as_mut().project();
+            while !this.framed.is_write_buf_full() {
+                match Pin::new(&mut this.rx).poll_next(cx) {
                     Poll::Ready(Some(Ok(msg))) => {
-                        if let Err(err) = self.framed.write(msg) {
-                            self.state = FramedState::FramedError(ServiceError::Encoder(err));
+                        if let Err(err) = this.framed.as_mut().write(msg) {
+                            *this.state = FramedState::FramedError(ServiceError::Encoder(err));
                             return true;
                         }
                         continue;
                     }
                     Poll::Ready(Some(Err(err))) => {
-                        self.state = FramedState::Error(ServiceError::Service(err));
+                        *this.state = FramedState::Error(ServiceError::Service(err));
                         return true;
                     }
                     Poll::Ready(None) | Poll::Pending => (),
                 }
 
-                if self.sink.is_some() {
-                    match Pin::new(self.sink.as_mut().unwrap()).poll_next(cx) {
+                if this.sink.is_some() {
+                    match Pin::new(this.sink.as_mut().unwrap()).poll_next(cx) {
                         Poll::Ready(Some(msg)) => {
-                            if let Err(err) = self.framed.write(msg) {
-                                self.state =
+                            if let Err(err) = this.framed.as_mut().write(msg) {
+                                *this.state =
                                     FramedState::FramedError(ServiceError::Encoder(err));
                                 return true;
                             }
                             continue;
                         }
                         Poll::Ready(None) => {
-                            let _ = self.sink.take();
-                            self.state = FramedState::FlushAndStop;
+                            let _ = this.sink.take();
+                            *this.state = FramedState::FlushAndStop;
                             return true;
                         }
                         Poll::Pending => (),
@@ -169,13 +174,13 @@ where
                 break;
             }
 
-            if !self.framed.is_write_buf_empty() {
-                match self.framed.flush(cx) {
+            if !this.framed.is_write_buf_empty() {
+                match this.framed.as_mut().flush(cx) {
                     Poll::Pending => break,
                     Poll::Ready(Ok(_)) => (),
                     Poll::Ready(Err(err)) => {
                         debug!("Error sending data: {:?}", err);
-                        self.state = FramedState::FramedError(ServiceError::Encoder(err));
+                        *this.state = FramedState::FramedError(ServiceError::Encoder(err));
                         return true;
                     }
                 }
@@ -187,13 +192,14 @@ where
     }
 
     pub(crate) fn poll(
-        &mut self,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), ServiceError<S::Error, U>>> {
-        match self.state {
+        let mut this = self.as_mut().project();
+        match this.state {
             FramedState::Processing => loop {
-                let read = self.poll_read(cx);
-                let write = self.poll_write(cx);
+                let read = self.as_mut().poll_read(cx);
+                let write = self.as_mut().poll_write(cx);
                 if read || write {
                     continue;
                 } else {
@@ -202,18 +208,18 @@ where
             },
             FramedState::Error(_) => {
                 // flush write buffer
-                if !self.framed.is_write_buf_empty() {
-                    if let Poll::Pending = self.framed.flush(cx) {
+                if !this.framed.is_write_buf_empty() {
+                    if let Poll::Pending = this.framed.flush(cx) {
                         return Poll::Pending;
                     }
                 }
-                Poll::Ready(Err(self.state.take_error()))
+                Poll::Ready(Err(this.state.take_error()))
             }
             FramedState::FlushAndStop => {
                 // drain service responses
-                match Pin::new(&mut self.rx).poll_next(cx) {
+                match Pin::new(this.rx).poll_next(cx) {
                     Poll::Ready(Some(Ok(msg))) => {
-                        if self.framed.write(msg).is_err() {
+                        if this.framed.as_mut().write(msg).is_err() {
                             return Poll::Ready(Ok(()));
                         }
                     }
@@ -222,8 +228,8 @@ where
                 }
 
                 // flush io
-                if !self.framed.is_write_buf_empty() {
-                    match self.framed.flush(cx) {
+                if !this.framed.is_write_buf_empty() {
+                    match this.framed.flush(cx) {
                         Poll::Ready(Err(err)) => {
                             debug!("Error sending data: {:?}", err);
                         }
@@ -235,7 +241,7 @@ where
                 };
                 Poll::Ready(Ok(()))
             }
-            FramedState::FramedError(_) => Poll::Ready(Err(self.state.take_framed_error())),
+            FramedState::FramedError(_) => Poll::Ready(Err(this.state.take_framed_error())),
             FramedState::Stopping => Poll::Ready(Ok(())),
         }
     }
