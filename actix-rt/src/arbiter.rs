@@ -181,7 +181,7 @@ impl Arbiter {
                 // because the executor boxes the future again, but works for now
                 Q.with(move |cell| {
                     cell.borrow_mut()
-                        .push(unsafe { Pin::new_unchecked(Box::alloc().init(future)) })
+                        .push(Pin::from(Box::alloc().init(future)))
                 });
             }
         });
