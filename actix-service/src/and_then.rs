@@ -4,13 +4,13 @@ use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use super::{Service, ServiceFactory};
-use crate::cell::Cell;
+use crate::axcell::AXCell;
 
 /// Service for the `and_then` combinator, chaining a computation onto the end
 /// of another service which completes successfully.
 ///
 /// This is created by the `ServiceExt::and_then` method.
-pub(crate) struct AndThenService<A, B>(Cell<(A, B)>);
+pub(crate) struct AndThenService<A, B>(AXCell<(A, B)>);
 
 impl<A, B> AndThenService<A, B> {
     /// Create new `AndThen` combinator
@@ -19,7 +19,7 @@ impl<A, B> AndThenService<A, B> {
         A: Service,
         B: Service<Request = A::Response, Error = A::Error>,
     {
-        Self(Cell::new((a, b)))
+        Self(AXCell::new((a, b)))
     }
 }
 
@@ -40,7 +40,7 @@ where
     type Future = AndThenServiceResponse<A, B>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let srv = self.0.get_mut();
+        let mut srv = self.0.get_mut();
         let not_ready = !srv.0.poll_ready(cx)?.is_ready();
         if !srv.1.poll_ready(cx)?.is_ready() || not_ready {
             Poll::Pending
@@ -50,8 +50,9 @@ where
     }
 
     fn call(&mut self, req: A::Request) -> Self::Future {
+        let fut = self.0.get_mut().0.call(req);
         AndThenServiceResponse {
-            state: State::A(self.0.get_mut().0.call(req), Some(self.0.clone())),
+            state: State::A(fut, Some(self.0.clone())),
         }
     }
 }
@@ -72,7 +73,7 @@ where
     A: Service,
     B: Service<Request = A::Response, Error = A::Error>,
 {
-    A(#[pin] A::Future, Option<Cell<(A, B)>>),
+    A(#[pin] A::Future, Option<AXCell<(A, B)>>),
     B(#[pin] B::Future),
     Empty,
 }
@@ -257,9 +258,11 @@ mod tests {
     use std::rc::Rc;
     use std::task::{Context, Poll};
 
-    use futures_util::future::{lazy, ok, ready, Ready};
+    use futures_util::future::{lazy, ok, ready, Ready, join_all, Future, FutureExt};
+    use actix_rt::time::delay_for;
 
     use crate::{fn_factory, pipeline, pipeline_factory, Service, ServiceFactory};
+    use std::pin::Pin;
 
     struct Srv1(Rc<Cell<usize>>);
 
@@ -298,6 +301,32 @@ mod tests {
         }
     }
 
+    #[derive(Clone)]
+    struct SrvSlow(Rc<Cell<usize>>);
+
+    impl Service for SrvSlow {
+        type Request = &'static str;
+        type Response = &'static str;
+        type Error = ();
+        type Future = Pin<Box<dyn Future<Output=Result<Self::Response, Self::Error>>>>;
+
+        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            self.0.set(self.0.get() + 1);
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _: &'static str) -> Self::Future {
+            let cnt = self.0.clone();
+            Box::pin(
+                delay_for(std::time::Duration::from_millis(10))
+                    .then(|()| async move {
+                        cnt.set(cnt.get() + 1);
+                        Ok("slow") 
+                    })
+            )
+    }
+    }
+
     #[actix_rt::test]
     async fn test_poll_ready() {
         let cnt = Rc::new(Cell::new(0));
@@ -328,5 +357,34 @@ mod tests {
         let res = srv.call("srv1").await;
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), ("srv1", "srv2"));
+    }
+
+    #[actix_rt::test]
+    async fn test_concurrency_slow_first() {
+        let cnt = Rc::new(Cell::new(0));
+        let mut srv = pipeline(SrvSlow(cnt.clone())).and_then(Srv1(cnt.clone()));
+        let futures = (1u16..=1000).map(|_| srv.call("req"));
+        let res = join_all(futures).await;
+        assert!(res.iter().all(|r| r.is_ok()));
+        assert_eq!(cnt.get(), 1000);
+    }
+
+    #[actix_rt::test]
+    async fn test_concurrency_slow_last() {
+        let cnt = Rc::new(Cell::new(0));
+        let mut srv = pipeline(Srv1(cnt.clone())).and_then(SrvSlow(cnt.clone()));
+        let futures = (1u16..=1000).map(|_| srv.call("req"));
+        let res = join_all(futures).await;
+        assert!(res.iter().all(|r| r.is_ok()));
+        assert_eq!(cnt.get(), 1000);
+    }
+
+    #[actix_rt::test]
+    async fn test_concurrency_fast() {
+        let cnt = Rc::new(Cell::new(0));
+        let mut srv = pipeline(Srv1(cnt.clone())).and_then(Srv2(cnt.clone()));
+        let futures = (1u16..=1000).map(|_| srv.call("req"));
+        let res = join_all(futures).await;
+        assert!(res.iter().all(|r| r.is_ok()));
     }
 }

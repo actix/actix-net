@@ -10,7 +10,7 @@ use actix_service::IntoService;
 use std::future::Future;
 use std::pin::Pin;
 use futures_util::future::TryFutureExt;
-use actix_service::boxed::BoxFuture;
+use actix_service::{boxed::BoxFuture, pipeline};
 
 
 /*
@@ -319,6 +319,7 @@ pub fn service_benches() {
     bench_async_service(&mut criterion, AndThenUC::new(svc1.into_service(), svc2.into_service()), "AndThen with UnsafeCell");
     bench_async_service(&mut criterion, AndThenRC::new(svc1.into_service(), svc2.into_service()), "AndThen with RefCell");
     bench_async_service(&mut criterion, AndThenRCFuture::new(svc1.into_service(), svc2.into_service()), "AndThen with RefCell via future::and_then");
+    bench_async_service(&mut criterion, pipeline(svc1.into_service()).and_then(svc2.into_service()), "Pipeline::and_then based RC<RefCell>");
 }
 
 criterion_main!(service_benches);

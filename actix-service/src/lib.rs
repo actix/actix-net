@@ -13,6 +13,7 @@ mod apply;
 mod apply_cfg;
 pub mod boxed;
 mod cell;
+mod axcell;
 mod fn_service;
 mod map;
 mod map_config;
