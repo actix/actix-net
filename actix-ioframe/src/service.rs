@@ -357,7 +357,7 @@ where
 {
     Connect(#[pin] C::Future, Rc<T>),
     Handler(#[pin] T::Future, Option<Framed<Io, Codec>>, Option<Out>),
-    Dispatcher(Dispatcher<T::Service, Io, Codec, Out>),
+    Dispatcher(#[pin] Dispatcher<T::Service, Io, Codec, Out>),
 }
 
 impl<St, Io, Codec, Out, C, T> FramedServiceImplResponseInner<St, Io, Codec, Out, C, T>
@@ -408,7 +408,7 @@ where
                     Poll::Ready(Err(e)) => Either::Right(Poll::Ready(Err(e.into()))),
                 }
             }
-            FramedServiceImplResponseInner::Dispatcher(ref mut fut) => {
+            FramedServiceImplResponseInner::Dispatcher(fut) => {
                 Either::Right(fut.poll(cx))
             }
         }
