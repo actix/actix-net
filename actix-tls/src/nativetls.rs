@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
-use futures::future::{self, FutureExt, LocalBoxFuture, TryFutureExt};
+use futures_util::future::{self, FutureExt, LocalBoxFuture, TryFutureExt};
 pub use native_tls::Error;
 pub use tokio_tls::{TlsAcceptor, TlsStream};
 
