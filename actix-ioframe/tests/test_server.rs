@@ -6,7 +6,7 @@ use actix_service::{fn_factory_with_config, fn_service, IntoService, Service};
 use actix_testing::TestServer;
 use actix_utils::mpsc;
 use bytes::{Bytes, BytesMut};
-use futures::future::ok;
+use futures_util::future::ok;
 
 use actix_ioframe::{Builder, Connect, FactoryBuilder};
 
