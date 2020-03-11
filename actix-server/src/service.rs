@@ -6,8 +6,8 @@ use std::time::Duration;
 use actix_rt::spawn;
 use actix_service::{self as actix, Service, ServiceFactory as ActixServiceFactory};
 use actix_utils::counter::CounterGuard;
-use futures::future::{err, ok, LocalBoxFuture, Ready};
-use futures::{FutureExt, TryFutureExt};
+use futures_util::future::{err, ok, LocalBoxFuture, Ready};
+use futures_util::{FutureExt, TryFutureExt};
 use log::error;
 
 use super::Token;
