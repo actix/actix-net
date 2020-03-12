@@ -3,7 +3,7 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::future::lazy;
+use futures_util::future::lazy;
 
 use crate::server::Server;
 

@@ -4,7 +4,7 @@ use std::{net, thread, time};
 
 use actix_server::Server;
 use actix_service::fn_service;
-use futures::future::{lazy, ok};
+use futures_util::future::{lazy, ok};
 use net2::TcpBuilder;
 
 fn unused_addr() -> net::SocketAddr {
@@ -71,7 +71,7 @@ fn test_start() {
     use actix_codec::{BytesCodec, Framed};
     use actix_rt::net::TcpStream;
     use bytes::Bytes;
-    use futures::SinkExt;
+    use futures_util::sink::SinkExt;
     use std::io::Read;
 
     let addr = unused_addr();

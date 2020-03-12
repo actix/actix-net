@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use actix_service::{IntoService, Service, Transform};
-use futures::future::{ok, Ready};
+use futures_util::future::{ok, Ready};
 
 use crate::oneshot;
 use crate::task::LocalWaker;
@@ -210,8 +210,8 @@ mod tests {
 
     use super::*;
     use actix_service::Service;
-    use futures::channel::oneshot;
-    use futures::future::{lazy, poll_fn, FutureExt, LocalBoxFuture};
+    use futures_channel::oneshot;
+    use futures_util::future::{lazy, poll_fn, FutureExt, LocalBoxFuture};
 
     struct Srv;
 

@@ -9,7 +9,7 @@ pub use tokio_openssl::{HandshakeError, SslStream};
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
-use futures::future::{ok, FutureExt, LocalBoxFuture, Ready};
+use futures_util::future::{ok, FutureExt, LocalBoxFuture, Ready};
 
 use crate::MAX_CONN_COUNTER;
 
@@ -105,7 +105,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> Future for AcceptorServiceResponse<T> {
     type Output = Result<SslStream<T>, HandshakeError<T>>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let io = futures::ready!(Pin::new(&mut self.fut).poll(cx))?;
+        let io = futures_util::ready!(Pin::new(&mut self.fut).poll(cx))?;
         Poll::Ready(Ok(io))
     }
 }

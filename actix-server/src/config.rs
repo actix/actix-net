@@ -4,7 +4,7 @@ use std::{fmt, io, net};
 use actix_rt::net::TcpStream;
 use actix_service as actix;
 use actix_utils::counter::CounterGuard;
-use futures::future::{ok, Future, FutureExt, LocalBoxFuture};
+use futures_util::future::{ok, Future, FutureExt, LocalBoxFuture};
 use log::error;
 
 use super::builder::bind_addr;

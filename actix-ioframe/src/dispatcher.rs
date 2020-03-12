@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use actix_codec::{AsyncRead, AsyncWrite, Decoder, Encoder, Framed};
 use actix_service::Service;
 use actix_utils::mpsc;
-use futures::Stream;
+use futures_core::stream::Stream;
 use pin_project::pin_project;
 use log::debug;
 

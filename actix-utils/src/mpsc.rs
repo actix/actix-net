@@ -6,7 +6,8 @@ use std::fmt;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::{Sink, Stream};
+use futures_sink::Sink;
+use futures_util::stream::Stream;
 
 use crate::cell::Cell;
 use crate::task::LocalWaker;
@@ -180,8 +181,8 @@ impl<T> SendError<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::future::lazy;
-    use futures::{Stream, StreamExt};
+    use futures_util::future::lazy;
+    use futures_util::{stream::Stream, StreamExt};
 
     #[actix_rt::test]
     async fn test_mpsc() {

@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 
 use actix_codec::{AsyncRead, AsyncWrite, Decoder, Encoder, Framed};
 use actix_utils::mpsc::Receiver;
-use futures::Stream;
+use futures_core::stream::Stream;
 
 pub struct Connect<Io, Codec>
 where
@@ -90,7 +90,7 @@ where
     }
 }
 
-impl<Io, St, Codec, Out> futures::Sink<<Codec as Encoder>::Item>
+impl<Io, St, Codec, Out> futures_sink::Sink<<Codec as Encoder>::Item>
     for ConnectResult<Io, St, Codec, Out>
 where
     Io: AsyncRead + AsyncWrite,

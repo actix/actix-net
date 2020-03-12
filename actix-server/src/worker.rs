@@ -7,10 +7,10 @@ use std::time;
 use actix_rt::time::{delay_until, Delay, Instant};
 use actix_rt::{spawn, Arbiter};
 use actix_utils::counter::Counter;
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
-use futures::channel::oneshot;
-use futures::future::{join_all, LocalBoxFuture, MapOk};
-use futures::{Future, FutureExt, Stream, TryFutureExt};
+use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures_channel::oneshot;
+use futures_util::future::{join_all, LocalBoxFuture, MapOk};
+use futures_util::{future::Future, FutureExt, stream::Stream, TryFutureExt};
 use log::{error, info, trace};
 
 use crate::accept::AcceptNotify;

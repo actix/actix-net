@@ -24,4 +24,3 @@ actix-service = "1.0.0"
 
 log = "0.4"
 net2 = "0.2"
-futures = "0.3.1"

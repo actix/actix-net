@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pub use futures::channel::oneshot::Canceled;
+pub use futures_channel::oneshot::Canceled;
 use slab::Slab;
 
 use crate::cell::Cell;
@@ -253,7 +253,7 @@ impl<T> Future for PReceiver<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::future::lazy;
+    use futures_util::future::lazy;
 
     #[actix_rt::test]
     async fn test_oneshot() {

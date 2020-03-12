@@ -3,9 +3,9 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::channel::mpsc::UnboundedSender;
-use futures::channel::oneshot;
-use futures::FutureExt;
+use futures_channel::mpsc::UnboundedSender;
+use futures_channel::oneshot;
+use futures_util::FutureExt;
 
 use crate::builder::ServerBuilder;
 use crate::signals::Signal;

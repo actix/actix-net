@@ -5,7 +5,7 @@ use actix_rt::net::TcpStream;
 use actix_service::{fn_service, Service, ServiceFactory};
 use actix_testing::TestServer;
 use bytes::Bytes;
-use futures::SinkExt;
+use futures_util::sink::SinkExt;
 
 use actix_connect::resolver::{ResolverConfig, ResolverOpts};
 use actix_connect::Connect;

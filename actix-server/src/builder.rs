@@ -6,11 +6,11 @@ use std::{io, mem, net};
 use actix_rt::net::TcpStream;
 use actix_rt::time::{delay_until, Instant};
 use actix_rt::{spawn, System};
-use futures::channel::mpsc::{unbounded, UnboundedReceiver};
-use futures::channel::oneshot;
-use futures::future::ready;
-use futures::stream::FuturesUnordered;
-use futures::{ready, Future, FutureExt, Stream, StreamExt};
+use futures_channel::mpsc::{unbounded, UnboundedReceiver};
+use futures_channel::oneshot;
+use futures_util::future::ready;
+use futures_util::stream::FuturesUnordered;
+use futures_util::{ready, future::Future, FutureExt, stream::Stream, StreamExt};
 use log::{error, info};
 use net2::TcpBuilder;
 
