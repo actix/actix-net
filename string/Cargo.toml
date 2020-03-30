@@ -1,6 +1,6 @@
 [package]
 name = "bytestring"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "A UTF-8 encoded string with Bytes as a storage"
 keywords = ["actix"]
@@ -16,3 +16,7 @@ path = "src/lib.rs"
 
 [dependencies]
 bytes = "0.5.3"
+serde = { version = "1.0", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0"

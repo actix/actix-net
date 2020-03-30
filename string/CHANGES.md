@@ -1,5 +1,9 @@
 # Changes
 
+## [0.1.5] - 2020-03-30
+
+* Serde support
+
 ## [0.1.4] - 2020-01-14
 
 * Fix `AsRef<str>` impl
