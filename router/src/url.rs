@@ -31,7 +31,7 @@ fn set_bit(array: &mut [u8], ch: u8) {
 }
 
 thread_local! {
-    static DEFAULT_QUOTER: Quoter = { Quoter::new(b"@:", b"/+") };
+    static DEFAULT_QUOTER: Quoter = Quoter::new(b"@:", b"/+");
 }
 
 #[derive(Default, Clone, Debug)]
