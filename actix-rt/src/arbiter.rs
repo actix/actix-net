@@ -89,6 +89,11 @@ impl Arbiter {
         })
     }
 
+    /// Check if current arbiter is running.
+    pub fn is_running() -> bool {
+        RUNNING.with(|cell| cell.get())
+    }
+
     /// Stop arbiter from continuing it's event loop.
     pub fn stop(&self) {
         let _ = self.sender.unbounded_send(ArbiterCommand::Stop);

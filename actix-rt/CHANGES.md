@@ -2,7 +2,11 @@
 
 ## [TBD] - [TBD]
 
-- Expose `System::is_set` to check if current system is running
+Added
+
+- Expose `System::is_set` to check if current system has ben started
+
+- Add `Arbiter::is_running` to check if event loop is running
 
 - Add `Arbiter::local_join` associated function to get be able to `await` for spawned futures
 

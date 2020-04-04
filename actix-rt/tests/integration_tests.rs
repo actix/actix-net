@@ -1,6 +1,20 @@
 use std::time::{Duration, Instant};
 
 #[test]
+fn start_and_stop() {
+    actix_rt::System::new("start_and_stop").block_on(async move {
+        assert!(
+            actix_rt::Arbiter::is_running(),
+            "System doesn't seem to have started"
+        );
+    });
+    assert!(
+        !actix_rt::Arbiter::is_running(),
+        "System doesn't seem to have stopped"
+    );
+}
+
+#[test]
 fn await_for_timer() {
     let time = Duration::from_secs(2);
     let instant = Instant::now();
