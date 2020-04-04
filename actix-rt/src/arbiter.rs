@@ -8,7 +8,10 @@ use std::{fmt, thread};
 
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot::{channel, Canceled, Sender};
-use futures_util::{future::{self, Future, FutureExt}, stream::Stream};
+use futures_util::{
+    future::{self, Future, FutureExt},
+    stream::Stream,
+};
 
 use crate::runtime::Runtime;
 use crate::system::System;
@@ -180,8 +183,7 @@ impl Arbiter {
                 // Box the future and push it to the queue, this results in double boxing
                 // because the executor boxes the future again, but works for now
                 Q.with(move |cell| {
-                    cell.borrow_mut()
-                        .push(Pin::from(Box::alloc().init(future)))
+                    cell.borrow_mut().push(Pin::from(Box::alloc().init(future)))
                 });
             }
         });
