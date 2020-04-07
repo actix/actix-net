@@ -4,8 +4,8 @@
 
 ### Added
 
-* Expose `System::is_set` to check if current system has ben started [#124]
-* Add `Arbiter::is_running` to check if event loop is running [#99]
+* Expose `System::is_set` to check if current system has ben started [#99]
+* Add `Arbiter::is_running` to check if event loop is running [#124]
 * Add `Arbiter::local_join` associated function
   to get be able to `await` for spawned futures [#94]
 
