@@ -1,14 +1,17 @@
 # Changes
 
-## [TBD] - [TBD]
+## [1.1.0] - 2020-04-08
 
-Added
+### Added
 
-- Expose `System::is_set` to check if current system has ben started
+* Expose `System::is_set` to check if current system has ben started [#124]
+* Add `Arbiter::is_running` to check if event loop is running [#99]
+* Add `Arbiter::local_join` associated function
+  to get be able to `await` for spawned futures [#94]
 
-- Add `Arbiter::is_running` to check if event loop is running
-
-- Add `Arbiter::local_join` associated function to get be able to `await` for spawned futures
+[#94]: https://github.com/actix/actix-net/pull/94
+[#99]: https://github.com/actix/actix-net/pull/99
+[#124]: https://github.com/actix/actix-net/pull/124
 
 ## [1.0.0] - 2019-12-11
 
