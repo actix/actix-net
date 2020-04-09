@@ -183,7 +183,8 @@ impl Arbiter {
                 // Spawn the future on running executor
                 PENDING.with(move |cell| {
                     cell.borrow_mut().push(tokio::task::spawn_local(future));
-                })
+                });
+                tokio::task::spawn_local(CleanupPending);
             } else {
                 // Box the future and push it to the queue, this results in double boxing
                 // because the executor boxes the future again, but works for now
@@ -314,6 +315,30 @@ impl Arbiter {
             let current = cell.replace(Vec::new());
             future::join_all(current).map(|_| ())
         })
+    }
+}
+
+/// Future used for cleaning-up already finished `JoinHandle`s
+/// from the `PENDING` list so the vector doesn't grow indefinitely
+struct CleanupPending;
+
+impl Future for CleanupPending {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        PENDING.with(move |cell| {
+            let mut pending = cell.borrow_mut();
+            let mut i = 0;
+            while i != pending.len() {
+                if let Poll::Ready(_) = Pin::new(&mut pending[i]).poll(cx) {
+                    pending.remove(i);
+                } else {
+                    i += 1;
+                }
+            }
+        });
+
+        Poll::Ready(())
     }
 }
 
