@@ -58,6 +58,7 @@ pub fn test(_: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
 
     let ret = &input.sig.output;
+    let inputs = &input.sig.inputs;
     let name = &input.sig.ident;
     let body = &input.block;
     let attrs = &input.attrs;
@@ -81,7 +82,7 @@ pub fn test(_: TokenStream, item: TokenStream) -> TokenStream {
     let result = if has_test_attr {
         quote! {
             #(#attrs)*
-            fn #name() #ret {
+            fn #name(#inputs) #ret {
                 actix_rt::System::new("test")
                     .block_on(async { #body })
             }
@@ -90,7 +91,7 @@ pub fn test(_: TokenStream, item: TokenStream) -> TokenStream {
         quote! {
             #[test]
             #(#attrs)*
-            fn #name() #ret {
+            fn #name(#inputs) #ret {
                 actix_rt::System::new("test")
                     .block_on(async { #body })
             }
