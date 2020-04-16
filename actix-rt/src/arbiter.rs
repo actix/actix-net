@@ -18,13 +18,14 @@ use crate::system::System;
 
 use copyless::BoxHelper;
 
+use smallvec::SmallVec;
 pub use tokio::task::JoinHandle;
 
 thread_local!(
     static ADDR: RefCell<Option<Arbiter>> = RefCell::new(None);
     static RUNNING: Cell<bool> = Cell::new(false);
     static Q: RefCell<Vec<Pin<Box<dyn Future<Output = ()>>>>> = RefCell::new(Vec::new());
-    static PENDING: RefCell<Vec<JoinHandle<()>>> = RefCell::new(Vec::new());
+    static PENDING: RefCell<SmallVec<[JoinHandle<()>; 8]>> = RefCell::new(SmallVec::new());
     static STORAGE: RefCell<HashMap<TypeId, Box<dyn Any>>> = RefCell::new(HashMap::new());
 );
 
@@ -181,10 +182,15 @@ impl Arbiter {
         RUNNING.with(move |cell| {
             if cell.get() {
                 // Spawn the future on running executor
-                PENDING.with(move |cell| {
-                    cell.borrow_mut().push(tokio::task::spawn_local(future));
+                let len = PENDING.with(move |cell| {
+                    let mut p = cell.borrow_mut();
+                    p.push(tokio::task::spawn_local(future));
+                    p.len()
                 });
-                tokio::task::spawn_local(CleanupPending);
+                if len > 7 {
+                    // Before reaching the inline size
+                    tokio::task::spawn_local(CleanupPending);
+                }
             } else {
                 // Box the future and push it to the queue, this results in double boxing
                 // because the executor boxes the future again, but works for now
@@ -312,7 +318,7 @@ impl Arbiter {
     /// have completed.
     pub fn local_join() -> impl Future<Output = ()> {
         PENDING.with(move |cell| {
-            let current = cell.replace(Vec::new());
+            let current = cell.replace(SmallVec::new());
             future::join_all(current).map(|_| ())
         })
     }
@@ -375,9 +381,15 @@ impl Future for ArbiterController {
                         return Poll::Ready(());
                     }
                     ArbiterCommand::Execute(fut) => {
-                        PENDING.with(move |cell| {
-                            cell.borrow_mut().push(tokio::task::spawn_local(fut));
+                        let len = PENDING.with(move |cell| {
+                            let mut p = cell.borrow_mut();
+                            p.push(tokio::task::spawn_local(fut));
+                            p.len()
                         });
+                        if len > 7 {
+                            // Before reaching the inline size
+                            tokio::task::spawn_local(CleanupPending);
+                        }
                     }
                     ArbiterCommand::ExecuteFn(f) => {
                         f.call_box();
