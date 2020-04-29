@@ -1,6 +1,16 @@
 # Changes
 
+## [1.1.1] - 2020-04-30
+
+### Fixed
+
+* Fix memory leak due to [#94] (see [#129] for more detail)
+
+[#129]: https://github.com/actix/actix-net/issues/129
+
 ## [1.1.0] - 2020-04-08
+
+**This version has been yanked.**
 
 ### Added
 
