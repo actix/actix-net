@@ -1,10 +1,11 @@
-//! A utl-8 encoded read-only string with Bytes as a storage.
+//! A UTF-8 encoded read-only string using Bytes as storage.
+
 use std::convert::TryFrom;
 use std::{borrow, fmt, hash, ops, str};
 
 use bytes::Bytes;
 
-/// A utf-8 encoded string with [`Bytes`] as a storage.
+/// A UTF-8 encoded string with [`Bytes`] as a storage.
 ///
 /// [`Bytes`]: https://docs.rs/bytes/0.5.3/bytes/struct.Bytes.html
 #[derive(Clone, Eq, Ord, PartialOrd, Default)]
