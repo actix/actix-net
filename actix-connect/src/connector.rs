@@ -88,7 +88,7 @@ impl<T: Address> Service for TcpConnector<T> {
             Either::Left(TcpConnectorResponse::new(req, port, addr))
         } else {
             error!("TCP connector: got unresolved address");
-            Either::Right(err(ConnectError::Unresolverd))
+            Either::Right(err(ConnectError::Unresolved))
         }
     }
 }
