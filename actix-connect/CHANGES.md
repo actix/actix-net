@@ -1,5 +1,11 @@
 # Changes
 
+## [Unreleased]
+
+### Fixed
+
+* Corrected spelling of `ConnectError::Unresolverd` to `ConnectError::Unresolved`
+
 ## [2.0.0-alpha.2] - 2020-03-08
 
 ### Changed
