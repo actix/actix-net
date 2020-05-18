@@ -2,9 +2,6 @@ name: CI (Windows-mingw)
 
 on: [push, pull_request]
 
-env:
-  OPENSSL_DIR: d:\a\_temp\msys\msys64\usr
-
 jobs:
   build_and_test:
     strategy:
@@ -30,25 +27,13 @@ jobs:
       - name: Install MSYS2
         uses: numworks/setup-msys2@v1
 
-      - name: Install OpenSSL
+      - name: Install packages
         run: |
-          msys2do pacman --noconfirm -S openssl-devel pkg-config
-
-      - name: Copy and check libs
-        run: |
-          Copy-Item d:\a\_temp\msys\msys64\usr\lib\libssl.dll.a d:\a\_temp\msys\msys64\usr\lib\libssl.dll
-          Copy-Item d:\a\_temp\msys\msys64\usr\lib\libcrypto.dll.a d:\a\_temp\msys\msys64\usr\lib\libcrypto.dll
-          Get-ChildItem d:\a\_temp\msys\msys64\usr\lib
-          Get-ChildItem d:\a\_temp\msys\msys64\usr
+          msys2do pacman -Sy --noconfirm pacman
+          msys2do pacman --noconfirm -S base-devel pkg-config
 
       - name: check build
         uses: actions-rs/cargo@v1
         with:
           command: check
           args: --all --bins --examples --tests
-
-      - name: tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all --all-features --no-fail-fast -- --nocapture
