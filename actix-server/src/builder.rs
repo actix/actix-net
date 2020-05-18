@@ -12,7 +12,7 @@ use futures_util::future::ready;
 use futures_util::stream::FuturesUnordered;
 use futures_util::{ready, future::Future, FutureExt, stream::Stream, StreamExt};
 use log::{error, info};
-use net2::TcpBuilder;
+use socket2::{Domain, Protocol, Socket, Type};
 
 use crate::accept::{AcceptLoop, AcceptNotify, Command};
 use crate::config::{ConfiguredService, ServiceConfig};
@@ -487,11 +487,13 @@ pub(super) fn bind_addr<S: net::ToSocketAddrs>(
 }
 
 fn create_tcp_listener(addr: net::SocketAddr, backlog: i32) -> io::Result<net::TcpListener> {
-    let builder = match addr {
-        net::SocketAddr::V4(_) => TcpBuilder::new_v4()?,
-        net::SocketAddr::V6(_) => TcpBuilder::new_v6()?,
+    let domain = match addr {
+        net::SocketAddr::V4(_) => Domain::ipv4(),
+        net::SocketAddr::V6(_) => Domain::ipv6(),
     };
-    builder.reuse_address(true)?;
-    builder.bind(addr)?;
-    Ok(builder.listen(backlog)?)
+    let socket = Socket::new(domain, Type::stream(), Some(Protocol::tcp()))?;
+    socket.set_reuse_address(true)?;
+    socket.bind(&addr.into())?;
+    socket.listen(backlog)?;
+    Ok(socket.into_tcp_listener())
 }
