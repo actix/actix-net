@@ -1,5 +1,11 @@
 # Changes
 
+## [Unreleased]
+
+### Changed
+
+* Replace deprecated `net2` crate with `socket2`
+
 ## [1.0.2] - 2020-02-26
 
 ### Fixed

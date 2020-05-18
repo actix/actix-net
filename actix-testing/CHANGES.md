@@ -1,5 +1,9 @@
 # Changes
 
+## [Unreleased]
+
+* Replace deprecated `net2` crate with `socket2`
+
 ## [1.0.0] - 2019-12-11
 
 * Update actix-server to 1.0.0
