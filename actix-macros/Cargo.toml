@@ -1,6 +1,6 @@
 [package]
 name = "actix-macros"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Actix runtime macros"
 repository = "https://github.com/actix/actix-net"
@@ -19,5 +19,5 @@ syn = { version = "^1", features = ["full"] }
 [dev-dependencies]
 actix-rt = "1.0"
 
-futures = "0.3"
+futures-util = { version = "0.3", default-features = false }
 trybuild = "1"

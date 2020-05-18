@@ -1,4 +1,4 @@
 #[actix_rt::main]
 fn main() {
-    futures::future::ready(()).await
+    futures_util::future::ready(()).await
 }
