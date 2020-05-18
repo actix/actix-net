@@ -9,6 +9,6 @@ error[E0601]: `main` function not found in crate `$CRATE`
   |
 1 | / #[actix_rt::main]
 2 | | fn main() {
-3 | |     futures::future::ready(()).await
+3 | |     futures_util::future::ready(()).await
 4 | | }
   | |_^ consider adding a `main` function to `$DIR/tests/trybuild/main-02-only-async.rs`
