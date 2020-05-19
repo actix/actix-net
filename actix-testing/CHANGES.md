@@ -1,8 +1,10 @@
 # Changes
 
-## [Unreleased]
+## [1.0.1] - 2020-05-19
 
 * Replace deprecated `net2` crate with `socket2`
+
+* Remove unused `futures` dependency
 
 ## [1.0.0] - 2019-12-11
 
