@@ -10,7 +10,7 @@ use actix_utils::counter::Counter;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot;
 use futures_util::future::{join_all, LocalBoxFuture, MapOk};
-use futures_util::{future::Future, FutureExt, stream::Stream, TryFutureExt};
+use futures_util::{future::Future, stream::Stream, FutureExt, TryFutureExt};
 use log::{error, info, trace};
 
 use crate::accept::AcceptNotify;

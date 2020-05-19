@@ -1,6 +1,6 @@
 [package]
 name = "actix-server"
-version = "1.0.2"
+version = "1.0.3"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Actix server - General purpose tcp server"
 keywords = ["network", "framework", "async", "futures"]
@@ -9,7 +9,7 @@ repository = "https://github.com/actix/actix-net.git"
 documentation = "https://docs.rs/actix-server/"
 categories = ["network-programming", "asynchronous"]
 license = "MIT/Apache-2.0"
-exclude = [".gitignore", ".travis.yml", ".cargo/config", "appveyor.yml"]
+exclude = [".gitignore", ".cargo/config"]
 edition = "2018"
 workspace = ".."
 

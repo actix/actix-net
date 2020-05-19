@@ -10,7 +10,7 @@ use futures_channel::mpsc::{unbounded, UnboundedReceiver};
 use futures_channel::oneshot;
 use futures_util::future::ready;
 use futures_util::stream::FuturesUnordered;
-use futures_util::{ready, future::Future, FutureExt, stream::Stream, StreamExt};
+use futures_util::{future::Future, ready, stream::Stream, FutureExt, StreamExt};
 use log::{error, info};
 use socket2::{Domain, Protocol, Socket, Type};
 
@@ -381,7 +381,7 @@ impl ServerBuilder {
                                             .await;
                                             System::current().stop();
                                         }
-                                            .boxed(),
+                                        .boxed(),
                                     );
                                 }
                                 ready(())
