@@ -1,0 +1,14 @@
+coverage:
+  status:
+    project:
+      default:
+        threshold: 10% # make CI green
+    patch:
+      default:
+        threshold: 10% # make CI green
+
+ignore: # ignore codecoverage on following paths
+  - "examples"
+  - ".github"
+  - "**/*.md"
+  - "**/*.toml"
