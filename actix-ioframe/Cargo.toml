@@ -24,7 +24,7 @@ bytes = "0.5.3"
 either = "1.5.3"
 futures-sink = { version = "0.3.4", default-features = false }
 futures-core = { version = "0.3.4", default-features = false }
-pin-project = "0.4.6"
+pin-project = "0.4.17"
 log = "0.4"
 
 [dev-dependencies]

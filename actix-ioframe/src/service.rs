@@ -8,7 +8,6 @@ use actix_codec::{AsyncRead, AsyncWrite, Decoder, Encoder, Framed};
 use actix_service::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 use either::Either;
 use futures_core::{ready, stream::Stream};
-use pin_project::project;
 
 use crate::connect::{Connect, ConnectResult};
 use crate::dispatcher::Dispatcher;
@@ -336,7 +335,7 @@ where
     }
 }
 
-#[pin_project::pin_project]
+#[pin_project::pin_project(project = FramedServiceImplResponseInnerProj)]
 enum FramedServiceImplResponseInner<St, Io, Codec, Out, C, T>
 where
     C: Service<Request = Connect<Io, Codec>, Response = ConnectResult<Io, St, Codec, Out>>,
@@ -378,7 +377,6 @@ where
     <Codec as Encoder>::Error: std::fmt::Debug,
     Out: Stream<Item = <Codec as Encoder>::Item> + Unpin,
 {
-    #[project]
     fn poll(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -386,9 +384,8 @@ where
         FramedServiceImplResponseInner<St, Io, Codec, Out, C, T>,
         Poll<Result<(), ServiceError<C::Error, Codec>>>,
     > {
-        #[project]
         match self.project() {
-            FramedServiceImplResponseInner::Connect(fut, handler) => match fut.poll(cx) {
+            FramedServiceImplResponseInnerProj::Connect(fut, handler) => match fut.poll(cx) {
                 Poll::Ready(Ok(res)) => Either::Left(FramedServiceImplResponseInner::Handler(
                     handler.new_service(res.state),
                     Some(res.framed),
@@ -397,7 +394,7 @@ where
                 Poll::Pending => Either::Right(Poll::Pending),
                 Poll::Ready(Err(e)) => Either::Right(Poll::Ready(Err(e.into()))),
             },
-            FramedServiceImplResponseInner::Handler(fut, framed, out) => {
+            FramedServiceImplResponseInnerProj::Handler(fut, framed, out) => {
                 match fut.poll(cx) {
                     Poll::Ready(Ok(handler)) => {
                         Either::Left(FramedServiceImplResponseInner::Dispatcher(
@@ -408,7 +405,7 @@ where
                     Poll::Ready(Err(e)) => Either::Right(Poll::Ready(Err(e.into()))),
                 }
             }
-            FramedServiceImplResponseInner::Dispatcher(fut) => {
+            FramedServiceImplResponseInnerProj::Dispatcher(fut) => {
                 Either::Right(fut.poll(cx))
             }
         }
