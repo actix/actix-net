@@ -177,7 +177,7 @@ where
     state: State<T, R, S>,
 }
 
-#[pin_project::pin_project]
+#[pin_project::pin_project(project = StateProj)]
 enum State<T, R, S>
 where
     T: ServiceFactory<Config = ()>,
@@ -200,20 +200,18 @@ where
 {
     type Output = Result<S, T::InitError>;
 
-    #[pin_project::project]
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.as_mut().project();
 
-        #[project]
         match this.state.as_mut().project() {
-            State::A(fut) => match fut.poll(cx)? {
+            StateProj::A(fut) => match fut.poll(cx)? {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(srv) => {
                     this.state.set(State::B(srv));
                     self.poll(cx)
                 }
             },
-            State::B(srv) => match srv.poll_ready(cx)? {
+            StateProj::B(srv) => match srv.poll_ready(cx)? {
                 Poll::Ready(_) => {
                     let fut = (this.store.get_mut().1)(this.cfg.take().unwrap(), srv);
                     this.state.set(State::C(fut));
@@ -221,7 +219,7 @@ where
                 }
                 Poll::Pending => Poll::Pending,
             },
-            State::C(fut) => fut.poll(cx),
+            StateProj::C(fut) => fut.poll(cx),
         }
     }
 }
