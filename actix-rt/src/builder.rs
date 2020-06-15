@@ -56,7 +56,7 @@ impl Builder {
     /// Create new System that can run asynchronously.
     ///
     /// This method panics if it cannot start the system arbiter
-    pub(crate) fn build_async(self, local: &LocalSet) -> AsyncSystemRunner {
+    pub fn build_async(self, local: &LocalSet) -> AsyncSystemRunner {
         self.create_async_runtime(local)
     }
 
