@@ -108,7 +108,7 @@ impl Builder {
 }
 
 #[derive(Debug)]
-pub(crate) struct AsyncSystemRunner {
+pub struct AsyncSystemRunner {
     stop: Receiver<i32>,
     system: System,
 }
