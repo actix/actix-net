@@ -1,5 +1,22 @@
 # Changes
 
+## [2.0.0-alpha.3] - 2020-05-08
+
+### Fixed
+
+* Corrected spelling of `ConnectError::Unresolverd` to `ConnectError::Unresolved`
+
+## [2.0.0-alpha.2] - 2020-03-08
+
+### Changed
+
+* Update `trust-dns-proto` dependency to 0.19. [#116]
+* Update `trust-dns-resolver` dependency to 0.19. [#116]
+* `Address` trait is now required to have static lifetime. [#116]
+* `start_resolver` and `start_default_resolver` are now `async` and may return a `ConnectError`. [#116]
+
+[#116]: https://github.com/actix/actix-net/pull/116
+
 ## [2.0.0-alpha.1] - 2020-03-03
 
 ### Changed

@@ -5,7 +5,7 @@ use actix_rt::net::TcpStream;
 use actix_service::{fn_service, Service, ServiceFactory};
 use actix_testing::TestServer;
 use bytes::Bytes;
-use futures::SinkExt;
+use futures_util::sink::SinkExt;
 
 use actix_connect::resolver::{ResolverConfig, ResolverOpts};
 use actix_connect::Connect;
@@ -14,12 +14,10 @@ use actix_connect::Connect;
 #[actix_rt::test]
 async fn test_string() {
     let srv = TestServer::with(|| {
-        fn_service(|io: TcpStream| {
-            async {
-                let mut framed = Framed::new(io, BytesCodec);
-                framed.send(Bytes::from_static(b"test")).await?;
-                Ok::<_, io::Error>(())
-            }
+        fn_service(|io: TcpStream| async {
+            let mut framed = Framed::new(io, BytesCodec);
+            framed.send(Bytes::from_static(b"test")).await?;
+            Ok::<_, io::Error>(())
         })
     });
 
@@ -33,12 +31,10 @@ async fn test_string() {
 #[actix_rt::test]
 async fn test_rustls_string() {
     let srv = TestServer::with(|| {
-        fn_service(|io: TcpStream| {
-            async {
-                let mut framed = Framed::new(io, BytesCodec);
-                framed.send(Bytes::from_static(b"test")).await?;
-                Ok::<_, io::Error>(())
-            }
+        fn_service(|io: TcpStream| async {
+            let mut framed = Framed::new(io, BytesCodec);
+            framed.send(Bytes::from_static(b"test")).await?;
+            Ok::<_, io::Error>(())
         })
     });
 
@@ -51,16 +47,14 @@ async fn test_rustls_string() {
 #[actix_rt::test]
 async fn test_static_str() {
     let srv = TestServer::with(|| {
-        fn_service(|io: TcpStream| {
-            async {
-                let mut framed = Framed::new(io, BytesCodec);
-                framed.send(Bytes::from_static(b"test")).await?;
-                Ok::<_, io::Error>(())
-            }
+        fn_service(|io: TcpStream| async {
+            let mut framed = Framed::new(io, BytesCodec);
+            framed.send(Bytes::from_static(b"test")).await?;
+            Ok::<_, io::Error>(())
         })
     });
 
-    let resolver = actix_connect::start_default_resolver();
+    let resolver = actix_connect::start_default_resolver().await.unwrap();
     let mut conn = actix_connect::new_connector(resolver.clone());
 
     let con = conn.call(Connect::with("10", srv.addr())).await.unwrap();
@@ -75,17 +69,17 @@ async fn test_static_str() {
 #[actix_rt::test]
 async fn test_new_service() {
     let srv = TestServer::with(|| {
-        fn_service(|io: TcpStream| {
-            async {
-                let mut framed = Framed::new(io, BytesCodec);
-                framed.send(Bytes::from_static(b"test")).await?;
-                Ok::<_, io::Error>(())
-            }
+        fn_service(|io: TcpStream| async {
+            let mut framed = Framed::new(io, BytesCodec);
+            framed.send(Bytes::from_static(b"test")).await?;
+            Ok::<_, io::Error>(())
         })
     });
 
     let resolver =
-        actix_connect::start_resolver(ResolverConfig::default(), ResolverOpts::default());
+        actix_connect::start_resolver(ResolverConfig::default(), ResolverOpts::default())
+            .await
+            .unwrap();
 
     let factory = actix_connect::new_connector_factory(resolver);
 
@@ -100,12 +94,10 @@ async fn test_uri() {
     use std::convert::TryFrom;
 
     let srv = TestServer::with(|| {
-        fn_service(|io: TcpStream| {
-            async {
-                let mut framed = Framed::new(io, BytesCodec);
-                framed.send(Bytes::from_static(b"test")).await?;
-                Ok::<_, io::Error>(())
-            }
+        fn_service(|io: TcpStream| async {
+            let mut framed = Framed::new(io, BytesCodec);
+            framed.send(Bytes::from_static(b"test")).await?;
+            Ok::<_, io::Error>(())
         })
     });
 
@@ -121,12 +113,10 @@ async fn test_rustls_uri() {
     use std::convert::TryFrom;
 
     let srv = TestServer::with(|| {
-        fn_service(|io: TcpStream| {
-            async {
-                let mut framed = Framed::new(io, BytesCodec);
-                framed.send(Bytes::from_static(b"test")).await?;
-                Ok::<_, io::Error>(())
-            }
+        fn_service(|io: TcpStream| async {
+            let mut framed = Framed::new(io, BytesCodec);
+            framed.send(Bytes::from_static(b"test")).await?;
+            Ok::<_, io::Error>(())
         })
     });
 

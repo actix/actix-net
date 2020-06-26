@@ -1,10 +1,11 @@
-//! A utl-8 encoded read-only string with Bytes as a storage.
+//! A UTF-8 encoded read-only string using Bytes as storage.
+
 use std::convert::TryFrom;
 use std::{borrow, fmt, hash, ops, str};
 
 use bytes::Bytes;
 
-/// A utf-8 encoded string with [`Bytes`] as a storage.
+/// A UTF-8 encoded string with [`Bytes`] as a storage.
 ///
 /// [`Bytes`]: https://docs.rs/bytes/0.5.3/bytes/struct.Bytes.html
 #[derive(Clone, Eq, Ord, PartialOrd, Default)]
@@ -159,6 +160,34 @@ impl fmt::Display for ByteString {
     }
 }
 
+#[cfg(feature = "serde")]
+mod serde {
+    use serde::de::{Deserialize, Deserializer};
+    use serde::ser::{Serialize, Serializer};
+
+    use super::ByteString;
+
+    impl Serialize for ByteString {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            serializer.serialize_str(self.as_ref())
+        }
+    }
+
+    impl<'de> Deserialize<'de> for ByteString {
+        #[inline]
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            String::deserialize(deserializer).map(ByteString::from)
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -221,5 +250,19 @@ mod test {
     #[test]
     fn test_try_from_bytesmut() {
         let _ = ByteString::try_from(bytes::BytesMut::from(&b"nice bytes"[..])).unwrap();
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serialize() {
+        let s: ByteString = serde_json::from_str(r#""nice bytes""#).unwrap();
+        assert_eq!(s, "nice bytes");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_deserialize() {
+        let s = serde_json::to_string(&ByteString::from_static("nice bytes")).unwrap();
+        assert_eq!(s, r#""nice bytes""#);
     }
 }

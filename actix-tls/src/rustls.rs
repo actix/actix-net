@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
-use futures::future::{ok, Ready};
+use futures_util::future::{ok, Ready};
 use tokio_rustls::{Accept, TlsAcceptor};
 
 pub use rust_tls::{ServerConfig, Session};
@@ -108,7 +108,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> Future for AcceptorServiceFut<T> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
 
-        let res = futures::ready!(Pin::new(&mut this.fut).poll(cx));
+        let res = futures_util::ready!(Pin::new(&mut this.fut).poll(cx));
         match res {
             Ok(io) => Poll::Ready(Ok(io)),
             Err(e) => Poll::Ready(Err(e)),

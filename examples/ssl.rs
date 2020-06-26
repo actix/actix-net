@@ -7,7 +7,7 @@ use std::sync::{
 use actix_rt::System;
 use actix_server::{ssl, Server};
 use actix_service::NewService;
-use futures::future;
+use futures_util::future;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 
 #[derive(Debug)]

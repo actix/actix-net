@@ -1,10 +1,27 @@
 # Changes
 
-## [TBD] - [TBD]
+## [1.1.1] - 2020-04-30
 
-- Expose `System::is_set` to check if current system is running
+### Fixed
 
-- Add `Arbiter::local_join` associated function to get be able to `await` for spawned futures
+* Fix memory leak due to [#94] (see [#129] for more detail)
+
+[#129]: https://github.com/actix/actix-net/issues/129
+
+## [1.1.0] - 2020-04-08
+
+**This version has been yanked.**
+
+### Added
+
+* Expose `System::is_set` to check if current system has ben started [#99]
+* Add `Arbiter::is_running` to check if event loop is running [#124]
+* Add `Arbiter::local_join` associated function
+  to get be able to `await` for spawned futures [#94]
+
+[#94]: https://github.com/actix/actix-net/pull/94
+[#99]: https://github.com/actix/actix-net/pull/99
+[#124]: https://github.com/actix/actix-net/pull/124
 
 ## [1.0.0] - 2019-12-11
 

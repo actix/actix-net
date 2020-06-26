@@ -5,8 +5,8 @@ use std::task::{Context, Poll};
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
 use either::Either;
-use futures::future::{ok, Ready};
-use trust_dns_resolver::AsyncResolver;
+use futures_util::future::{ok, Ready};
+use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 
 use crate::connect::{Address, Connect, Connection};
 use crate::connector::{TcpConnector, TcpConnectorFactory};

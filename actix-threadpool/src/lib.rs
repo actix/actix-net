@@ -48,6 +48,8 @@ pub enum BlockingError<E: fmt::Debug> {
     Canceled,
 }
 
+impl<E: fmt::Debug> std::error::Error for BlockingError<E> {}
+
 /// Execute blocking function on a thread pool, returns future that resolves
 /// to result of the function execution.
 pub fn run<F, I, E>(f: F) -> CpuFuture<I, E>

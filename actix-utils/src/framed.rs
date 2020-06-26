@@ -6,7 +6,7 @@ use std::{fmt, mem};
 
 use actix_codec::{AsyncRead, AsyncWrite, Decoder, Encoder, Framed};
 use actix_service::{IntoService, Service};
-use futures::{Future, FutureExt, Stream};
+use futures_util::{future::Future, FutureExt, stream::Stream};
 use log::debug;
 
 use crate::mpsc;

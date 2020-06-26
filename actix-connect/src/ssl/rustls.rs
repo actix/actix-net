@@ -10,7 +10,7 @@ pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
-use futures::future::{ok, Ready};
+use futures_util::future::{ok, Ready};
 use tokio_rustls::{Connect, TlsConnector};
 use webpki::DNSNameRef;
 
@@ -126,7 +126,7 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
         Poll::Ready(
-            futures::ready!(Pin::new(&mut this.fut).poll(cx)).map(|stream| {
+            futures_util::ready!(Pin::new(&mut this.fut).poll(cx)).map(|stream| {
                 let s = this.stream.take().unwrap();
                 trace!("SSL Handshake success: {:?}", s.host());
                 s.replace(stream).1

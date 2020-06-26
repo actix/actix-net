@@ -1,5 +1,13 @@
 # Changes
 
+## [1.0.3] - 2020-05-19
+
+### Changed
+
+* Replace deprecated `net2` crate with `socket2` [#140]
+
+[#140]: https://github.com/actix/actix-net/pull/140
+
 ## [1.0.2] - 2020-02-26
 
 ### Fixed

@@ -11,7 +11,7 @@ use actix_codec::{AsyncRead, AsyncWrite};
 use actix_rt::System;
 use actix_server::{Io, Server};
 use actix_service::{service_fn, NewService};
-use futures::{future, Future};
+use futures_util::{future, Future};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tokio_openssl::SslAcceptorExt;
 

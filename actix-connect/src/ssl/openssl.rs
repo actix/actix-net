@@ -10,8 +10,8 @@ pub use tokio_openssl::{HandshakeError, SslStream};
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
-use futures::future::{err, ok, Either, FutureExt, LocalBoxFuture, Ready};
-use trust_dns_resolver::AsyncResolver;
+use futures_util::future::{err, ok, Either, FutureExt, LocalBoxFuture, Ready};
+use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 
 use crate::{
     Address, Connect, ConnectError, ConnectService, ConnectServiceFactory, Connection,
@@ -243,7 +243,7 @@ impl<T: Address> Future for OpensslConnectServiceResponse<T> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if let Some(ref mut fut) = self.fut1 {
-            match futures::ready!(Pin::new(fut).poll(cx)) {
+            match futures_util::ready!(Pin::new(fut).poll(cx)) {
                 Ok(res) => {
                     let _ = self.fut1.take();
                     self.fut2 = Some(self.openssl.call(res));
@@ -253,7 +253,7 @@ impl<T: Address> Future for OpensslConnectServiceResponse<T> {
         }
 
         if let Some(ref mut fut) = self.fut2 {
-            match futures::ready!(Pin::new(fut).poll(cx)) {
+            match futures_util::ready!(Pin::new(fut).poll(cx)) {
                 Ok(connect) => Poll::Ready(Ok(connect.into_parts().0)),
                 Err(e) => Poll::Ready(Err(ConnectError::Io(io::Error::new(
                     io::ErrorKind::Other,

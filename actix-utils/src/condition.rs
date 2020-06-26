@@ -96,7 +96,7 @@ impl Drop for Waiter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::future::lazy;
+    use futures_util::future::lazy;
 
     #[actix_rt::test]
     async fn test_condition() {

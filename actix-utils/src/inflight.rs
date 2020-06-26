@@ -4,7 +4,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix_service::{IntoService, Service, Transform};
-use futures::future::{ok, Ready};
+use futures_util::future::{ok, Ready};
 
 use super::counter::{Counter, CounterGuard};
 
@@ -116,7 +116,7 @@ mod tests {
 
     use super::*;
     use actix_service::{apply, fn_factory, Service, ServiceFactory};
-    use futures::future::{lazy, ok, FutureExt, LocalBoxFuture};
+    use futures_util::future::{lazy, ok, FutureExt, LocalBoxFuture};
 
     struct SleepService(Duration);
 

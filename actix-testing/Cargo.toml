@@ -1,6 +1,6 @@
 [package]
 name = "actix-testing"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Actix testing utils"
 keywords = ["network", "framework", "async", "futures"]
@@ -11,6 +11,7 @@ categories = ["network-programming", "asynchronous"]
 license = "MIT/Apache-2.0"
 edition = "2018"
 workspace = ".."
+readme = "README.md"
 
 [lib]
 name = "actix_testing"
@@ -23,5 +24,4 @@ actix-server = "1.0.0"
 actix-service = "1.0.0"
 
 log = "0.4"
-net2 = "0.2"
-futures = "0.3.1"
+socket2 = "0.3"

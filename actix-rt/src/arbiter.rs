@@ -8,20 +8,24 @@ use std::{fmt, thread};
 
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot::{channel, Canceled, Sender};
-use futures_util::{future::{self, Future, FutureExt}, stream::Stream};
+use futures_util::{
+    future::{self, Future, FutureExt},
+    stream::Stream,
+};
 
 use crate::runtime::Runtime;
 use crate::system::System;
 
 use copyless::BoxHelper;
 
+use smallvec::SmallVec;
 pub use tokio::task::JoinHandle;
 
 thread_local!(
     static ADDR: RefCell<Option<Arbiter>> = RefCell::new(None);
     static RUNNING: Cell<bool> = Cell::new(false);
     static Q: RefCell<Vec<Pin<Box<dyn Future<Output = ()>>>>> = RefCell::new(Vec::new());
-    static PENDING: RefCell<Vec<JoinHandle<()>>> = RefCell::new(Vec::new());
+    static PENDING: RefCell<SmallVec<[JoinHandle<()>; 8]>> = RefCell::new(SmallVec::new());
     static STORAGE: RefCell<HashMap<TypeId, Box<dyn Any>>> = RefCell::new(HashMap::new());
 );
 
@@ -84,6 +88,11 @@ impl Arbiter {
             Some(ref addr) => addr.clone(),
             None => panic!("Arbiter is not running"),
         })
+    }
+
+    /// Check if current arbiter is running.
+    pub fn is_running() -> bool {
+        RUNNING.with(|cell| cell.get())
     }
 
     /// Stop arbiter from continuing it's event loop.
@@ -173,15 +182,20 @@ impl Arbiter {
         RUNNING.with(move |cell| {
             if cell.get() {
                 // Spawn the future on running executor
-                PENDING.with(move |cell| {
-                    cell.borrow_mut().push(tokio::task::spawn_local(future));
-                })
+                let len = PENDING.with(move |cell| {
+                    let mut p = cell.borrow_mut();
+                    p.push(tokio::task::spawn_local(future));
+                    p.len()
+                });
+                if len > 7 {
+                    // Before reaching the inline size
+                    tokio::task::spawn_local(CleanupPending);
+                }
             } else {
                 // Box the future and push it to the queue, this results in double boxing
                 // because the executor boxes the future again, but works for now
                 Q.with(move |cell| {
-                    cell.borrow_mut()
-                        .push(Pin::from(Box::alloc().init(future)))
+                    cell.borrow_mut().push(Pin::from(Box::alloc().init(future)))
                 });
             }
         });
@@ -304,9 +318,33 @@ impl Arbiter {
     /// have completed.
     pub fn local_join() -> impl Future<Output = ()> {
         PENDING.with(move |cell| {
-            let current = cell.replace(Vec::new());
+            let current = cell.replace(SmallVec::new());
             future::join_all(current).map(|_| ())
         })
+    }
+}
+
+/// Future used for cleaning-up already finished `JoinHandle`s
+/// from the `PENDING` list so the vector doesn't grow indefinitely
+struct CleanupPending;
+
+impl Future for CleanupPending {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        PENDING.with(move |cell| {
+            let mut pending = cell.borrow_mut();
+            let mut i = 0;
+            while i != pending.len() {
+                if let Poll::Ready(_) = Pin::new(&mut pending[i]).poll(cx) {
+                    pending.remove(i);
+                } else {
+                    i += 1;
+                }
+            }
+        });
+
+        Poll::Ready(())
     }
 }
 
@@ -343,9 +381,15 @@ impl Future for ArbiterController {
                         return Poll::Ready(());
                     }
                     ArbiterCommand::Execute(fut) => {
-                        PENDING.with(move |cell| {
-                            cell.borrow_mut().push(tokio::task::spawn_local(fut));
+                        let len = PENDING.with(move |cell| {
+                            let mut p = cell.borrow_mut();
+                            p.push(tokio::task::spawn_local(fut));
+                            p.len()
                         });
+                        if len > 7 {
+                            // Before reaching the inline size
+                            tokio::task::spawn_local(CleanupPending);
+                        }
                     }
                     ArbiterCommand::ExecuteFn(f) => {
                         f.call_box();
