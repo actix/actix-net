@@ -4,13 +4,13 @@ use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use super::{Service, ServiceFactory};
-use crate::axcell::AXCell;
+use crate::rcrefcell::RcRefCell;
 
 /// Service for the `and_then` combinator, chaining a computation onto the end
 /// of another service which completes successfully.
 ///
 /// This is created by the `ServiceExt::and_then` method.
-pub(crate) struct AndThenService<A, B>(AXCell<(A, B)>);
+pub(crate) struct AndThenService<A, B>(RcRefCell<(A, B)>);
 
 impl<A, B> AndThenService<A, B> {
     /// Create new `AndThen` combinator
@@ -19,7 +19,7 @@ impl<A, B> AndThenService<A, B> {
         A: Service,
         B: Service<Request = A::Response, Error = A::Error>,
     {
-        Self(AXCell::new((a, b)))
+        Self(RcRefCell::new((a, b)))
     }
 }
 
@@ -73,7 +73,7 @@ where
     A: Service,
     B: Service<Request = A::Response, Error = A::Error>,
 {
-    A(#[pin] A::Future, Option<AXCell<(A, B)>>),
+    A(#[pin] A::Future, Option<RcRefCell<(A, B)>>),
     B(#[pin] B::Future),
     Empty,
 }

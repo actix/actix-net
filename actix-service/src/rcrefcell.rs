@@ -2,11 +2,11 @@
 use std::task::{Context, Poll};
 use std::{cell::{RefCell, RefMut}, fmt, rc::Rc};
 
-pub(crate) struct AXCell<T> {
+pub(crate) struct RcRefCell<T> {
     inner: Rc<RefCell<T>>,
 }
 
-impl<T> Clone for AXCell<T> {
+impl<T> Clone for RcRefCell<T> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -14,13 +14,13 @@ impl<T> Clone for AXCell<T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for AXCell<T> {
+impl<T: fmt::Debug> fmt::Debug for RcRefCell<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(f)
     }
 }
 
-impl<T> AXCell<T> {
+impl<T> RcRefCell<T> {
     pub(crate) fn new(inner: T) -> Self {
         Self {
             inner: Rc::new(RefCell::new(inner)),
@@ -32,7 +32,7 @@ impl<T> AXCell<T> {
     }
 }
 
-impl<T: crate::Service> crate::Service for AXCell<T> {
+impl<T: crate::Service> crate::Service for RcRefCell<T> {
     type Request = T::Request;
     type Response = T::Response;
     type Error = T::Error;
