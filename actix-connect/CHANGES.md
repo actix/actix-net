@@ -1,5 +1,12 @@
 # Changes
 
+## [unreleased]
+
+### Changed
+
+* Update `rustls` dependency to 0.18
+* Update `tokio-rustls` dependency to 0.14
+
 ## [2.0.0-alpha.3] - 2020-05-08
 
 ### Fixed
