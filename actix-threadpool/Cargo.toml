@@ -1,6 +1,6 @@
 [package]
 name = "actix-threadpool"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Actix thread pool for sync code"
 keywords = ["actix", "network", "framework", "async", "futures"]

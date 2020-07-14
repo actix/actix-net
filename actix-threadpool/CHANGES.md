@@ -1,10 +1,10 @@
 # Changes
 
-## [0.3.3] - 2020-07-03
+## [0.3.3] - 2020-07-14
 
 ### Changed
 
-* Use parking_lot 0.11
+* Update parking_lot to 0.11
 
 ## [0.3.2] - 2020-05-20
 
@@ -18,7 +18,7 @@
 
 ### Changed
 
-* Use parking_lot 0.10
+* Update parking_lot to 0.10
 
 ## [0.3.0] - 2019-12-02
 
