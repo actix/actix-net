@@ -1,4 +1,4 @@
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Bytes, BytesMut, Buf};
 use std::io;
 
 use super::{Decoder, Encoder};
@@ -12,9 +12,9 @@ pub struct BytesCodec;
 impl Encoder<Bytes> for BytesCodec {
     type Error = io::Error;
 
+    #[inline]
     fn encode(&mut self, item: Bytes, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        dst.reserve(item.len());
-        dst.put(item);
+        dst.extend_from_slice(item.bytes());
         Ok(())
     }
 }
