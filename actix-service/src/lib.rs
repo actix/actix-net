@@ -12,7 +12,6 @@ mod and_then_apply_fn;
 mod apply;
 mod apply_cfg;
 pub mod boxed;
-mod cell;
 mod fn_service;
 mod map;
 mod map_config;

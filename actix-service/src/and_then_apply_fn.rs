@@ -2,9 +2,9 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::task::{Context, Poll};
 
-use crate::cell::Cell;
 use crate::{Service, ServiceFactory};
 
 /// `Apply` service combinator
@@ -16,7 +16,7 @@ where
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error> + From<B::Error>,
 {
-    srv: Cell<(A, B, F)>,
+    srv: Rc<RefCell<(A, B, F)>>,
     r: PhantomData<(Fut, Res, Err)>,
 }
 
@@ -31,7 +31,7 @@ where
     /// Create new `Apply` combinator
     pub(crate) fn new(a: A, b: B, f: F) -> Self {
         Self {
-            srv: Cell::new((a, b, f)),
+            srv:  Rc::new(RefCell::new((a, b, f))),
             r: PhantomData,
         }
     }
@@ -67,7 +67,7 @@ where
     type Future = AndThenApplyFnFuture<A, B, F, Fut, Res, Err>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let inner = self.srv.get_mut();
+        let mut inner = self.srv.borrow_mut();
         let not_ready = inner.0.poll_ready(cx)?.is_pending();
         if inner.1.poll_ready(cx)?.is_pending() || not_ready {
             Poll::Pending
@@ -77,7 +77,7 @@ where
     }
 
     fn call(&mut self, req: A::Request) -> Self::Future {
-        let fut = self.srv.get_mut().0.call(req);
+        let fut = self.srv.borrow_mut().0.call(req);
         AndThenApplyFnFuture {
             state: State::A(fut, Some(self.srv.clone())),
         }
@@ -108,7 +108,7 @@ where
     Err: From<A::Error>,
     Err: From<B::Error>,
 {
-    A(#[pin] A::Future, Option<Cell<(A, B, F)>>),
+    A(#[pin] A::Future, Option<Rc<RefCell<(A, B, F)>>>),
     B(#[pin] Fut),
     Empty,
 }
@@ -129,10 +129,10 @@ where
         match this.state.as_mut().project() {
             StateProj::A(fut, b) => match fut.poll(cx)? {
                 Poll::Ready(res) => {
-                    let mut b = b.take().unwrap();
+                    let b = b.take().unwrap();
                     this.state.set(State::Empty);
-                    let b = b.get_mut();
-                    let fut = (&mut b.2)(res, &mut b.1);
+                    let (_, b, f) = &mut *b.borrow_mut();
+                    let fut = f(res, b);
                     this.state.set(State::B(fut));
                     self.poll(cx)
                 }
@@ -255,11 +255,11 @@ where
 
         if this.a.is_some() && this.b.is_some() {
             Poll::Ready(Ok(AndThenApplyFn {
-                srv: Cell::new((
+                srv: Rc::new(RefCell::new((
                     this.a.take().unwrap(),
                     this.b.take().unwrap(),
                     this.f.clone(),
-                )),
+                ))),
                 r: PhantomData,
             }))
         } else {

@@ -2,8 +2,9 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::rc::Rc;
+use std::cell::RefCell;
 
-use crate::cell::Cell;
 use crate::{Service, ServiceFactory};
 
 /// Convert `Fn(Config, &mut Service1) -> Future<Service2>` fn to a service factory
@@ -26,7 +27,7 @@ where
     S: Service,
 {
     ApplyConfigService {
-        srv: Cell::new((srv, f)),
+        srv: Rc::new(RefCell::new((srv, f))),
         _t: PhantomData,
     }
 }
@@ -53,7 +54,7 @@ where
     S: Service,
 {
     ApplyConfigServiceFactory {
-        srv: Cell::new((factory, f)),
+        srv: Rc::new(RefCell::new((factory, f))),
         _t: PhantomData,
     }
 }
@@ -66,7 +67,7 @@ where
     R: Future<Output = Result<S, E>>,
     S: Service,
 {
-    srv: Cell<(T, F)>,
+    srv: Rc<RefCell<(T, F)>>,
     _t: PhantomData<(C, R, S)>,
 }
 
@@ -102,10 +103,8 @@ where
     type Future = R;
 
     fn new_service(&self, cfg: C) -> Self::Future {
-        unsafe {
-            let srv = self.srv.get_mut_unsafe();
-            (srv.1)(cfg, &mut srv.0)
-        }
+        let (t, f) = &mut *self.srv.borrow_mut();
+        f(cfg, t)
     }
 }
 
@@ -117,7 +116,7 @@ where
     R: Future<Output = Result<S, T::InitError>>,
     S: Service,
 {
-    srv: Cell<(T, F)>,
+    srv: Rc<RefCell<(T, F)>>,
     _t: PhantomData<(C, R, S)>,
 }
 
@@ -157,7 +156,7 @@ where
         ApplyConfigServiceFactoryResponse {
             cfg: Some(cfg),
             store: self.srv.clone(),
-            state: State::A(self.srv.get_ref().0.new_service(())),
+            state: State::A(self.srv.borrow().0.new_service(())),
         }
     }
 }
@@ -172,7 +171,7 @@ where
     S: Service,
 {
     cfg: Option<C>,
-    store: Cell<(T, F)>,
+    store: Rc<RefCell<(T, F)>>,
     #[pin]
     state: State<T, R, S>,
 }
@@ -213,8 +212,11 @@ where
             },
             StateProj::B(srv) => match srv.poll_ready(cx)? {
                 Poll::Ready(_) => {
-                    let fut = (this.store.get_mut().1)(this.cfg.take().unwrap(), srv);
-                    this.state.set(State::C(fut));
+                    {
+                        let (_, f) = &mut *this.store.borrow_mut();
+                        let fut = f(this.cfg.take().unwrap(), srv);
+                        this.state.set(State::C(fut));
+                    }
                     self.poll(cx)
                 }
                 Poll::Pending => Poll::Pending,
