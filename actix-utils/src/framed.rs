@@ -69,7 +69,7 @@ where
     S::Future: 'static,
     T: AsyncRead + AsyncWrite,
     U: Encoder<I> + Decoder,
-    // I: 'static,
+    I: 'static,
     <U as Encoder<I>>::Error: std::fmt::Debug,
 {
     service: S,
@@ -111,7 +111,7 @@ where
     S::Future: 'static,
     T: AsyncRead + AsyncWrite,
     U: Decoder + Encoder<I>,
-    // I: 'static,
+    I: 'static,
     <U as Decoder>::Error: std::fmt::Debug,
     <U as Encoder<I>>::Error: std::fmt::Debug,
 {

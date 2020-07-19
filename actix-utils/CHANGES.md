@@ -1,5 +1,8 @@
 # Changes
 
+## Unreleased - 2020-xx-xx
+* Upgrade `tokio-util` to `0.3`.
+
 ## [1.0.6] - 2020-01-08
 
 * Add `Clone` impl for `condition::Waiter`
