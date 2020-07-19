@@ -9,8 +9,7 @@ use super::{Decoder, Encoder};
 #[derive(Debug, Copy, Clone)]
 pub struct BytesCodec;
 
-impl Encoder for BytesCodec {
-    type Item = Bytes;
+impl Encoder<Bytes> for BytesCodec {
     type Error = io::Error;
 
     fn encode(&mut self, item: Bytes, dst: &mut BytesMut) -> Result<(), Self::Error> {

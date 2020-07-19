@@ -9,7 +9,9 @@ use pin_project::pin_project;
 
 use crate::{AsyncRead, AsyncWrite, Decoder, Encoder};
 
+/// Low-water mark
 const LW: usize = 1024;
+/// High-water mark
 const HW: usize = 8 * 1024;
 
 bitflags::bitflags! {
@@ -34,7 +36,7 @@ pub struct Framed<T, U> {
 impl<T, U> Framed<T, U>
 where
     T: AsyncRead + AsyncWrite,
-    U: Decoder + Encoder,
+    U: Decoder,
 {
     /// Provides a `Stream` and `Sink` interface for reading and writing to this
     /// `Io` object, using `Decode` and `Encode` to read and write the raw data.
@@ -129,7 +131,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Consume the `Frame`, returning `Frame` with different codec.
-    pub fn into_framed<U2>(self, codec: U2) -> Framed<T, U2> {
+    pub fn into_framed<U2, I2>(self, codec: U2) -> Framed<T, U2> {
         Framed {
             codec,
             io: self.io,
@@ -140,7 +142,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Consume the `Frame`, returning `Frame` with different io.
-    pub fn map_io<F, T2>(self, f: F) -> Framed<T2, U>
+    pub fn map_io<F, T2, I2>(self, f: F) -> Framed<T2, U>
     where
         F: Fn(T) -> T2,
     {
@@ -154,7 +156,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Consume the `Frame`, returning `Frame` with different codec.
-    pub fn map_codec<F, U2>(self, f: F) -> Framed<T, U2>
+    pub fn map_codec<F, U2, I2>(self, f: F) -> Framed<T, U2>
     where
         F: Fn(U) -> U2,
     {
@@ -186,10 +188,10 @@ impl<T, U> Framed<T, U> {
 
 impl<T, U> Framed<T, U> {
     /// Serialize item and Write to the inner buffer
-    pub fn write(mut self: Pin<&mut Self>, item: <U as Encoder>::Item) -> Result<(), <U as Encoder>::Error>
+    pub fn write<I>(mut self: Pin<&mut Self>, item: I) -> Result<(), <U as Encoder<I>>::Error>
     where
         T: AsyncWrite,
-        U: Encoder,
+        U: Encoder<I>,
     {
         let this = self.as_mut().project();
         let remaining = this.write_buf.capacity() - this.write_buf.len();
@@ -209,7 +211,10 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Try to read underlying I/O stream and decode item.
-    pub fn next_item(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<U::Item, U::Error>>>
+    pub fn next_item(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<<U as Decoder>::Item, U::Error>>>
     where
         T: AsyncRead,
         U: Decoder,
@@ -266,10 +271,10 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Flush write buffer to underlying I/O stream.
-    pub fn flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
+    pub fn flush<I>(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
     where
         T: AsyncWrite,
-        U: Encoder,
+        U: Encoder<I>,
     {
         let mut this = self.as_mut().project();
         log::trace!("flushing framed transport");
@@ -277,9 +282,7 @@ impl<T, U> Framed<T, U> {
         while !this.write_buf.is_empty() {
             log::trace!("writing; remaining={}", this.write_buf.len());
 
-            let n = ready!(
-                this.io.as_mut().poll_write(cx, this.write_buf)
-            )?;
+            let n = ready!(this.io.as_mut().poll_write(cx, this.write_buf))?;
 
             if n == 0 {
                 return Poll::Ready(Err(io::Error::new(
@@ -301,10 +304,10 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Flush write buffer and shutdown underlying I/O stream.
-    pub fn close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
+    pub fn close<I>(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
     where
         T: AsyncWrite,
-        U: Encoder,
+        U: Encoder<I>,
     {
         let mut this = self.as_mut().project();
         ready!(this.io.as_mut().poll_flush(cx))?;
@@ -325,10 +328,10 @@ where
     }
 }
 
-impl<T, U> Sink<U::Item> for Framed<T, U>
+impl<T, U, I> Sink<I> for Framed<T, U>
 where
     T: AsyncWrite,
-    U: Encoder,
+    U: Encoder<I>,
     U::Error: From<io::Error>,
 {
     type Error = U::Error;
@@ -341,24 +344,15 @@ where
         }
     }
 
-    fn start_send(
-        self: Pin<&mut Self>,
-        item: <U as Encoder>::Item,
-    ) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
         self.write(item)
     }
 
-    fn poll_flush(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.flush(cx)
     }
 
-    fn poll_close(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.close(cx)
     }
 }

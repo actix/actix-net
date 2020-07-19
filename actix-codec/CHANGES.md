@@ -1,6 +1,8 @@
 # Changes
 
-* Use `.advance()` intead of `.split_to()`
+## Unreleased - 2020-xx-xx
+* Use `.advance()` instead of `.split_to()`.
+* Upgrade `tokio-util` to `0.3`.
 
 ## [0.2.0] - 2019-12-10
 
@@ -8,7 +10,7 @@
 
 ## [0.2.0-alpha.4]
 
-* Fix buffer remaining capacity calcualtion
+* Fix buffer remaining capacity calculation
 
 ## [0.2.0-alpha.3]
 
