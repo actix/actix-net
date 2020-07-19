@@ -1,16 +1,16 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::task::{Context, Poll};
 
 use super::{Service, ServiceFactory};
-use crate::cell::Cell;
 
 /// Service for the `then` combinator, chaining a computation onto the end of
 /// another service.
 ///
 /// This is created by the `Pipeline::then` method.
-pub(crate) struct ThenService<A, B>(Cell<(A, B)>);
+pub(crate) struct ThenService<A, B>(Rc<RefCell<(A, B)>>);
 
 impl<A, B> ThenService<A, B> {
     /// Create new `.then()` combinator
@@ -19,7 +19,7 @@ impl<A, B> ThenService<A, B> {
         A: Service,
         B: Service<Request = Result<A::Response, A::Error>, Error = A::Error>,
     {
-        Self(Cell::new((a, b)))
+        Self(Rc::new(RefCell::new((a, b))))
     }
 }
 
@@ -40,7 +40,7 @@ where
     type Future = ThenServiceResponse<A, B>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let srv = self.0.get_mut();
+        let mut srv = self.0.borrow_mut();
         let not_ready = !srv.0.poll_ready(cx)?.is_ready();
         if !srv.1.poll_ready(cx)?.is_ready() || not_ready {
             Poll::Pending
@@ -51,7 +51,7 @@ where
 
     fn call(&mut self, req: A::Request) -> Self::Future {
         ThenServiceResponse {
-            state: State::A(self.0.get_mut().0.call(req), Some(self.0.clone())),
+            state: State::A(self.0.borrow_mut().0.call(req), Some(self.0.clone())),
         }
     }
 }
@@ -72,7 +72,7 @@ where
     A: Service,
     B: Service<Request = Result<A::Response, A::Error>>,
 {
-    A(#[pin] A::Future, Option<Cell<(A, B)>>),
+    A(#[pin] A::Future, Option<Rc<RefCell<(A, B)>>>),
     B(#[pin] B::Future),
     Empty,
 }
@@ -90,9 +90,9 @@ where
         match this.state.as_mut().project() {
             StateProj::A(fut, b) => match fut.poll(cx) {
                 Poll::Ready(res) => {
-                    let mut b = b.take().unwrap();
+                    let b = b.take().unwrap();
                     this.state.set(State::Empty); // drop fut A
-                    let fut = b.get_mut().1.call(res);
+                    let fut = b.borrow_mut().1.call(res);
                     this.state.set(State::B(fut));
                     self.poll(cx)
                 }
