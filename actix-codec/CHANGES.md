@@ -3,6 +3,7 @@
 ## Unreleased - 2020-xx-xx
 * Use `.advance()` instead of `.split_to()`.
 * Upgrade `tokio-util` to `0.3`.
+* Improve `BytesCodec` `.encode()` performance
 
 ## [0.2.0] - 2019-12-10
 
