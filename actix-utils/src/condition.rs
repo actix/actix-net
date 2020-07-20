@@ -1,14 +1,15 @@
+use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use slab::Slab;
 
-use crate::cell::Cell;
 use crate::task::LocalWaker;
 
 /// Condition allows to notify multiple receivers at the same time
-pub struct Condition(Cell<Inner>);
+pub struct Condition(Rc<RefCell<Inner>>);
 
 struct Inner {
     data: Slab<Option<LocalWaker>>,
@@ -22,12 +23,12 @@ impl Default for Condition {
 
 impl Condition {
     pub fn new() -> Condition {
-        Condition(Cell::new(Inner { data: Slab::new() }))
+        Condition(Rc::new(RefCell::new(Inner { data: Slab::new() })))
     }
 
     /// Get condition waiter
     pub fn wait(&mut self) -> Waiter {
-        let token = self.0.get_mut().data.insert(None);
+        let token = self.0.borrow_mut().data.insert(None);
         Waiter {
             token,
             inner: self.0.clone(),
@@ -36,7 +37,7 @@ impl Condition {
 
     /// Notify all waiters
     pub fn notify(&self) {
-        let inner = self.0.get_ref();
+        let inner = self.0.borrow();
         for item in inner.data.iter() {
             if let Some(waker) = item.1 {
                 waker.wake();
@@ -54,12 +55,12 @@ impl Drop for Condition {
 #[must_use = "Waiter do nothing unless polled"]
 pub struct Waiter {
     token: usize,
-    inner: Cell<Inner>,
+    inner: Rc<RefCell<Inner>>,
 }
 
 impl Clone for Waiter {
     fn clone(&self) -> Self {
-        let token = unsafe { self.inner.get_mut_unsafe() }.data.insert(None);
+        let token = self.inner.borrow_mut().data.insert(None);
         Waiter {
             token,
             inner: self.inner.clone(),
@@ -73,7 +74,8 @@ impl Future for Waiter {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
 
-        let inner = unsafe { this.inner.get_mut().data.get_unchecked_mut(this.token) };
+        let mut inner = this.inner.borrow_mut();
+        let inner = unsafe { inner.data.get_unchecked_mut(this.token) };
         if inner.is_none() {
             let waker = LocalWaker::default();
             waker.register(cx.waker());
@@ -89,7 +91,7 @@ impl Future for Waiter {
 
 impl Drop for Waiter {
     fn drop(&mut self) {
-        self.inner.get_mut().data.remove(self.token);
+        self.inner.borrow_mut().data.remove(self.token);
     }
 }
 

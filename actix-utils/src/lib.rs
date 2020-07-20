@@ -2,7 +2,6 @@
 #![deny(rust_2018_idioms)]
 #![allow(clippy::type_complexity)]
 
-mod cell;
 pub mod condition;
 pub mod counter;
 pub mod either;

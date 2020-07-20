@@ -1,24 +1,25 @@
 //! A multi-producer, single-consumer, futures-aware, FIFO queue.
 use std::any::Any;
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::error::Error;
 use std::fmt;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use futures_sink::Sink;
 use futures_util::stream::Stream;
 
-use crate::cell::Cell;
 use crate::task::LocalWaker;
 
 /// Creates a unbounded in-memory channel with buffered storage.
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
-    let shared = Cell::new(Shared {
+    let shared = Rc::new(RefCell::new(Shared {
         has_receiver: true,
         buffer: VecDeque::new(),
         blocked_recv: LocalWaker::new(),
-    });
+    }));
     let sender = Sender {
         shared: shared.clone(),
     };
@@ -38,7 +39,7 @@ struct Shared<T> {
 /// This is created by the `channel` function.
 #[derive(Debug)]
 pub struct Sender<T> {
-    shared: Cell<Shared<T>>,
+    shared: Rc<RefCell<Shared<T>>>,
 }
 
 impl<T> Unpin for Sender<T> {}
@@ -46,7 +47,7 @@ impl<T> Unpin for Sender<T> {}
 impl<T> Sender<T> {
     /// Sends the provided message along this channel.
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
-        let shared = unsafe { self.shared.get_mut_unsafe() };
+        let mut shared = self.shared.borrow_mut();
         if !shared.has_receiver {
             return Err(SendError(item)); // receiver was dropped
         };
@@ -60,7 +61,7 @@ impl<T> Sender<T> {
     /// This prevents any further messages from being sent on the channel while
     /// still enabling the receiver to drain messages that are buffered.
     pub fn close(&mut self) {
-        self.shared.get_mut().has_receiver = false;
+        self.shared.borrow_mut().has_receiver = false;
     }
 }
 
@@ -94,8 +95,8 @@ impl<T> Sink<T> for Sender<T> {
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        let count = self.shared.strong_count();
-        let shared = self.shared.get_mut();
+        let count = Rc::strong_count(&self.shared);
+        let shared = self.shared.borrow_mut();
 
         // check is last sender is about to drop
         if shared.has_receiver && count == 2 {
@@ -110,7 +111,7 @@ impl<T> Drop for Sender<T> {
 /// This is created by the `channel` function.
 #[derive(Debug)]
 pub struct Receiver<T> {
-    shared: Cell<Shared<T>>,
+    shared: Rc<RefCell<Shared<T>>>,
 }
 
 impl<T> Receiver<T> {
@@ -127,15 +128,16 @@ impl<T> Unpin for Receiver<T> {}
 impl<T> Stream for Receiver<T> {
     type Item = T;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.shared.strong_count() == 1 {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut shared = self.shared.borrow_mut();
+        if Rc::strong_count(&self.shared) == 1 {
             // All senders have been dropped, so drain the buffer and end the
             // stream.
-            Poll::Ready(self.shared.get_mut().buffer.pop_front())
-        } else if let Some(msg) = self.shared.get_mut().buffer.pop_front() {
+            Poll::Ready(shared.buffer.pop_front())
+        } else if let Some(msg) = shared.buffer.pop_front() {
             Poll::Ready(Some(msg))
         } else {
-            self.shared.get_mut().blocked_recv.register(cx.waker());
+            shared.blocked_recv.register(cx.waker());
             Poll::Pending
         }
     }
@@ -143,7 +145,7 @@ impl<T> Stream for Receiver<T> {
 
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
-        let shared = self.shared.get_mut();
+        let mut shared = self.shared.borrow_mut();
         shared.buffer.clear();
         shared.has_receiver = false;
     }
