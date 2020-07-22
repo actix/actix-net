@@ -33,6 +33,13 @@ impl ByteString {
     }
 
     /// Creates a new `ByteString` from a Bytes.
+    ///
+    /// # Safety
+    /// This function is unsafe because it does not check the bytes passed to it
+    /// are valid UTF-8. If this constraint is violated,
+    /// it may cause memory unsafety issues with future users of the `ByteString`,
+    /// as we assume that `ByteString`s are valid UTF-8.
+    /// However, the most likely issue is that the data gets corrupted.
     pub const unsafe fn from_bytes_unchecked(src: Bytes) -> ByteString {
         Self(src)
     }
