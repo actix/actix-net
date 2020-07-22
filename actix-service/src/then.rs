@@ -1,7 +1,7 @@
+use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::cell::RefCell;
 use std::task::{Context, Poll};
 
 use super::{Service, ServiceFactory};
@@ -102,7 +102,9 @@ where
                 this.state.set(State::Empty);
                 r
             }),
-            StateProj::Empty => panic!("future must not be polled after it returned `Poll::Ready`"),
+            StateProj::Empty => {
+                panic!("future must not be polled after it returned `Poll::Ready`")
+            }
         }
     }
 }
