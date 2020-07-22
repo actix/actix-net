@@ -1,72 +1,71 @@
+use actix_service::Service;
 use criterion::{criterion_main, Criterion};
 use futures_util::future::join_all;
-use std::cell::{RefCell, UnsafeCell};
-use std::task::{Context, Poll};
-use std::rc::Rc;
-use actix_service::{Service};
 use futures_util::future::{ok, Ready};
+use std::cell::{RefCell, UnsafeCell};
+use std::rc::Rc;
+use std::task::{Context, Poll};
 
 struct SrvUC(Rc<UnsafeCell<usize>>);
 
 impl Default for SrvUC {
-	fn default() -> Self {
-		Self(Rc::new(UnsafeCell::new(0)))
-	}
+    fn default() -> Self {
+        Self(Rc::new(UnsafeCell::new(0)))
+    }
 }
 
 impl Clone for SrvUC {
-	fn clone(&self) -> Self {
-		Self(self.0.clone())
-	}
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
 }
 
 impl Service for SrvUC {
-	type Request = ();
-	type Response = usize;
-	type Error = ();
-	type Future = Ready<Result<Self::Response, ()>>;
+    type Request = ();
+    type Response = usize;
+    type Error = ();
+    type Future = Ready<Result<Self::Response, ()>>;
 
-	fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-		Poll::Ready(Ok(()))
-	}
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
 
-	fn call(&mut self, _: ()) -> Self::Future {
-		unsafe { *(*self.0).get() = *(*self.0).get() + 1 };
-		ok(unsafe { *self.0.get() })
-	}
+    fn call(&mut self, _: ()) -> Self::Future {
+        unsafe { *(*self.0).get() = *(*self.0).get() + 1 };
+        ok(unsafe { *self.0.get() })
+    }
 }
 
 struct SrvRC(Rc<RefCell<usize>>);
 
 impl Default for SrvRC {
-	fn default() -> Self {
-		Self(Rc::new(RefCell::new(0)))
-	}
+    fn default() -> Self {
+        Self(Rc::new(RefCell::new(0)))
+    }
 }
 
 impl Clone for SrvRC {
-	fn clone(&self) -> Self {
-		Self(self.0.clone())
-	}
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
 }
 
 impl Service for SrvRC {
-	type Request = ();
-	type Response = usize;
-	type Error = ();
-	type Future = Ready<Result<Self::Response, ()>>;
+    type Request = ();
+    type Response = usize;
+    type Error = ();
+    type Future = Ready<Result<Self::Response, ()>>;
 
-	fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-		Poll::Ready(Ok(()))
-	}
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
 
-	fn call(&mut self, _: ()) -> Self::Future {
-		let prev = *self.0.borrow();
-		*(*self.0).borrow_mut() = prev + 1;
-		ok(*self.0.borrow())
-	}
+    fn call(&mut self, _: ()) -> Self::Future {
+        let prev = *self.0.borrow();
+        *(*self.0).borrow_mut() = prev + 1;
+        ok(*self.0.borrow())
+    }
 }
-
 
 /// Criterion Benchmark for async Service
 /// Should be used from within criterion group:
@@ -95,16 +94,13 @@ where
             // exclude request generation, it appears it takes significant time vs call (3us vs 1us)
             let start = std::time::Instant::now();
             // benchmark body
-            rt.block_on(async move {
-				join_all(srvs.iter_mut().map(|srv| srv.call(()))).await
-			});
+            rt.block_on(async move { join_all(srvs.iter_mut().map(|srv| srv.call(()))).await });
             let elapsed = start.elapsed();
             // check that at least first request succeeded
             elapsed
         })
     });
 }
-
 
 pub fn service_benches() {
     let mut criterion: ::criterion::Criterion<_> =

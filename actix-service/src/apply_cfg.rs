@@ -1,9 +1,9 @@
+use std::cell::RefCell;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
-use std::task::{Context, Poll};
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::task::{Context, Poll};
 
 use crate::{Service, ServiceFactory};
 

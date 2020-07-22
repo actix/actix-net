@@ -1,8 +1,8 @@
+use std::cell::RefCell;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::cell::RefCell;
 use std::task::{Context, Poll};
 
 use crate::{Service, ServiceFactory};
@@ -31,7 +31,7 @@ where
     /// Create new `Apply` combinator
     pub(crate) fn new(a: A, b: B, f: F) -> Self {
         Self {
-            srv:  Rc::new(RefCell::new((a, b, f))),
+            srv: Rc::new(RefCell::new((a, b, f))),
             r: PhantomData,
         }
     }
@@ -142,7 +142,9 @@ where
                 this.state.set(State::Empty);
                 r
             }),
-            StateProj::Empty => panic!("future must not be polled after it returned `Poll::Ready`"),
+            StateProj::Empty => {
+                panic!("future must not be polled after it returned `Poll::Ready`")
+            }
         }
     }
 }
@@ -296,10 +298,9 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_service() {
-        let mut srv = pipeline(ok)
-            .and_then_apply_fn(Srv, |req: &'static str, s| {
-                s.call(()).map_ok(move |res| (req, res))
-            });
+        let mut srv = pipeline(ok).and_then_apply_fn(Srv, |req: &'static str, s| {
+            s.call(()).map_ok(move |res| (req, res))
+        });
         let res = lazy(|cx| srv.poll_ready(cx)).await;
         assert_eq!(res, Poll::Ready(Ok(())));
 
@@ -310,11 +311,10 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_service_factory() {
-        let new_srv = pipeline_factory(|| ok::<_, ()>(fn_service(ok)))
-            .and_then_apply_fn(
-                || ok(Srv),
-                |req: &'static str, s| s.call(()).map_ok(move |res| (req, res)),
-            );
+        let new_srv = pipeline_factory(|| ok::<_, ()>(fn_service(ok))).and_then_apply_fn(
+            || ok(Srv),
+            |req: &'static str, s| s.call(()).map_ok(move |res| (req, res)),
+        );
         let mut srv = new_srv.new_service(()).await.unwrap();
         let res = lazy(|cx| srv.poll_ready(cx)).await;
         assert_eq!(res, Poll::Ready(Ok(())));
