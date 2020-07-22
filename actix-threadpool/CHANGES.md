@@ -1,5 +1,7 @@
 # Changes
 
+* Rework pool's gut.
+
 ## [0.3.3] - 2020-07-14
 
 ### Changed
