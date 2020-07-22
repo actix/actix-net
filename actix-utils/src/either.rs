@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix_service::{Service, ServiceFactory};
-use futures_util::{future, ready, future::Future};
+use futures_util::{future, future::Future, ready};
 
 /// Combine two different service types into a single type.
 ///

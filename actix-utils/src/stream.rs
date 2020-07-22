@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix_service::{IntoService, Service};
-use futures_util::{FutureExt, stream::Stream};
+use futures_util::{stream::Stream, FutureExt};
 
 use crate::mpsc;
 

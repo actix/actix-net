@@ -1,20 +1,21 @@
 //! A one-shot, futures-aware channel.
+use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::task::{Context, Poll};
 
 pub use futures_channel::oneshot::Canceled;
 use slab::Slab;
 
-use crate::cell::Cell;
 use crate::task::LocalWaker;
 
 /// Creates a new futures-aware, one-shot channel.
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
-    let inner = Cell::new(Inner {
+    let inner = Rc::new(RefCell::new(Inner {
         value: None,
         rx_task: LocalWaker::new(),
-    });
+    }));
     let tx = Sender {
         inner: inner.clone(),
     };
@@ -24,14 +25,14 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 
 /// Creates a new futures-aware, pool of one-shot's.
 pub fn pool<T>() -> Pool<T> {
-    Pool(Cell::new(Slab::new()))
+    Pool(Rc::new(RefCell::new(Slab::new())))
 }
 
 /// Represents the completion half of a oneshot through which the result of a
 /// computation is signaled.
 #[derive(Debug)]
 pub struct Sender<T> {
-    inner: Cell<Inner<T>>,
+    inner: Rc<RefCell<Inner<T>>>,
 }
 
 /// A future representing the completion of a computation happening elsewhere in
@@ -39,7 +40,7 @@ pub struct Sender<T> {
 #[derive(Debug)]
 #[must_use = "futures do nothing unless polled"]
 pub struct Receiver<T> {
-    inner: Cell<Inner<T>>,
+    inner: Rc<RefCell<Inner<T>>>,
 }
 
 // The channels do not ever project Pin to the inner T
@@ -63,9 +64,9 @@ impl<T> Sender<T> {
     /// then `Ok(())` is returned. If the receiving end was dropped before
     /// this function was called, however, then `Err` is returned with the value
     /// provided.
-    pub fn send(mut self, val: T) -> Result<(), T> {
-        if self.inner.strong_count() == 2 {
-            let inner = self.inner.get_mut();
+    pub fn send(self, val: T) -> Result<(), T> {
+        if Rc::strong_count(&self.inner) == 2 {
+            let mut inner = self.inner.borrow_mut();
             inner.value = Some(val);
             inner.rx_task.wake();
             Ok(())
@@ -77,13 +78,13 @@ impl<T> Sender<T> {
     /// Tests to see whether this `Sender`'s corresponding `Receiver`
     /// has gone away.
     pub fn is_canceled(&self) -> bool {
-        self.inner.strong_count() == 1
+        Rc::strong_count(&self.inner) == 1
     }
 }
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.inner.get_ref().rx_task.wake();
+        self.inner.borrow().rx_task.wake();
     }
 }
 
@@ -94,22 +95,22 @@ impl<T> Future for Receiver<T> {
         let this = self.get_mut();
 
         // If we've got a value, then skip the logic below as we're done.
-        if let Some(val) = this.inner.get_mut().value.take() {
+        if let Some(val) = this.inner.borrow_mut().value.take() {
             return Poll::Ready(Ok(val));
         }
 
         // Check if sender is dropped and return error if it is.
-        if this.inner.strong_count() == 1 {
+        if Rc::strong_count(&this.inner) == 1 {
             Poll::Ready(Err(Canceled))
         } else {
-            this.inner.get_ref().rx_task.register(cx.waker());
+            this.inner.borrow().rx_task.register(cx.waker());
             Poll::Pending
         }
     }
 }
 
 /// Futures-aware, pool of one-shot's.
-pub struct Pool<T>(Cell<Slab<PoolInner<T>>>);
+pub struct Pool<T>(Rc<RefCell<Slab<PoolInner<T>>>>);
 
 bitflags::bitflags! {
     pub struct Flags: u8 {
@@ -127,7 +128,7 @@ struct PoolInner<T> {
 
 impl<T> Pool<T> {
     pub fn channel(&mut self) -> (PSender<T>, PReceiver<T>) {
-        let token = self.0.get_mut().insert(PoolInner {
+        let token = self.0.borrow_mut().insert(PoolInner {
             flags: Flags::all(),
             value: None,
             waker: LocalWaker::default(),
@@ -157,7 +158,7 @@ impl<T> Clone for Pool<T> {
 #[derive(Debug)]
 pub struct PSender<T> {
     token: usize,
-    inner: Cell<Slab<PoolInner<T>>>,
+    inner: Rc<RefCell<Slab<PoolInner<T>>>>,
 }
 
 /// A future representing the completion of a computation happening elsewhere in
@@ -166,7 +167,7 @@ pub struct PSender<T> {
 #[must_use = "futures do nothing unless polled"]
 pub struct PReceiver<T> {
     token: usize,
-    inner: Cell<Slab<PoolInner<T>>>,
+    inner: Rc<RefCell<Slab<PoolInner<T>>>>,
 }
 
 // The oneshots do not ever project Pin to the inner T
@@ -184,8 +185,9 @@ impl<T> PSender<T> {
     /// then `Ok(())` is returned. If the receiving end was dropped before
     /// this function was called, however, then `Err` is returned with the value
     /// provided.
-    pub fn send(mut self, val: T) -> Result<(), T> {
-        let inner = unsafe { self.inner.get_mut().get_unchecked_mut(self.token) };
+    pub fn send(self, val: T) -> Result<(), T> {
+        let mut inner = self.inner.borrow_mut();
+        let inner = unsafe { inner.get_unchecked_mut(self.token) };
 
         if inner.flags.contains(Flags::RECEIVER) {
             inner.value = Some(val);
@@ -199,7 +201,7 @@ impl<T> PSender<T> {
     /// Tests to see whether this `Sender`'s corresponding `Receiver`
     /// has gone away.
     pub fn is_canceled(&self) -> bool {
-        !unsafe { self.inner.get_ref().get_unchecked(self.token) }
+        !unsafe { self.inner.borrow().get_unchecked(self.token) }
             .flags
             .contains(Flags::RECEIVER)
     }
@@ -207,23 +209,25 @@ impl<T> PSender<T> {
 
 impl<T> Drop for PSender<T> {
     fn drop(&mut self) {
-        let inner = unsafe { self.inner.get_mut().get_unchecked_mut(self.token) };
-        if inner.flags.contains(Flags::RECEIVER) {
-            inner.waker.wake();
-            inner.flags.remove(Flags::SENDER);
+        let mut inner = self.inner.borrow_mut();
+        let inner_token = unsafe { inner.get_unchecked_mut(self.token) };
+        if inner_token.flags.contains(Flags::RECEIVER) {
+            inner_token.waker.wake();
+            inner_token.flags.remove(Flags::SENDER);
         } else {
-            self.inner.get_mut().remove(self.token);
+            inner.remove(self.token);
         }
     }
 }
 
 impl<T> Drop for PReceiver<T> {
     fn drop(&mut self) {
-        let inner = unsafe { self.inner.get_mut().get_unchecked_mut(self.token) };
-        if inner.flags.contains(Flags::SENDER) {
-            inner.flags.remove(Flags::RECEIVER);
+        let mut inner = self.inner.borrow_mut();
+        let inner_token = unsafe { inner.get_unchecked_mut(self.token) };
+        if inner_token.flags.contains(Flags::SENDER) {
+            inner_token.flags.remove(Flags::RECEIVER);
         } else {
-            self.inner.get_mut().remove(self.token);
+            inner.remove(self.token);
         }
     }
 }
@@ -233,7 +237,8 @@ impl<T> Future for PReceiver<T> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-        let inner = unsafe { this.inner.get_mut().get_unchecked_mut(this.token) };
+        let mut inner = this.inner.borrow_mut();
+        let inner = unsafe { inner.get_unchecked_mut(this.token) };
 
         // If we've got a value, then skip the logic below as we're done.
         if let Some(val) = inner.value.take() {
