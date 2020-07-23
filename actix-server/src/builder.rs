@@ -72,9 +72,12 @@ impl ServerBuilder {
     /// Set number of workers to start.
     ///
     /// By default server uses number of available logical cpu as workers
-    /// count.
+    /// count. Explicitly setting 0 will also default.
     pub fn workers(mut self, num: usize) -> Self {
-        self.threads = num;
+        self.threads = match num {
+            0 => num_cpus::get(),
+            _ => num,
+        };
         self
     }
 
