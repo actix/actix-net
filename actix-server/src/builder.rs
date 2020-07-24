@@ -74,10 +74,8 @@ impl ServerBuilder {
     /// By default server uses number of available logical cpu as workers
     /// count. Explicitly setting 0 will also default.
     pub fn workers(mut self, num: usize) -> Self {
-        self.threads = match num {
-            0 => num_cpus::get(),
-            _ => num,
-        };
+        assert_ne!(num 0, "workers must be greater than 0");
+        self.threads = num;
         self
     }
 
