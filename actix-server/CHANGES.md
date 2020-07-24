@@ -4,7 +4,7 @@
 
 ### Changed
 
-* workers(0) defaults to num_cpus::get()
+* workers must be greater than 0
 
 ## [1.0.3] - 2020-05-19
 
