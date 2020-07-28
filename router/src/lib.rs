@@ -37,7 +37,6 @@ impl ResourcePath for bytestring::ByteString {
 
 /// Helper trait for type that could be converted to path pattern
 pub trait IntoPattern {
-    /// Signle patter
     fn is_single(&self) -> bool;
 
     fn patterns(&self) -> Vec<String>;
