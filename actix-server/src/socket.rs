@@ -83,6 +83,7 @@ pub(crate) enum SocketListener {
 }
 
 impl SocketListener {
+    /// Accept the socket *in blocking mode*
     pub(crate) fn accept(&self) -> io::Result<Option<(StdStream, SocketAddr)>> {
         match *self {
             SocketListener::Tcp(ref lst) => lst

@@ -78,14 +78,14 @@ impl WorkerClient {
         }
     }
 
-    pub fn send(&self, msg: Conn) -> Result<(), Conn> {
+    pub fn send(&self, conn: Conn) -> Result<(), Conn> {
         self.tx1
-            .unbounded_send(WorkerCommand(msg))
-            .map_err(|msg| msg.into_inner().0)
+            .unbounded_send(WorkerCommand(conn))
+            .map_err(|conn| conn.into_inner().0)
     }
 
-    pub fn available(&self) -> bool {
-        self.avail.available()
+    pub fn is_available(&self) -> bool {
+        self.avail.is_available()
     }
 
     pub fn stop(&self, graceful: bool) -> oneshot::Receiver<bool> {
@@ -109,12 +109,14 @@ impl WorkerAvailability {
         }
     }
 
-    pub fn available(&self) -> bool {
+    pub fn is_available(&self) -> bool {
         self.available.load(Ordering::Acquire)
     }
 
     pub fn set(&self, val: bool) {
         let old = self.available.swap(val, Ordering::Release);
+        // If changing availability to 'true', also
+        // send a notification event via `mio`
         if !old && val {
             self.notify.notify()
         }
@@ -318,7 +320,7 @@ impl Future for Worker {
     // FIXME: remove this attribute
     #[allow(clippy::never_loop)]
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // `StopWorker` message handler
+        // first we check the `StopWorker` message receiver
         if let Poll::Ready(Some(StopCommand { graceful, result })) =
             Pin::new(&mut self.rx2).poll_next(cx)
         {
@@ -448,19 +450,19 @@ impl Future for Worker {
                 loop {
                     match Pin::new(&mut self.rx).poll_next(cx) {
                         // handle incoming io stream
-                        Poll::Ready(Some(WorkerCommand(msg))) => {
+                        Poll::Ready(Some(WorkerCommand(conn))) => {
                             match self.check_readiness(cx) {
                                 Ok(true) => {
                                     let guard = self.conns.get();
-                                    let _ = self.services[msg.token.0]
+                                    let _ = self.services[conn.token.0]
                                         .service
-                                        .call((Some(guard), ServerMessage::Connect(msg.io)));
+                                        .call((Some(guard), ServerMessage::Connect(conn.io)));
                                     continue;
                                 }
                                 Ok(false) => {
                                     trace!("Worker is unavailable");
                                     self.availability.set(false);
-                                    self.state = WorkerState::Unavailable(vec![msg]);
+                                    self.state = WorkerState::Unavailable(vec![conn]);
                                 }
                                 Err((token, idx)) => {
                                     trace!(

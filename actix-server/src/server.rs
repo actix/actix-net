@@ -25,6 +25,11 @@ pub(crate) enum ServerCommand {
     Notify(oneshot::Sender<()>),
 }
 
+// A `Server` is just a handle through which we can send messages.
+// It may be cloned and handed out to other parts of the `actix`
+// runtime (e.g. one is held by the `Accept` struct)
+// On the receiving end is a ServerBuilder, spawned onto the event
+// loop, which responds to the messages
 #[derive(Debug)]
 pub struct Server(
     UnboundedSender<ServerCommand>,

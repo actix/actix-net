@@ -303,6 +303,7 @@ impl ServerBuilder {
         Worker::start(idx, services, avail, self.shutdown_timeout)
     }
 
+    /// Handle commands received from the `Server`
     fn handle_cmd(&mut self, item: ServerCommand) {
         match item {
             ServerCommand::Pause(tx) => {
@@ -408,6 +409,9 @@ impl ServerBuilder {
                 }
             }
             ServerCommand::WorkerFaulted(idx) => {
+                // a worker has crashed, attempt to restart
+
+                // discard crashed worker
                 let mut found = false;
                 for i in 0..self.workers.len() {
                     if self.workers[i].0 == idx {
@@ -418,8 +422,9 @@ impl ServerBuilder {
                 }
 
                 if found {
-                    error!("Worker has died {:?}, restarting", idx);
+                    error!("Worker {} has died, restarting", idx);
 
+                    // generate a new (unused) worker index
                     let mut new_idx = self.workers.len();
                     'found: loop {
                         for i in 0..self.workers.len() {
@@ -431,6 +436,7 @@ impl ServerBuilder {
                         break;
                     }
 
+                    // start a new worker and send to the accept loop
                     let worker = self.start_worker(new_idx, self.accept.get_notify());
                     self.workers.push((new_idx, worker.clone()));
                     self.accept.send(Command::Worker(worker));
