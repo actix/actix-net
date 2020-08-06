@@ -1,5 +1,11 @@
 # Changes
 
+## Unreleased - 2020-xx-xx
+
+### Added
+
+* Add `System::attach_to_tokio` method. [#173]
+
 ## [1.1.1] - 2020-04-30
 
 ### Fixed
