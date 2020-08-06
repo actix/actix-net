@@ -52,7 +52,7 @@ pub use self::transform::{apply, Transform};
 ///      type Request = u8;
 ///      type Response = u64;
 ///      type Error = MyError;
-///      type Future = Pin<Box<Future<Output=Result<Self::Response, Self::Error>>>;
+///      type Future = Pin<Box<Future<Output=Result<Self::Response, Self::Error>>>>;
 ///
 ///      fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> { ... }
 ///
