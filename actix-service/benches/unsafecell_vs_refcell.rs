@@ -95,9 +95,8 @@ where
             let start = std::time::Instant::now();
             // benchmark body
             rt.block_on(async move { join_all(srvs.iter_mut().map(|srv| srv.call(()))).await });
-            let elapsed = start.elapsed();
             // check that at least first request succeeded
-            elapsed
+            start.elapsed()
         })
     });
 }
