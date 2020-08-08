@@ -63,17 +63,18 @@ impl System {
     ///
     /// Note: This method uses provided `LocalSet` to create a `System` future only.
     /// All the [`Arbiter`]s will be started in separate threads using their own tokio `Runtime`s.
-    /// It means that using this method currently it is impossible to make `actix-rt` work in the `Runtime` other
-    /// than the provided by `tokio` 0.2 (e.g. provided by `tokio_compat`).
+    /// It means that using this method currently it is impossible to make `actix-rt` work in the
+    /// alternative `tokio` `Runtime`s (e.g. provided by [`tokio_compat`]).
     ///
     /// [`Arbiter`]: struct.Arbiter.html
+    /// [`tokio_compat`]: https://crates.io/crates/tokio-compat
     ///
     /// # Examples
     ///
     /// ```
     /// use tokio::{runtime::Runtime, task::LocalSet};
     /// use actix_rt::System;
-    /// use futures::future::try_join_all;
+    /// use futures_util::future::try_join_all;
     ///
     /// async fn run_application() {
     ///     let first_task = tokio::spawn(async {
@@ -128,14 +129,15 @@ impl System {
     /// Note: This method uses provided `Runtime` to create a `System` future only.
     /// All the [`Arbiter`]s will be started in separate threads using their own tokio `Runtime`s.
     /// It means that using this method currently it is impossible to make `actix-rt` work in the
-    /// `Runtime` other than the provided by `tokio` 0.2 (e.g. provided by `tokio_compat`).
+    /// alternative `tokio` `Runtime`s (e.g. provided by `tokio_compat`).
     ///
     /// [`Arbiter`]: struct.Arbiter.html
+    /// [`tokio_compat`]: https://crates.io/crates/tokio-compat
     ///
     /// # Arguments
     ///
-    /// - `runtime`: A tokio Runtime to run the system in.
     /// - `name`: Name of the System
+    /// - `runtime`: A tokio Runtime to run the system in.
     /// - `rest_operations`: A future to be executed in the runtime along with the System.
     ///
     /// # Examples
@@ -143,7 +145,7 @@ impl System {
     /// ```
     /// use tokio::runtime::Runtime;
     /// use actix_rt::System;
-    /// use futures::future::try_join_all;
+    /// use futures_util::future::try_join_all;
     ///
     /// async fn run_application() {
     ///     let first_task = tokio::spawn(async {
@@ -172,11 +174,11 @@ impl System {
     ///     .unwrap();
     ///
     /// let rest_operations = run_application();
-    /// System::attach_to_tokio(runtime, "actix-main-system", rest_operations);
+    /// System::attach_to_tokio("actix-main-system", runtime, rest_operations);
     /// ```
     pub fn attach_to_tokio<Fut, R>(
-        mut runtime: tokio::runtime::Runtime,
         name: impl Into<String>,
+        mut runtime: tokio::runtime::Runtime,
         rest_operations: Fut,
     ) -> R
     where
