@@ -29,7 +29,7 @@ where
 /// /// Service that divides two usize values.
 /// async fn div((x, y): (usize, usize)) -> Result<usize, io::Error> {
 ///     if y == 0 {
-///         Err(io::Error::new(io::ErrorKind::Other, "divide by zdro"))
+///         Err(io::Error::new(io::ErrorKind::Other, "divide by zero"))
 ///     } else {
 ///         Ok(x / y)
 ///     }
