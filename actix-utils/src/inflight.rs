@@ -152,7 +152,7 @@ mod tests {
     }
 
     #[actix_rt::test]
-    async fn test_newtransform() {
+    async fn test_new_transform() {
         let wait_time = Duration::from_millis(50);
 
         let srv = apply(InFlight::new(1), fn_factory(|| ok(SleepService(wait_time))));

@@ -8,7 +8,9 @@
 //! [`AsyncWrite`]: AsyncWrite
 //! [`Sink`]: futures_sink::Sink
 //! [`Stream`]: futures_core::Stream
+
 #![deny(rust_2018_idioms)]
+#![warn(missing_docs)]
 
 mod bcodec;
 mod framed;

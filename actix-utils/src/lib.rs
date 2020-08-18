@@ -1,11 +1,12 @@
 //! Actix utils - various helper services
+
 #![deny(rust_2018_idioms)]
 #![allow(clippy::type_complexity)]
 
 pub mod condition;
 pub mod counter;
+pub mod dispatcher;
 pub mod either;
-pub mod framed;
 pub mod inflight;
 pub mod keepalive;
 pub mod mpsc;

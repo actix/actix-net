@@ -220,7 +220,7 @@ mod tests {
     }
 
     #[actix_rt::test]
-    async fn test_timeout_newservice() {
+    async fn test_timeout_new_service() {
         let resolution = Duration::from_millis(100);
         let wait_time = Duration::from_millis(500);
 
