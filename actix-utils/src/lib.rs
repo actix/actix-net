@@ -16,5 +16,3 @@ pub mod stream;
 pub mod task;
 pub mod time;
 pub mod timeout;
-
-pub use dispatcher as framed;

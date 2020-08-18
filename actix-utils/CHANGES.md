@@ -4,8 +4,7 @@
 
 * Upgrade `tokio-util` to `0.3`.
 * Remove unsound custom Cell and use `std::cell::RefCell` instead, as well as `actix-service`.
-* Provide correctly spelled `LocalWaker::is_registered` method and deprecate the replaced.
-* Alias `framed` module as `dispatcher`.
+* Rename method to correctly spelled `LocalWaker::is_registered`.
 
 ## [1.0.6] - 2020-01-08
 

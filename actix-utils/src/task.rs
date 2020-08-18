@@ -34,15 +34,6 @@ impl LocalWaker {
         }
     }
 
-    #[deprecated(
-        note = "Use correctly spelled `is_registered` method. Removal scheduled for v2.0."
-    )]
-    #[inline]
-    /// Check if waker has been registered.
-    pub fn is_registed(&self) -> bool {
-        self.is_registered()
-    }
-
     #[inline]
     /// Check if waker has been registered.
     pub fn is_registered(&self) -> bool {
