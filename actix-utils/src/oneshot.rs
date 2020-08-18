@@ -170,7 +170,7 @@ pub struct PReceiver<T> {
     inner: Rc<RefCell<Slab<PoolInner<T>>>>,
 }
 
-// The oneshots do not ever project Pin to the inner T
+// The one-shots do not ever project Pin to the inner T
 impl<T> Unpin for PReceiver<T> {}
 impl<T> Unpin for PSender<T> {}
 
