@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - 1.39.0
+          - 1.42.0
           - stable
           - nightly
 
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
 
       - name: Install ${{ matrix.version }}
         uses: actions-rs/toolchain@v1
@@ -65,7 +65,7 @@ jobs:
       - name: Generate coverage file
         if: matrix.version == 'stable' && (github.ref == 'refs/heads/master' || github.event_name == 'pull_request')
         run: |
-          which cargo-tarpaulin || cargo install cargo-tarpaulin
+          cargo install cargo-tarpaulin
           cargo tarpaulin --out Xml --workspace --all-features
 
       - name: Upload to Codecov
@@ -76,5 +76,7 @@ jobs:
 
       - name: Clear the cargo caches
         run: |
-          which cargo-cache || cargo install cargo-cache --no-default-features --features ci-autoclean
+          rustup update stable
+          rustup override set stable
+          cargo install cargo-cache --no-default-features --features ci-autoclean
           cargo-cache

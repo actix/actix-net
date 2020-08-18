@@ -58,10 +58,7 @@ impl<E: PartialEq> PartialEq for TimeoutError<E> {
                 TimeoutError::Service(e2) => e1 == e2,
                 TimeoutError::Timeout => false,
             },
-            TimeoutError::Timeout => match other {
-                TimeoutError::Service(_) => false,
-                TimeoutError::Timeout => true,
-            },
+            TimeoutError::Timeout => matches!(other, TimeoutError::Timeout),
         }
     }
 }

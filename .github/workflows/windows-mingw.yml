@@ -21,7 +21,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
 
       - name: Install ${{ matrix.version }}
         uses: actions-rs/toolchain@v1
@@ -31,12 +31,12 @@ jobs:
           override: true
 
       - name: Install MSYS2
-        uses: numworks/setup-msys2@v1
+        uses: msys2/setup-msys2@v2
 
       - name: Install packages
         run: |
-          msys2do pacman -Sy --noconfirm pacman
-          msys2do pacman --noconfirm -S base-devel pkg-config
+          msys2 -c 'pacman -Sy --noconfirm pacman'
+          msys2 -c 'pacman --noconfirm -S base-devel pkg-config'
 
       - name: check build
         uses: actions-rs/cargo@v1

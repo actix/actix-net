@@ -1,6 +1,9 @@
 # Changes
 
-## Unreleased
+## Unreleased - 2020-xx-xx
+
+
+## 1.0.6 - 2020-08-09
 
 ### Fixed
 
