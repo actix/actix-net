@@ -72,8 +72,9 @@ impl ServerBuilder {
     /// Set number of workers to start.
     ///
     /// By default server uses number of available logical cpu as workers
-    /// count.
+    /// count. Workers must be greater than 0.
     pub fn workers(mut self, num: usize) -> Self {
+        assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;
         self
     }
