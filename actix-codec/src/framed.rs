@@ -117,7 +117,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Consume the `Frame`, returning `Frame` with different codec.
-    pub fn replace_codec<U2, I2>(self, codec: U2) -> Framed<T, U2> {
+    pub fn replace_codec<U2>(self, codec: U2) -> Framed<T, U2> {
         Framed {
             codec,
             io: self.io,
