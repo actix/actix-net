@@ -2,6 +2,9 @@
 
 ## Unreleased - 2020-xx-xx
 
+## 0.3.0 - 2020-08-23
+* No changes from beta 2.
+
 ## 0.3.0-beta.2 - 2020-08-19
 * Remove unused type parameter from `Framed::replace_codec`.
 
