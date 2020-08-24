@@ -33,8 +33,8 @@ nativetls = ["native-tls", "tokio-tls"]
 
 [dependencies]
 actix-service = "1.0.0"
-actix-codec = "0.3.0-beta.2"
-actix-utils = "1.0.0"
+actix-codec = "0.3.0"
+actix-utils = "2.0.0"
 actix-rt = "1.0.0"
 derive_more = "0.99.2"
 either = "1.5.2"

@@ -1,8 +1,8 @@
 [package]
 name = "actix-utils"
-version = "2.0.0-beta.1"
+version = "2.0.0"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
-description = "Actix utils - various Actix net related services"
+description = "Various network related services and utilities for the Actix ecosystem."
 keywords = ["network", "framework", "async", "futures"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
@@ -16,7 +16,7 @@ name = "actix_utils"
 path = "src/lib.rs"
 
 [dependencies]
-actix-codec = "0.3.0-beta.2"
+actix-codec = "0.3.0"
 actix-rt = "1.1.1"
 actix-service = "1.0.6"
 bitflags = "1.2.1"
