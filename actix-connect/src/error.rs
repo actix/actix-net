@@ -20,7 +20,7 @@ pub enum ConnectError {
     #[display(fmt = "Connector received `Connect` method with unresolved host")]
     Unresolved,
 
-    /// Connection io error
+    /// Connection IO error
     #[display(fmt = "{}", _0)]
     Io(io::Error),
 }

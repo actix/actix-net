@@ -88,9 +88,9 @@ async fn test_new_service() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "openssl", feature = "uri"))]
 #[actix_rt::test]
-async fn test_uri() {
+async fn test_openssl_uri() {
     use std::convert::TryFrom;
 
     let srv = TestServer::with(|| {
@@ -107,7 +107,7 @@ async fn test_uri() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(feature = "rustls")]
+#[cfg(all(feature = "rustls", feature = "uri"))]
 #[actix_rt::test]
 async fn test_rustls_uri() {
     use std::convert::TryFrom;

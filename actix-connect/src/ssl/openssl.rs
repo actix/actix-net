@@ -17,7 +17,7 @@ use crate::{
     Address, Connect, ConnectError, ConnectService, ConnectServiceFactory, Connection,
 };
 
-/// Openssl connector factory
+/// OpenSSL connector factory
 pub struct OpensslConnector<T, U> {
     connector: SslConnector,
     _t: PhantomData<(T, U)>,
@@ -97,6 +97,7 @@ where
     type Request = Connection<T, U>;
     type Response = Connection<T, SslStream<U>>;
     type Error = io::Error;
+    #[allow(clippy::type_complexity)]
     type Future = Either<ConnectAsyncExt<T, U>, Ready<Result<Self::Response, Self::Error>>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -164,7 +165,7 @@ impl<T> OpensslConnectServiceFactory<T> {
         }
     }
 
-    /// Construct new connect service with custom dns resolver
+    /// Construct new connect service with custom DNS resolver
     pub fn with_resolver(connector: SslConnector, resolver: AsyncResolver) -> Self {
         OpensslConnectServiceFactory {
             tcp: ConnectServiceFactory::with_resolver(resolver),
@@ -172,7 +173,7 @@ impl<T> OpensslConnectServiceFactory<T> {
         }
     }
 
-    /// Construct openssl connect service
+    /// Construct OpenSSL connect service
     pub fn service(&self) -> OpensslConnectService<T> {
         OpensslConnectService {
             tcp: self.tcp.service(),

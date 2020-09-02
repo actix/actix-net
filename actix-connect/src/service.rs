@@ -114,6 +114,7 @@ enum ConnectState<T: Address> {
 }
 
 impl<T: Address> ConnectState<T> {
+    #[allow(clippy::type_complexity)]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
