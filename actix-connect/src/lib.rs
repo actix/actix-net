@@ -1,11 +1,11 @@
-//! Actix connect - tcp connector service
+//! TCP connector service for Actix ecosystem.
 //!
 //! ## Package feature
 //!
 //! * `openssl` - enables ssl support via `openssl` crate
 //! * `rustls` - enables ssl support via `rustls` crate
-#![deny(rust_2018_idioms, warnings)]
-#![allow(clippy::type_complexity)]
+
+#![deny(rust_2018_idioms)]
 #![recursion_limit = "128"]
 
 #[macro_use]
@@ -71,7 +71,7 @@ pub async fn start_default_resolver() -> Result<AsyncResolver, ConnectError> {
     get_default_resolver().await
 }
 
-/// Create tcp connector service
+/// Create TCP connector service.
 pub fn new_connector<T: Address + 'static>(
     resolver: AsyncResolver,
 ) -> impl Service<Request = Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError>
@@ -79,7 +79,7 @@ pub fn new_connector<T: Address + 'static>(
     pipeline(Resolver::new(resolver)).and_then(TcpConnector::new())
 }
 
-/// Create tcp connector service
+/// Create TCP connector service factory.
 pub fn new_connector_factory<T: Address + 'static>(
     resolver: AsyncResolver,
 ) -> impl ServiceFactory<
@@ -92,14 +92,14 @@ pub fn new_connector_factory<T: Address + 'static>(
     pipeline_factory(ResolverFactory::new(resolver)).and_then(TcpConnectorFactory::new())
 }
 
-/// Create connector service with default parameters
+/// Create connector service with default parameters.
 pub fn default_connector<T: Address + 'static>(
 ) -> impl Service<Request = Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError>
        + Clone {
     pipeline(Resolver::default()).and_then(TcpConnector::new())
 }
 
-/// Create connector service factory with default parameters
+/// Create connector service factory with default parameters.
 pub fn default_connector_factory<T: Address + 'static>() -> impl ServiceFactory<
     Config = (),
     Request = Connect<T>,
