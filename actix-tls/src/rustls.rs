@@ -17,16 +17,17 @@ pub use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::MAX_CONN_COUNTER;
 
-/// Support `SSL` connections via rustls package
+/// Accept TLS connections via `rustls` package.
 ///
-/// `rust-tls` feature enables `RustlsAcceptor` type
+/// `rustls` feature enables this `Acceptor` type.
 pub struct Acceptor<T> {
     config: Arc<ServerConfig>,
     io: PhantomData<T>,
 }
 
 impl<T: AsyncRead + AsyncWrite> Acceptor<T> {
-    /// Create rustls based `Acceptor` service factory
+    /// Create Rustls based `Acceptor` service factory.
+    #[inline]
     pub fn new(config: ServerConfig) -> Self {
         Acceptor {
             config: Arc::new(config),
@@ -36,6 +37,7 @@ impl<T: AsyncRead + AsyncWrite> Acceptor<T> {
 }
 
 impl<T> Clone for Acceptor<T> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),
@@ -65,7 +67,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> ServiceFactory for Acceptor<T> {
     }
 }
 
-/// RusTLS based `Acceptor` service
+/// Rustls based `Acceptor` service
 pub struct AcceptorService<T> {
     acceptor: TlsAcceptor,
     io: PhantomData<T>,

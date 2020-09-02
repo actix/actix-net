@@ -1,16 +1,15 @@
 [package]
 name = "actix-tls"
-version = "2.0.0-alpha.2"
+version = "2.0.0"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
-description = "Actix tls services"
-keywords = ["network", "framework", "async", "futures"]
+description = "TLS acceptor services for Actix ecosystem."
+keywords = ["network", "framework", "async", "futures", "tls", "ssl"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 documentation = "https://docs.rs/actix-tls/"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
-workspace = ".."
 
 [package.metadata.docs.rs]
 features = ["openssl", "rustls", "nativetls"]
@@ -35,26 +34,23 @@ nativetls = ["native-tls", "tokio-tls"]
 actix-service = "1.0.0"
 actix-codec = "0.3.0"
 actix-utils = "2.0.0"
-actix-rt = "1.0.0"
-derive_more = "0.99.2"
-either = "1.5.2"
+
 futures-util = { version = "0.3.4", default-features = false }
-log = "0.4"
 
 # openssl
-open-ssl = { version="0.10", package = "openssl", optional = true }
+open-ssl = { package = "openssl", version = "0.10", optional = true }
 tokio-openssl = { version = "0.4.0", optional = true }
 
 # rustls
-rust-tls = { version = "0.18.0", package = "rustls", optional = true }
+rust-tls = { package = "rustls", version = "0.18.0", optional = true }
 webpki = { version = "0.21", optional = true }
 webpki-roots = { version = "0.20", optional = true }
 tokio-rustls = { version = "0.14.0", optional = true }
 
 # native-tls
-native-tls = { version="0.2", optional = true }
-tokio-tls = { version="0.3", optional = true }
+native-tls = { version = "0.2", optional = true }
+tokio-tls = { version = "0.3", optional = true }
 
 [dev-dependencies]
 bytes = "0.5"
-actix-testing = { version="1.0.0" }
+actix-testing = { version = "1.0.0" }

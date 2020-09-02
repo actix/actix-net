@@ -3,26 +3,27 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pub use open_ssl::ssl::{AlpnError, SslAcceptor, SslAcceptorBuilder};
-pub use tokio_openssl::{HandshakeError, SslStream};
-
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
 use futures_util::future::{ok, FutureExt, LocalBoxFuture, Ready};
 
+pub use open_ssl::ssl::{AlpnError, SslAcceptor, SslAcceptorBuilder};
+pub use tokio_openssl::{HandshakeError, SslStream};
+
 use crate::MAX_CONN_COUNTER;
 
-/// Support `TLS` server connections via openssl package
+/// Accept TLS connections via `openssl` package.
 ///
-/// `openssl` feature enables `Acceptor` type
+/// `openssl` feature enables this `Acceptor` type.
 pub struct Acceptor<T: AsyncRead + AsyncWrite> {
     acceptor: SslAcceptor,
     io: PhantomData<T>,
 }
 
 impl<T: AsyncRead + AsyncWrite> Acceptor<T> {
-    /// Create default `OpensslAcceptor`
+    /// Create OpenSSL based `Acceptor` service factory.
+    #[inline]
     pub fn new(acceptor: SslAcceptor) -> Self {
         Acceptor {
             acceptor,
@@ -32,6 +33,7 @@ impl<T: AsyncRead + AsyncWrite> Acceptor<T> {
 }
 
 impl<T: AsyncRead + AsyncWrite> Clone for Acceptor<T> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             acceptor: self.acceptor.clone(),
