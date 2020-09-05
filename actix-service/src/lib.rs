@@ -1,3 +1,5 @@
+//! See [`Service`](trait.Service.html) docs for information on this crate's foundational trait.
+
 #![deny(rust_2018_idioms, warnings)]
 #![allow(clippy::type_complexity)]
 
@@ -29,21 +31,23 @@ pub use self::map_config::{map_config, unit_config};
 pub use self::pipeline::{pipeline, pipeline_factory, Pipeline, PipelineFactory};
 pub use self::transform::{apply, Transform};
 
-/// An asynchronous function from `Request` to a `Response`.
+/// An asynchronous operation from `Request` to a `Response`.
 ///
-/// `Service` represents a service that represanting interation, taking requests and giving back
-/// replies. You can think about service as a function with one argument and result as a return
-/// type. In general form it looks like `async fn(Req) -> Result<Res, Err>`. `Service`
-/// trait just generalizing form of this function. Each parameter described as an assotiated type.
+/// The `Service` trait models a request/response interaction, receiving requests and returning
+/// replies. You can think about a service as a function with one argument that returns some result
+/// asynchronously. Conceptually, the operation looks like this:
 ///
-/// Services provides a symmetric and uniform API, same abstractions represents
-/// clients and servers. Services describe only `transforamtion` operation
-/// which encorouge to simplify api surface and phrases `value transformation`.
-/// That leads to simplier design of each service. That also allows better testability
-/// and better composition.
+/// ```rust,ignore
+/// async fn(Request) -> Result<Response, Err>
+/// ```
 ///
-/// Services could be represented in several different forms. In general,
-/// Service is a type that implements `Service` trait.
+/// The `Service` trait just generalizes this form where each parameter is described as an
+/// associated type on the trait. Services can also have mutable state that influence computation.
+///
+/// `Service` provides a symmetric and uniform API; the same abstractions can be used to represent
+/// both clients and servers. Services describe only _transformation_ operations which encourage
+/// simple API surfaces. This leads to simpler design of each service, improves test-ability and
+/// makes composition easier.
 ///
 /// ```rust,ignore
 /// struct MyService;
@@ -52,7 +56,7 @@ pub use self::transform::{apply, Transform};
 ///      type Request = u8;
 ///      type Response = u64;
 ///      type Error = MyError;
-///      type Future = Pin<Box<Future<Output=Result<Self::Response, Self::Error>>>;
+///      type Future = Pin<Box<Future<Output=Result<Self::Response, Self::Error>>>>;
 ///
 ///      fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> { ... }
 ///
@@ -60,8 +64,8 @@ pub use self::transform::{apply, Transform};
 /// }
 /// ```
 ///
-/// Service can have mutable state that influence computation.
-/// This service could be rewritten as a simple function:
+/// Sometimes it is not necessary to implement the Service trait. For example, the above service
+/// could be rewritten as a simple function and passed to [fn_service](fn.fn_service.html).
 ///
 /// ```rust,ignore
 /// async fn my_service(req: u8) -> Result<u64, MyError>;
@@ -89,11 +93,9 @@ pub trait Service {
     /// It is permitted for the service to return `Ready` from a `poll_ready`
     /// call and the next invocation of `call` results in an error.
     ///
-    /// There are several notes to consider:
-    ///
+    /// # Notes
     /// 1. `.poll_ready()` might be called on different task from actual service call.
-    ///
-    /// 2. In case of chained services, `.poll_ready()` get called for all services at once.
+    /// 1. In case of chained services, `.poll_ready()` get called for all services at once.
     fn poll_ready(&mut self, ctx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>>;
 
     /// Process the request and return the response asynchronously.
@@ -127,7 +129,7 @@ pub trait Service {
     /// Map this service's error to a different error, returning a new service.
     ///
     /// This function is similar to the `Result::map_err` where it will change
-    /// the error type of the underlying service. This is useful for example to
+    /// the error type of the underlying service. For example, this can be useful to
     /// ensure that services have the same error type.
     ///
     /// Note that this function consumes the receiving service and returns a
@@ -141,42 +143,42 @@ pub trait Service {
     }
 }
 
-/// Creates new `Service` values.
+/// Factory for creating `Service`s.
 ///
-/// Acts as a service factory. This is useful for cases where new `Service`
-/// values must be produced. One case is a TCP server listener. The listener
-/// accepts new TCP streams, obtains a new `Service` value using the
-/// `ServiceFactory` trait, and uses that new `Service` value to process inbound
+/// Acts as a service factory. This is useful for cases where new `Service`s
+/// must be produced. One case is a TCP server listener. The listener
+/// accepts new TCP streams, obtains a new `Service` using the
+/// `ServiceFactory` trait, and uses the new `Service` to process inbound
 /// requests on that new TCP stream.
 ///
 /// `Config` is a service factory configuration type.
 pub trait ServiceFactory {
-    /// Requests handled by the service.
+    /// Requests handled by the created services.
     type Request;
 
-    /// Responses given by the service
+    /// Responses given by the created services.
     type Response;
 
-    /// Errors produced by the service
+    /// Errors produced by the created services.
     type Error;
 
-    /// Service factory configuration
+    /// Service factory configuration.
     type Config;
 
-    /// The `Service` value created by this factory
+    /// The kind of `Service` created by this factory.
     type Service: Service<
         Request = Self::Request,
         Response = Self::Response,
         Error = Self::Error,
     >;
 
-    /// Errors produced while building a service.
+    /// Errors potentially raised while building a service.
     type InitError;
 
     /// The future of the `Service` instance.
     type Future: Future<Output = Result<Self::Service, Self::InitError>>;
 
-    /// Create and return a new service value asynchronously.
+    /// Create and return a new service asynchronously.
     fn new_service(&self, cfg: Self::Config) -> Self::Future;
 
     /// Map this service's output to a different type, returning a new service

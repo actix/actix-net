@@ -23,8 +23,8 @@ default = []
 [dependencies]
 actix-service = "1.0.1"
 actix-rt = "1.0.0"
-actix-codec = "0.2.0"
-actix-utils = "1.0.4"
+actix-codec = "0.3.0"
+actix-utils = "2.0.0"
 
 log = "0.4"
 num_cpus = "1.11"

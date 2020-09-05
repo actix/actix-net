@@ -1,5 +1,11 @@
 # Changes
 
+## Unreleased
+
+### Changed
+
+* workers must be greater than 0
+
 ## [1.0.3] - 2020-05-19
 
 ### Changed

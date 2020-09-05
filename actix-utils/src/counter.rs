@@ -7,7 +7,7 @@ use crate::task::LocalWaker;
 #[derive(Clone)]
 /// Simple counter with ability to notify task on reaching specific number
 ///
-/// Counter could be cloned, total ncount is shared across all clones.
+/// Counter could be cloned, total n-count is shared across all clones.
 pub struct Counter(Rc<CounterInner>);
 
 struct CounterInner {

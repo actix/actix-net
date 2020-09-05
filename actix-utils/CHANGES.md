@@ -2,8 +2,13 @@
 
 ## Unreleased - 2020-xx-xx
 
+## 2.0.0 - 2020-08-23
+* No changes from beta 1.
+
+## 2.0.0-beta.1 - 2020-08-19
 * Upgrade `tokio-util` to `0.3`.
 * Remove unsound custom Cell and use `std::cell::RefCell` instead, as well as `actix-service`.
+* Rename method to correctly spelled `LocalWaker::is_registered`.
 
 ## [1.0.6] - 2020-01-08
 

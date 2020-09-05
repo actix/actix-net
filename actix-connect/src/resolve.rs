@@ -106,6 +106,7 @@ impl<T: Address> Service for Resolver<T> {
     type Request = Connect<T>;
     type Response = Connect<T>;
     type Error = ConnectError;
+    #[allow(clippy::type_complexity)]
     type Future = Either<
         Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>,
         Ready<Result<Connect<T>, Self::Error>>,

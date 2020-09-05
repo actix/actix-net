@@ -13,7 +13,7 @@ use futures_util::future::{err, ok, BoxFuture, Either, FutureExt, Ready};
 use super::connect::{Address, Connect, Connection};
 use super::error::ConnectError;
 
-/// Tcp connector service factory
+/// TCP connector service factory
 #[derive(Debug)]
 pub struct TcpConnectorFactory<T>(PhantomData<T>);
 
@@ -22,7 +22,7 @@ impl<T> TcpConnectorFactory<T> {
         TcpConnectorFactory(PhantomData)
     }
 
-    /// Create tcp connector service
+    /// Create TCP connector service
     pub fn service(&self) -> TcpConnector<T> {
         TcpConnector(PhantomData)
     }
@@ -54,7 +54,7 @@ impl<T: Address> ServiceFactory for TcpConnectorFactory<T> {
     }
 }
 
-/// Tcp connector service
+/// TCP connector service
 #[derive(Default, Debug)]
 pub struct TcpConnector<T>(PhantomData<T>);
 
@@ -74,6 +74,7 @@ impl<T: Address> Service for TcpConnector<T> {
     type Request = Connect<T>;
     type Response = Connection<T, TcpStream>;
     type Error = ConnectError;
+    #[allow(clippy::type_complexity)]
     type Future = Either<TcpConnectorResponse<T>, Ready<Result<Self::Response, Self::Error>>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -94,7 +95,7 @@ impl<T: Address> Service for TcpConnector<T> {
 }
 
 #[doc(hidden)]
-/// Tcp stream connector response future
+/// TCP stream connector response future
 pub struct TcpConnectorResponse<T> {
     req: Option<T>,
     port: u16,

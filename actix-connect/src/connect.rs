@@ -43,7 +43,7 @@ pub struct Connect<T> {
 }
 
 impl<T: Address> Connect<T> {
-    /// Create `Connect` instance by spliting the string by ':' and convert the second part to u16
+    /// Create `Connect` instance by splitting the string by ':' and convert the second part to u16
     pub fn new(req: T) -> Connect<T> {
         let (_, port) = parse(req.host());
         Connect {
@@ -53,7 +53,8 @@ impl<T: Address> Connect<T> {
         }
     }
 
-    /// Create new `Connect` instance from host and address. Connector skips name resolution stage for such connect messages.
+    /// Create new `Connect` instance from host and address. Connector skips name resolution stage
+    /// for such connect messages.
     pub fn with(req: T, addr: SocketAddr) -> Connect<T> {
         Connect {
             req,
@@ -102,7 +103,7 @@ impl<T: Address> Connect<T> {
         self.req.port().unwrap_or(self.port)
     }
 
-    /// Preresolved addresses of the request.
+    /// Pre-resolved addresses of the request.
     pub fn addrs(&self) -> ConnectAddrsIter<'_> {
         let inner = match self.addr {
             None => Either::Left(None),
@@ -113,7 +114,7 @@ impl<T: Address> Connect<T> {
         ConnectAddrsIter { inner }
     }
 
-    /// Takes preresolved addresses of the request.
+    /// Takes pre-resolved addresses of the request.
     pub fn take_addrs(&mut self) -> ConnectTakeAddrsIter {
         let inner = match self.addr.take() {
             None => Either::Left(None),

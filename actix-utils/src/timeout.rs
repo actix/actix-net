@@ -58,10 +58,7 @@ impl<E: PartialEq> PartialEq for TimeoutError<E> {
                 TimeoutError::Service(e2) => e1 == e2,
                 TimeoutError::Timeout => false,
             },
-            TimeoutError::Timeout => match other {
-                TimeoutError::Service(_) => false,
-                TimeoutError::Timeout => true,
-            },
+            TimeoutError::Timeout => matches!(other, TimeoutError::Timeout),
         }
     }
 }
@@ -223,7 +220,7 @@ mod tests {
     }
 
     #[actix_rt::test]
-    async fn test_timeout_newservice() {
+    async fn test_timeout_new_service() {
         let resolution = Duration::from_millis(100);
         let wait_time = Duration::from_millis(500);
 

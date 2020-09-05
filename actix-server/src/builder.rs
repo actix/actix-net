@@ -72,8 +72,9 @@ impl ServerBuilder {
     /// Set number of workers to start.
     ///
     /// By default server uses number of available logical cpu as workers
-    /// count.
+    /// count. Workers must be greater than 0.
     pub fn workers(mut self, num: usize) -> Self {
+        assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;
         self
     }
@@ -276,7 +277,7 @@ impl ServerBuilder {
                 info!("Starting \"{}\" service on {}", sock.1, sock.2);
             }
             self.accept.start(
-                mem::replace(&mut self.sockets, Vec::new())
+                mem::take(&mut self.sockets)
                     .into_iter()
                     .map(|t| (t.0, t.2))
                     .collect(),
@@ -355,7 +356,7 @@ impl ServerBuilder {
 
                 // stop accept thread
                 self.accept.send(Command::Stop);
-                let notify = std::mem::replace(&mut self.notify, Vec::new());
+                let notify = std::mem::take(&mut self.notify);
 
                 // stop workers
                 if !self.workers.is_empty() && graceful {

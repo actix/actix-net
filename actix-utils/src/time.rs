@@ -173,7 +173,7 @@ mod tests {
     ///
     /// Expected Behavior: Two back-to-back calls of `LowResTimeService::now()` return the same value.
     #[actix_rt::test]
-    async fn lowres_time_service_time_does_not_immediately_change() {
+    async fn low_res_time_service_time_does_not_immediately_change() {
         let resolution = Duration::from_millis(50);
         let time_service = LowResTimeService::with(resolution);
         assert_eq!(time_service.now(), time_service.now());
@@ -210,7 +210,7 @@ mod tests {
     /// Expected Behavior: Two calls of `LowResTimeService::now()` made in subsequent resolution interval return different values
     /// and second value is greater than the first one at least by a resolution interval.
     #[actix_rt::test]
-    async fn lowres_time_service_time_updates_after_resolution_interval() {
+    async fn low_res_time_service_time_updates_after_resolution_interval() {
         let resolution = Duration::from_millis(100);
         let wait_time = Duration::from_millis(300);
         let time_service = LowResTimeService::with(resolution);
