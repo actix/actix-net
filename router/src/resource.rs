@@ -624,7 +624,7 @@ impl ResourceDef {
         }
 
         if !for_prefix {
-            re.push_str("$");
+            re.push('$');
         }
         (re, elems, true, pattern.chars().count())
     }

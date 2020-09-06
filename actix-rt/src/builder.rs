@@ -137,7 +137,7 @@ impl AsyncSystemRunner {
                     Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
                 };
                 Arbiter::stop_system();
-                return res;
+                res
             }
         })
         .flatten()
