@@ -2,8 +2,8 @@
 //!
 //! ## Package feature
 //!
-//! * `openssl` - enables ssl support via `openssl` crate
-//! * `rustls` - enables ssl support via `rustls` crate
+//! * `openssl` - enables TLS support via `openssl` crate
+//! * `rustls` - enables TLS support via `rustls` crate
 
 #![deny(rust_2018_idioms)]
 #![recursion_limit = "128"]

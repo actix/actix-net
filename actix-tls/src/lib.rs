@@ -1,6 +1,11 @@
-//! SSL Services
-#![deny(rust_2018_idioms, warnings)]
-#![allow(clippy::type_complexity)]
+//! TLS acceptor services for Actix ecosystem.
+//!
+//! ## Crate Features
+//! * `openssl` - TLS acceptor using the `openssl` crate.
+//! * `rustls` - TLS acceptor using the `rustls` crate.
+//! * `nativetls` - TLS acceptor using the `native-tls` crate.
+
+#![deny(rust_2018_idioms)]
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -15,25 +20,25 @@ pub mod rustls;
 #[cfg(feature = "nativetls")]
 pub mod nativetls;
 
-/// Sets the maximum per-worker concurrent ssl connection establish process.
-///
-/// All listeners will stop accepting connections when this limit is
-/// reached. It can be used to limit the global SSL CPU usage.
-///
-/// By default max connections is set to a 256.
-pub fn max_concurrent_ssl_connect(num: usize) {
-    MAX_CONN.store(num, Ordering::Relaxed);
-}
-
 pub(crate) static MAX_CONN: AtomicUsize = AtomicUsize::new(256);
 
 thread_local! {
     static MAX_CONN_COUNTER: Counter = Counter::new(MAX_CONN.load(Ordering::Relaxed));
 }
 
-/// Ssl error combinded with service error.
+/// Sets the maximum per-worker concurrent TLS connection limit.
+///
+/// All listeners will stop accepting connections when this limit is reached.
+/// It can be used to regulate the global TLS CPU usage.
+///
+/// By default, the connection limit is 256.
+pub fn max_concurrent_tls_connect(num: usize) {
+    MAX_CONN.store(num, Ordering::Relaxed);
+}
+
+/// TLS error combined with service error.
 #[derive(Debug)]
-pub enum SslError<E1, E2> {
-    Ssl(E1),
+pub enum TlsError<E1, E2> {
+    Tls(E1),
     Service(E2),
 }

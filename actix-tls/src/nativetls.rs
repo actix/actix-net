@@ -5,34 +5,35 @@ use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
 use futures_util::future::{self, FutureExt, LocalBoxFuture, TryFutureExt};
+
 pub use native_tls::Error;
 pub use tokio_tls::{TlsAcceptor, TlsStream};
 
 use crate::MAX_CONN_COUNTER;
 
-/// Support `SSL` connections via native-tls package
+/// Accept TLS connections via `native-tls` package.
 ///
-/// `tls` feature enables `NativeTlsAcceptor` type
-pub struct NativeTlsAcceptor<T> {
+/// `nativetls` feature enables this `Acceptor` type.
+pub struct Acceptor<T> {
     acceptor: TlsAcceptor,
     io: PhantomData<T>,
 }
 
-impl<T> NativeTlsAcceptor<T>
+impl<T> Acceptor<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
-    /// Create `NativeTlsAcceptor` instance
+    /// Create `native-tls` based `Acceptor` service factory.
     #[inline]
     pub fn new(acceptor: TlsAcceptor) -> Self {
-        NativeTlsAcceptor {
+        Acceptor {
             acceptor,
             io: PhantomData,
         }
     }
 }
 
-impl<T> Clone for NativeTlsAcceptor<T> {
+impl<T> Clone for Acceptor<T> {
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -42,7 +43,7 @@ impl<T> Clone for NativeTlsAcceptor<T> {
     }
 }
 
-impl<T> ServiceFactory for NativeTlsAcceptor<T>
+impl<T> ServiceFactory for Acceptor<T>
 where
     T: AsyncRead + AsyncWrite + Unpin + 'static,
 {
@@ -104,8 +105,7 @@ where
         let this = self.clone();
         async move { this.acceptor.accept(req).await }
             .map_ok(move |io| {
-                // Required to preserve `CounterGuard` until `Self::Future`
-                // is completely resolved.
+                // Required to preserve `CounterGuard` until `Self::Future` is completely resolved.
                 let _ = guard;
                 io
             })

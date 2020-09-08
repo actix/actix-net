@@ -1,7 +1,10 @@
 # Changes
 
-## Unreleased
+## Unreleased - 2020-xx-xx
 
+
+## 2.0.0 - 2020-09-02
+- No significant changes from `2.0.0-alpha.4`.
 
 ## 2.0.0-alpha.4 - 2020-08-17
 
