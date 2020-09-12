@@ -3,7 +3,7 @@ name = "actix-tls"
 version = "2.0.0"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "TLS acceptor services for Actix ecosystem."
-keywords = ["network", "framework", "async", "futures", "tls", "ssl"]
+keywords = ["network", "framework", "async", "tls", "ssl"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 documentation = "https://docs.rs/actix-tls/"
@@ -53,4 +53,4 @@ tokio-tls = { version = "0.3", optional = true }
 
 [dev-dependencies]
 bytes = "0.5"
-actix-testing = { version = "1.0.0" }
+actix-testing = "1.0.0"
