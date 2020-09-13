@@ -18,6 +18,10 @@ features = ["openssl", "rustls", "nativetls"]
 name = "actix_tls"
 path = "src/lib.rs"
 
+[[example]]
+name = "basic"
+required-features = ["rustls"]
+
 [features]
 default = []
 
@@ -53,4 +57,8 @@ tokio-tls = { version = "0.3", optional = true }
 
 [dev-dependencies]
 bytes = "0.5"
+log = "0.4"
+env_logger = "0.7"
 actix-testing = "1.0.0"
+actix-server = "1"
+actix-rt = "1"

@@ -17,8 +17,10 @@ use crate::socket::{FromStream, StdStream};
 pub(crate) enum ServerMessage {
     /// New stream
     Connect(StdStream),
-    /// Gracefull shutdown
+
+    /// Gracefully shutdown
     Shutdown(Duration),
+
     /// Force shutdown
     ForceShutdown,
 }

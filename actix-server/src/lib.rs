@@ -1,6 +1,6 @@
-//! General purpose tcp server
-#![deny(rust_2018_idioms, warnings)]
-#![allow(clippy::type_complexity)]
+//! General purpose TCP server.
+
+#![deny(rust_2018_idioms)]
 
 mod accept;
 mod builder;
@@ -19,7 +19,7 @@ pub use self::service::ServiceFactory;
 #[doc(hidden)]
 pub use self::socket::FromStream;
 
-/// Socket id token
+/// Socket ID token
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct Token(usize);
 

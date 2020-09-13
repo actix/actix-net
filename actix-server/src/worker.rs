@@ -303,6 +303,7 @@ enum WorkerState {
     Restarting(
         usize,
         Token,
+        #[allow(clippy::type_complexity)]
         Pin<Box<dyn Future<Output = Result<Vec<(Token, BoxedServerService)>, ()>>>>,
     ),
     Shutdown(
