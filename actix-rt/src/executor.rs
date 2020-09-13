@@ -1,4 +1,5 @@
 //! This module provides a wrapper abstraction around used executor.
+//! Depending on the provided feature, a corresponding set of types / helper functions is provided.
 //!
 //! Currently supported executors:
 //!
