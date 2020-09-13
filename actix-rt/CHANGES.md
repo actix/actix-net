@@ -4,7 +4,11 @@
 
 ### Added
 
+* Add support of `tokio-compat` runtime. [#191]
 * Add `System::attach_to_tokio` method. [#173]
+
+[#173]: https://github.com/actix/actix-net/pull/173
+[#191]: https://github.com/actix/actix-net/pull/191
 
 ## [1.1.1] - 2020-04-30
 
