@@ -112,3 +112,39 @@ fn join_current_arbiter() {
         "local_join should await only for the already spawned futures"
     );
 }
+
+#[test]
+#[cfg(all(feature = "tokio-compat-executor", not(feature = "tokio-executor")))]
+fn tokio_compat_timer() {
+    use tokio_compat::prelude::*;
+
+    let time = Duration::from_secs(2);
+    let instant = Instant::now();
+    actix_rt::System::new("test_wait_timer").block_on(async move {
+        // Spawn a `std::Future`.
+        tokio::time::delay_for(time).await;
+        let when = Instant::now() + time;
+        // Spawn a `futures01::Future`.
+        tokio01::timer::Delay::new(when)
+            // convert the delay future into a `std::future` that we can `await`.
+            .compat()
+            .await
+            .expect("tokio 0.1 timer should work!");
+    });
+    assert!(
+        instant.elapsed() >= time * 2,
+        "Block on should poll awaited future to completion"
+    );
+}
+
+#[test]
+#[cfg(all(feature = "tokio-compat-executor", not(feature = "tokio-executor")))]
+fn tokio_compat_spawn() {
+    actix_rt::System::new("test_wait_timer").block_on(async move {
+        // Spawning with tokio 0.1 works on the main thread
+        tokio01::spawn(futures01::lazy(|| futures01::future::ok(())));
+
+        // Spawning with tokio 0.2 works of course
+        tokio::spawn(async {}).await.unwrap();
+    });
+}

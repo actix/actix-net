@@ -67,3 +67,8 @@ jobs:
         with:
           command: test
           args: --all --all-features --no-fail-fast -- --nocapture
+
+      - name: tokio compat tests
+        run:
+          cd actix-rt
+          cargo test --features tokio-compat-executor --no-default-features

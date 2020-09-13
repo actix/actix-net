@@ -1,6 +1,6 @@
+use crate::executor::{LocalSet, Runtime as ExecutorRuntime};
 use std::future::Future;
 use std::io;
-use tokio::{runtime, task::LocalSet};
 
 /// Single-threaded runtime provides a way to start reactor
 /// and runtime on the current thread.
@@ -11,18 +11,14 @@ use tokio::{runtime, task::LocalSet};
 #[derive(Debug)]
 pub struct Runtime {
     local: LocalSet,
-    rt: runtime::Runtime,
+    rt: ExecutorRuntime,
 }
 
 impl Runtime {
     #[allow(clippy::new_ret_no_self)]
     /// Returns a new runtime initialized with default configuration values.
     pub fn new() -> io::Result<Runtime> {
-        let rt = runtime::Builder::new()
-            .enable_io()
-            .enable_time()
-            .basic_scheduler()
-            .build()?;
+        let rt = crate::executor::build_runtime()?;
 
         Ok(Runtime {
             rt,
@@ -86,6 +82,6 @@ impl Runtime {
     where
         F: Future + 'static,
     {
-        self.local.block_on(&mut self.rt, f)
+        crate::executor::block_on_local(&mut self.rt, &self.local, f)
     }
 }

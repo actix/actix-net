@@ -13,13 +13,14 @@ use futures_util::{
     stream::Stream,
 };
 
+use crate::executor::spawn_local;
 use crate::runtime::Runtime;
 use crate::system::System;
 
 use copyless::BoxHelper;
 
+pub use crate::executor::JoinHandle;
 use smallvec::SmallVec;
-pub use tokio::task::JoinHandle;
 
 thread_local!(
     static ADDR: RefCell<Option<Arbiter>> = RefCell::new(None);
@@ -162,7 +163,7 @@ impl Arbiter {
                 if let Some(rt) = rt {
                     rt.spawn(fut);
                 } else {
-                    tokio::task::spawn_local(fut);
+                    spawn_local(fut);
                 }
             }
         });
@@ -184,12 +185,12 @@ impl Arbiter {
                 // Spawn the future on running executor
                 let len = PENDING.with(move |cell| {
                     let mut p = cell.borrow_mut();
-                    p.push(tokio::task::spawn_local(future));
+                    p.push(spawn_local(future));
                     p.len()
                 });
                 if len > 7 {
                     // Before reaching the inline size
-                    tokio::task::spawn_local(CleanupPending);
+                    spawn_local(CleanupPending);
                 }
             } else {
                 // Box the future and push it to the queue, this results in double boxing
@@ -383,12 +384,12 @@ impl Future for ArbiterController {
                     ArbiterCommand::Execute(fut) => {
                         let len = PENDING.with(move |cell| {
                             let mut p = cell.borrow_mut();
-                            p.push(tokio::task::spawn_local(fut));
+                            p.push(spawn_local(fut));
                             p.len()
                         });
                         if len > 7 {
                             // Before reaching the inline size
-                            tokio::task::spawn_local(CleanupPending);
+                            spawn_local(CleanupPending);
                         }
                     }
                     ArbiterCommand::ExecuteFn(f) => {

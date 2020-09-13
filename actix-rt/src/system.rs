@@ -4,10 +4,10 @@ use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use futures_channel::mpsc::UnboundedSender;
-use tokio::task::LocalSet;
 
 use crate::arbiter::{Arbiter, SystemCommand};
 use crate::builder::{Builder, SystemRunner};
+use crate::executor::LocalSet;
 
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -143,6 +143,8 @@ impl System {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(feature = "tokio-executor")] // Test won't work for `tokio-compat-executor`.
+    /// # fn main() {
     /// use tokio::runtime::Runtime;
     /// use actix_rt::System;
     /// use futures_util::future::try_join_all;
@@ -175,20 +177,22 @@ impl System {
     ///
     /// let rest_operations = run_application();
     /// System::attach_to_tokio("actix-main-system", runtime, rest_operations);
+    /// # }
+    /// # #[cfg(not(feature = "tokio-executor"))] fn main() {} // Provie a blanket main function, so test will compile.
     /// ```
     pub fn attach_to_tokio<Fut, R>(
         name: impl Into<String>,
-        mut runtime: tokio::runtime::Runtime,
+        mut runtime: crate::executor::Runtime,
         rest_operations: Fut,
     ) -> R
     where
-        Fut: std::future::Future<Output = R>,
+        Fut: std::future::Future<Output = R> + 'static,
     {
         let actix_system_task = LocalSet::new();
         let sys = System::run_in_tokio(name.into(), &actix_system_task);
         actix_system_task.spawn_local(sys);
 
-        runtime.block_on(actix_system_task.run_until(rest_operations))
+        crate::executor::block_on_local(&mut runtime, &actix_system_task, rest_operations)
     }
 
     /// Get current running system.

@@ -4,9 +4,9 @@ use std::io;
 use futures_channel::mpsc::unbounded;
 use futures_channel::oneshot::{channel, Receiver};
 use futures_util::future::{lazy, Future, FutureExt};
-use tokio::task::LocalSet;
 
 use crate::arbiter::{Arbiter, SystemArbiter};
+use crate::executor::LocalSet;
 use crate::runtime::Runtime;
 use crate::system::System;
 

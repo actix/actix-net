@@ -62,6 +62,11 @@ jobs:
           command: test
           args: --all --all-features --no-fail-fast -- --nocapture
 
+      - name: tokio compat tests
+        run:
+          cd actix-rt
+          cargo test --features tokio-compat-executor --no-default-features
+
       - name: Generate coverage file
         if: matrix.version == 'stable' && (github.ref == 'refs/heads/master' || github.event_name == 'pull_request')
         run: |

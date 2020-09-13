@@ -7,6 +7,7 @@ pub use actix_macros::{main, test};
 
 mod arbiter;
 mod builder;
+mod executor;
 mod runtime;
 mod system;
 
