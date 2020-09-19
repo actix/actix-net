@@ -115,7 +115,7 @@ pub trait Transform<S> {
     /// Creates and returns a new Transform component, asynchronously
     fn new_transform(&self, service: S) -> Self::Future;
 
-    /// Map this transforms's factory error to a different error,
+    /// Map this transform's factory error to a different error,
     /// returning a new transform service factory.
     fn map_init_err<F, E>(self, f: F) -> TransformMapInitErr<Self, S, F, E>
     where

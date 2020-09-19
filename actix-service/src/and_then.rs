@@ -9,7 +9,7 @@ use super::{Service, ServiceFactory};
 /// Service for the `and_then` combinator, chaining a computation onto the end
 /// of another service which completes successfully.
 ///
-/// This is created by the `ServiceExt::and_then` method.
+/// This is created by the `Pipeline::and_then` method.
 pub(crate) struct AndThenService<A, B>(Rc<RefCell<(A, B)>>);
 
 impl<A, B> AndThenService<A, B> {
