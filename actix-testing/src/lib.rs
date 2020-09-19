@@ -37,7 +37,7 @@ pub use actix_macros::test;
 /// ```
 pub struct TestServer;
 
-/// Test server runstime
+/// Test server runtime
 pub struct TestServerRuntime {
     addr: net::SocketAddr,
     host: String,
@@ -107,7 +107,7 @@ impl TestServer {
         }
     }
 
-    /// Get firat available unused local address
+    /// Get first available unused local address
     pub fn unused_addr() -> net::SocketAddr {
         let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
         let socket =
