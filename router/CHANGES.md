@@ -1,5 +1,9 @@
 # Changes
 
+## [0.2.5] - 2020-09-19
+
+* Fix `from_hex()` method
+
 ## [0.2.4] - 2019-12-31
 
 * Add `ResourceDef::resource_path_named()` path generation method
