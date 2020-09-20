@@ -225,4 +225,19 @@ mod tests {
         assert!(re.match_path(&mut path));
         assert_eq!(path.get("id").unwrap(), "qwe%rty");
     }
+
+    #[test]
+    fn test_from_hex() {
+        let hex = b"0123456789abcdefABCDEF";
+
+        let max = u8::MAX as i32 + 1;
+        for i in 0..max {
+            let c = i as u8;
+            if hex.contains(&c) {
+                assert!(from_hex(c).is_some())
+            } else {
+                assert!(from_hex(c).is_none())
+            }
+        }
+    }
 }
