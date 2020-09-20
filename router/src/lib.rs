@@ -1,4 +1,5 @@
 //! Resource path matching library.
+
 mod de;
 mod path;
 mod resource;

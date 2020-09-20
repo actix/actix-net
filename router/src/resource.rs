@@ -155,7 +155,7 @@ impl ResourceDef {
     }
 
     #[inline]
-    /// Check if path matchs this pattern?
+    /// Check if path matches this pattern.
     pub fn is_match(&self, path: &str) -> bool {
         match self.tp {
             PatternType::Static(ref s) => s == path,
@@ -165,7 +165,7 @@ impl ResourceDef {
         }
     }
 
-    /// Is prefix path a match against this resource?
+    /// Is prefix path a match against this resource.
     pub fn is_prefix_match(&self, path: &str) -> Option<usize> {
         let plen = path.len();
         let path = if path.is_empty() { "/" } else { path };
@@ -240,7 +240,7 @@ impl ResourceDef {
         }
     }
 
-    /// Is the given path and parameters a match against this pattern?
+    /// Is the given path and parameters a match against this pattern.
     pub fn match_path<T: ResourcePath>(&self, path: &mut Path<T>) -> bool {
         match self.tp {
             PatternType::Static(ref s) => {
@@ -875,7 +875,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reousrce_prefix_dynamic() {
+    fn test_resource_prefix_dynamic() {
         let re = ResourceDef::prefix("/{name}/");
         assert!(re.is_match("/name/"));
         assert!(re.is_match("/name/gs"));
