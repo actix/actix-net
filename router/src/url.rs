@@ -243,7 +243,6 @@ mod tests {
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 10, 11, 12, 13, 14, 15,
         ];
         for i in 0..hex.len() {
-            println!("{}", hex[i]);
             assert_eq!(from_hex(hex[i]).unwrap(), expected[i]);
         }
     }
