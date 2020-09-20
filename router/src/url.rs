@@ -186,7 +186,7 @@ fn from_hex(v: u8) -> Option<u8> {
         Some(v - 0x30) // ord('0') == 0x30
     } else if v >= b'A' && v <= b'F' {
         Some(v - 0x41 + 10) // ord('A') == 0x41
-    } else if v > b'a' && v <= b'f' {
+    } else if v >= b'a' && v <= b'f' {
         Some(v - 0x61 + 10) // ord('a') == 0x61
     } else {
         None
@@ -224,5 +224,26 @@ mod tests {
         let mut path = Path::new(Url::new(url));
         assert!(re.match_path(&mut path));
         assert_eq!(path.get("id").unwrap(), "qwe%rty");
+    }
+
+    #[test]
+    fn test_from_hex() {
+        let hex = b"0123456789abcdefABCDEF";
+
+        for i in 0..256 {
+            let c = i as u8;
+            if hex.contains(&c) {
+                assert!(from_hex(c).is_some())
+            } else {
+                assert!(from_hex(c).is_none())
+            }
+        }
+
+        let expected = [
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 10, 11, 12, 13, 14, 15,
+        ];
+        for i in 0..hex.len() {
+            assert_eq!(from_hex(hex[i]).unwrap(), expected[i]);
+        }
     }
 }
