@@ -230,8 +230,7 @@ mod tests {
     fn test_from_hex() {
         let hex = b"0123456789abcdefABCDEF";
 
-        let max = u8::MAX as i32 + 1;
-        for i in 0..max {
+        for i in 0..256 {
             let c = i as u8;
             if hex.contains(&c) {
                 assert!(from_hex(c).is_some())
