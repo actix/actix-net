@@ -186,7 +186,7 @@ impl System {
         rest_operations: Fut,
     ) -> R
     where
-        Fut: std::future::Future<Output = R> + 'static,
+        Fut: std::future::Future<Output = R>,
     {
         let actix_system_task = LocalSet::new();
         let sys = System::run_in_tokio(name.into(), &actix_system_task);

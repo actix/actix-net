@@ -24,7 +24,7 @@ mod executor_impl {
 
     pub fn block_on_local<F>(rt: &mut Runtime, local: &LocalSet, f: F) -> F::Output
     where
-        F: std::future::Future + 'static,
+        F: std::future::Future,
     {
         local.block_on(rt, f)
     }
@@ -44,7 +44,7 @@ mod executor_impl {
 
     pub fn block_on_local<F>(rt: &mut Runtime, local: &LocalSet, f: F) -> F::Output
     where
-        F: std::future::Future + 'static,
+        F: std::future::Future,
     {
         rt.block_on_std(local.run_until(f))
     }
