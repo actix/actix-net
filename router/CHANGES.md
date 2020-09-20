@@ -1,6 +1,6 @@
 # Changes
 
-## [0.2.5] - 2020-09-19
+## Unreleased - 2020-xx-xx
 
 * Fix `from_hex()` method
 
