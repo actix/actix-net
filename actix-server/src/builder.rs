@@ -4,7 +4,7 @@ use std::time::Duration;
 use std::{io, mem, net};
 
 use actix_rt::net::TcpStream;
-use actix_rt::time::{delay_until, Instant};
+use actix_rt::time::{sleep_until, Instant};
 use actix_rt::{spawn, System};
 use futures_channel::mpsc::{unbounded, UnboundedReceiver};
 use futures_channel::oneshot;
@@ -14,12 +14,13 @@ use futures_util::{future::Future, ready, stream::Stream, FutureExt, StreamExt};
 use log::{error, info};
 use socket2::{Domain, Protocol, Socket, Type};
 
-use crate::accept::{AcceptLoop, AcceptNotify, Command};
+use crate::accept::{AcceptLoop, AcceptNotify};
 use crate::config::{ConfiguredService, ServiceConfig};
 use crate::server::{Server, ServerCommand};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::StdListener;
+use crate::waker_queue::WakerInterest;
 use crate::worker::{self, Worker, WorkerAvailability, WorkerClient};
 use crate::Token;
 
@@ -265,7 +266,7 @@ impl ServerBuilder {
             // start workers
             let workers = (0..self.threads)
                 .map(|idx| {
-                    let worker = self.start_worker(idx, self.accept.get_notify());
+                    let worker = self.start_worker(idx, self.accept.get_accept_notify());
                     self.workers.push((idx, worker.clone()));
 
                     worker
@@ -276,7 +277,7 @@ impl ServerBuilder {
             for sock in &self.sockets {
                 info!("Starting \"{}\" service on {}", sock.1, sock.2);
             }
-            self.accept.start(
+            self.accept.start_accept(
                 mem::take(&mut self.sockets)
                     .into_iter()
                     .map(|t| (t.0, t.2))
@@ -307,11 +308,11 @@ impl ServerBuilder {
     fn handle_cmd(&mut self, item: ServerCommand) {
         match item {
             ServerCommand::Pause(tx) => {
-                self.accept.send(Command::Pause);
+                self.accept.wake_accept(WakerInterest::Pause);
                 let _ = tx.send(());
             }
             ServerCommand::Resume(tx) => {
-                self.accept.send(Command::Resume);
+                self.accept.wake_accept(WakerInterest::Resume);
                 let _ = tx.send(());
             }
             ServerCommand::Signal(sig) => {
@@ -355,7 +356,7 @@ impl ServerBuilder {
                 let exit = self.exit;
 
                 // stop accept thread
-                self.accept.send(Command::Stop);
+                self.accept.wake_accept(WakerInterest::Stop);
                 let notify = std::mem::take(&mut self.notify);
 
                 // stop workers
@@ -376,7 +377,7 @@ impl ServerBuilder {
                                 if exit {
                                     spawn(
                                         async {
-                                            delay_until(
+                                            sleep_until(
                                                 Instant::now() + Duration::from_millis(300),
                                             )
                                             .await;
@@ -392,7 +393,7 @@ impl ServerBuilder {
                     // we need to stop system if server was spawned
                     if self.exit {
                         spawn(
-                            delay_until(Instant::now() + Duration::from_millis(300)).then(
+                            sleep_until(Instant::now() + Duration::from_millis(300)).then(
                                 |_| {
                                     System::current().stop();
                                     ready(())
@@ -432,9 +433,9 @@ impl ServerBuilder {
                         break;
                     }
 
-                    let worker = self.start_worker(new_idx, self.accept.get_notify());
+                    let worker = self.start_worker(new_idx, self.accept.get_accept_notify());
                     self.workers.push((new_idx, worker.clone()));
-                    self.accept.send(Command::Worker(worker));
+                    self.accept.wake_accept(WakerInterest::Worker(worker));
                 }
             }
         }

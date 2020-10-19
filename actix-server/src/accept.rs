@@ -1,119 +1,100 @@
-use std::sync::mpsc as sync_mpsc;
 use std::time::Duration;
+
 use std::{io, thread};
 
-use actix_rt::time::{delay_until, Instant};
+use actix_rt::time::{sleep_until, Instant};
 use actix_rt::System;
 use log::{error, info};
+use mio::{Interest, Poll, Token as MioToken};
 use slab::Slab;
 
 use crate::server::Server;
-use crate::socket::{SocketAddr, SocketListener, StdListener};
+use crate::socket::{MioSocketListener, SocketAddr, StdListener};
+use crate::waker_queue::{WakerInterest, WakerQueue, WakerQueueError, WAKER_TOKEN};
 use crate::worker::{Conn, WorkerClient};
 use crate::Token;
-
-pub(crate) enum Command {
-    Pause,
-    Resume,
-    Stop,
-    Worker(WorkerClient),
-}
 
 struct ServerSocketInfo {
     addr: SocketAddr,
     token: Token,
-    sock: SocketListener,
+    sock: MioSocketListener,
     timeout: Option<Instant>,
 }
 
+/// accept notify would clone waker queue from accept loop and use it to push new interest and wake
+/// up the accept poll.
 #[derive(Clone)]
-pub(crate) struct AcceptNotify(mio::SetReadiness);
+pub(crate) struct AcceptNotify(WakerQueue);
 
 impl AcceptNotify {
-    pub(crate) fn new(ready: mio::SetReadiness) -> Self {
-        AcceptNotify(ready)
+    pub(crate) fn new(waker: WakerQueue) -> Self {
+        Self(waker)
     }
 
     pub(crate) fn notify(&self) {
-        let _ = self.0.set_readiness(mio::Ready::readable());
+        self.0.wake(WakerInterest::Notify);
     }
 }
 
-impl Default for AcceptNotify {
-    fn default() -> Self {
-        AcceptNotify::new(mio::Registration::new2().1)
-    }
-}
-
+/// Accept loop would live with `ServerBuilder`.
+///
+/// It's tasked with construct `Poll` instance and `WakerQueue` which would be distributed to
+/// `Accept` and `WorkerClient` accordingly.
+///
+/// It would also listen to `ServerCommand` and push interests to `WakerQueue`.
 pub(crate) struct AcceptLoop {
-    cmd_reg: Option<mio::Registration>,
-    cmd_ready: mio::SetReadiness,
-    notify_reg: Option<mio::Registration>,
-    notify_ready: mio::SetReadiness,
-    tx: sync_mpsc::Sender<Command>,
-    rx: Option<sync_mpsc::Receiver<Command>>,
     srv: Option<Server>,
+    poll: Option<Poll>,
+    waker: WakerQueue,
 }
 
 impl AcceptLoop {
-    pub fn new(srv: Server) -> AcceptLoop {
-        let (tx, rx) = sync_mpsc::channel();
-        let (cmd_reg, cmd_ready) = mio::Registration::new2();
-        let (notify_reg, notify_ready) = mio::Registration::new2();
+    pub fn new(srv: Server) -> Self {
+        // Create a poll instance.
+        let poll = Poll::new().unwrap_or_else(|e| panic!("Can not create mio::Poll: {}", e));
 
-        AcceptLoop {
-            tx,
-            cmd_ready,
-            cmd_reg: Some(cmd_reg),
-            notify_ready,
-            notify_reg: Some(notify_reg),
-            rx: Some(rx),
+        // construct a waker queue which would wake up poll with associate extra interest types.
+        let waker = WakerQueue::with_capacity(poll.registry(), 128).unwrap();
+
+        Self {
             srv: Some(srv),
+            poll: Some(poll),
+            waker,
         }
     }
 
-    pub fn send(&self, msg: Command) {
-        let _ = self.tx.send(msg);
-        let _ = self.cmd_ready.set_readiness(mio::Ready::readable());
+    pub fn wake_accept(&self, i: WakerInterest) {
+        self.waker.wake(i);
     }
 
-    pub fn get_notify(&self) -> AcceptNotify {
-        AcceptNotify::new(self.notify_ready.clone())
+    pub fn get_accept_notify(&self) -> AcceptNotify {
+        AcceptNotify::new(self.waker.clone())
     }
 
-    pub(crate) fn start(
+    pub(crate) fn start_accept(
         &mut self,
         socks: Vec<(Token, StdListener)>,
         workers: Vec<WorkerClient>,
     ) {
         let srv = self.srv.take().expect("Can not re-use AcceptInfo");
+        let poll = self.poll.take().unwrap();
+        let waker = self.waker.clone();
 
-        Accept::start(
-            self.rx.take().expect("Can not re-use AcceptInfo"),
-            self.cmd_reg.take().expect("Can not re-use AcceptInfo"),
-            self.notify_reg.take().expect("Can not re-use AcceptInfo"),
-            socks,
-            srv,
-            workers,
-        );
+        Accept::start(poll, waker, socks, srv, workers);
     }
 }
 
+/// poll instance of the server.
 struct Accept {
-    poll: mio::Poll,
-    rx: sync_mpsc::Receiver<Command>,
-    sockets: Slab<ServerSocketInfo>,
+    poll: Poll,
+    waker: WakerQueue,
     workers: Vec<WorkerClient>,
     srv: Server,
-    timer: (mio::Registration, mio::SetReadiness),
     next: usize,
     backpressure: bool,
 }
 
 const DELTA: usize = 100;
-const CMD: mio::Token = mio::Token(0);
-const TIMER: mio::Token = mio::Token(1);
-const NOTIFY: mio::Token = mio::Token(2);
 
 /// This function defines errors that are per-connection. Which basically
 /// means that if we get this error from `accept()` system call it means
@@ -129,11 +110,9 @@ fn connection_error(e: &io::Error) -> bool {
 }
 
 impl Accept {
-    #![allow(clippy::too_many_arguments)]
     pub(crate) fn start(
-        rx: sync_mpsc::Receiver<Command>,
-        cmd_reg: mio::Registration,
-        notify_reg: mio::Registration,
+        poll: Poll,
+        waker: WakerQueue,
         socks: Vec<(Token, StdListener)>,
         srv: Server,
         workers: Vec<WorkerClient>,
@@ -141,66 +120,40 @@ impl Accept {
         let sys = System::current();
 
         // start accept thread
-        let _ = thread::Builder::new()
+        thread::Builder::new()
             .name("actix-server accept loop".to_owned())
             .spawn(move || {
                 System::set_current(sys);
-                let mut accept = Accept::new(rx, socks, workers, srv);
-
-                // Start listening for incoming commands
-                if let Err(err) = accept.poll.register(
-                    &cmd_reg,
-                    CMD,
-                    mio::Ready::readable(),
-                    mio::PollOpt::edge(),
-                ) {
-                    panic!("Can not register Registration: {}", err);
-                }
-
-                // Start listening for notify updates
-                if let Err(err) = accept.poll.register(
-                    &notify_reg,
-                    NOTIFY,
-                    mio::Ready::readable(),
-                    mio::PollOpt::edge(),
-                ) {
-                    panic!("Can not register Registration: {}", err);
-                }
-
-                accept.poll();
-            });
+                let (mut accept, sockets) =
+                    Accept::new_with_sockets(poll, waker, socks, workers, srv);
+                accept.poll_with(sockets);
+            })
+            .unwrap();
     }
 
-    fn new(
-        rx: sync_mpsc::Receiver<Command>,
+    fn new_with_sockets(
+        poll: Poll,
+        waker: WakerQueue,
         socks: Vec<(Token, StdListener)>,
         workers: Vec<WorkerClient>,
         srv: Server,
-    ) -> Accept {
-        // Create a poll instance
-        let poll = match mio::Poll::new() {
-            Ok(poll) => poll,
-            Err(err) => panic!("Can not create mio::Poll: {}", err),
-        };
-
+        // Accept and sockets info are separated so that we can borrow mut on both at the same time
+    ) -> (Accept, Slab<ServerSocketInfo>) {
         // Start accept
         let mut sockets = Slab::new();
         for (hnd_token, lst) in socks.into_iter() {
             let addr = lst.local_addr();
 
-            let server = lst.into_listener();
+            let mut server = lst
+                .into_listener()
+                .unwrap_or_else(|e| panic!("Can not set non_block on listener: {}", e));
             let entry = sockets.vacant_entry();
             let token = entry.key();
 
             // Start listening for incoming connections
-            if let Err(err) = poll.register(
-                &server,
-                mio::Token(token + DELTA),
-                mio::Ready::readable(),
-                mio::PollOpt::edge(),
-            ) {
-                panic!("Can not register io: {}", err);
-            }
+            poll.registry()
+                .register(&mut server, MioToken(token + DELTA), Interest::READABLE)
+                .unwrap_or_else(|e| panic!("Can not register io: {}", e));
 
             entry.insert(ServerSocketInfo {
                 addr,
@@ -210,67 +163,124 @@ impl Accept {
             });
         }
 
-        // Timer
-        let (tm, tmr) = mio::Registration::new2();
-        if let Err(err) =
-            poll.register(&tm, TIMER, mio::Ready::readable(), mio::PollOpt::edge())
-        {
-            panic!("Can not register Registration: {}", err);
-        }
-
-        Accept {
+        let accept = Accept {
             poll,
-            rx,
-            sockets,
+            waker,
             workers,
             srv,
             next: 0,
-            timer: (tm, tmr),
             backpressure: false,
-        }
+        };
+
+        (accept, sockets)
     }
 
-    fn poll(&mut self) {
+    fn poll_with(&mut self, mut sockets: Slab<ServerSocketInfo>) {
         // Create storage for events
         let mut events = mio::Events::with_capacity(128);
 
         loop {
-            if let Err(err) = self.poll.poll(&mut events, None) {
-                panic!("Poll error: {}", err);
-            }
+            self.poll
+                .poll(&mut events, None)
+                .unwrap_or_else(|e| panic!("Poll error: {}", e));
 
             for event in events.iter() {
                 let token = event.token();
                 match token {
-                    CMD => {
-                        if !self.process_cmd() {
-                            return;
+                    // This is a loop because interests for command were a loop that would try to
+                    // drain the command channel. We break at first iter with other kind interests.
+                    WAKER_TOKEN => 'waker: loop {
+                        match self.waker.pop() {
+                            Ok(i) => {
+                                match i {
+                                    WakerInterest::Pause => {
+                                        for (_, info) in sockets.iter_mut() {
+                                            if let Err(err) =
+                                                self.poll.registry().deregister(&mut info.sock)
+                                            {
+                                                error!(
+                                                    "Can not deregister server socket {}",
+                                                    err
+                                                );
+                                            } else {
+                                                info!(
+                                                    "Paused accepting connections on {}",
+                                                    info.addr
+                                                );
+                                            }
+                                        }
+                                    }
+                                    WakerInterest::Resume => {
+                                        for (token, info) in sockets.iter_mut() {
+                                            if let Err(err) = self.register(token, info) {
+                                                error!(
+                                                    "Can not resume socket accept process: {}",
+                                                    err
+                                                );
+                                            } else {
+                                                info!(
+                                                    "Accepting connections on {} has been resumed",
+                                                    info.addr
+                                                );
+                                            }
+                                        }
+                                    }
+                                    WakerInterest::Stop => {
+                                        for (_, info) in sockets.iter_mut() {
+                                            let _ =
+                                                self.poll.registry().deregister(&mut info.sock);
+                                        }
+                                        return;
+                                    }
+                                    WakerInterest::Worker(worker) => {
+                                        self.backpressure(&mut sockets, false);
+                                        self.workers.push(worker);
+                                    }
+                                    // timer and notify interests need to break the loop at first iter.
+                                    WakerInterest::Timer => {
+                                        self.process_timer(&mut sockets);
+                                        break 'waker;
+                                    }
+                                    WakerInterest::Notify => {
+                                        self.backpressure(&mut sockets, false);
+                                        break 'waker;
+                                    }
+                                }
+                            }
+                            Err(err) => match err {
+                                // the waker queue is empty so we break the loop
+                                WakerQueueError::Empty => break 'waker,
+                                // the waker queue is closed so we return
+                                WakerQueueError::Closed => {
+                                    for (_, info) in sockets.iter_mut() {
+                                        let _ = self.poll.registry().deregister(&mut info.sock);
+                                    }
+                                    return;
+                                }
+                            },
                         }
-                    }
-                    TIMER => self.process_timer(),
-                    NOTIFY => self.backpressure(false),
+                    },
                     _ => {
                         let token = usize::from(token);
                         if token < DELTA {
                             continue;
                         }
-                        self.accept(token - DELTA);
+                        self.accept(&mut sockets, token - DELTA);
                     }
                 }
             }
         }
     }
 
-    fn process_timer(&mut self) {
+    fn process_timer(&mut self, sockets: &mut Slab<ServerSocketInfo>) {
         let now = Instant::now();
-        for (token, info) in self.sockets.iter_mut() {
+        for (token, info) in sockets.iter_mut() {
             if let Some(inst) = info.timeout.take() {
                 if now > inst {
-                    if let Err(err) = self.poll.register(
-                        &info.sock,
-                        mio::Token(token + DELTA),
-                        mio::Ready::readable(),
-                        mio::PollOpt::edge(),
+                    if let Err(err) = self.poll.registry().register(
+                        &mut info.sock,
+                        MioToken(token + DELTA),
+                        Interest::READABLE,
                     ) {
                         error!("Can not register server socket {}", err);
                     } else {
@@ -283,63 +293,12 @@ impl Accept {
         }
     }
 
-    fn process_cmd(&mut self) -> bool {
-        loop {
-            match self.rx.try_recv() {
-                Ok(cmd) => match cmd {
-                    Command::Pause => {
-                        for (_, info) in self.sockets.iter_mut() {
-                            if let Err(err) = self.poll.deregister(&info.sock) {
-                                error!("Can not deregister server socket {}", err);
-                            } else {
-                                info!("Paused accepting connections on {}", info.addr);
-                            }
-                        }
-                    }
-                    Command::Resume => {
-                        for (token, info) in self.sockets.iter() {
-                            if let Err(err) = self.register(token, info) {
-                                error!("Can not resume socket accept process: {}", err);
-                            } else {
-                                info!(
-                                    "Accepting connections on {} has been resumed",
-                                    info.addr
-                                );
-                            }
-                        }
-                    }
-                    Command::Stop => {
-                        for (_, info) in self.sockets.iter() {
-                            let _ = self.poll.deregister(&info.sock);
-                        }
-                        return false;
-                    }
-                    Command::Worker(worker) => {
-                        self.backpressure(false);
-                        self.workers.push(worker);
-                    }
-                },
-                Err(err) => match err {
-                    sync_mpsc::TryRecvError::Empty => break,
-                    sync_mpsc::TryRecvError::Disconnected => {
-                        for (_, info) in self.sockets.iter() {
-                            let _ = self.poll.deregister(&info.sock);
-                        }
-                        return false;
-                    }
-                },
-            }
-        }
-        true
-    }
-
     #[cfg(not(target_os = "windows"))]
-    fn register(&self, token: usize, info: &ServerSocketInfo) -> io::Result<()> {
-        self.poll.register(
-            &info.sock,
-            mio::Token(token + DELTA),
-            mio::Ready::readable(),
-            mio::PollOpt::edge(),
+    fn register(&self, token: usize, info: &mut ServerSocketInfo) -> io::Result<()> {
+        self.poll.registry().register(
+            &mut info.sock,
+            MioToken(token + DELTA),
+            Interest::READABLE,
         )
     }
 
@@ -365,11 +324,11 @@ impl Accept {
             })
     }
 
-    fn backpressure(&mut self, on: bool) {
+    fn backpressure(&mut self, sockets: &mut Slab<ServerSocketInfo>, on: bool) {
         if self.backpressure {
             if !on {
                 self.backpressure = false;
-                for (token, info) in self.sockets.iter() {
+                for (token, info) in sockets.iter_mut() {
                     if let Err(err) = self.register(token, info) {
                         error!("Can not resume socket accept process: {}", err);
                     } else {
@@ -379,13 +338,13 @@ impl Accept {
             }
         } else if on {
             self.backpressure = true;
-            for (_, info) in self.sockets.iter() {
-                let _ = self.poll.deregister(&info.sock);
+            for (_, info) in sockets.iter_mut() {
+                let _ = self.poll.registry().deregister(&mut info.sock);
             }
         }
     }
 
-    fn accept_one(&mut self, mut msg: Conn) {
+    fn accept_one(&mut self, sockets: &mut Slab<ServerSocketInfo>, mut msg: Conn) {
         if self.backpressure {
             while !self.workers.is_empty() {
                 match self.workers[self.next].send(msg) {
@@ -422,7 +381,7 @@ impl Accept {
                             self.workers.swap_remove(self.next);
                             if self.workers.is_empty() {
                                 error!("No workers");
-                                self.backpressure(true);
+                                self.backpressure(sockets, true);
                                 return;
                             } else if self.workers.len() <= self.next {
                                 self.next = 0;
@@ -434,14 +393,14 @@ impl Accept {
                 self.next = (self.next + 1) % self.workers.len();
             }
             // enable backpressure
-            self.backpressure(true);
-            self.accept_one(msg);
+            self.backpressure(sockets, true);
+            self.accept_one(sockets, msg);
         }
     }
 
-    fn accept(&mut self, token: usize) {
+    fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
         loop {
-            let msg = if let Some(info) = self.sockets.get_mut(token) {
+            let msg = if let Some(info) = sockets.get_mut(token) {
                 match info.sock.accept() {
                     Ok(Some((io, addr))) => Conn {
                         io,
@@ -453,17 +412,17 @@ impl Accept {
                     Err(ref e) if connection_error(e) => continue,
                     Err(e) => {
                         error!("Error accepting connection: {}", e);
-                        if let Err(err) = self.poll.deregister(&info.sock) {
+                        if let Err(err) = self.poll.registry().deregister(&mut info.sock) {
                             error!("Can not deregister server socket {}", err);
                         }
 
                         // sleep after error
                         info.timeout = Some(Instant::now() + Duration::from_millis(500));
 
-                        let r = self.timer.1.clone();
+                        let w = self.waker.clone();
                         System::current().arbiter().send(Box::pin(async move {
-                            delay_until(Instant::now() + Duration::from_millis(510)).await;
-                            let _ = r.set_readiness(mio::Ready::readable());
+                            sleep_until(Instant::now() + Duration::from_millis(510)).await;
+                            w.wake(WakerInterest::Timer);
                         }));
                         return;
                     }
@@ -472,7 +431,7 @@ impl Accept {
                 return;
             };
 
-            self.accept_one(msg);
+            self.accept_one(sockets, msg);
         }
     }
 }

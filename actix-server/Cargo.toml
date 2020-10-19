@@ -25,20 +25,17 @@ actix-rt = "1.1.1"
 actix-codec = "0.3.0"
 actix-utils = "2.0.0"
 
-log = "0.4"
-num_cpus = "1.13"
-mio = "0.6.19"
-socket2 = "0.3"
+concurrent-queue = "1.2.2"
 futures-channel = { version = "0.3.4", default-features = false }
 futures-util = { version = "0.3.4", default-features = false, features = ["sink"] }
+log = "0.4"
+mio = { version = "0.7.3", features = [ "os-poll", "tcp", "uds"] }
+num_cpus = "1.13"
 slab = "0.4"
-
-# unix domain sockets
-# FIXME: Remove it and use mio own uds feature once mio 0.7 is released
-mio-uds = { version = "0.6.7" }
+socket2 = "0.3"
 
 [dev-dependencies]
 bytes = "0.5"
 env_logger = "0.7"
 actix-testing = "1.0.0"
-tokio = { version = "0.2", features = ["io-util"] }
+tokio = { version = "0.3.0", features = ["full"] }

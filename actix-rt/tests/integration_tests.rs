@@ -19,7 +19,7 @@ fn await_for_timer() {
     let time = Duration::from_secs(2);
     let instant = Instant::now();
     actix_rt::System::new("test_wait_timer").block_on(async move {
-        tokio::time::delay_for(time).await;
+        tokio::time::sleep(time).await;
     });
     assert!(
         instant.elapsed() >= time,
@@ -34,7 +34,7 @@ fn join_another_arbiter() {
     actix_rt::System::new("test_join_another_arbiter").block_on(async move {
         let mut arbiter = actix_rt::Arbiter::new();
         arbiter.send(Box::pin(async move {
-            tokio::time::delay_for(time).await;
+            tokio::time::sleep(time).await;
             actix_rt::Arbiter::current().stop();
         }));
         arbiter.join().unwrap();
@@ -49,7 +49,7 @@ fn join_another_arbiter() {
         let mut arbiter = actix_rt::Arbiter::new();
         arbiter.exec_fn(move || {
             actix_rt::spawn(async move {
-                tokio::time::delay_for(time).await;
+                tokio::time::sleep(time).await;
                 actix_rt::Arbiter::current().stop();
             });
         });
@@ -64,7 +64,7 @@ fn join_another_arbiter() {
     actix_rt::System::new("test_join_another_arbiter").block_on(async move {
         let mut arbiter = actix_rt::Arbiter::new();
         arbiter.send(Box::pin(async move {
-            tokio::time::delay_for(time).await;
+            tokio::time::sleep(time).await;
             actix_rt::Arbiter::current().stop();
         }));
         arbiter.stop();
@@ -83,7 +83,7 @@ fn join_current_arbiter() {
     let instant = Instant::now();
     actix_rt::System::new("test_join_current_arbiter").block_on(async move {
         actix_rt::spawn(async move {
-            tokio::time::delay_for(time).await;
+            tokio::time::sleep(time).await;
             actix_rt::Arbiter::current().stop();
         });
         actix_rt::Arbiter::local_join().await;
@@ -97,12 +97,12 @@ fn join_current_arbiter() {
     let instant = Instant::now();
     actix_rt::System::new("test_join_current_arbiter").block_on(async move {
         actix_rt::spawn(async move {
-            tokio::time::delay_for(time).await;
+            tokio::time::sleep(time).await;
             actix_rt::Arbiter::current().stop();
         });
         let f = actix_rt::Arbiter::local_join();
         actix_rt::spawn(async move {
-            tokio::time::delay_for(large_timer).await;
+            tokio::time::sleep(large_timer).await;
             actix_rt::Arbiter::current().stop();
         });
         f.await;

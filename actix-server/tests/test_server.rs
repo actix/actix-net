@@ -90,11 +90,13 @@ fn test_start() {
                 })
             })
             .unwrap()
+            .workers(1)
             .start();
 
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
     });
+
     let (srv, sys) = rx.recv().unwrap();
 
     let mut buf = [1u8; 4];

@@ -9,6 +9,7 @@ mod server;
 mod service;
 mod signals;
 mod socket;
+mod waker_queue;
 mod worker;
 
 pub use self::builder::ServerBuilder;

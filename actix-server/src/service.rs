@@ -11,12 +11,12 @@ use futures_util::{FutureExt, TryFutureExt};
 use log::error;
 
 use super::Token;
-use crate::socket::{FromStream, StdStream};
+use crate::socket::{FromStream, MioStream};
 
 /// Server message
 pub(crate) enum ServerMessage {
     /// New stream
-    Connect(StdStream),
+    Connect(MioStream),
 
     /// Gracefully shutdown
     Shutdown(Duration),
@@ -77,7 +77,7 @@ where
     fn call(&mut self, (guard, req): (Option<CounterGuard>, ServerMessage)) -> Self::Future {
         match req {
             ServerMessage::Connect(stream) => {
-                let stream = FromStream::from_stdstream(stream).map_err(|e| {
+                let stream = FromStream::from_mio_stream(stream).map_err(|e| {
                     error!("Can not convert to an async tcp stream: {}", e);
                 });
 

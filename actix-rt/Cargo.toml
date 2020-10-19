@@ -22,7 +22,7 @@ futures-channel = { version = "0.3.4", default-features = false }
 futures-util = { version = "0.3.4", default-features = false, features = ["alloc"] }
 copyless = "0.1.4"
 smallvec = "1"
-tokio = { version = "0.2.6", default-features = false, features = ["rt-core", "rt-util", "io-driver", "tcp", "uds", "udp", "time", "signal", "stream"] }
+tokio = { version = "0.3.0", features = ["rt", "net", "signal", "stream", "time"] }
 
 [dev-dependencies]
-tokio = { version = "0.2.6", features = ["full"] }
+tokio = { version = "0.3.0", features = ["full"] }

@@ -21,7 +21,7 @@ use actix_service::pipeline_factory;
 use bytes::BytesMut;
 use futures_util::future::ok;
 use log::{error, info};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadBuf};
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
@@ -49,10 +49,10 @@ async fn main() -> io::Result<()> {
                     let num = num + 1;
 
                     let mut size = 0;
-                    let mut buf = BytesMut::new();
+                    let mut buf = Vec::new();
 
                     loop {
-                        match stream.read_buf(&mut buf).await {
+                        match stream.read(&mut buf).await {
                             // end of stream; bail from loop
                             Ok(0) => break,
 
@@ -72,7 +72,7 @@ async fn main() -> io::Result<()> {
                     }
 
                     // send data down service pipeline
-                    Ok((buf.freeze(), size))
+                    Ok((buf.len(), size))
                 }
             })
             .map_err(|err| error!("Service Error: {:?}", err))

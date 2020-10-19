@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use futures_util::future::lazy;
+use futures_util::stream::Stream;
 
 use crate::server::Server;
 
@@ -87,7 +88,7 @@ impl Future for Signals {
         {
             for idx in 0..self.streams.len() {
                 loop {
-                    match self.streams[idx].1.poll_recv(cx) {
+                    match Pin::new(&mut self.streams[idx].1).poll_next(cx) {
                         Poll::Ready(None) => return Poll::Ready(()),
                         Poll::Pending => break,
                         Poll::Ready(Some(_)) => {

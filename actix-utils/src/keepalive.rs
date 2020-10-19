@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use actix_rt::time::{delay_until, Delay, Instant};
+use actix_rt::time::{sleep_until, Instant, Sleep};
 use actix_service::{Service, ServiceFactory};
 use futures_util::future::{ok, Ready};
 
@@ -71,7 +71,7 @@ pub struct KeepAliveService<R, E, F> {
     f: F,
     ka: Duration,
     time: LowResTimeService,
-    delay: Delay,
+    delay: Sleep,
     expire: Instant,
     _t: PhantomData<(R, E)>,
 }
@@ -87,7 +87,7 @@ where
             ka,
             time,
             expire,
-            delay: delay_until(expire),
+            delay: sleep_until(expire),
             _t: PhantomData,
         }
     }

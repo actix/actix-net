@@ -95,10 +95,9 @@ impl System {
     /// }
     ///
     ///
-    /// let mut runtime = tokio::runtime::Builder::new()
-    ///     .core_threads(2)
+    /// let runtime = tokio::runtime::Builder::new_multi_thread()
+    ///     .worker_threads(2)
     ///     .enable_all()
-    ///     .threaded_scheduler()
     ///     .build()
     ///     .unwrap();
     ///
@@ -166,10 +165,9 @@ impl System {
     /// }
     ///
     ///
-    /// let runtime = tokio::runtime::Builder::new()
-    ///     .core_threads(2)
+    /// let runtime = tokio::runtime::Builder::new_multi_thread()
+    ///     .worker_threads(2)
     ///     .enable_all()
-    ///     .threaded_scheduler()
     ///     .build()
     ///     .unwrap();
     ///
@@ -178,7 +176,7 @@ impl System {
     /// ```
     pub fn attach_to_tokio<Fut, R>(
         name: impl Into<String>,
-        mut runtime: tokio::runtime::Runtime,
+        runtime: tokio::runtime::Runtime,
         rest_operations: Fut,
     ) -> R
     where

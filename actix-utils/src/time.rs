@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::task::{Context, Poll};
 use std::time::{self, Duration, Instant};
 
-use actix_rt::time::delay_for;
+use actix_rt::time::sleep;
 use actix_service::{Service, ServiceFactory};
 use futures_util::future::{ok, ready, FutureExt, Ready};
 
@@ -79,7 +79,7 @@ impl LowResTimeService {
                 b.resolution
             };
 
-            actix_rt::spawn(delay_for(interval).then(move |_| {
+            actix_rt::spawn(sleep(interval).then(move |_| {
                 inner.borrow_mut().current.take();
                 ready(())
             }));
@@ -144,7 +144,7 @@ impl SystemTimeService {
                 b.resolution
             };
 
-            actix_rt::spawn(delay_for(interval).then(move |_| {
+            actix_rt::spawn(sleep(interval).then(move |_| {
                 inner.borrow_mut().current.take();
                 ready(())
             }));
@@ -195,7 +195,7 @@ mod tests {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap();
 
-        delay_for(wait_time).await;
+        sleep(wait_time).await;
 
         let second_time = time_service
             .now()
@@ -217,7 +217,7 @@ mod tests {
 
         let first_time = time_service.now();
 
-        delay_for(wait_time).await;
+        sleep(wait_time).await;
 
         let second_time = time_service.now();
         assert!(second_time - first_time >= wait_time);

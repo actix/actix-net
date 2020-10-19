@@ -220,11 +220,14 @@ impl<T, U> Framed<T, U> {
             if remaining < LW {
                 this.read_buf.reserve(HW - remaining)
             }
-            let cnt = match this.io.poll_read_buf(cx, &mut this.read_buf) {
-                Poll::Pending => return Poll::Pending,
-                Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
-                Poll::Ready(Ok(cnt)) => cnt,
-            };
+
+            // FixMe: This must be fixed as `poll_read_buf` is removed
+            // let cnt = match this.io.poll_read_buf(cx, &mut this.read_buf) {
+            //     Poll::Pending => return Poll::Pending,
+            //     Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
+            //     Poll::Ready(Ok(cnt)) => cnt,
+            // };
+            let cnt = 0;
 
             if cnt == 0 {
                 this.flags.insert(Flags::EOF);
