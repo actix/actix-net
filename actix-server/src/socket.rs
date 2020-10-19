@@ -6,19 +6,20 @@ use std::os::unix::{
     io::{FromRawFd, IntoRawFd},
     net::{SocketAddr as StdUdsSocketAddr, UnixListener as StdUnixListener},
 };
-
 #[cfg(windows)]
 use std::os::windows::io::{FromRawSocket, IntoRawSocket};
 
-use mio::event::Source;
-use mio::net::{
-    SocketAddr as MioSocketAddr, TcpListener as MioTcpListener, TcpStream as MioTcpStream,
-    UnixListener as MioUnixListener, UnixStream as MioUnixStream,
-};
-use mio::{Interest, Registry, Token};
-
 use actix_codec::{AsyncRead, AsyncWrite};
-use actix_rt::net::{TcpStream, UnixStream};
+use actix_rt::net::TcpStream;
+#[cfg(unix)]
+use actix_rt::net::UnixStream;
+use mio::event::Source;
+#[cfg(unix)]
+use mio::net::{
+    SocketAddr as MioSocketAddr, UnixListener as MioUnixListener, UnixStream as MioUnixStream,
+};
+use mio::net::{TcpListener as MioTcpListener, TcpStream as MioTcpStream};
+use mio::{Interest, Registry, Token};
 
 /// socket module contains a unified wrapper for Tcp/Uds listener/SocketAddr/Stream and necessary
 /// trait impl for registering the listener to mio::Poll and convert stream to
@@ -202,9 +203,6 @@ impl FromStream for TcpStream {
             MioStream::Tcp(mio) => {
                 let raw = IntoRawSocket::into_raw_socket(mio);
                 TcpStream::from_std(unsafe { FromRawSocket::from_raw_socket(raw) })
-            }
-            MioStream::Uds(_) => {
-                panic!("Should not happen, bug in server impl");
             }
         }
     }

@@ -6,7 +6,7 @@ use std::time::Duration;
 use actix_rt::spawn;
 use actix_service::{self as actix, Service, ServiceFactory as ActixServiceFactory};
 use actix_utils::counter::CounterGuard;
-use futures_util::future::{err, ok, LocalBoxFuture, Ready};
+use futures_util::future::{ready, LocalBoxFuture, Ready};
 use futures_util::{FutureExt, TryFutureExt};
 use log::error;
 
@@ -87,12 +87,12 @@ where
                         let _ = f.await;
                         drop(guard);
                     });
-                    ok(())
+                    ready(Ok(()))
                 } else {
-                    err(())
+                    ready(Err(()))
                 }
             }
-            _ => ok(()),
+            _ => ready(Ok(())),
         }
     }
 }

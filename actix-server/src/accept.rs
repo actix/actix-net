@@ -1,5 +1,4 @@
 use std::time::Duration;
-
 use std::{io, thread};
 
 use actix_rt::time::{sleep_until, Instant};

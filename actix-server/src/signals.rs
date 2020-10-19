@@ -4,7 +4,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use futures_util::future::lazy;
-use futures_util::stream::Stream;
 
 use crate::server::Server;
 
@@ -43,6 +42,7 @@ impl Signals {
             #[cfg(unix)]
             {
                 use actix_rt::signal::unix;
+                use futures_util::stream::Stream;
 
                 let mut streams = Vec::new();
 
@@ -82,7 +82,7 @@ impl Future for Signals {
                 self.srv.signal(Signal::Int);
                 Poll::Ready(())
             }
-            Poll::Pending => return Poll::Pending,
+            Poll::Pending => Poll::Pending,
         }
         #[cfg(unix)]
         {

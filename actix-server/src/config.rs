@@ -4,7 +4,7 @@ use std::{fmt, io, net};
 use actix_rt::net::TcpStream;
 use actix_service as actix;
 use actix_utils::counter::CounterGuard;
-use futures_util::future::{ok, Future, FutureExt, LocalBoxFuture};
+use futures_util::future::{ready, Future, FutureExt, LocalBoxFuture};
 use log::error;
 
 use super::builder::bind_addr;
@@ -145,7 +145,7 @@ impl InternalServiceFactory for ConfiguredService {
                         Box::new(StreamService::new(actix::fn_service(
                             move |_: TcpStream| {
                                 error!("Service {:?} is not configured", name);
-                                ok::<_, ()>(())
+                                ready::<Result<_, ()>>(Ok(()))
                             },
                         ))),
                     ));

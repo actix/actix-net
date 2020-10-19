@@ -27,7 +27,7 @@ actix-utils = "2.0.0"
 
 concurrent-queue = "1.2.2"
 futures-channel = { version = "0.3.4", default-features = false }
-futures-util = { version = "0.3.4", default-features = false, features = ["sink"] }
+futures-util = { version = "0.3.4", default-features = false }
 log = "0.4"
 mio = { version = "0.7.3", features = [ "os-poll", "tcp", "uds"] }
 num_cpus = "1.13"
@@ -35,7 +35,8 @@ slab = "0.4"
 socket2 = "0.3"
 
 [dev-dependencies]
+actix-testing = "1.0.0"
 bytes = "0.5"
 env_logger = "0.7"
-actix-testing = "1.0.0"
+futures-util = { version = "0.3.4", default-features = false, features = ["sink"] }
 tokio = { version = "0.3.0", features = ["full"] }
