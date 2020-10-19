@@ -7,7 +7,7 @@ use futures_core::{ready, Stream};
 use futures_sink::Sink;
 use pin_project::pin_project;
 
-use crate::{AsyncRead, AsyncWrite, Decoder, Encoder};
+use crate::{AsyncRead, AsyncWrite, Decoder, Encoder, ReadBuf};
 
 /// Low-water mark
 const LW: usize = 1024;
@@ -221,13 +221,13 @@ impl<T, U> Framed<T, U> {
                 this.read_buf.reserve(HW - remaining)
             }
 
-            // FixMe: This must be fixed as `poll_read_buf` is removed
-            // let cnt = match this.io.poll_read(cx, &mut this.read_buf) {
-            //     Poll::Pending => return Poll::Pending,
-            //     Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
-            //     Poll::Ready(Ok(cnt)) => cnt,
-            // };
-            let cnt = 0;
+            // FixMe: Is this the right way to do it for now?
+            let mut buf = ReadBuf::new(&mut this.read_buf);
+            let cnt = match this.io.poll_read(cx, &mut buf) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
+                Poll::Ready(Ok(())) => buf.filled().len(),
+            };
 
             if cnt == 0 {
                 this.flags.insert(Flags::EOF);

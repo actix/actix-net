@@ -1,14 +1,19 @@
-use std::{fmt, io, net};
+use std::net::{SocketAddr as StdTcpSocketAddr, TcpListener as StdTcpListener};
+use std::{fmt, io};
 
 #[cfg(unix)]
-use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::os::unix::{
+    io::{FromRawFd, IntoRawFd},
+    net::{SocketAddr as StdUdsSocketAddr, UnixListener as StdUnixListener},
+};
+
 #[cfg(windows)]
 use std::os::windows::io::{FromRawSocket, IntoRawSocket};
 
 use mio::event::Source;
 use mio::net::{
-    TcpListener as MioTcpListener, TcpStream as MioTcpStream, UnixListener as MioUnixListener,
-    UnixStream as MioUnixStream,
+    SocketAddr as MioSocketAddr, TcpListener as MioTcpListener, TcpStream as MioTcpStream,
+    UnixListener as MioUnixListener, UnixStream as MioUnixStream,
 };
 use mio::{Interest, Registry, Token};
 
@@ -20,15 +25,17 @@ use actix_rt::net::{TcpStream, UnixStream};
 /// `actix_rt::net::{TcpStream, UnixStream}`.
 
 pub(crate) enum StdListener {
-    Tcp(net::TcpListener),
+    Tcp(StdTcpListener),
     #[cfg(all(unix))]
-    Uds(std::os::unix::net::UnixListener),
+    Uds(StdUnixListener),
 }
 
 pub(crate) enum SocketAddr {
-    Tcp(net::SocketAddr),
+    Tcp(StdTcpSocketAddr),
     #[cfg(all(unix))]
-    Uds(mio::net::SocketAddr),
+    Uds(StdUdsSocketAddr),
+    #[cfg(all(unix))]
+    UdsMio(MioSocketAddr),
 }
 
 impl fmt::Display for SocketAddr {
@@ -37,6 +44,8 @@ impl fmt::Display for SocketAddr {
             SocketAddr::Tcp(ref addr) => write!(f, "{}", addr),
             #[cfg(all(unix))]
             SocketAddr::Uds(ref addr) => write!(f, "{:?}", addr),
+            #[cfg(all(unix))]
+            SocketAddr::UdsMio(ref addr) => write!(f, "{:?}", addr),
         }
     }
 }
@@ -47,6 +56,8 @@ impl fmt::Debug for SocketAddr {
             SocketAddr::Tcp(ref addr) => write!(f, "{:?}", addr),
             #[cfg(all(unix))]
             SocketAddr::Uds(ref addr) => write!(f, "{:?}", addr),
+            #[cfg(all(unix))]
+            SocketAddr::UdsMio(ref addr) => write!(f, "{:?}", addr),
         }
     }
 }
@@ -66,15 +77,11 @@ impl StdListener {
         match self {
             StdListener::Tcp(lst) => SocketAddr::Tcp(lst.local_addr().unwrap()),
             #[cfg(all(unix))]
-            StdListener::Uds(_lst) => {
-                // FixMe: How to get a SocketAddr?
-                unimplemented!()
-                // SocketAddr::Uds(lst.local_addr().unwrap())
-            }
+            StdListener::Uds(lst) => SocketAddr::Uds(lst.local_addr().unwrap()),
         }
     }
 
-    pub(crate) fn into_listener(self) -> std::io::Result<MioSocketListener> {
+    pub(crate) fn into_mio_listener(self) -> std::io::Result<MioSocketListener> {
         match self {
             StdListener::Tcp(lst) => {
                 // ToDo: is this non_blocking a good practice?
@@ -115,7 +122,7 @@ impl MioSocketListener {
             #[cfg(all(unix))]
             MioSocketListener::Uds(ref lst) => lst
                 .accept()
-                .map(|(stream, addr)| Some((MioStream::Uds(stream), SocketAddr::Uds(addr)))),
+                .map(|(stream, addr)| Some((MioStream::Uds(stream), SocketAddr::UdsMio(addr)))),
         }
     }
 }

@@ -22,7 +22,7 @@ impl WakerQueue {
     /// construct a waker queue with given `Poll`'s `Registry` and capacity.
     ///
     /// A fixed `WAKER_TOKEN` is used to identify the wake interest and the `Poll` needs to match
-    /// event for it to properly handle `WakerInterest`.
+    /// event's token for it to properly handle `WakerInterest`.
     pub(crate) fn with_capacity(registry: &Registry, cap: usize) -> std::io::Result<Self> {
         let waker = Waker::new(registry, WAKER_TOKEN)?;
         let queue = ConcurrentQueue::bounded(cap);
@@ -45,11 +45,11 @@ impl WakerQueue {
     }
 }
 
-/// the types of interests we would look into when `Accept`'s `Poll` is waked up by waker.
+/// types of interests we would look into when `Accept`'s `Poll` is waked up by waker.
 ///
-/// *. These interests should not confused with `mio::Interest` and mostly not I/O related
+/// *. These interests should not be confused with `mio::Interest` and mostly not I/O related
 pub(crate) enum WakerInterest {
-    /// Interest from `WorkerClient` notifying `Accept` to run `backpressure` method
+    /// Interest from `Worker` notifying `Accept` to run `backpressure` method
     Notify,
     /// `Pause`, `Resume`, `Stop` Interest are from `ServerBuilder` future. It listens to
     /// `ServerCommand` and notify `Accept` to do exactly these tasks.
@@ -57,9 +57,12 @@ pub(crate) enum WakerInterest {
     Resume,
     Stop,
     /// `Timer` is an interest sent as a delayed future. When an error happens on accepting
-    /// connection the poll would deregister the socket temporary and wake up the poll and register
-    /// again after the delayed future resolve.   
+    /// connection the poll would deregister sockets temporary and wake up the poll and register
+    /// them again after the delayed future resolve.
     Timer,
+    /// `Worker` ins an interest happen after a worker runs into faulted state(This is determined by
+    /// if work can be sent to it successfully).`Accept` would be waked up and add the new
+    /// `WorkerClient` to workers.
     Worker(WorkerClient),
 }
 

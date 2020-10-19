@@ -18,10 +18,9 @@ use std::{env, io};
 use actix_rt::net::TcpStream;
 use actix_server::Server;
 use actix_service::pipeline_factory;
-use bytes::BytesMut;
 use futures_util::future::ok;
 use log::{error, info};
-use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadBuf};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
@@ -49,7 +48,8 @@ async fn main() -> io::Result<()> {
                     let num = num + 1;
 
                     let mut size = 0;
-                    let mut buf = Vec::new();
+                    // FixMe: BytesMut and Vec are not working?
+                    let mut buf = [0; 1024];
 
                     loop {
                         match stream.read(&mut buf).await {

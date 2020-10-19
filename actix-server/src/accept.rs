@@ -130,7 +130,7 @@ impl Accept {
             let addr = lst.local_addr();
 
             let mut server = lst
-                .into_listener()
+                .into_mio_listener()
                 .unwrap_or_else(|e| panic!("Can not set non_block on listener: {}", e));
             let entry = sockets.vacant_entry();
             let token = entry.key();
