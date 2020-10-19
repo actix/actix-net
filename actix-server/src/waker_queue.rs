@@ -4,8 +4,6 @@ use concurrent_queue::{ConcurrentQueue, PopError};
 use mio::{Registry, Token as MioToken, Waker};
 
 use crate::worker::WorkerClient;
-use futures_util::core_reexport::fmt::Formatter;
-use std::fmt::Debug;
 
 /// waker token for `mio::Poll` instance
 pub(crate) const WAKER_TOKEN: MioToken = MioToken(1);
@@ -41,7 +39,7 @@ impl WakerQueue {
         (self.0).0.wake().expect("can not wake up Accept Poll");
     }
 
-    /// pop an `Interests` from the back of the queue.
+    /// pop an `WakerInterest` from the back of the queue.
     pub(crate) fn pop(&self) -> Result<WakerInterest, WakerQueueError> {
         (self.0).1.pop()
     }
@@ -63,23 +61,6 @@ pub(crate) enum WakerInterest {
     /// again after the delayed future resolve.   
     Timer,
     Worker(WorkerClient),
-}
-
-impl Debug for WakerInterest {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut f = f.debug_struct("WakerInterest");
-
-        match *self {
-            Self::Notify => f.field("type", &"notify"),
-            Self::Pause => f.field("type", &"pause"),
-            Self::Resume => f.field("type", &"resume"),
-            Self::Stop => f.field("type", &"stop"),
-            Self::Timer => f.field("type", &"timer"),
-            Self::Worker(_) => f.field("type", &"worker"),
-        };
-
-        f.finish()
-    }
 }
 
 pub(crate) type WakerQueueError = PopError;

@@ -21,21 +21,6 @@ struct ServerSocketInfo {
     timeout: Option<Instant>,
 }
 
-/// accept notify would clone waker queue from accept loop and use it to push new interest and wake
-/// up the accept poll.
-#[derive(Clone)]
-pub(crate) struct AcceptNotify(WakerQueue);
-
-impl AcceptNotify {
-    pub(crate) fn new(waker: WakerQueue) -> Self {
-        Self(waker)
-    }
-
-    pub(crate) fn notify(&self) {
-        self.0.wake(WakerInterest::Notify);
-    }
-}
-
 /// Accept loop would live with `ServerBuilder`.
 ///
 /// It's tasked with construct `Poll` instance and `WakerQueue` which would be distributed to
@@ -63,12 +48,12 @@ impl AcceptLoop {
         }
     }
 
-    pub fn wake_accept(&self, i: WakerInterest) {
-        self.waker.wake(i);
+    pub(crate) fn waker_owned(&self) -> WakerQueue {
+        self.waker.clone()
     }
 
-    pub fn get_accept_notify(&self) -> AcceptNotify {
-        AcceptNotify::new(self.waker.clone())
+    pub fn wake_accept(&self, i: WakerInterest) {
+        self.waker.wake(i);
     }
 
     pub(crate) fn start_accept(
@@ -303,23 +288,22 @@ impl Accept {
     }
 
     #[cfg(target_os = "windows")]
-    fn register(&self, token: usize, info: &ServerSocketInfo) -> io::Result<()> {
+    fn register(&self, token: usize, info: &mut ServerSocketInfo) -> io::Result<()> {
         // On windows, calling register without deregister cause an error.
         // See https://github.com/actix/actix-web/issues/905
         // Calling reregister seems to fix the issue.
         self.poll
+            .registry()
             .register(
-                &info.sock,
+                &mut info.sock,
                 mio::Token(token + DELTA),
-                mio::Ready::readable(),
-                mio::PollOpt::edge(),
+                Interest::READABLE,
             )
             .or_else(|_| {
-                self.poll.reregister(
-                    &info.sock,
+                self.poll.registry().reregister(
+                    &mut info.sock,
                     mio::Token(token + DELTA),
-                    mio::Ready::readable(),
-                    mio::PollOpt::edge(),
+                    Interest::READABLE,
                 )
             })
     }

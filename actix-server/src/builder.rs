@@ -14,13 +14,13 @@ use futures_util::{future::Future, ready, stream::Stream, FutureExt, StreamExt};
 use log::{error, info};
 use socket2::{Domain, Protocol, Socket, Type};
 
-use crate::accept::{AcceptLoop, AcceptNotify};
+use crate::accept::AcceptLoop;
 use crate::config::{ConfiguredService, ServiceConfig};
 use crate::server::{Server, ServerCommand};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::StdListener;
-use crate::waker_queue::WakerInterest;
+use crate::waker_queue::{WakerInterest, WakerQueue};
 use crate::worker::{self, Worker, WorkerAvailability, WorkerClient};
 use crate::Token;
 
@@ -266,7 +266,7 @@ impl ServerBuilder {
             // start workers
             let workers = (0..self.threads)
                 .map(|idx| {
-                    let worker = self.start_worker(idx, self.accept.get_accept_notify());
+                    let worker = self.start_worker(idx, self.accept.waker_owned());
                     self.workers.push((idx, worker.clone()));
 
                     worker
@@ -297,8 +297,8 @@ impl ServerBuilder {
         }
     }
 
-    fn start_worker(&self, idx: usize, notify: AcceptNotify) -> WorkerClient {
-        let avail = WorkerAvailability::new(notify);
+    fn start_worker(&self, idx: usize, waker: WakerQueue) -> WorkerClient {
+        let avail = WorkerAvailability::new(waker);
         let services: Vec<Box<dyn InternalServiceFactory>> =
             self.services.iter().map(|v| v.clone_factory()).collect();
 
@@ -433,7 +433,7 @@ impl ServerBuilder {
                         break;
                     }
 
-                    let worker = self.start_worker(new_idx, self.accept.get_accept_notify());
+                    let worker = self.start_worker(new_idx, self.accept.waker_owned());
                     self.workers.push((new_idx, worker.clone()));
                     self.accept.wake_accept(WakerInterest::Worker(worker));
                 }

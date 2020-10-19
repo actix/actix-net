@@ -13,9 +13,9 @@ use futures_util::future::{join_all, LocalBoxFuture, MapOk};
 use futures_util::{future::Future, stream::Stream, FutureExt, TryFutureExt};
 use log::{error, info, trace};
 
-use crate::accept::AcceptNotify;
 use crate::service::{BoxedServerService, InternalServiceFactory, ServerMessage};
 use crate::socket::{MioStream, SocketAddr};
+use crate::waker_queue::{WakerInterest, WakerQueue};
 use crate::Token;
 
 pub(crate) struct WorkerCommand(Conn);
@@ -97,14 +97,14 @@ impl WorkerClient {
 
 #[derive(Clone)]
 pub(crate) struct WorkerAvailability {
-    notify: AcceptNotify,
+    waker: WakerQueue,
     available: Arc<AtomicBool>,
 }
 
 impl WorkerAvailability {
-    pub fn new(notify: AcceptNotify) -> Self {
+    pub fn new(waker: WakerQueue) -> Self {
         WorkerAvailability {
-            notify,
+            waker,
             available: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -116,7 +116,7 @@ impl WorkerAvailability {
     pub fn set(&self, val: bool) {
         let old = self.available.swap(val, Ordering::Release);
         if !old && val {
-            self.notify.notify()
+            self.waker.wake(WakerInterest::Notify);
         }
     }
 }

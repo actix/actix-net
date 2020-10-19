@@ -97,7 +97,7 @@ impl Builder {
         // system arbiter
         let arb = SystemArbiter::new(stop_tx, sys_receiver);
 
-        let mut rt = Runtime::new().unwrap();
+        let rt = Runtime::new().unwrap();
         rt.spawn(arb);
 
         // init system arbiter and run configuration method
@@ -157,7 +157,7 @@ impl SystemRunner {
     /// This function will start event loop and will finish once the
     /// `System::stop()` function is called.
     pub fn run(self) -> io::Result<()> {
-        let SystemRunner { mut rt, stop, .. } = self;
+        let SystemRunner { rt, stop, .. } = self;
 
         // run loop
         Arbiter::run_system(Some(&rt));

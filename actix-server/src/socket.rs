@@ -1,5 +1,10 @@
 use std::{fmt, io, net};
 
+#[cfg(unix)]
+use std::os::unix::io::{FromRawFd, IntoRawFd};
+#[cfg(windows)]
+use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+
 use mio::event::Source;
 use mio::net::{
     TcpListener as MioTcpListener, TcpStream as MioTcpStream, UnixListener as MioUnixListener,
@@ -166,15 +171,15 @@ pub trait FromStream: AsyncRead + AsyncWrite + Sized {
     fn from_mio_stream(sock: MioStream) -> io::Result<Self>;
 }
 
+// ToDo: This is a workaround and we need an efficient way to convert between mio and tokio stream
+#[cfg(unix)]
 impl FromStream for TcpStream {
     fn from_mio_stream(sock: MioStream) -> io::Result<Self> {
         match sock {
-            MioStream::Tcp(stream) => {
-                // FixMe: this only works on unix. We possibly want TcpStream::new from tokio.
-                let raw = std::os::unix::io::IntoRawFd::into_raw_fd(stream);
-                TcpStream::from_std(unsafe { std::os::unix::io::FromRawFd::from_raw_fd(raw) })
+            MioStream::Tcp(mio) => {
+                let raw = IntoRawFd::into_raw_fd(mio);
+                TcpStream::from_std(unsafe { FromRawFd::from_raw_fd(raw) })
             }
-            #[cfg(all(unix))]
             MioStream::Uds(_) => {
                 panic!("Should not happen, bug in server impl");
             }
@@ -182,15 +187,30 @@ impl FromStream for TcpStream {
     }
 }
 
-#[cfg(all(unix))]
+// ToDo: This is a workaround and we need an efficient way to convert between mio and tokio stream
+#[cfg(windows)]
+impl FromStream for TcpStream {
+    fn from_mio_stream(sock: MioStream) -> io::Result<Self> {
+        match sock {
+            MioStream::Tcp(mio) => {
+                let raw = IntoRawSocket::into_raw_socket(mio);
+                TcpStream::from_std(unsafe { FromRawSocket::from_raw_socket(raw) })
+            }
+            MioStream::Uds(_) => {
+                panic!("Should not happen, bug in server impl");
+            }
+        }
+    }
+}
+
+#[cfg(unix)]
 impl FromStream for UnixStream {
     fn from_mio_stream(sock: MioStream) -> io::Result<Self> {
         match sock {
             MioStream::Tcp(_) => panic!("Should not happen, bug in server impl"),
-            MioStream::Uds(stream) => {
-                // FixMe: this only works on unix. Like for TcpStream.
-                let raw = std::os::unix::io::IntoRawFd::into_raw_fd(stream);
-                UnixStream::from_std(unsafe { std::os::unix::io::FromRawFd::from_raw_fd(raw) })
+            MioStream::Uds(mio) => {
+                let raw = IntoRawFd::into_raw_fd(mio);
+                UnixStream::from_std(unsafe { FromRawFd::from_raw_fd(raw) })
             }
         }
     }

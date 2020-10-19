@@ -6,6 +6,10 @@
 
 * Add `System::attach_to_tokio` method. [#173]
 
+### Changed
+* update tokio to 0.3
+* Remove `'static` lifetime requirement for `Runtime::block_on`. The method would accept a &Self when calling.
+
 ## [1.1.1] - 2020-04-30
 
 ### Fixed

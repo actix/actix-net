@@ -1,7 +1,10 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
-
+* Update mio to 0.7.3
+* Use `concurrent-queue` to manage poll wakes instead of `futures::channel::mpsc`.
+* Remove `AcceptNotify` type and pass `WakerQueue` to `WorkerClient` for notify the `Accept` more directly.
+* Convert `mio::Stream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using `FromRawFd` and `IntoRawFd`(`IntoRawSocket` and `FromRawSocket` on windows).
 
 ## 1.0.4 - 2020-09-12
 * Update actix-codec to 0.3.0.

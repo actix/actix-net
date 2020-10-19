@@ -222,7 +222,7 @@ impl<T, U> Framed<T, U> {
             }
 
             // FixMe: This must be fixed as `poll_read_buf` is removed
-            // let cnt = match this.io.poll_read_buf(cx, &mut this.read_buf) {
+            // let cnt = match this.io.poll_read(cx, &mut this.read_buf) {
             //     Poll::Pending => return Poll::Pending,
             //     Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
             //     Poll::Ready(Ok(cnt)) => cnt,

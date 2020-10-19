@@ -24,7 +24,6 @@ fn test_bind() {
     let h = thread::spawn(move || {
         let sys = actix_rt::System::new("test");
         let srv = Server::build()
-            .workers(1)
             .disable_signals()
             .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
             .unwrap()

@@ -23,4 +23,4 @@ futures-sink = { version = "0.3.4", default-features = false }
 log = "0.4"
 pin-project = "0.4.17"
 tokio = "0.3.0"
-tokio-util = { version = "0.3.1", default-features = false, features = ["codec"] }
+tokio-util = { version = "0.4.0", default-features = false, features = ["codec"] }
