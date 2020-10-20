@@ -8,7 +8,8 @@
 
 ### Changed
 * update tokio to 0.3
-* Remove `'static` lifetime requirement for `Runtime::block_on`. The method would accept a &Self when calling.
+* Remove `'static` lifetime requirement for `Runtime::block_on` and `SystemRunner::block_on`. These methods would accept a &Self when calling.
+* Remove `'static` lifetime requirement for `System::run`
 
 ## [1.1.1] - 2020-04-30
 

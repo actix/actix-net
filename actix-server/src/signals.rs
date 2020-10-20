@@ -42,7 +42,6 @@ impl Signals {
             #[cfg(unix)]
             {
                 use actix_rt::signal::unix;
-                use futures_util::stream::Stream;
 
                 let mut streams = Vec::new();
 
@@ -86,6 +85,8 @@ impl Future for Signals {
         }
         #[cfg(unix)]
         {
+            use futures_util::stream::Stream;
+
             for idx in 0..self.streams.len() {
                 loop {
                     match Pin::new(&mut self.streams[idx].1).poll_next(cx) {

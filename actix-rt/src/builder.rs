@@ -65,7 +65,7 @@ impl Builder {
     /// Function `f` get called within tokio runtime context.
     pub fn run<F>(self, f: F) -> io::Result<()>
     where
-        F: FnOnce() + 'static,
+        F: FnOnce(),
     {
         self.create_runtime(f).run()
     }
@@ -87,7 +87,7 @@ impl Builder {
 
     fn create_runtime<F>(self, f: F) -> SystemRunner
     where
-        F: FnOnce() + 'static,
+        F: FnOnce(),
     {
         let (stop_tx, stop) = channel();
         let (sys_sender, sys_receiver) = unbounded();
@@ -179,9 +179,9 @@ impl SystemRunner {
     }
 
     /// Execute a future and wait for result.
-    pub fn block_on<F, O>(&mut self, fut: F) -> O
+    pub fn block_on<F, O>(&self, fut: F) -> O
     where
-        F: Future<Output = O> + 'static,
+        F: Future<Output = O>,
     {
         Arbiter::run_system(Some(&self.rt));
         let res = self.rt.block_on(fut);
