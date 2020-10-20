@@ -2,7 +2,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{fmt, io};
 
-use bytes::{Buf, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 use futures_core::{ready, Stream};
 use futures_sink::Sink;
 use pin_project::pin_project;
@@ -222,15 +222,19 @@ impl<T, U> Framed<T, U> {
             }
 
             // FixMe: Is this the right way to do it for now?
-            let mut buf = ReadBuf::new(&mut this.read_buf);
-            let cnt = match this.io.poll_read(cx, &mut buf) {
+            let mut read = ReadBuf::uninit(this.read_buf.bytes_mut());
+            let cnt = match this.io.poll_read(cx, &mut read) {
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
-                Poll::Ready(Ok(())) => buf.filled().len(),
+                Poll::Ready(Ok(())) => read.filled().len(),
             };
 
             if cnt == 0 {
                 this.flags.insert(Flags::EOF);
+            } else {
+                unsafe {
+                    this.read_buf.advance_mut(cnt);
+                }
             }
             this.flags.insert(Flags::READABLE);
         }

@@ -229,7 +229,7 @@ impl Worker {
             self.services.iter_mut().for_each(|srv| {
                 if srv.status == WorkerServiceStatus::Available {
                     srv.status = WorkerServiceStatus::Stopped;
-                    actix_rt::spawn(
+                    spawn(
                         srv.service
                             .call((None, ServerMessage::ForceShutdown))
                             .map(|_| ()),
@@ -241,7 +241,7 @@ impl Worker {
             self.services.iter_mut().for_each(move |srv| {
                 if srv.status == WorkerServiceStatus::Available {
                     srv.status = WorkerServiceStatus::Stopping;
-                    actix_rt::spawn(
+                    spawn(
                         srv.service
                             .call((None, ServerMessage::Shutdown(timeout)))
                             .map(|_| ()),
@@ -304,21 +304,15 @@ enum WorkerState {
     Restarting(
         usize,
         Token,
-        #[allow(clippy::type_complexity)]
-        Pin<Box<dyn Future<Output = Result<Vec<(Token, BoxedServerService)>, ()>>>>,
+        LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>>,
     ),
-    Shutdown(
-        Pin<Box<Sleep>>,
-        Pin<Box<Sleep>>,
-        Option<oneshot::Sender<bool>>,
-    ),
+    Shutdown(Sleep, Sleep, Option<oneshot::Sender<bool>>),
 }
 
 impl Future for Worker {
     type Output = ();
 
-    // FIXME: remove this attribute
-    #[allow(clippy::never_loop)]
+    // #[allow(clippy::never_loop)]
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // `StopWorker` message handler
         if let Poll::Ready(Some(StopCommand { graceful, result })) =
@@ -336,8 +330,8 @@ impl Future for Worker {
                 if num != 0 {
                     info!("Graceful worker shutdown, {} connections", num);
                     self.state = WorkerState::Shutdown(
-                        Box::pin(sleep_until(Instant::now() + time::Duration::from_secs(1))),
-                        Box::pin(sleep_until(Instant::now() + self.shutdown_timeout)),
+                        sleep_until(Instant::now() + time::Duration::from_secs(1)),
+                        sleep_until(Instant::now() + self.shutdown_timeout),
                         Some(result),
                     );
                 } else {
@@ -391,9 +385,10 @@ impl Future for Worker {
                 }
             }
             WorkerState::Restarting(idx, token, ref mut fut) => {
-                match Pin::new(fut).poll(cx) {
+                match fut.as_mut().poll(cx) {
                     Poll::Ready(Ok(item)) => {
-                        for (token, service) in item {
+                        // only interest in the first item?
+                        if let Some((token, service)) = item.into_iter().next() {
                             trace!(
                                 "Service {:?} has been restarted",
                                 self.factories[idx].name(token)
@@ -402,6 +397,15 @@ impl Future for Worker {
                             self.state = WorkerState::Unavailable(Vec::new());
                             return self.poll(cx);
                         }
+                        // for (token, service) in item {
+                        //     trace!(
+                        //         "Service {:?} has been restarted",
+                        //         self.factories[idx].name(token)
+                        //     );
+                        //     self.services[token.0].created(service);
+                        //     self.state = WorkerState::Unavailable(Vec::new());
+                        //     return self.poll(cx);
+                        // }
                     }
                     Poll::Ready(Err(_)) => {
                         panic!(
@@ -424,26 +428,19 @@ impl Future for Worker {
                 }
 
                 // check graceful timeout
-                match t2.as_mut().poll(cx) {
-                    Poll::Pending => (),
-                    Poll::Ready(_) => {
-                        let _ = tx.take().unwrap().send(false);
-                        self.shutdown(true);
-                        Arbiter::current().stop();
-                        return Poll::Ready(());
-                    }
+                if Pin::new(t2).poll(cx).is_ready() {
+                    let _ = tx.take().unwrap().send(false);
+                    self.shutdown(true);
+                    Arbiter::current().stop();
+                    return Poll::Ready(());
                 }
 
                 // sleep for 1 second and then check again
-                match t1.as_mut().poll(cx) {
-                    Poll::Pending => (),
-                    Poll::Ready(_) => {
-                        *t1 = Box::pin(sleep_until(
-                            Instant::now() + time::Duration::from_secs(1),
-                        ));
-                        let _ = t1.as_mut().poll(cx);
-                    }
+                if Pin::new(&mut *t1).poll(cx).is_ready() {
+                    *t1 = sleep_until(Instant::now() + time::Duration::from_secs(1));
+                    let _ = Pin::new(t1).poll(cx);
                 }
+
                 Poll::Pending
             }
             WorkerState::Available => {

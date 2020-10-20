@@ -172,76 +172,40 @@ impl Accept {
                 let token = event.token();
                 match token {
                     // This is a loop because interests for command were a loop that would try to
-                    // drain the command channel. We break at first iter with other kind interests.
+                    // drain the command channel.
                     WAKER_TOKEN => 'waker: loop {
                         match self.waker.pop() {
-                            Ok(i) => {
-                                match i {
-                                    WakerInterest::Pause => {
-                                        for (_, info) in sockets.iter_mut() {
-                                            if let Err(err) =
-                                                self.poll.registry().deregister(&mut info.sock)
-                                            {
-                                                error!(
-                                                    "Can not deregister server socket {}",
-                                                    err
-                                                );
-                                            } else {
-                                                info!(
-                                                    "Paused accepting connections on {}",
-                                                    info.addr
-                                                );
-                                            }
-                                        }
-                                    }
-                                    WakerInterest::Resume => {
-                                        for (token, info) in sockets.iter_mut() {
-                                            if let Err(err) = self.register(token, info) {
-                                                error!(
-                                                    "Can not resume socket accept process: {}",
-                                                    err
-                                                );
-                                            } else {
-                                                info!(
-                                                    "Accepting connections on {} has been resumed",
-                                                    info.addr
-                                                );
-                                            }
-                                        }
-                                    }
-                                    WakerInterest::Stop => {
-                                        for (_, info) in sockets.iter_mut() {
-                                            let _ =
-                                                self.poll.registry().deregister(&mut info.sock);
-                                        }
-                                        return;
-                                    }
-                                    WakerInterest::Worker(worker) => {
-                                        self.backpressure(&mut sockets, false);
-                                        self.workers.push(worker);
-                                    }
-                                    // timer and notify interests need to break the loop at first iter.
-                                    WakerInterest::Timer => {
-                                        self.process_timer(&mut sockets);
-                                        break 'waker;
-                                    }
-                                    WakerInterest::Notify => {
-                                        self.backpressure(&mut sockets, false);
-                                        break 'waker;
+                            Ok(WakerInterest::Notify) => {
+                                self.maybe_backpressure(&mut sockets, false)
+                            }
+                            Ok(WakerInterest::Pause) => {
+                                for (_, info) in sockets.iter_mut() {
+                                    if let Err(err) =
+                                        self.poll.registry().deregister(&mut info.sock)
+                                    {
+                                        error!("Can not deregister server socket {}", err);
+                                    } else {
+                                        info!("Paused accepting connections on {}", info.addr);
                                     }
                                 }
                             }
-                            Err(err) => match err {
-                                // the waker queue is empty so we break the loop
-                                WakerQueueError::Empty => break 'waker,
-                                // the waker queue is closed so we return
-                                WakerQueueError::Closed => {
-                                    for (_, info) in sockets.iter_mut() {
-                                        let _ = self.poll.registry().deregister(&mut info.sock);
-                                    }
-                                    return;
+                            Ok(WakerInterest::Resume) => {
+                                for (token, info) in sockets.iter_mut() {
+                                    self.register_logged(token, info);
                                 }
-                            },
+                            }
+                            Ok(WakerInterest::Stop) => {
+                                return self.deregister_all(&mut sockets)
+                            }
+                            Ok(WakerInterest::Worker(worker)) => {
+                                self.maybe_backpressure(&mut sockets, false);
+                                self.workers.push(worker);
+                            }
+                            Ok(WakerInterest::Timer) => self.process_timer(&mut sockets),
+                            Err(WakerQueueError::Empty) => break 'waker,
+                            Err(WakerQueueError::Closed) => {
+                                return self.deregister_all(&mut sockets);
+                            }
                         }
                     },
                     _ => {
@@ -261,15 +225,7 @@ impl Accept {
         for (token, info) in sockets.iter_mut() {
             if let Some(inst) = info.timeout.take() {
                 if now > inst {
-                    if let Err(err) = self.poll.registry().register(
-                        &mut info.sock,
-                        MioToken(token + DELTA),
-                        Interest::READABLE,
-                    ) {
-                        error!("Can not register server socket {}", err);
-                    } else {
-                        info!("Resume accepting connections on {}", info.addr);
-                    }
+                    self.register_logged(token, info);
                 } else {
                     info.timeout = Some(inst);
                 }
@@ -307,23 +263,30 @@ impl Accept {
             })
     }
 
-    fn backpressure(&mut self, sockets: &mut Slab<ServerSocketInfo>, on: bool) {
+    fn register_logged(&self, token: usize, info: &mut ServerSocketInfo) {
+        match self.register(token, info) {
+            Ok(_) => info!("Resume accepting connections on {}", info.addr),
+            Err(e) => error!("Can not register server socket {}", e),
+        }
+    }
+
+    fn deregister_all(&mut self, sockets: &mut Slab<ServerSocketInfo>) {
+        sockets.iter_mut().for_each(|(_, info)| {
+            let _ = self.poll.registry().deregister(&mut info.sock);
+        });
+    }
+
+    fn maybe_backpressure(&mut self, sockets: &mut Slab<ServerSocketInfo>, on: bool) {
         if self.backpressure {
             if !on {
                 self.backpressure = false;
                 for (token, info) in sockets.iter_mut() {
-                    if let Err(err) = self.register(token, info) {
-                        error!("Can not resume socket accept process: {}", err);
-                    } else {
-                        info!("Accepting connections on {} has been resumed", info.addr);
-                    }
+                    self.register_logged(token, info);
                 }
             }
         } else if on {
             self.backpressure = true;
-            for (_, info) in sockets.iter_mut() {
-                let _ = self.poll.registry().deregister(&mut info.sock);
-            }
+            self.deregister_all(sockets);
         }
     }
 
@@ -331,7 +294,10 @@ impl Accept {
         if self.backpressure {
             while !self.workers.is_empty() {
                 match self.workers[self.next].send(msg) {
-                    Ok(_) => (),
+                    Ok(_) => {
+                        self.set_next();
+                        break;
+                    }
                     Err(tmp) => {
                         self.srv.worker_faulted(self.workers[self.next].idx);
                         msg = tmp;
@@ -345,8 +311,6 @@ impl Accept {
                         continue;
                     }
                 }
-                self.next = (self.next + 1) % self.workers.len();
-                break;
             }
         } else {
             let mut idx = 0;
@@ -355,7 +319,7 @@ impl Accept {
                 if self.workers[self.next].available() {
                     match self.workers[self.next].send(msg) {
                         Ok(_) => {
-                            self.next = (self.next + 1) % self.workers.len();
+                            self.set_next();
                             return;
                         }
                         Err(tmp) => {
@@ -364,7 +328,7 @@ impl Accept {
                             self.workers.swap_remove(self.next);
                             if self.workers.is_empty() {
                                 error!("No workers");
-                                self.backpressure(sockets, true);
+                                self.maybe_backpressure(sockets, true);
                                 return;
                             } else if self.workers.len() <= self.next {
                                 self.next = 0;
@@ -373,12 +337,17 @@ impl Accept {
                         }
                     }
                 }
-                self.next = (self.next + 1) % self.workers.len();
+                self.set_next();
             }
             // enable backpressure
-            self.backpressure(sockets, true);
+            self.maybe_backpressure(sockets, true);
             self.accept_one(sockets, msg);
         }
+    }
+
+    // set next worker that would accept work.
+    fn set_next(&mut self) {
+        self.next = (self.next + 1) % self.workers.len();
     }
 
     fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
@@ -402,10 +371,10 @@ impl Accept {
                         // sleep after error
                         info.timeout = Some(Instant::now() + Duration::from_millis(500));
 
-                        let w = self.waker.clone();
+                        let waker = self.waker.clone();
                         System::current().arbiter().send(Box::pin(async move {
                             sleep_until(Instant::now() + Duration::from_millis(510)).await;
-                            w.wake(WakerInterest::Timer);
+                            waker.wake(WakerInterest::Timer);
                         }));
                         return;
                     }

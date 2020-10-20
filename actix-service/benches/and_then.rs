@@ -283,7 +283,7 @@ pub fn bench_async_service<S>(c: &mut Criterion, srv: S, name: &str)
 where
     S: Service<Request = (), Response = usize, Error = ()> + Clone + 'static,
 {
-    let mut rt = actix_rt::System::new("test");
+    let rt = actix_rt::System::new("test");
 
     // start benchmark loops
     c.bench_function(name, move |b| {

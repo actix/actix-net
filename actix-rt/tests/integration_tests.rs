@@ -121,9 +121,9 @@ fn non_static_block_on() {
     let sys = actix_rt::System::new("borrow some");
 
     sys.block_on(async {
-            actix_rt::time::sleep(Duration::from_millis(1)).await;
-            assert_eq!("test_str", str);
-        });
+        actix_rt::time::sleep(Duration::from_millis(1)).await;
+        assert_eq!("test_str", str);
+    });
 
     let rt = actix_rt::Runtime::new().unwrap();
 
@@ -135,5 +135,6 @@ fn non_static_block_on() {
     actix_rt::System::run(|| {
         assert_eq!("test_str", str);
         actix_rt::System::current().stop();
-    } ).unwrap();
+    })
+    .unwrap();
 }
