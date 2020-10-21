@@ -5,6 +5,7 @@
 * Use `concurrent-queue` to manage poll wakes instead of `futures::channel::mpsc`.
 * Remove `AcceptNotify` type and pass `WakerQueue` to `WorkerClient` for notify the `Accept` more directly.
 * Convert `mio::Stream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using `FromRawFd` and `IntoRawFd`(`IntoRawSocket` and `FromRawSocket` on windows).
+* Remove `AsyncRead` and `AsyncWrite` trait bound for `socket::FromStream` trait. 
 
 ## 1.0.4 - 2020-09-12
 * Update actix-codec to 0.3.0.

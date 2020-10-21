@@ -1,6 +1,7 @@
 use std::any::{Any, TypeId};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
@@ -9,7 +10,7 @@ use std::{fmt, thread};
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot::{channel, Canceled, Sender};
 use futures_util::{
-    future::{self, Future, FutureExt},
+    future::{self, FutureExt},
     stream::Stream,
 };
 

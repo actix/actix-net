@@ -5,7 +5,6 @@ use std::task::{Context, Poll};
 
 use futures_channel::mpsc::UnboundedSender;
 use futures_channel::oneshot;
-use futures_util::FutureExt;
 
 use crate::builder::ServerBuilder;
 use crate::signals::Signal;
@@ -56,14 +55,18 @@ impl Server {
     pub fn pause(&self) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
         let _ = self.0.unbounded_send(ServerCommand::Pause(tx));
-        rx.map(|_| ())
+        async {
+            let _ = rx.await;
+        }
     }
 
     /// Resume accepting incoming connections
     pub fn resume(&self) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
         let _ = self.0.unbounded_send(ServerCommand::Resume(tx));
-        rx.map(|_| ())
+        async {
+            let _ = rx.await;
+        }
     }
 
     /// Stop incoming connection processing, stop all workers and exit.
@@ -75,7 +78,9 @@ impl Server {
             graceful,
             completion: Some(tx),
         });
-        rx.map(|_| ())
+        async {
+            let _ = rx.await;
+        }
     }
 }
 
@@ -101,8 +106,7 @@ impl Future for Server {
 
         match Pin::new(this.1.as_mut().unwrap()).poll(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(Ok(_)) => Poll::Ready(Ok(())),
-            Poll::Ready(Err(_)) => Poll::Ready(Ok(())),
+            Poll::Ready(_) => Poll::Ready(Ok(())),
         }
     }
 }

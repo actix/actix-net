@@ -1,9 +1,10 @@
 use std::borrow::Cow;
+use std::future::Future;
 use std::io;
 
 use futures_channel::mpsc::unbounded;
 use futures_channel::oneshot::{channel, Receiver};
-use futures_util::future::{lazy, Future, FutureExt};
+use futures_util::future::{lazy, FutureExt};
 use tokio::task::LocalSet;
 
 use crate::arbiter::{Arbiter, SystemArbiter};

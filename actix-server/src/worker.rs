@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time;
+use std::time::Duration;
 
 use actix_rt::time::{sleep_until, Instant, Sleep};
 use actix_rt::{spawn, Arbiter};
@@ -134,7 +134,7 @@ pub(crate) struct Worker {
     conns: Counter,
     factories: Vec<Box<dyn InternalServiceFactory>>,
     state: WorkerState,
-    shutdown_timeout: time::Duration,
+    shutdown_timeout: Duration,
 }
 
 struct WorkerService {
@@ -165,61 +165,58 @@ impl Worker {
         idx: usize,
         factories: Vec<Box<dyn InternalServiceFactory>>,
         availability: WorkerAvailability,
-        shutdown_timeout: time::Duration,
+        shutdown_timeout: Duration,
     ) -> WorkerClient {
         let (tx1, rx) = unbounded();
         let (tx2, rx2) = unbounded();
         let avail = availability.clone();
 
-        Arbiter::new().send(
-            async move {
-                availability.set(false);
-                let mut wrk = MAX_CONNS_COUNTER.with(move |conns| Worker {
-                    rx,
-                    rx2,
-                    availability,
-                    factories,
-                    shutdown_timeout,
-                    services: Vec::new(),
-                    conns: conns.clone(),
-                    state: WorkerState::Unavailable(Vec::new()),
-                });
+        Arbiter::new().send(Box::pin(async move {
+            availability.set(false);
+            let mut wrk = MAX_CONNS_COUNTER.with(move |conns| Worker {
+                rx,
+                rx2,
+                availability,
+                factories,
+                shutdown_timeout,
+                services: Vec::new(),
+                conns: conns.clone(),
+                state: WorkerState::Unavailable(Vec::new()),
+            });
 
-                let mut fut: Vec<MapOk<LocalBoxFuture<'static, _>, _>> = Vec::new();
-                for (idx, factory) in wrk.factories.iter().enumerate() {
-                    fut.push(factory.create().map_ok(move |r| {
-                        r.into_iter()
-                            .map(|(t, s): (Token, _)| (idx, t, s))
-                            .collect::<Vec<_>>()
-                    }));
-                }
+            let mut fut: Vec<MapOk<LocalBoxFuture<'static, _>, _>> = Vec::new();
+            for (idx, factory) in wrk.factories.iter().enumerate() {
+                fut.push(factory.create().map_ok(move |r| {
+                    r.into_iter()
+                        .map(|(t, s): (Token, _)| (idx, t, s))
+                        .collect::<Vec<_>>()
+                }));
+            }
 
-                spawn(async move {
-                    let res = join_all(fut).await;
-                    let res: Result<Vec<_>, _> = res.into_iter().collect();
-                    match res {
-                        Ok(services) => {
-                            for item in services {
-                                for (factory, token, service) in item {
-                                    assert_eq!(token.0, wrk.services.len());
-                                    wrk.services.push(WorkerService {
-                                        factory,
-                                        service,
-                                        status: WorkerServiceStatus::Unavailable,
-                                    });
-                                }
+            spawn(async move {
+                let res = join_all(fut).await;
+                let res: Result<Vec<_>, _> = res.into_iter().collect();
+                match res {
+                    Ok(services) => {
+                        for item in services {
+                            for (factory, token, service) in item {
+                                assert_eq!(token.0, wrk.services.len());
+                                wrk.services.push(WorkerService {
+                                    factory,
+                                    service,
+                                    status: WorkerServiceStatus::Unavailable,
+                                });
                             }
                         }
-                        Err(e) => {
-                            error!("Can not start worker: {:?}", e);
-                            Arbiter::current().stop();
-                        }
                     }
-                    wrk.await
-                });
-            }
-            .boxed(),
-        );
+                    Err(e) => {
+                        error!("Can not start worker: {:?}", e);
+                        Arbiter::current().stop();
+                    }
+                }
+                wrk.await
+            });
+        }));
 
         WorkerClient::new(idx, tx1, tx2, avail)
     }
@@ -330,7 +327,7 @@ impl Future for Worker {
                 if num != 0 {
                     info!("Graceful worker shutdown, {} connections", num);
                     self.state = WorkerState::Shutdown(
-                        sleep_until(Instant::now() + time::Duration::from_secs(1)),
+                        sleep_until(Instant::now() + Duration::from_secs(1)),
                         sleep_until(Instant::now() + self.shutdown_timeout),
                         Some(result),
                     );
@@ -437,7 +434,7 @@ impl Future for Worker {
 
                 // sleep for 1 second and then check again
                 if Pin::new(&mut *t1).poll(cx).is_ready() {
-                    *t1 = sleep_until(Instant::now() + time::Duration::from_secs(1));
+                    *t1 = sleep_until(Instant::now() + Duration::from_secs(1));
                     let _ = Pin::new(t1).poll(cx);
                 }
 
@@ -445,7 +442,7 @@ impl Future for Worker {
             }
             WorkerState::Available => {
                 loop {
-                    match Pin::new(&mut self.rx).poll_next(cx) {
+                    return match Pin::new(&mut self.rx).poll_next(cx) {
                         // handle incoming io stream
                         Poll::Ready(Some(WorkerCommand(msg))) => {
                             match self.check_readiness(cx) {
@@ -476,13 +473,13 @@ impl Future for Worker {
                                     );
                                 }
                             }
-                            return self.poll(cx);
+                            self.poll(cx)
                         }
                         Poll::Pending => {
                             self.state = WorkerState::Available;
-                            return Poll::Pending;
+                            Poll::Pending
                         }
-                        Poll::Ready(None) => return Poll::Ready(()),
+                        Poll::Ready(None) => Poll::Ready(()),
                     }
                 }
             }

@@ -77,7 +77,7 @@ where
     fn call(&mut self, (guard, req): (Option<CounterGuard>, ServerMessage)) -> Self::Future {
         match req {
             ServerMessage::Connect(stream) => {
-                let stream = FromStream::from_mio_stream(stream).map_err(|e| {
+                let stream = FromStream::from_mio(stream).map_err(|e| {
                     error!("Can not convert to an async tcp stream: {}", e);
                 });
 

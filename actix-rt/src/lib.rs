@@ -1,6 +1,5 @@
 //! A runtime implementation that runs everything on the current thread.
-#![deny(rust_2018_idioms, warnings)]
-#![allow(clippy::type_complexity)]
+#![forbid(unsafe_code)]
 
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub use actix_macros::{main, test};
@@ -25,7 +24,7 @@ pub use actix_threadpool as blocking;
 /// This function panics if actix system is not running.
 pub fn spawn<F>(f: F)
 where
-    F: futures_util::future::Future<Output = ()> + 'static,
+    F: std::future::Future<Output = ()> + 'static,
 {
     if !System::is_set() {
         panic!("System is not running");

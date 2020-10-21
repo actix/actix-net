@@ -49,7 +49,7 @@ impl WakerQueue {
 ///
 /// *. These interests should not be confused with `mio::Interest` and mostly not I/O related
 pub(crate) enum WakerInterest {
-    /// Interest from `Worker` notifying `Accept` to run `backpressure` method
+    /// Interest from `Worker` notifying `Accept` to run `maybe_backpressure` method
     Notify,
     /// `Pause`, `Resume`, `Stop` Interest are from `ServerBuilder` future. It listens to
     /// `ServerCommand` and notify `Accept` to do exactly these tasks.
@@ -57,7 +57,7 @@ pub(crate) enum WakerInterest {
     Resume,
     Stop,
     /// `Timer` is an interest sent as a delayed future. When an error happens on accepting
-    /// connection the poll would deregister sockets temporary and wake up the poll and register
+    /// connection `Accept` would deregister sockets temporary and wake up the poll and register
     /// them again after the delayed future resolve.
     Timer,
     /// `Worker` ins an interest happen after a worker runs into faulted state(This is determined by

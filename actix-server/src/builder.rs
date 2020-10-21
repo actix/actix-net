@@ -203,7 +203,7 @@ impl ServerBuilder {
         self.listen_uds(name, lst, factory)
     }
 
-    #[cfg(all(unix))]
+    #[cfg(unix)]
     /// Add new unix domain service to the server.
     /// Useful when running as a systemd service and
     /// a socket FD can be acquired using the systemd crate.
@@ -278,7 +278,7 @@ impl ServerBuilder {
             for sock in &self.sockets {
                 info!("Starting \"{}\" service on {}", sock.1, sock.2);
             }
-            self.accept.start_accept(
+            self.accept.start(
                 mem::take(&mut self.sockets)
                     .into_iter()
                     .map(|t| (t.0, t.2))
@@ -309,11 +309,11 @@ impl ServerBuilder {
     fn handle_cmd(&mut self, item: ServerCommand) {
         match item {
             ServerCommand::Pause(tx) => {
-                self.accept.wake_accept(WakerInterest::Pause);
+                self.accept.wake(WakerInterest::Pause);
                 let _ = tx.send(());
             }
             ServerCommand::Resume(tx) => {
-                self.accept.wake_accept(WakerInterest::Resume);
+                self.accept.wake(WakerInterest::Resume);
                 let _ = tx.send(());
             }
             ServerCommand::Signal(sig) => {
@@ -357,7 +357,7 @@ impl ServerBuilder {
                 let exit = self.exit;
 
                 // stop accept thread
-                self.accept.wake_accept(WakerInterest::Stop);
+                self.accept.wake(WakerInterest::Stop);
                 let notify = std::mem::take(&mut self.notify);
 
                 // stop workers
@@ -436,7 +436,7 @@ impl ServerBuilder {
 
                     let worker = self.start_worker(new_idx, self.accept.waker_owned());
                     self.workers.push((new_idx, worker.clone()));
-                    self.accept.wake_accept(WakerInterest::Worker(worker));
+                    self.accept.wake(WakerInterest::Worker(worker));
                 }
             }
         }

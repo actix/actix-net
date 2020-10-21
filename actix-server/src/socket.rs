@@ -9,7 +9,6 @@ use std::os::unix::{
 #[cfg(windows)]
 use std::os::windows::io::{FromRawSocket, IntoRawSocket};
 
-use actix_codec::{AsyncRead, AsyncWrite};
 use actix_rt::net::TcpStream;
 #[cfg(unix)]
 use actix_rt::net::UnixStream;
@@ -27,15 +26,17 @@ use mio::{Interest, Registry, Token};
 
 pub(crate) enum StdListener {
     Tcp(StdTcpListener),
-    #[cfg(all(unix))]
+    #[cfg(unix)]
     Uds(StdUnixListener),
 }
 
 pub(crate) enum SocketAddr {
     Tcp(StdTcpSocketAddr),
-    #[cfg(all(unix))]
+    #[cfg(unix)]
     Uds(StdUdsSocketAddr),
-    #[cfg(all(unix))]
+    // this is a work around. mio would return different types of SocketAddr between accept and
+    // local_addr methods.
+    #[cfg(unix)]
     UdsMio(MioSocketAddr),
 }
 
@@ -43,9 +44,9 @@ impl fmt::Display for SocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             SocketAddr::Tcp(ref addr) => write!(f, "{}", addr),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             SocketAddr::Uds(ref addr) => write!(f, "{:?}", addr),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             SocketAddr::UdsMio(ref addr) => write!(f, "{:?}", addr),
         }
     }
@@ -55,9 +56,9 @@ impl fmt::Debug for SocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             SocketAddr::Tcp(ref addr) => write!(f, "{:?}", addr),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             SocketAddr::Uds(ref addr) => write!(f, "{:?}", addr),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             SocketAddr::UdsMio(ref addr) => write!(f, "{:?}", addr),
         }
     }
@@ -67,7 +68,7 @@ impl fmt::Display for StdListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             StdListener::Tcp(ref lst) => write!(f, "{}", lst.local_addr().ok().unwrap()),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             StdListener::Uds(ref lst) => write!(f, "{:?}", lst.local_addr().ok().unwrap()),
         }
     }
@@ -77,7 +78,7 @@ impl StdListener {
     pub(crate) fn local_addr(&self) -> SocketAddr {
         match self {
             StdListener::Tcp(lst) => SocketAddr::Tcp(lst.local_addr().unwrap()),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             StdListener::Uds(lst) => SocketAddr::Uds(lst.local_addr().unwrap()),
         }
     }
@@ -87,13 +88,13 @@ impl StdListener {
             StdListener::Tcp(lst) => {
                 // ToDo: is this non_blocking a good practice?
                 lst.set_nonblocking(true)?;
-                Ok(MioSocketListener::Tcp(mio::net::TcpListener::from_std(lst)))
+                Ok(MioSocketListener::Tcp(MioTcpListener::from_std(lst)))
             }
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             StdListener::Uds(lst) => {
                 // ToDo: the same as above
                 lst.set_nonblocking(true)?;
-                Ok(MioSocketListener::Uds(mio::net::UnixListener::from_std(
+                Ok(MioSocketListener::Uds(MioUnixListener::from_std(
                     lst,
                 )))
             }
@@ -104,13 +105,13 @@ impl StdListener {
 #[derive(Debug)]
 pub enum MioStream {
     Tcp(MioTcpStream),
-    #[cfg(all(unix))]
+    #[cfg(unix)]
     Uds(MioUnixStream),
 }
 
 pub(crate) enum MioSocketListener {
     Tcp(MioTcpListener),
-    #[cfg(all(unix))]
+    #[cfg(unix)]
     Uds(MioUnixListener),
 }
 
@@ -120,7 +121,7 @@ impl MioSocketListener {
             MioSocketListener::Tcp(ref lst) => lst
                 .accept()
                 .map(|(stream, addr)| Some((MioStream::Tcp(stream), SocketAddr::Tcp(addr)))),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             MioSocketListener::Uds(ref lst) => lst
                 .accept()
                 .map(|(stream, addr)| Some((MioStream::Uds(stream), SocketAddr::UdsMio(addr)))),
@@ -137,7 +138,7 @@ impl Source for MioSocketListener {
     ) -> io::Result<()> {
         match *self {
             MioSocketListener::Tcp(ref mut lst) => lst.register(registry, token, interests),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             MioSocketListener::Uds(ref mut lst) => lst.register(registry, token, interests),
         }
     }
@@ -150,7 +151,7 @@ impl Source for MioSocketListener {
     ) -> io::Result<()> {
         match *self {
             MioSocketListener::Tcp(ref mut lst) => lst.reregister(registry, token, interests),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             MioSocketListener::Uds(ref mut lst) => lst.reregister(registry, token, interests),
         }
     }
@@ -158,7 +159,7 @@ impl Source for MioSocketListener {
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         match *self {
             MioSocketListener::Tcp(ref mut lst) => lst.deregister(registry),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             MioSocketListener::Uds(ref mut lst) => {
                 let res = lst.deregister(registry);
 
@@ -175,17 +176,19 @@ impl Source for MioSocketListener {
 }
 
 /// helper trait for converting mio stream to tokio stream.
-pub trait FromStream: AsyncRead + AsyncWrite + Sized {
-    fn from_mio_stream(sock: MioStream) -> io::Result<Self>;
+pub trait FromStream: Sized {
+    fn from_mio(sock: MioStream) -> io::Result<Self>;
 }
 
 // ToDo: This is a workaround and we need an efficient way to convert between mio and tokio stream
 #[cfg(unix)]
 impl FromStream for TcpStream {
-    fn from_mio_stream(sock: MioStream) -> io::Result<Self> {
+    fn from_mio(sock: MioStream) -> io::Result<Self> {
         match sock {
             MioStream::Tcp(mio) => {
                 let raw = IntoRawFd::into_raw_fd(mio);
+                // # Safety:
+                // This is a in place conversion from mio stream to tokio stream.
                 TcpStream::from_std(unsafe { FromRawFd::from_raw_fd(raw) })
             }
             MioStream::Uds(_) => {
@@ -198,23 +201,28 @@ impl FromStream for TcpStream {
 // ToDo: This is a workaround and we need an efficient way to convert between mio and tokio stream
 #[cfg(windows)]
 impl FromStream for TcpStream {
-    fn from_mio_stream(sock: MioStream) -> io::Result<Self> {
+    fn from_mio(sock: MioStream) -> io::Result<Self> {
         match sock {
             MioStream::Tcp(mio) => {
                 let raw = IntoRawSocket::into_raw_socket(mio);
+                // # Safety:
+                // This is a in place conversion from mio stream to tokio stream.
                 TcpStream::from_std(unsafe { FromRawSocket::from_raw_socket(raw) })
             }
         }
     }
 }
 
+// ToDo: This is a workaround and we need an efficient way to convert between mio and tokio stream
 #[cfg(unix)]
 impl FromStream for UnixStream {
-    fn from_mio_stream(sock: MioStream) -> io::Result<Self> {
+    fn from_mio(sock: MioStream) -> io::Result<Self> {
         match sock {
             MioStream::Tcp(_) => panic!("Should not happen, bug in server impl"),
             MioStream::Uds(mio) => {
                 let raw = IntoRawFd::into_raw_fd(mio);
+                // # Safety:
+                // This is a in place conversion from mio stream to tokio stream.
                 UnixStream::from_std(unsafe { FromRawFd::from_raw_fd(raw) })
             }
         }
