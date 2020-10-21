@@ -89,7 +89,6 @@ fn test_start() {
                 })
             })
             .unwrap()
-            .workers(1)
             .start();
 
         let _ = tx.send((srv, actix_rt::System::current()));
