@@ -10,7 +10,7 @@ use slab::Slab;
 use crate::server::Server;
 use crate::socket::{MioSocketListener, SocketAddr, StdListener};
 use crate::waker_queue::{WakerInterest, WakerQueue, WakerQueueError, WAKER_TOKEN};
-use crate::worker::{Conn, WorkerClient};
+use crate::worker::{Conn, WorkerHandle};
 use crate::Token;
 
 struct ServerSocketInfo {
@@ -56,7 +56,7 @@ impl AcceptLoop {
     pub(crate) fn start(
         &mut self,
         socks: Vec<(Token, StdListener)>,
-        workers: Vec<WorkerClient>,
+        workers: Vec<WorkerHandle>,
     ) {
         let srv = self.srv.take().expect("Can not re-use AcceptInfo");
         let poll = self.poll.take().unwrap();
@@ -70,7 +70,7 @@ impl AcceptLoop {
 struct Accept {
     poll: Poll,
     waker: WakerQueue,
-    workers: Vec<WorkerClient>,
+    workers: Vec<WorkerHandle>,
     srv: Server,
     next: usize,
     backpressure: bool,
@@ -97,7 +97,7 @@ impl Accept {
         waker: WakerQueue,
         socks: Vec<(Token, StdListener)>,
         srv: Server,
-        workers: Vec<WorkerClient>,
+        workers: Vec<WorkerHandle>,
     ) {
         // Accept runs in its own thread and would want to spawn additional futures to current
         // actix system.
@@ -117,10 +117,9 @@ impl Accept {
         poll: Poll,
         waker: WakerQueue,
         socks: Vec<(Token, StdListener)>,
-        workers: Vec<WorkerClient>,
+        workers: Vec<WorkerHandle>,
         srv: Server,
     ) -> (Accept, Slab<ServerSocketInfo>) {
-
         let mut sockets = Slab::new();
         for (hnd_token, lst) in socks.into_iter() {
             let addr = lst.local_addr();

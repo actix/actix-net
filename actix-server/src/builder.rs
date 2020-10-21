@@ -22,7 +22,7 @@ use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::StdListener;
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{self, Worker, WorkerAvailability, WorkerClient};
+use crate::worker::{self, Worker, WorkerAvailability, WorkerHandle};
 use crate::Token;
 
 /// Server builder
@@ -30,7 +30,7 @@ pub struct ServerBuilder {
     threads: usize,
     token: Token,
     backlog: i32,
-    workers: Vec<(usize, WorkerClient)>,
+    workers: Vec<(usize, WorkerHandle)>,
     services: Vec<Box<dyn InternalServiceFactory>>,
     sockets: Vec<(Token, String, StdListener)>,
     accept: AcceptLoop,
@@ -298,7 +298,7 @@ impl ServerBuilder {
         }
     }
 
-    fn start_worker(&self, idx: usize, waker: WakerQueue) -> WorkerClient {
+    fn start_worker(&self, idx: usize, waker: WakerQueue) -> WorkerHandle {
         let avail = WorkerAvailability::new(waker);
         let services: Vec<Box<dyn InternalServiceFactory>> =
             self.services.iter().map(|v| v.clone_factory()).collect();

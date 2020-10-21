@@ -30,6 +30,9 @@ impl Token {
     }
 }
 
+pub(crate) type LocalBoxFuture<'a, T> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = T> + 'a>>;
+
 /// Start server building process
 pub fn new() -> ServerBuilder {
     ServerBuilder::default()

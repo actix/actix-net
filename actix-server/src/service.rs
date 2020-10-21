@@ -6,12 +6,12 @@ use std::time::Duration;
 use actix_rt::spawn;
 use actix_service::{self as actix, Service, ServiceFactory as ActixServiceFactory};
 use actix_utils::counter::CounterGuard;
-use futures_util::future::{ready, LocalBoxFuture, Ready};
-use futures_util::{FutureExt, TryFutureExt};
+use futures_util::future::{ready, Ready};
 use log::error;
 
-use super::Token;
 use crate::socket::{FromStream, MioStream};
+use crate::LocalBoxFuture;
+use crate::Token;
 
 /// Server message
 pub(crate) enum ServerMessage {
@@ -76,22 +76,20 @@ where
 
     fn call(&mut self, (guard, req): (Option<CounterGuard>, ServerMessage)) -> Self::Future {
         match req {
-            ServerMessage::Connect(stream) => {
-                let stream = FromStream::from_mio(stream).map_err(|e| {
-                    error!("Can not convert to an async tcp stream: {}", e);
-                });
-
-                if let Ok(stream) = stream {
+            ServerMessage::Connect(stream) => match FromStream::from_mio(stream) {
+                Ok(stream) => {
                     let f = self.service.call(stream);
                     spawn(async move {
                         let _ = f.await;
                         drop(guard);
                     });
                     ready(Ok(()))
-                } else {
+                }
+                Err(e) => {
+                    error!("Can not convert to an async tcp stream: {}", e);
                     ready(Err(()))
                 }
-            }
+            },
             _ => ready(Ok(())),
         }
     }
@@ -147,15 +145,16 @@ where
 
     fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>> {
         let token = self.token;
-        self.inner
-            .create()
-            .new_service(())
-            .map_err(|_| ())
-            .map_ok(move |inner| {
-                let service: BoxedServerService = Box::new(StreamService::new(inner));
-                vec![(token, service)]
-            })
-            .boxed_local()
+        let fut = self.inner.create().new_service(());
+        Box::pin(async move {
+            match fut.await {
+                Ok(inner) => {
+                    let service = Box::new(StreamService::new(inner)) as BoxedServerService;
+                    Ok(vec![(token, service)])
+                }
+                Err(_) => Err(()),
+            }
+        })
     }
 }
 

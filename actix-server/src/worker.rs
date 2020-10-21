@@ -10,13 +10,14 @@ use actix_rt::{spawn, Arbiter};
 use actix_utils::counter::Counter;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot;
-use futures_util::future::{join_all, LocalBoxFuture, MapOk};
-use futures_util::{stream::Stream, FutureExt, TryFutureExt};
+use futures_util::future::join_all;
+use futures_util::{stream::Stream, TryFutureExt};
 use log::{error, info, trace};
 
 use crate::service::{BoxedServerService, InternalServiceFactory, ServerMessage};
 use crate::socket::{MioStream, SocketAddr};
 use crate::waker_queue::{WakerInterest, WakerQueue};
+use crate::LocalBoxFuture;
 use crate::Token;
 
 pub(crate) struct WorkerCommand(Conn);
@@ -56,22 +57,24 @@ thread_local! {
         Counter::new(MAX_CONNS.load(Ordering::Relaxed));
 }
 
+// a handle to worker that can send message to worker and share the availability of worker to other
+// thread.
 #[derive(Clone)]
-pub(crate) struct WorkerClient {
+pub(crate) struct WorkerHandle {
     pub idx: usize,
     tx1: UnboundedSender<WorkerCommand>,
     tx2: UnboundedSender<StopCommand>,
     avail: WorkerAvailability,
 }
 
-impl WorkerClient {
+impl WorkerHandle {
     pub fn new(
         idx: usize,
         tx1: UnboundedSender<WorkerCommand>,
         tx2: UnboundedSender<StopCommand>,
         avail: WorkerAvailability,
     ) -> Self {
-        WorkerClient {
+        WorkerHandle {
             idx,
             tx1,
             tx2,
@@ -166,7 +169,7 @@ impl Worker {
         factories: Vec<Box<dyn InternalServiceFactory>>,
         availability: WorkerAvailability,
         shutdown_timeout: Duration,
-    ) -> WorkerClient {
+    ) -> WorkerHandle {
         let (tx1, rx) = unbounded();
         let (tx2, rx2) = unbounded();
         let avail = availability.clone();
@@ -184,14 +187,16 @@ impl Worker {
                 state: WorkerState::Unavailable(Vec::new()),
             });
 
-            let mut fut: Vec<MapOk<LocalBoxFuture<'static, _>, _>> = Vec::new();
-            for (idx, factory) in wrk.factories.iter().enumerate() {
-                fut.push(factory.create().map_ok(move |r| {
-                    r.into_iter()
-                        .map(|(t, s): (Token, _)| (idx, t, s))
-                        .collect::<Vec<_>>()
-                }));
-            }
+            let fut = wrk
+                .factories
+                .iter()
+                .enumerate()
+                .map(|(idx, factory)| {
+                    factory.create().map_ok(move |r| {
+                        r.into_iter().map(|(t, s)| (idx, t, s)).collect::<Vec<_>>()
+                    })
+                })
+                .collect::<Vec<_>>();
 
             spawn(async move {
                 let res = join_all(fut).await;
@@ -218,7 +223,7 @@ impl Worker {
             });
         }));
 
-        WorkerClient::new(idx, tx1, tx2, avail)
+        WorkerHandle::new(idx, tx1, tx2, avail)
     }
 
     fn shutdown(&mut self, force: bool) {
@@ -226,11 +231,10 @@ impl Worker {
             self.services.iter_mut().for_each(|srv| {
                 if srv.status == WorkerServiceStatus::Available {
                     srv.status = WorkerServiceStatus::Stopped;
-                    spawn(
-                        srv.service
-                            .call((None, ServerMessage::ForceShutdown))
-                            .map(|_| ()),
-                    );
+                    let fut = srv.service.call((None, ServerMessage::ForceShutdown));
+                    spawn(async {
+                        let _ = fut.await;
+                    });
                 }
             });
         } else {
@@ -238,11 +242,10 @@ impl Worker {
             self.services.iter_mut().for_each(move |srv| {
                 if srv.status == WorkerServiceStatus::Available {
                     srv.status = WorkerServiceStatus::Stopping;
-                    spawn(
-                        srv.service
-                            .call((None, ServerMessage::Shutdown(timeout)))
-                            .map(|_| ()),
-                    );
+                    let fut = srv.service.call((None, ServerMessage::Shutdown(timeout)));
+                    spawn(async {
+                        let _ = fut.await;
+                    });
                 }
             });
         }
@@ -309,7 +312,6 @@ enum WorkerState {
 impl Future for Worker {
     type Output = ();
 
-    // #[allow(clippy::never_loop)]
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // `StopWorker` message handler
         if let Poll::Ready(Some(StopCommand { graceful, result })) =
@@ -480,7 +482,7 @@ impl Future for Worker {
                             Poll::Pending
                         }
                         Poll::Ready(None) => Poll::Ready(()),
-                    }
+                    };
                 }
             }
         }

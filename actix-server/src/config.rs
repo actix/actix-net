@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::{fmt, io, net};
 
 use actix_rt::net::TcpStream;
 use actix_service as actix;
 use actix_utils::counter::CounterGuard;
-use futures_util::future::{ready, Future, FutureExt, LocalBoxFuture};
+use futures_util::future::{ready, FutureExt, LocalBoxFuture};
 use log::error;
 
 use super::builder::bind_addr;
@@ -119,7 +120,7 @@ impl InternalServiceFactory for ConfiguredService {
         let tokens = self.services.clone();
 
         // construct services
-        async move {
+        Box::pin(async move {
             let mut services = rt.services;
             // TODO: Proper error handling here
             for f in rt.onstart.into_iter() {
@@ -152,8 +153,7 @@ impl InternalServiceFactory for ConfiguredService {
                 };
             }
             Ok(res)
-        }
-        .boxed_local()
+        })
     }
 }
 

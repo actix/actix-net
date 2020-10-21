@@ -94,9 +94,7 @@ impl StdListener {
             StdListener::Uds(lst) => {
                 // ToDo: the same as above
                 lst.set_nonblocking(true)?;
-                Ok(MioSocketListener::Uds(MioUnixListener::from_std(
-                    lst,
-                )))
+                Ok(MioSocketListener::Uds(MioUnixListener::from_std(lst)))
             }
         }
     }

@@ -3,13 +3,13 @@ use std::sync::Arc;
 use concurrent_queue::{ConcurrentQueue, PopError};
 use mio::{Registry, Token as MioToken, Waker};
 
-use crate::worker::WorkerClient;
+use crate::worker::WorkerHandle;
 
 /// waker token for `mio::Poll` instance
 pub(crate) const WAKER_TOKEN: MioToken = MioToken(1);
 
 /// `mio::Waker` with a queue for waking up the `Accept`'s `Poll` and contains the `WakerInterest`
-/// we want `Poll` to look into.
+/// the `Poll` would want to look into.
 pub(crate) struct WakerQueue(Arc<(Waker, ConcurrentQueue<WakerInterest>)>);
 
 impl Clone for WakerQueue {
@@ -62,8 +62,8 @@ pub(crate) enum WakerInterest {
     Timer,
     /// `Worker` ins an interest happen after a worker runs into faulted state(This is determined by
     /// if work can be sent to it successfully).`Accept` would be waked up and add the new
-    /// `WorkerClient` to workers.
-    Worker(WorkerClient),
+    /// `WorkerHandle`.
+    Worker(WorkerHandle),
 }
 
 pub(crate) type WakerQueueError = PopError;
