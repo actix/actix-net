@@ -8,7 +8,7 @@ use mio::{Interest, Poll, Token as MioToken};
 use slab::Slab;
 
 use crate::server::Server;
-use crate::socket::{MioSocketListener, SocketAddr, StdListener};
+use crate::socket::{MioListener, SocketAddr};
 use crate::waker_queue::{WakerInterest, WakerQueue, WakerQueueError, WAKER_TOKEN};
 use crate::worker::{Conn, WorkerHandle};
 use crate::Token;
@@ -19,7 +19,7 @@ struct ServerSocketInfo {
     // be ware this is the crate token for identify socket and should not be confused with
     // mio::Token
     token: Token,
-    lst: MioSocketListener,
+    lst: MioListener,
     // timeout is used to mark the deadline when this socket's listener should be registered again
     // after an error.
     timeout: Option<Instant>,
@@ -40,7 +40,8 @@ pub(crate) struct AcceptLoop {
 impl AcceptLoop {
     pub fn new(srv: Server) -> Self {
         let poll = Poll::new().unwrap_or_else(|e| panic!("Can not create mio::Poll: {}", e));
-        let waker = WakerQueue::with_capacity(poll.registry(), 128).unwrap();
+        let waker = WakerQueue::with_capacity(poll.registry(), 128)
+            .unwrap_or_else(|e| panic!("Can not create mio::Waker: {}", e));
 
         Self {
             srv: Some(srv),
@@ -59,7 +60,7 @@ impl AcceptLoop {
 
     pub(crate) fn start(
         &mut self,
-        socks: Vec<(Token, StdListener)>,
+        socks: Vec<(Token, MioListener)>,
         workers: Vec<WorkerHandle>,
     ) {
         let srv = self.srv.take().expect("Can not re-use AcceptInfo");
@@ -99,7 +100,7 @@ impl Accept {
     pub(crate) fn start(
         poll: Poll,
         waker: WakerQueue,
-        socks: Vec<(Token, StdListener)>,
+        socks: Vec<(Token, MioListener)>,
         srv: Server,
         workers: Vec<WorkerHandle>,
     ) {
@@ -120,29 +121,26 @@ impl Accept {
     fn new_with_sockets(
         poll: Poll,
         waker: WakerQueue,
-        socks: Vec<(Token, StdListener)>,
+        socks: Vec<(Token, MioListener)>,
         workers: Vec<WorkerHandle>,
         srv: Server,
     ) -> (Accept, Slab<ServerSocketInfo>) {
         let mut sockets = Slab::new();
-        for (hnd_token, lst) in socks.into_iter() {
+        for (hnd_token, mut lst) in socks.into_iter() {
             let addr = lst.local_addr();
 
-            let mut sock = lst
-                .into_mio_listener()
-                .unwrap_or_else(|e| panic!("Can not set non_block on listener: {}", e));
             let entry = sockets.vacant_entry();
             let token = entry.key();
 
             // Start listening for incoming connections
             poll.registry()
-                .register(&mut sock, MioToken(token + DELTA), Interest::READABLE)
+                .register(&mut lst, MioToken(token + DELTA), Interest::READABLE)
                 .unwrap_or_else(|e| panic!("Can not register io: {}", e));
 
             entry.insert(ServerSocketInfo {
                 addr,
                 token: hnd_token,
-                lst: sock,
+                lst,
                 timeout: None,
             });
         }
@@ -175,17 +173,21 @@ impl Accept {
                     // necessary/good practice to actively drain the waker queue.
                     WAKER_TOKEN => 'waker: loop {
                         match self.waker.pop() {
-                            // worker notify it's availability has change. we maybe want to enter
-                            // backpressure or recover from one.
+                            // worker notify it's availability has change. we maybe want to recover
+                            // from backpressure.
                             Ok(WakerInterest::Notify) => {
                                 self.maybe_backpressure(&mut sockets, false);
                             }
                             Ok(WakerInterest::Pause) => {
                                 sockets.iter_mut().for_each(|(_, info)| {
-                                    if let Err(err) = self.deregister(info) {
-                                        error!("Can not deregister server socket {}", err);
-                                    } else {
-                                        info!("Paused accepting connections on {}", info.addr);
+                                    match self.deregister(info) {
+                                        Ok(_) => info!(
+                                            "Paused accepting connections on {}",
+                                            info.addr
+                                        ),
+                                        Err(e) => {
+                                            error!("Can not deregister server socket {}", e)
+                                        }
                                     }
                                 });
                             }
@@ -253,11 +255,7 @@ impl Accept {
         // Calling reregister seems to fix the issue.
         self.poll
             .registry()
-            .register(
-                &mut info.lst,
-                mio::Token(token + DELTA),
-                Interest::READABLE,
-            )
+            .register(&mut info.lst, mio::Token(token + DELTA), Interest::READABLE)
             .or_else(|_| {
                 self.poll.registry().reregister(
                     &mut info.lst,

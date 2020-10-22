@@ -1,7 +1,8 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
-
+* Update `tokio-openssl` dependency to 0.5
+* Update `tokio-rustls` dependency to 0.20
 
 ## 2.0.0 - 2020-09-02
 - No significant changes from `2.0.0-alpha.4`.

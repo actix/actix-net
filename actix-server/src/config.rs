@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::future::Future;
-use std::{fmt, io, net};
+use std::{fmt, io};
 
 use actix_rt::net::TcpStream;
 use actix_service as actix;
@@ -12,18 +12,19 @@ use crate::builder::bind_addr;
 use crate::service::{
     BoxedServerService, InternalServiceFactory, ServerMessage, StreamService,
 };
+use crate::socket::{MioTcpListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::LocalBoxFuture;
 use crate::Token;
 
 pub struct ServiceConfig {
-    pub(crate) services: Vec<(String, net::TcpListener)>,
+    pub(crate) services: Vec<(String, MioTcpListener)>,
     pub(crate) apply: Option<Box<dyn ServiceRuntimeConfiguration>>,
     pub(crate) threads: usize,
-    pub(crate) backlog: i32,
+    pub(crate) backlog: u32,
 }
 
 impl ServiceConfig {
-    pub(super) fn new(threads: usize, backlog: i32) -> ServiceConfig {
+    pub(super) fn new(threads: usize, backlog: u32) -> ServiceConfig {
         ServiceConfig {
             threads,
             backlog,
@@ -43,19 +44,23 @@ impl ServiceConfig {
     /// Add new service to server
     pub fn bind<U, N: AsRef<str>>(&mut self, name: N, addr: U) -> io::Result<&mut Self>
     where
-        U: net::ToSocketAddrs,
+        U: ToSocketAddrs,
     {
         let sockets = bind_addr(addr, self.backlog)?;
 
         for lst in sockets {
-            self.listen(name.as_ref(), lst);
+            self._listen(name.as_ref(), lst);
         }
 
         Ok(self)
     }
 
     /// Add new service to server
-    pub fn listen<N: AsRef<str>>(&mut self, name: N, lst: net::TcpListener) -> &mut Self {
+    pub fn listen<N: AsRef<str>>(&mut self, name: N, lst: StdTcpListener) -> &mut Self {
+        self._listen(name, MioTcpListener::from_std(lst))
+    }
+
+    fn _listen<N: AsRef<str>>(&mut self, name: N, lst: MioTcpListener) -> &mut Self {
         if self.apply.is_none() {
             self.apply = Some(Box::new(not_configured));
         }
@@ -76,7 +81,7 @@ impl ServiceConfig {
 
 pub(super) struct ConfiguredService {
     rt: Box<dyn ServiceRuntimeConfiguration>,
-    names: HashMap<Token, (String, net::SocketAddr)>,
+    names: HashMap<Token, (String, StdSocketAddr)>,
     topics: HashMap<String, Token>,
     services: Vec<Token>,
 }
@@ -91,7 +96,7 @@ impl ConfiguredService {
         }
     }
 
-    pub(super) fn stream(&mut self, token: Token, name: String, addr: net::SocketAddr) {
+    pub(super) fn stream(&mut self, token: Token, name: String, addr: StdSocketAddr) {
         self.names.insert(token, (name.clone(), addr));
         self.topics.insert(name, token);
         self.services.push(token);

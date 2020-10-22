@@ -1,143 +1,64 @@
-use std::net::{SocketAddr as StdTcpSocketAddr, TcpListener as StdTcpListener};
+pub(crate) use std::net::{
+    SocketAddr as StdSocketAddr, TcpListener as StdTcpListener, ToSocketAddrs,
+};
+
+pub(crate) use mio::net::{TcpListener as MioTcpListener, TcpSocket as MioTcpSocket};
+
+#[cfg(unix)]
+pub(crate) use {
+    mio::net::UnixListener as MioUnixListener,
+    std::os::unix::net::UnixListener as StdUnixListener,
+};
+
 use std::{fmt, io};
 
-#[cfg(unix)]
-use std::os::unix::{
-    io::{FromRawFd, IntoRawFd},
-    net::{SocketAddr as StdUdsSocketAddr, UnixListener as StdUnixListener},
-};
+use actix_rt::net::TcpStream;
+use mio::event::Source;
+use mio::net::TcpStream as MioTcpStream;
+use mio::{Interest, Registry, Token};
+
 #[cfg(windows)]
 use std::os::windows::io::{FromRawSocket, IntoRawSocket};
-
-use actix_rt::net::TcpStream;
 #[cfg(unix)]
-use actix_rt::net::UnixStream;
-use mio::event::Source;
-#[cfg(unix)]
-use mio::net::{
-    SocketAddr as MioSocketAddr, UnixListener as MioUnixListener, UnixStream as MioUnixStream,
+use {
+    actix_rt::net::UnixStream,
+    mio::net::{SocketAddr as MioSocketAddr, UnixStream as MioUnixStream},
+    std::os::unix::io::{FromRawFd, IntoRawFd},
 };
-use mio::net::{TcpListener as MioTcpListener, TcpStream as MioTcpStream};
-use mio::{Interest, Registry, Token};
 
 /// socket module contains a unified wrapper for Tcp/Uds listener/SocketAddr/Stream and necessary
 /// trait impl for registering the listener to mio::Poll and convert stream to
 /// `actix_rt::net::{TcpStream, UnixStream}`.
 
-pub(crate) enum StdListener {
-    Tcp(StdTcpListener),
-    #[cfg(unix)]
-    Uds(StdUnixListener),
-}
-
-impl fmt::Debug for StdListener {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            StdListener::Tcp(ref lst) => write!(f, "{:?}", lst),
-            #[cfg(all(unix))]
-            StdListener::Uds(ref lst) => write!(f, "{:?}", lst),
-        }
-    }
-}
-
-impl fmt::Display for StdListener {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            StdListener::Tcp(ref lst) => write!(f, "{}", lst.local_addr().ok().unwrap()),
-            #[cfg(unix)]
-            StdListener::Uds(ref lst) => write!(f, "{:?}", lst.local_addr().ok().unwrap()),
-        }
-    }
-}
-
-pub(crate) enum SocketAddr {
-    Tcp(StdTcpSocketAddr),
-    #[cfg(unix)]
-    Uds(StdUdsSocketAddr),
-    // this is a work around. mio would return different types of SocketAddr between accept and
-    // local_addr methods.
-    #[cfg(unix)]
-    UdsMio(MioSocketAddr),
-}
-
-impl fmt::Display for SocketAddr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            SocketAddr::Tcp(ref addr) => write!(f, "{}", addr),
-            #[cfg(unix)]
-            SocketAddr::Uds(ref addr) => write!(f, "{:?}", addr),
-            #[cfg(unix)]
-            SocketAddr::UdsMio(ref addr) => write!(f, "{:?}", addr),
-        }
-    }
-}
-
-impl fmt::Debug for SocketAddr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            SocketAddr::Tcp(ref addr) => write!(f, "{:?}", addr),
-            #[cfg(unix)]
-            SocketAddr::Uds(ref addr) => write!(f, "{:?}", addr),
-            #[cfg(unix)]
-            SocketAddr::UdsMio(ref addr) => write!(f, "{:?}", addr),
-        }
-    }
-}
-
-impl StdListener {
-    pub(crate) fn local_addr(&self) -> SocketAddr {
-        match self {
-            StdListener::Tcp(lst) => SocketAddr::Tcp(lst.local_addr().unwrap()),
-            #[cfg(unix)]
-            StdListener::Uds(lst) => SocketAddr::Uds(lst.local_addr().unwrap()),
-        }
-    }
-
-    pub(crate) fn into_mio_listener(self) -> std::io::Result<MioSocketListener> {
-        match self {
-            StdListener::Tcp(lst) => {
-                // ToDo: is this non_blocking a good practice?
-                lst.set_nonblocking(true)?;
-                Ok(MioSocketListener::Tcp(MioTcpListener::from_std(lst)))
-            }
-            #[cfg(unix)]
-            StdListener::Uds(lst) => {
-                // ToDo: the same as above
-                lst.set_nonblocking(true)?;
-                Ok(MioSocketListener::Uds(MioUnixListener::from_std(lst)))
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum MioStream {
-    Tcp(MioTcpStream),
-    #[cfg(unix)]
-    Uds(MioUnixStream),
-}
-
-pub(crate) enum MioSocketListener {
+pub(crate) enum MioListener {
     Tcp(MioTcpListener),
     #[cfg(unix)]
     Uds(MioUnixListener),
 }
 
-impl MioSocketListener {
+impl MioListener {
+    pub(crate) fn local_addr(&self) -> SocketAddr {
+        match *self {
+            MioListener::Tcp(ref lst) => SocketAddr::Tcp(lst.local_addr().unwrap()),
+            #[cfg(unix)]
+            MioListener::Uds(ref lst) => SocketAddr::Uds(lst.local_addr().unwrap()),
+        }
+    }
+
     pub(crate) fn accept(&self) -> io::Result<Option<(MioStream, SocketAddr)>> {
         match *self {
-            MioSocketListener::Tcp(ref lst) => lst
+            MioListener::Tcp(ref lst) => lst
                 .accept()
                 .map(|(stream, addr)| Some((MioStream::Tcp(stream), SocketAddr::Tcp(addr)))),
             #[cfg(unix)]
-            MioSocketListener::Uds(ref lst) => lst
+            MioListener::Uds(ref lst) => lst
                 .accept()
-                .map(|(stream, addr)| Some((MioStream::Uds(stream), SocketAddr::UdsMio(addr)))),
+                .map(|(stream, addr)| Some((MioStream::Uds(stream), SocketAddr::Uds(addr)))),
         }
     }
 }
 
-impl Source for MioSocketListener {
+impl Source for MioListener {
     fn register(
         &mut self,
         registry: &Registry,
@@ -145,9 +66,9 @@ impl Source for MioSocketListener {
         interests: Interest,
     ) -> io::Result<()> {
         match *self {
-            MioSocketListener::Tcp(ref mut lst) => lst.register(registry, token, interests),
+            MioListener::Tcp(ref mut lst) => lst.register(registry, token, interests),
             #[cfg(unix)]
-            MioSocketListener::Uds(ref mut lst) => lst.register(registry, token, interests),
+            MioListener::Uds(ref mut lst) => lst.register(registry, token, interests),
         }
     }
 
@@ -158,17 +79,17 @@ impl Source for MioSocketListener {
         interests: Interest,
     ) -> io::Result<()> {
         match *self {
-            MioSocketListener::Tcp(ref mut lst) => lst.reregister(registry, token, interests),
+            MioListener::Tcp(ref mut lst) => lst.reregister(registry, token, interests),
             #[cfg(unix)]
-            MioSocketListener::Uds(ref mut lst) => lst.reregister(registry, token, interests),
+            MioListener::Uds(ref mut lst) => lst.reregister(registry, token, interests),
         }
     }
 
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         match *self {
-            MioSocketListener::Tcp(ref mut lst) => lst.deregister(registry),
+            MioListener::Tcp(ref mut lst) => lst.deregister(registry),
             #[cfg(unix)]
-            MioSocketListener::Uds(ref mut lst) => {
+            MioListener::Uds(ref mut lst) => {
                 let res = lst.deregister(registry);
 
                 // cleanup file path
@@ -181,6 +102,72 @@ impl Source for MioSocketListener {
             }
         }
     }
+}
+
+impl From<StdTcpListener> for MioListener {
+    fn from(lst: StdTcpListener) -> Self {
+        MioListener::Tcp(MioTcpListener::from_std(lst))
+    }
+}
+
+#[cfg(unix)]
+impl From<StdUnixListener> for MioListener {
+    fn from(lst: StdUnixListener) -> Self {
+        MioListener::Uds(MioUnixListener::from_std(lst))
+    }
+}
+
+impl fmt::Debug for MioListener {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            MioListener::Tcp(ref lst) => write!(f, "{:?}", lst),
+            #[cfg(all(unix))]
+            MioListener::Uds(ref lst) => write!(f, "{:?}", lst),
+        }
+    }
+}
+
+impl fmt::Display for MioListener {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            MioListener::Tcp(ref lst) => write!(f, "{}", lst.local_addr().ok().unwrap()),
+            #[cfg(unix)]
+            MioListener::Uds(ref lst) => write!(f, "{:?}", lst.local_addr().ok().unwrap()),
+        }
+    }
+}
+
+pub(crate) enum SocketAddr {
+    Tcp(StdSocketAddr),
+    #[cfg(unix)]
+    Uds(MioSocketAddr),
+}
+
+impl fmt::Display for SocketAddr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            SocketAddr::Tcp(ref addr) => write!(f, "{}", addr),
+            #[cfg(unix)]
+            SocketAddr::Uds(ref addr) => write!(f, "{:?}", addr),
+        }
+    }
+}
+
+impl fmt::Debug for SocketAddr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            SocketAddr::Tcp(ref addr) => write!(f, "{:?}", addr),
+            #[cfg(unix)]
+            SocketAddr::Uds(ref addr) => write!(f, "{:?}", addr),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum MioStream {
+    Tcp(MioTcpStream),
+    #[cfg(unix)]
+    Uds(MioUnixStream),
 }
 
 /// helper trait for converting mio stream to tokio stream.
@@ -243,18 +230,16 @@ mod tests {
 
     #[test]
     fn socket_addr() {
-        use socket2::{Domain, SockAddr, Socket, Type};
-
         let addr = SocketAddr::Tcp("127.0.0.1:8080".parse().unwrap());
         assert!(format!("{:?}", addr).contains("127.0.0.1:8080"));
         assert_eq!(format!("{}", addr), "127.0.0.1:8080");
 
-        let addr: StdTcpSocketAddr = "127.0.0.1:0".parse().unwrap();
-        let socket = Socket::new(Domain::ipv4(), Type::stream(), None).unwrap();
-        socket.set_reuse_address(true).unwrap();
-        socket.bind(&SockAddr::from(addr)).unwrap();
-        let tcp = socket.into_tcp_listener();
-        let lst = StdListener::Tcp(tcp);
+        let addr: StdSocketAddr = "127.0.0.1:0".parse().unwrap();
+        let socket = mio::net::TcpSocket::new_v4().unwrap();
+        socket.set_reuseaddr(true).unwrap();
+        socket.bind(addr).unwrap();
+        let tcp = socket.listen(128).unwrap();
+        let lst = MioListener::Tcp(tcp);
         assert!(format!("{:?}", lst).contains("TcpListener"));
         assert!(format!("{}", lst).contains("127.0.0.1"));
     }
@@ -263,13 +248,13 @@ mod tests {
     #[cfg(unix)]
     fn uds() {
         let _ = std::fs::remove_file("/tmp/sock.xxxxx");
-        if let Ok(socket) = StdUnixListener::bind("/tmp/sock.xxxxx") {
+        if let Ok(socket) = MioUnixListener::bind("/tmp/sock.xxxxx") {
             let addr = socket.local_addr().expect("Couldn't get local address");
             let a = SocketAddr::Uds(addr);
             assert!(format!("{:?}", a).contains("/tmp/sock.xxxxx"));
             assert!(format!("{}", a).contains("/tmp/sock.xxxxx"));
 
-            let lst = StdListener::Uds(socket);
+            let lst = MioListener::Uds(socket);
             assert!(format!("{:?}", lst).contains("/tmp/sock.xxxxx"));
             assert!(format!("{}", lst).contains("/tmp/sock.xxxxx"));
         }

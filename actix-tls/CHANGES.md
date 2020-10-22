@@ -1,7 +1,9 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
-
+* move from `tokio-tls` to `tokio-native-tls` for native-tls feature.
+* Update `tokio-openssl` dependency to 0.5.0
+* Update `tokio-rustls` dependency to 0.20.0
 
 ## 2.0.0 - 2020-09-03
 * `nativetls::NativeTlsAcceptor` is renamed to `nativetls::Acceptor`.

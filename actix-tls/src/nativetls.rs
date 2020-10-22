@@ -7,7 +7,7 @@ use actix_utils::counter::Counter;
 use futures_util::future::{self, FutureExt, LocalBoxFuture, TryFutureExt};
 
 pub use native_tls::Error;
-pub use tokio_tls::{TlsAcceptor, TlsStream};
+pub use tokio_native_tls::{TlsAcceptor, TlsStream};
 
 use crate::MAX_CONN_COUNTER;
 

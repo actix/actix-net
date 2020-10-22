@@ -5,14 +5,13 @@ use std::{net, thread, time};
 use actix_server::Server;
 use actix_service::fn_service;
 use futures_util::future::{lazy, ok};
-use socket2::{Domain, Protocol, Socket, Type};
 
 fn unused_addr() -> net::SocketAddr {
     let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-    let socket = Socket::new(Domain::ipv4(), Type::stream(), Some(Protocol::tcp())).unwrap();
-    socket.bind(&addr.into()).unwrap();
-    socket.set_reuse_address(true).unwrap();
-    let tcp = socket.into_tcp_listener();
+    let socket = mio::net::TcpSocket::new_v4().unwrap();
+    socket.bind(addr).unwrap();
+    socket.set_reuseaddr(true).unwrap();
+    let tcp = socket.listen(32).unwrap();
     tcp.local_addr().unwrap()
 }
 

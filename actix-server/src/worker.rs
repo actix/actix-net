@@ -199,8 +199,7 @@ impl Worker {
                 .collect::<Vec<_>>();
 
             spawn(async move {
-                let res = join_all(fut).await;
-                let res: Result<Vec<_>, _> = res.into_iter().collect();
+                let res: Result<Vec<_>, _> = join_all(fut).await.into_iter().collect();
                 match res {
                     Ok(services) => {
                         for item in services {

@@ -32,7 +32,7 @@ openssl = ["open-ssl", "tokio-openssl"]
 rustls = ["rust-tls", "webpki", "webpki-roots", "tokio-rustls"]
 
 # nativetls
-nativetls = ["native-tls", "tokio-tls"]
+nativetls = ["native-tls", "tokio-native-tls"]
 
 [dependencies]
 actix-service = "1.0.0"
@@ -43,20 +43,20 @@ futures-util = { version = "0.3.4", default-features = false }
 
 # openssl
 open-ssl = { package = "openssl", version = "0.10", optional = true }
-tokio-openssl = { version = "0.4.0", optional = true }
+tokio-openssl = { version = "0.5.0", optional = true }
 
 # rustls
 rust-tls = { package = "rustls", version = "0.18.0", optional = true }
 webpki = { version = "0.21", optional = true }
 webpki-roots = { version = "0.20", optional = true }
-tokio-rustls = { version = "0.14.0", optional = true }
+tokio-rustls = { version = "0.20.0", optional = true }
 
 # native-tls
 native-tls = { version = "0.2", optional = true }
-tokio-tls = { version = "0.3", optional = true }
+tokio-native-tls = { version = "0.2.0", optional = true }
 
 [dev-dependencies]
-bytes = "0.5"
+bytes = "0.6"
 log = "0.4"
 env_logger = "0.7"
 actix-testing = "1.0.0"

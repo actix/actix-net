@@ -32,11 +32,10 @@ log = "0.4"
 mio = { version = "0.7.3", features = [ "os-poll", "tcp", "uds"] }
 num_cpus = "1.13"
 slab = "0.4"
-socket2 = "0.3"
 
 [dev-dependencies]
 actix-testing = "1.0.0"
 bytes = "0.5"
 env_logger = "0.7"
 futures-util = { version = "0.3.4", default-features = false, features = ["sink"] }
-tokio = { version = "0.3.0", features = ["full"] }
+tokio = { version = "0.3.1", features = ["full"] }

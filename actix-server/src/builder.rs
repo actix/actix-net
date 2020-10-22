@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use std::{io, mem, net};
+use std::{io, mem};
 
 use actix_rt::net::TcpStream;
 use actix_rt::time::{sleep_until, Instant};
@@ -13,14 +13,14 @@ use futures_util::future::ready;
 use futures_util::stream::FuturesUnordered;
 use futures_util::{ready, stream::Stream, FutureExt, StreamExt};
 use log::{error, info};
-use socket2::{Domain, Protocol, Socket, Type};
 
 use crate::accept::AcceptLoop;
 use crate::config::{ConfiguredService, ServiceConfig};
 use crate::server::{Server, ServerCommand};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
-use crate::socket::StdListener;
+use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
+use crate::socket::{MioTcpListener, MioTcpSocket};
 use crate::waker_queue::{WakerInterest, WakerQueue};
 use crate::worker::{self, Worker, WorkerAvailability, WorkerHandle};
 use crate::Token;
@@ -29,10 +29,10 @@ use crate::Token;
 pub struct ServerBuilder {
     threads: usize,
     token: Token,
-    backlog: i32,
+    backlog: u32,
     workers: Vec<(usize, WorkerHandle)>,
     services: Vec<Box<dyn InternalServiceFactory>>,
-    sockets: Vec<(Token, String, StdListener)>,
+    sockets: Vec<(Token, String, MioListener)>,
     accept: AcceptLoop,
     exit: bool,
     shutdown_timeout: Duration,
@@ -91,7 +91,7 @@ impl ServerBuilder {
     /// Generally set in the 64-2048 range. Default value is 2048.
     ///
     /// This method should be called before `bind()` method call.
-    pub fn backlog(mut self, num: i32) -> Self {
+    pub fn backlog(mut self, num: u32) -> Self {
         self.backlog = num;
         self
     }
@@ -149,7 +149,7 @@ impl ServerBuilder {
             for (name, lst) in cfg.services {
                 let token = self.token.next();
                 srv.stream(token, name.clone(), lst.local_addr()?);
-                self.sockets.push((token, name, StdListener::Tcp(lst)));
+                self.sockets.push((token, name, MioListener::Tcp(lst)));
             }
             self.services.push(Box::new(srv));
         }
@@ -162,7 +162,7 @@ impl ServerBuilder {
     pub fn bind<F, U, N: AsRef<str>>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
         F: ServiceFactory<TcpStream>,
-        U: net::ToSocketAddrs,
+        U: ToSocketAddrs,
     {
         let sockets = bind_addr(addr, self.backlog)?;
 
@@ -175,12 +175,12 @@ impl ServerBuilder {
                 lst.local_addr()?,
             ));
             self.sockets
-                .push((token, name.as_ref().to_string(), StdListener::Tcp(lst)));
+                .push((token, name.as_ref().to_string(), MioListener::Tcp(lst)));
         }
         Ok(self)
     }
 
-    #[cfg(all(unix))]
+    #[cfg(unix)]
     /// Add new unix domain service to the server.
     pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
@@ -188,8 +188,6 @@ impl ServerBuilder {
         N: AsRef<str>,
         U: AsRef<std::path::Path>,
     {
-        use std::os::unix::net::UnixListener;
-
         // The path must not exist when we try to bind.
         // Try to remove it to avoid bind error.
         if let Err(e) = std::fs::remove_file(addr.as_ref()) {
@@ -199,7 +197,7 @@ impl ServerBuilder {
             }
         }
 
-        let lst = UnixListener::bind(addr)?;
+        let lst = crate::socket::StdUnixListener::bind(addr)?;
         self.listen_uds(name, lst, factory)
     }
 
@@ -210,15 +208,15 @@ impl ServerBuilder {
     pub fn listen_uds<F, N: AsRef<str>>(
         mut self,
         name: N,
-        lst: std::os::unix::net::UnixListener,
+        lst: crate::socket::StdUnixListener,
         factory: F,
     ) -> io::Result<Self>
     where
         F: ServiceFactory<actix_rt::net::UnixStream>,
     {
-        use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+        use std::net::{IpAddr, Ipv4Addr};
         let token = self.token.next();
-        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         self.services.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
@@ -226,7 +224,7 @@ impl ServerBuilder {
             addr,
         ));
         self.sockets
-            .push((token, name.as_ref().to_string(), StdListener::Uds(lst)));
+            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
         Ok(self)
     }
 
@@ -234,7 +232,7 @@ impl ServerBuilder {
     pub fn listen<F, N: AsRef<str>>(
         mut self,
         name: N,
-        lst: net::TcpListener,
+        lst: StdTcpListener,
         factory: F,
     ) -> io::Result<Self>
     where
@@ -247,8 +245,9 @@ impl ServerBuilder {
             factory,
             lst.local_addr()?,
         ));
+
         self.sockets
-            .push((token, name.as_ref().to_string(), StdListener::Tcp(lst)));
+            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
         Ok(self)
     }
 
@@ -450,10 +449,10 @@ impl Future for ServerBuilder {
     }
 }
 
-pub(super) fn bind_addr<S: net::ToSocketAddrs>(
+pub(super) fn bind_addr<S: ToSocketAddrs>(
     addr: S,
-    backlog: i32,
-) -> io::Result<Vec<net::TcpListener>> {
+    backlog: u32,
+) -> io::Result<Vec<MioTcpListener>> {
     let mut err = None;
     let mut succ = false;
     let mut sockets = Vec::new();
@@ -481,14 +480,13 @@ pub(super) fn bind_addr<S: net::ToSocketAddrs>(
     }
 }
 
-fn create_tcp_listener(addr: net::SocketAddr, backlog: i32) -> io::Result<net::TcpListener> {
-    let domain = match addr {
-        net::SocketAddr::V4(_) => Domain::ipv4(),
-        net::SocketAddr::V6(_) => Domain::ipv6(),
+fn create_tcp_listener(addr: StdSocketAddr, backlog: u32) -> io::Result<MioTcpListener> {
+    let socket = match addr {
+        StdSocketAddr::V4(_) => MioTcpSocket::new_v4()?,
+        StdSocketAddr::V6(_) => MioTcpSocket::new_v6()?,
     };
-    let socket = Socket::new(domain, Type::stream(), Some(Protocol::tcp()))?;
-    socket.set_reuse_address(true)?;
-    socket.bind(&addr.into())?;
-    socket.listen(backlog)?;
-    Ok(socket.into_tcp_listener())
+
+    socket.set_reuseaddr(true)?;
+    socket.bind(addr)?;
+    socket.listen(backlog)
 }
