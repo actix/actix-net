@@ -5,14 +5,15 @@ use std::{fmt, io, net};
 use actix_rt::net::TcpStream;
 use actix_service as actix;
 use actix_utils::counter::CounterGuard;
-use futures_util::future::{ready, FutureExt, LocalBoxFuture};
+use futures_util::future::ready;
 use log::error;
 
-use super::builder::bind_addr;
-use super::service::{
+use crate::builder::bind_addr;
+use crate::service::{
     BoxedServerService, InternalServiceFactory, ServerMessage, StreamService,
 };
-use super::Token;
+use crate::LocalBoxFuture;
+use crate::Token;
 
 pub struct ServiceConfig {
     pub(crate) services: Vec<(String, net::TcpListener)>,
@@ -233,7 +234,7 @@ impl ServiceRuntime {
     where
         F: Future<Output = ()> + 'static,
     {
-        self.onstart.push(fut.boxed_local())
+        self.onstart.push(Box::pin(fut))
     }
 }
 
@@ -264,14 +265,14 @@ where
     type Request = (Option<CounterGuard>, ServerMessage);
     type Response = ();
     type Error = ();
-    type InitError = ();
     type Config = ();
     type Service = BoxedServerService;
+    type InitError = ();
     type Future = LocalBoxFuture<'static, Result<BoxedServerService, ()>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         let fut = self.inner.new_service(());
-        async move {
+        Box::pin(async move {
             match fut.await {
                 Ok(s) => Ok(Box::new(StreamService::new(s)) as BoxedServerService),
                 Err(e) => {
@@ -279,7 +280,6 @@ where
                     Err(())
                 }
             }
-        }
-        .boxed_local()
+        })
     }
 }

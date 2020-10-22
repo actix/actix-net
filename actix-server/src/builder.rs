@@ -300,8 +300,7 @@ impl ServerBuilder {
 
     fn start_worker(&self, idx: usize, waker: WakerQueue) -> WorkerHandle {
         let avail = WorkerAvailability::new(waker);
-        let services: Vec<Box<dyn InternalServiceFactory>> =
-            self.services.iter().map(|v| v.clone_factory()).collect();
+        let services = self.services.iter().map(|v| v.clone_factory()).collect();
 
         Worker::start(idx, services, avail, self.shutdown_timeout)
     }
@@ -376,16 +375,13 @@ impl ServerBuilder {
                                     let _ = tx.send(());
                                 }
                                 if exit {
-                                    spawn(
-                                        async {
-                                            sleep_until(
-                                                Instant::now() + Duration::from_millis(300),
-                                            )
-                                            .await;
-                                            System::current().stop();
-                                        }
-                                        .boxed(),
-                                    );
+                                    spawn(async {
+                                        sleep_until(
+                                            Instant::now() + Duration::from_millis(300),
+                                        )
+                                        .await;
+                                        System::current().stop();
+                                    });
                                 }
                                 ready(())
                             }),
@@ -393,14 +389,10 @@ impl ServerBuilder {
                 } else {
                     // we need to stop system if server was spawned
                     if self.exit {
-                        spawn(
-                            sleep_until(Instant::now() + Duration::from_millis(300)).then(
-                                |_| {
-                                    System::current().stop();
-                                    ready(())
-                                },
-                            ),
-                        );
+                        spawn(async {
+                            sleep_until(Instant::now() + Duration::from_millis(300)).await;
+                            System::current().stop();
+                        });
                     }
                     if let Some(tx) = completion {
                         let _ = tx.send(());
@@ -434,9 +426,9 @@ impl ServerBuilder {
                         break;
                     }
 
-                    let worker = self.start_worker(new_idx, self.accept.waker_owned());
-                    self.workers.push((new_idx, worker.clone()));
-                    self.accept.wake(WakerInterest::Worker(worker));
+                    let handle = self.start_worker(new_idx, self.accept.waker_owned());
+                    self.workers.push((new_idx, handle.clone()));
+                    self.accept.wake(WakerInterest::Worker(handle));
                 }
             }
         }

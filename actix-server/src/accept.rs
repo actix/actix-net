@@ -14,17 +14,21 @@ use crate::worker::{Conn, WorkerHandle};
 use crate::Token;
 
 struct ServerSocketInfo {
+    // addr for socket. mainly used for logging.
     addr: SocketAddr,
+    // be ware this is the crate token for identify socket and should not be confused with
+    // mio::Token
     token: Token,
-    sock: MioSocketListener,
-    // timeout is used to mark the time this socket should be reregistered after an error.
+    lst: MioSocketListener,
+    // timeout is used to mark the deadline when this socket's listener should be registered again
+    // after an error.
     timeout: Option<Instant>,
 }
 
 /// Accept loop would live with `ServerBuilder`.
 ///
 /// It's tasked with construct `Poll` instance and `WakerQueue` which would be distributed to
-/// `Accept` and `WorkerClient` accordingly.
+/// `Accept` and `Worker`.
 ///
 /// It would also listen to `ServerCommand` and push interests to `WakerQueue`.
 pub(crate) struct AcceptLoop {
@@ -138,7 +142,7 @@ impl Accept {
             entry.insert(ServerSocketInfo {
                 addr,
                 token: hnd_token,
-                sock,
+                lst: sock,
                 timeout: None,
             });
         }
@@ -193,11 +197,11 @@ impl Accept {
                             Ok(WakerInterest::Stop) => {
                                 return self.deregister_all(&mut sockets);
                             }
-                            // a new worker thread is made and it's client would be added to Accept
-                            Ok(WakerInterest::Worker(worker)) => {
+                            // a new worker thread is made and it's handle would be added to Accept
+                            Ok(WakerInterest::Worker(handle)) => {
                                 // maybe we want to recover from a backpressure.
                                 self.maybe_backpressure(&mut sockets, false);
-                                self.workers.push(worker);
+                                self.workers.push(handle);
                             }
                             // got timer interest and it's time to try register socket(s) again.
                             Ok(WakerInterest::Timer) => self.process_timer(&mut sockets),
@@ -221,8 +225,8 @@ impl Accept {
 
     fn process_timer(&self, sockets: &mut Slab<ServerSocketInfo>) {
         let now = Instant::now();
-        for (token, info) in sockets.iter_mut() {
-            // only the sockets have an associate timeout value was de registered.
+        sockets.iter_mut().for_each(|(token, info)| {
+            // only the ServerSocketInfo have an associate timeout value was de registered.
             if let Some(inst) = info.timeout.take() {
                 if now > inst {
                     self.register_logged(token, info);
@@ -230,13 +234,13 @@ impl Accept {
                     info.timeout = Some(inst);
                 }
             }
-        }
+        });
     }
 
     #[cfg(not(target_os = "windows"))]
     fn register(&self, token: usize, info: &mut ServerSocketInfo) -> io::Result<()> {
         self.poll.registry().register(
-            &mut info.sock,
+            &mut info.lst,
             MioToken(token + DELTA),
             Interest::READABLE,
         )
@@ -250,13 +254,13 @@ impl Accept {
         self.poll
             .registry()
             .register(
-                &mut info.sock,
+                &mut info.lst,
                 mio::Token(token + DELTA),
                 Interest::READABLE,
             )
             .or_else(|_| {
                 self.poll.registry().reregister(
-                    &mut info.sock,
+                    &mut info.lst,
                     mio::Token(token + DELTA),
                     Interest::READABLE,
                 )
@@ -271,7 +275,7 @@ impl Accept {
     }
 
     fn deregister(&self, info: &mut ServerSocketInfo) -> io::Result<()> {
-        self.poll.registry().deregister(&mut info.sock)
+        self.poll.registry().deregister(&mut info.lst)
     }
 
     fn deregister_all(&self, sockets: &mut Slab<ServerSocketInfo>) {
@@ -305,7 +309,7 @@ impl Accept {
                     Err(tmp) => {
                         // worker lost contact and could be gone. a message is sent to
                         // `ServerBuilder` future to notify it a new worker should be made.
-                        // after that remove the fault worker and enter backpressure if necessary.
+                        // after that remove the fault worker.
                         self.srv.worker_faulted(self.workers[self.next].idx);
                         msg = tmp;
                         self.workers.swap_remove(self.next);
@@ -363,7 +367,7 @@ impl Accept {
     fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
         loop {
             let msg = if let Some(info) = sockets.get_mut(token) {
-                match info.sock.accept() {
+                match info.lst.accept() {
                     Ok(Some((io, addr))) => Conn {
                         io,
                         token: info.token,
@@ -373,14 +377,15 @@ impl Accept {
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return,
                     Err(ref e) if connection_error(e) => continue,
                     Err(e) => {
-                        // deregister socket temporary
+                        // deregister socket listener temporary
                         error!("Error accepting connection: {}", e);
-                        if let Err(err) = self.poll.registry().deregister(&mut info.sock) {
+                        if let Err(err) = self.poll.registry().deregister(&mut info.lst) {
                             error!("Can not deregister server socket {}", err);
                         }
 
                         // sleep after error. write the timeout to socket info as later the poll
-                        // would need it mark which socket and when it should be registered.
+                        // would need it mark which socket and when it's listener should be
+                        // registered.
                         info.timeout = Some(Instant::now() + Duration::from_millis(500));
 
                         // after the sleep a Timer interest is sent to Accept Poll

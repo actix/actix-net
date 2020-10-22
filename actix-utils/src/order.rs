@@ -94,8 +94,8 @@ where
     type Request = S::Request;
     type Response = S::Response;
     type Error = InOrderError<S::Error>;
-    type InitError = Infallible;
     type Transform = InOrderService<S>;
+    type InitError = Infallible;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
