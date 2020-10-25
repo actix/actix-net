@@ -1,7 +1,7 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
-
+* Upgrade `pin-project` to `1.0`.
 
 ## 1.0.6 - 2020-08-09
 
