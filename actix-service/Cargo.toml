@@ -18,7 +18,7 @@ path = "src/lib.rs"
 
 [dependencies]
 futures-util = "0.3.1"
-pin-project = "0.4.17"
+pin-project = "1.0.0"
 
 [dev-dependencies]
 actix-rt = "1.0.0"

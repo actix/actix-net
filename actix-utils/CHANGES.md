@@ -1,7 +1,8 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
-* Update `bytes` to 0.6
+* Upgrade `pin-project` to `1.0`.
+* Update `bytes` dependency to 0.6.
 
 ## 2.0.0 - 2020-08-23
 * No changes from beta 1.

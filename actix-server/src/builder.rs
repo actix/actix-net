@@ -30,7 +30,7 @@ pub struct ServerBuilder {
     threads: usize,
     token: Token,
     backlog: u32,
-    workers: Vec<(usize, WorkerHandle)>,
+    handles: Vec<(usize, WorkerHandle)>,
     services: Vec<Box<dyn InternalServiceFactory>>,
     sockets: Vec<(Token, String, MioListener)>,
     accept: AcceptLoop,
@@ -56,8 +56,8 @@ impl ServerBuilder {
 
         ServerBuilder {
             threads: num_cpus::get(),
-            token: Token(0),
-            workers: Vec::new(),
+            token: Token::default(),
+            handles: Vec::new(),
             services: Vec::new(),
             sockets: Vec::new(),
             accept: AcceptLoop::new(server.clone()),
@@ -264,12 +264,12 @@ impl ServerBuilder {
             info!("Starting {} workers", self.threads);
 
             // start workers
-            let workers = (0..self.threads)
+            let handles = (0..self.threads)
                 .map(|idx| {
-                    let worker = self.start_worker(idx, self.accept.waker_owned());
-                    self.workers.push((idx, worker.clone()));
+                    let handle = self.start_worker(idx, self.accept.waker_owned());
+                    self.handles.push((idx, handle.clone()));
 
-                    worker
+                    handle
                 })
                 .collect();
 
@@ -282,7 +282,7 @@ impl ServerBuilder {
                     .into_iter()
                     .map(|t| (t.0, t.2))
                     .collect(),
-                workers,
+                handles,
             );
 
             // handle signals
@@ -359,9 +359,9 @@ impl ServerBuilder {
                 let notify = std::mem::take(&mut self.notify);
 
                 // stop workers
-                if !self.workers.is_empty() && graceful {
+                if !self.handles.is_empty() && graceful {
                     spawn(
-                        self.workers
+                        self.handles
                             .iter()
                             .map(move |worker| worker.1.stop(graceful))
                             .collect::<FuturesUnordered<_>>()
@@ -403,9 +403,9 @@ impl ServerBuilder {
             }
             ServerCommand::WorkerFaulted(idx) => {
                 let mut found = false;
-                for i in 0..self.workers.len() {
-                    if self.workers[i].0 == idx {
-                        self.workers.swap_remove(i);
+                for i in 0..self.handles.len() {
+                    if self.handles[i].0 == idx {
+                        self.handles.swap_remove(i);
                         found = true;
                         break;
                     }
@@ -414,10 +414,10 @@ impl ServerBuilder {
                 if found {
                     error!("Worker has died {:?}, restarting", idx);
 
-                    let mut new_idx = self.workers.len();
+                    let mut new_idx = self.handles.len();
                     'found: loop {
-                        for i in 0..self.workers.len() {
-                            if self.workers[i].0 == new_idx {
+                        for i in 0..self.handles.len() {
+                            if self.handles[i].0 == new_idx {
                                 new_idx += 1;
                                 continue 'found;
                             }
@@ -426,7 +426,7 @@ impl ServerBuilder {
                     }
 
                     let handle = self.start_worker(new_idx, self.accept.waker_owned());
-                    self.workers.push((new_idx, handle.clone()));
+                    self.handles.push((new_idx, handle.clone()));
                     self.accept.wake(WakerInterest::Worker(handle));
                 }
             }

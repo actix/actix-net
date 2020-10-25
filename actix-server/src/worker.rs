@@ -48,13 +48,13 @@ pub fn max_concurrent_connections(num: usize) {
     MAX_CONNS.store(num, Ordering::Relaxed);
 }
 
-pub(crate) fn num_connections() -> usize {
-    MAX_CONNS_COUNTER.with(|conns| conns.total())
-}
-
 thread_local! {
     static MAX_CONNS_COUNTER: Counter =
         Counter::new(MAX_CONNS.load(Ordering::Relaxed));
+}
+
+pub(crate) fn num_connections() -> usize {
+    MAX_CONNS_COUNTER.with(|conns| conns.total())
 }
 
 // a handle to worker that can send message to worker and share the availability of worker to other
@@ -119,8 +119,9 @@ impl WorkerAvailability {
 
     pub fn set(&self, val: bool) {
         let old = self.available.swap(val, Ordering::Release);
+        // notify the accept on switched to available.
         if !old && val {
-            self.waker.wake(WakerInterest::Notify);
+            self.waker.wake(WakerInterest::WorkerAvailable);
         }
     }
 }
@@ -174,6 +175,7 @@ impl Worker {
         let (tx2, rx2) = unbounded();
         let avail = availability.clone();
 
+        // every worker runs in it's own arbiter.
         Arbiter::new().send(Box::pin(async move {
             availability.set(false);
             let mut wrk = MAX_CONNS_COUNTER.with(move |conns| Worker {
@@ -184,7 +186,7 @@ impl Worker {
                 shutdown_timeout,
                 services: Vec::new(),
                 conns: conns.clone(),
-                state: WorkerState::Unavailable(Vec::new()),
+                state: WorkerState::Unavailable,
             });
 
             let fut = wrk
@@ -253,7 +255,7 @@ impl Worker {
     fn check_readiness(&mut self, cx: &mut Context<'_>) -> Result<bool, (Token, usize)> {
         let mut ready = self.conns.available(cx);
         let mut failed = None;
-        for (idx, srv) in &mut self.services.iter_mut().enumerate() {
+        for (idx, srv) in self.services.iter_mut().enumerate() {
             if srv.status == WorkerServiceStatus::Available
                 || srv.status == WorkerServiceStatus::Unavailable
             {
@@ -299,7 +301,7 @@ impl Worker {
 
 enum WorkerState {
     Available,
-    Unavailable(Vec<Conn>),
+    Unavailable,
     Restarting(
         usize,
         Token,
@@ -345,43 +347,24 @@ impl Future for Worker {
         }
 
         match self.state {
-            WorkerState::Unavailable(ref mut conns) => {
-                let conn = conns.pop();
-                match self.check_readiness(cx) {
-                    Ok(true) => {
-                        // process requests from wait queue
-                        if let Some(conn) = conn {
-                            let guard = self.conns.get();
-                            let _ = self.services[conn.token.0]
-                                .service
-                                .call((Some(guard), ServerMessage::Connect(conn.io)));
-                        } else {
-                            self.state = WorkerState::Available;
-                            self.availability.set(true);
-                        }
-                        self.poll(cx)
-                    }
-                    Ok(false) => {
-                        // push connection back to queue
-                        if let Some(conn) = conn {
-                            if let WorkerState::Unavailable(ref mut conns) = self.state {
-                                conns.push(conn);
-                            }
-                        }
-                        Poll::Pending
-                    }
-                    Err((token, idx)) => {
-                        trace!(
-                            "Service {:?} failed, restarting",
-                            self.factories[idx].name(token)
-                        );
-                        self.services[token.0].status = WorkerServiceStatus::Restarting;
-                        self.state =
-                            WorkerState::Restarting(idx, token, self.factories[idx].create());
-                        self.poll(cx)
-                    }
+            WorkerState::Unavailable => match self.check_readiness(cx) {
+                Ok(true) => {
+                    self.state = WorkerState::Available;
+                    self.availability.set(true);
+                    self.poll(cx)
                 }
-            }
+                Ok(false) => Poll::Pending,
+                Err((token, idx)) => {
+                    trace!(
+                        "Service {:?} failed, restarting",
+                        self.factories[idx].name(token)
+                    );
+                    self.services[token.0].status = WorkerServiceStatus::Restarting;
+                    self.state =
+                        WorkerState::Restarting(idx, token, self.factories[idx].create());
+                    self.poll(cx)
+                }
+            },
             WorkerState::Restarting(idx, token, ref mut fut) => {
                 match fut.as_mut().poll(cx) {
                     Poll::Ready(Ok(item)) => {
@@ -392,18 +375,9 @@ impl Future for Worker {
                                 self.factories[idx].name(token)
                             );
                             self.services[token.0].created(service);
-                            self.state = WorkerState::Unavailable(Vec::new());
+                            self.state = WorkerState::Unavailable;
                             return self.poll(cx);
                         }
-                        // for (token, service) in item {
-                        //     trace!(
-                        //         "Service {:?} has been restarted",
-                        //         self.factories[idx].name(token)
-                        //     );
-                        //     self.services[token.0].created(service);
-                        //     self.state = WorkerState::Unavailable(Vec::new());
-                        //     return self.poll(cx);
-                        // }
                     }
                     Poll::Ready(Err(_)) => {
                         panic!(
@@ -411,9 +385,7 @@ impl Future for Worker {
                             self.factories[idx].name(token)
                         );
                     }
-                    Poll::Pending => {
-                        return Poll::Pending;
-                    }
+                    Poll::Pending => return Poll::Pending,
                 }
                 self.poll(cx)
             }
@@ -441,49 +413,41 @@ impl Future for Worker {
 
                 Poll::Pending
             }
-            WorkerState::Available => {
-                loop {
-                    return match Pin::new(&mut self.rx).poll_next(cx) {
-                        // handle incoming io stream
-                        Poll::Ready(Some(WorkerCommand(msg))) => {
-                            match self.check_readiness(cx) {
-                                Ok(true) => {
-                                    let guard = self.conns.get();
-                                    let _ = self.services[msg.token.0]
-                                        .service
-                                        .call((Some(guard), ServerMessage::Connect(msg.io)));
-                                    continue;
-                                }
-                                Ok(false) => {
-                                    trace!("Worker is unavailable");
-                                    self.availability.set(false);
-                                    self.state = WorkerState::Unavailable(vec![msg]);
-                                }
-                                Err((token, idx)) => {
-                                    trace!(
-                                        "Service {:?} failed, restarting",
-                                        self.factories[idx].name(token)
-                                    );
-                                    self.availability.set(false);
-                                    self.services[token.0].status =
-                                        WorkerServiceStatus::Restarting;
-                                    self.state = WorkerState::Restarting(
-                                        idx,
-                                        token,
-                                        self.factories[idx].create(),
-                                    );
-                                }
-                            }
-                            self.poll(cx)
-                        }
-                        Poll::Pending => {
-                            self.state = WorkerState::Available;
-                            Poll::Pending
-                        }
-                        Poll::Ready(None) => Poll::Ready(()),
-                    };
+            // actively poll stream and handle worker command
+            WorkerState::Available => loop {
+                match self.check_readiness(cx) {
+                    Ok(true) => (),
+                    Ok(false) => {
+                        trace!("Worker is unavailable");
+                        self.availability.set(false);
+                        self.state = WorkerState::Unavailable;
+                        return self.poll(cx);
+                    }
+                    Err((token, idx)) => {
+                        trace!(
+                            "Service {:?} failed, restarting",
+                            self.factories[idx].name(token)
+                        );
+                        self.availability.set(false);
+                        self.services[token.0].status = WorkerServiceStatus::Restarting;
+                        self.state =
+                            WorkerState::Restarting(idx, token, self.factories[idx].create());
+                        return self.poll(cx);
+                    }
                 }
-            }
+
+                match Pin::new(&mut self.rx).poll_next(cx) {
+                    // handle incoming io stream
+                    Poll::Ready(Some(WorkerCommand(msg))) => {
+                        let guard = self.conns.get();
+                        let _ = self.services[msg.token.0]
+                            .service
+                            .call((Some(guard), ServerMessage::Connect(msg.io)));
+                    }
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(None) => return Poll::Ready(()),
+                };
+            },
         }
     }
 }

@@ -60,14 +60,6 @@ impl ServiceConfig {
         self._listen(name, MioTcpListener::from_std(lst))
     }
 
-    fn _listen<N: AsRef<str>>(&mut self, name: N, lst: MioTcpListener) -> &mut Self {
-        if self.apply.is_none() {
-            self.apply = Some(Box::new(not_configured));
-        }
-        self.services.push((name.as_ref().to_string(), lst));
-        self
-    }
-
     /// Register service configuration function. This function get called
     /// during worker runtime configuration. It get executed in worker thread.
     pub fn apply<F>(&mut self, f: F) -> io::Result<()>
@@ -76,6 +68,14 @@ impl ServiceConfig {
     {
         self.apply = Some(Box::new(f));
         Ok(())
+    }
+
+    fn _listen<N: AsRef<str>>(&mut self, name: N, lst: MioTcpListener) -> &mut Self {
+        if self.apply.is_none() {
+            self.apply = Some(Box::new(not_configured));
+        }
+        self.services.push((name.as_ref().to_string(), lst));
+        self
     }
 }
 

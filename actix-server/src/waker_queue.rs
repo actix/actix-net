@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::sync::Arc;
 
 use concurrent_queue::{ConcurrentQueue, PopError};
@@ -6,7 +7,7 @@ use mio::{Registry, Token as MioToken, Waker};
 use crate::worker::WorkerHandle;
 
 /// waker token for `mio::Poll` instance
-pub(crate) const WAKER_TOKEN: MioToken = MioToken(1);
+pub(crate) const WAKER_TOKEN: MioToken = MioToken(usize::MAX);
 
 /// `mio::Waker` with a queue for waking up the `Accept`'s `Poll` and contains the `WakerInterest`
 /// the `Poll` would want to look into.
@@ -15,6 +16,14 @@ pub(crate) struct WakerQueue(Arc<(Waker, ConcurrentQueue<WakerInterest>)>);
 impl Clone for WakerQueue {
     fn clone(&self) -> Self {
         Self(self.0.clone())
+    }
+}
+
+impl Deref for WakerQueue {
+    type Target = (Waker, ConcurrentQueue<WakerInterest>);
+
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
     }
 }
 
@@ -32,16 +41,21 @@ impl WakerQueue {
 
     /// push a new interest to the queue and wake up the accept poll afterwards.
     pub(crate) fn wake(&self, interest: WakerInterest) {
-        // ToDo: should we handle error here?
-        let r = (self.0).1.push(interest);
-        assert!(r.is_ok());
+        let (waker, queue) = self.deref();
 
-        (self.0).0.wake().expect("can not wake up Accept Poll");
+        // ToDo: should we handle error here?
+        queue
+            .push(interest)
+            .unwrap_or_else(|e| panic!("WakerQueue overflow: {}", e));
+
+        waker
+            .wake()
+            .unwrap_or_else(|e| panic!("can not wake up Accept Poll: {}", e));
     }
 
     /// pop an `WakerInterest` from the back of the queue.
     pub(crate) fn pop(&self) -> Result<WakerInterest, WakerQueueError> {
-        (self.0).1.pop()
+        self.deref().1.pop()
     }
 }
 
@@ -49,8 +63,9 @@ impl WakerQueue {
 ///
 /// *. These interests should not be confused with `mio::Interest` and mostly not I/O related
 pub(crate) enum WakerInterest {
-    /// Interest from `Worker` notifying `Accept` to run `maybe_backpressure` method
-    Notify,
+    /// `WorkerAvailable` is an interest from `Worker` notifying `Accept` there is a worker
+    /// available and can accept new tasks.
+    WorkerAvailable,
     /// `Pause`, `Resume`, `Stop` Interest are from `ServerBuilder` future. It listens to
     /// `ServerCommand` and notify `Accept` to do exactly these tasks.
     Pause,
@@ -60,8 +75,8 @@ pub(crate) enum WakerInterest {
     /// connection `Accept` would deregister socket listener temporary and wake up the poll and
     /// register them again after the delayed future resolve.
     Timer,
-    /// `Worker` ins an interest happen after a worker runs into faulted state(This is determined by
-    /// if work can be sent to it successfully).`Accept` would be waked up and add the new
+    /// `WorkerNew` is an interest happen after a worker runs into faulted state(This is determined
+    /// by if work can be sent to it successfully).`Accept` would be waked up and add the new
     /// `WorkerHandle`.
     Worker(WorkerHandle),
 }

@@ -47,9 +47,9 @@ tokio-openssl = { version = "0.5.0", optional = true }
 
 # rustls
 rust-tls = { package = "rustls", version = "0.18.0", optional = true }
+tokio-rustls = { version = "0.20.0", optional = true }
 webpki = { version = "0.21", optional = true }
 webpki-roots = { version = "0.20", optional = true }
-tokio-rustls = { version = "0.20.0", optional = true }
 
 # native-tls
 native-tls = { version = "0.2", optional = true }

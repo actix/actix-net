@@ -7,20 +7,19 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
 use std::{fmt, thread};
 
+use copyless::BoxHelper;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot::{channel, Canceled, Sender};
 use futures_util::{
     future::{self, FutureExt},
     stream::Stream,
 };
+use smallvec::SmallVec;
+
+pub use tokio::task::JoinHandle;
 
 use crate::runtime::Runtime;
 use crate::system::System;
-
-use copyless::BoxHelper;
-
-use smallvec::SmallVec;
-pub use tokio::task::JoinHandle;
 
 thread_local!(
     static ADDR: RefCell<Option<Arbiter>> = RefCell::new(None);

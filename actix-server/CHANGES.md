@@ -1,11 +1,12 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
-* Update `mio` dependency to 0.7.3
-* `ServerBuilder::backlog` would accept `u32` instead of `i32`
-* Use `concurrent-queue` to manage poll wakes instead of `futures::channel::mpsc`.
-* Remove `AcceptNotify` type and pass `WakerQueue` to `WorkerClient` for notify the `Accept` more directly.
-* Convert `mio::Stream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using `FromRawFd` and `IntoRawFd`(`IntoRawSocket` and `FromRawSocket` on windows).
+* Update `mio` dependency to 0.7.3.
+* Remove `socket2` dependency.
+* `ServerBuilder::backlog` would accept `u32` instead of `i32`.
+* Use `concurrent-queue` to manage poll wakes instead of `futures::channel::mpsc::unbounded`.
+* Remove `AcceptNotify` type and pass `WakerQueue` to `Worker` for wake up the `Accept`'s `Poll`.
+* Convert `mio::net::TcpStream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using `FromRawFd` and `IntoRawFd`(`FromRawSocket` and `IntoRawSocket` on windows).
 * Remove `AsyncRead` and `AsyncWrite` trait bound for `socket::FromStream` trait. 
 
 ## 1.0.4 - 2020-09-12

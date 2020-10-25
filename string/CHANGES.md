@@ -1,5 +1,8 @@
 # Changes
 
+## Unreleased - 2020-xx-xx
+* Update `bytes` dependency to 0.6
+
 ## [0.1.5] - 2020-03-30
 
 * Serde support

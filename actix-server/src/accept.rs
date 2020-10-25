@@ -61,13 +61,13 @@ impl AcceptLoop {
     pub(crate) fn start(
         &mut self,
         socks: Vec<(Token, MioListener)>,
-        workers: Vec<WorkerHandle>,
+        handles: Vec<WorkerHandle>,
     ) {
         let srv = self.srv.take().expect("Can not re-use AcceptInfo");
         let poll = self.poll.take().unwrap();
         let waker = self.waker.clone();
 
-        Accept::start(poll, waker, socks, srv, workers);
+        Accept::start(poll, waker, socks, srv, handles);
     }
 }
 
@@ -75,13 +75,11 @@ impl AcceptLoop {
 struct Accept {
     poll: Poll,
     waker: WakerQueue,
-    workers: Vec<WorkerHandle>,
+    handles: Vec<WorkerHandle>,
     srv: Server,
     next: usize,
     backpressure: bool,
 }
-
-const DELTA: usize = 100;
 
 /// This function defines errors that are per-connection. Which basically
 /// means that if we get this error from `accept()` system call it means
@@ -102,7 +100,7 @@ impl Accept {
         waker: WakerQueue,
         socks: Vec<(Token, MioListener)>,
         srv: Server,
-        workers: Vec<WorkerHandle>,
+        handles: Vec<WorkerHandle>,
     ) {
         // Accept runs in its own thread and would want to spawn additional futures to current
         // actix system.
@@ -112,7 +110,7 @@ impl Accept {
             .spawn(move || {
                 System::set_current(sys);
                 let (mut accept, sockets) =
-                    Accept::new_with_sockets(poll, waker, socks, workers, srv);
+                    Accept::new_with_sockets(poll, waker, socks, handles, srv);
                 accept.poll_with(sockets);
             })
             .unwrap();
@@ -122,7 +120,7 @@ impl Accept {
         poll: Poll,
         waker: WakerQueue,
         socks: Vec<(Token, MioListener)>,
-        workers: Vec<WorkerHandle>,
+        handles: Vec<WorkerHandle>,
         srv: Server,
     ) -> (Accept, Slab<ServerSocketInfo>) {
         let mut sockets = Slab::new();
@@ -134,7 +132,7 @@ impl Accept {
 
             // Start listening for incoming connections
             poll.registry()
-                .register(&mut lst, MioToken(token + DELTA), Interest::READABLE)
+                .register(&mut lst, MioToken(token), Interest::READABLE)
                 .unwrap_or_else(|e| panic!("Can not register io: {}", e));
 
             entry.insert(ServerSocketInfo {
@@ -148,7 +146,7 @@ impl Accept {
         let accept = Accept {
             poll,
             waker,
-            workers,
+            handles,
             srv,
             next: 0,
             backpressure: false,
@@ -173,11 +171,20 @@ impl Accept {
                     // necessary/good practice to actively drain the waker queue.
                     WAKER_TOKEN => 'waker: loop {
                         match self.waker.pop() {
-                            // worker notify it's availability has change. we maybe want to recover
-                            // from backpressure.
-                            Ok(WakerInterest::Notify) => {
+                            // worker notify it becomes available. we may want to recover from
+                            // backpressure.
+                            Ok(WakerInterest::WorkerAvailable) => {
                                 self.maybe_backpressure(&mut sockets, false);
                             }
+                            // a new worker thread is made and it's handle would be added to Accept
+                            Ok(WakerInterest::Worker(handle)) => {
+                                // maybe we want to recover from a backpressure.
+                                self.maybe_backpressure(&mut sockets, false);
+                                self.handles.push(handle);
+                            }
+                            // got timer interest and it's time to try register socket(s) again.
+                            Ok(WakerInterest::Timer) => self.process_timer(&mut sockets),
+                            Err(WakerQueueError::Empty) => break 'waker,
                             Ok(WakerInterest::Pause) => {
                                 sockets.iter_mut().for_each(|(_, info)| {
                                     match self.deregister(info) {
@@ -196,29 +203,14 @@ impl Accept {
                                     self.register_logged(token, info);
                                 });
                             }
-                            Ok(WakerInterest::Stop) => {
-                                return self.deregister_all(&mut sockets);
-                            }
-                            // a new worker thread is made and it's handle would be added to Accept
-                            Ok(WakerInterest::Worker(handle)) => {
-                                // maybe we want to recover from a backpressure.
-                                self.maybe_backpressure(&mut sockets, false);
-                                self.workers.push(handle);
-                            }
-                            // got timer interest and it's time to try register socket(s) again.
-                            Ok(WakerInterest::Timer) => self.process_timer(&mut sockets),
-                            Err(WakerQueueError::Empty) => break 'waker,
-                            Err(WakerQueueError::Closed) => {
+                            Ok(WakerInterest::Stop) | Err(WakerQueueError::Closed) => {
                                 return self.deregister_all(&mut sockets);
                             }
                         }
                     },
                     _ => {
                         let token = usize::from(token);
-                        if token < DELTA {
-                            continue;
-                        }
-                        self.accept(&mut sockets, token - DELTA);
+                        self.accept(&mut sockets, token);
                     }
                 }
             }
@@ -241,11 +233,9 @@ impl Accept {
 
     #[cfg(not(target_os = "windows"))]
     fn register(&self, token: usize, info: &mut ServerSocketInfo) -> io::Result<()> {
-        self.poll.registry().register(
-            &mut info.lst,
-            MioToken(token + DELTA),
-            Interest::READABLE,
-        )
+        self.poll
+            .registry()
+            .register(&mut info.lst, MioToken(token), Interest::READABLE)
     }
 
     #[cfg(target_os = "windows")]
@@ -255,11 +245,11 @@ impl Accept {
         // Calling reregister seems to fix the issue.
         self.poll
             .registry()
-            .register(&mut info.lst, mio::Token(token + DELTA), Interest::READABLE)
+            .register(&mut info.lst, mio::Token(token), Interest::READABLE)
             .or_else(|_| {
                 self.poll.registry().reregister(
                     &mut info.lst,
-                    mio::Token(token + DELTA),
+                    mio::Token(token),
                     Interest::READABLE,
                 )
             })
@@ -298,8 +288,8 @@ impl Accept {
 
     fn accept_one(&mut self, sockets: &mut Slab<ServerSocketInfo>, mut msg: Conn) {
         if self.backpressure {
-            while !self.workers.is_empty() {
-                match self.workers[self.next].send(msg) {
+            while !self.handles.is_empty() {
+                match self.handles[self.next].send(msg) {
                     Ok(_) => {
                         self.set_next();
                         break;
@@ -308,13 +298,13 @@ impl Accept {
                         // worker lost contact and could be gone. a message is sent to
                         // `ServerBuilder` future to notify it a new worker should be made.
                         // after that remove the fault worker.
-                        self.srv.worker_faulted(self.workers[self.next].idx);
+                        self.srv.worker_faulted(self.handles[self.next].idx);
                         msg = tmp;
-                        self.workers.swap_remove(self.next);
-                        if self.workers.is_empty() {
+                        self.handles.swap_remove(self.next);
+                        if self.handles.is_empty() {
                             error!("No workers");
                             return;
-                        } else if self.workers.len() <= self.next {
+                        } else if self.handles.len() <= self.next {
                             self.next = 0;
                         }
                         continue;
@@ -323,10 +313,10 @@ impl Accept {
             }
         } else {
             let mut idx = 0;
-            while idx < self.workers.len() {
+            while idx < self.handles.len() {
                 idx += 1;
-                if self.workers[self.next].available() {
-                    match self.workers[self.next].send(msg) {
+                if self.handles[self.next].available() {
+                    match self.handles[self.next].send(msg) {
                         Ok(_) => {
                             self.set_next();
                             return;
@@ -335,14 +325,14 @@ impl Accept {
                         // `ServerBuilder` future to notify it a new worker should be made.
                         // after that remove the fault worker and enter backpressure if necessary.
                         Err(tmp) => {
-                            self.srv.worker_faulted(self.workers[self.next].idx);
+                            self.srv.worker_faulted(self.handles[self.next].idx);
                             msg = tmp;
-                            self.workers.swap_remove(self.next);
-                            if self.workers.is_empty() {
+                            self.handles.swap_remove(self.next);
+                            if self.handles.is_empty() {
                                 error!("No workers");
                                 self.maybe_backpressure(sockets, true);
                                 return;
-                            } else if self.workers.len() <= self.next {
+                            } else if self.handles.len() <= self.next {
                                 self.next = 0;
                             }
                             continue;
@@ -357,9 +347,9 @@ impl Accept {
         }
     }
 
-    // set next worker that would accept work.
+    // set next worker handle that would accept work.
     fn set_next(&mut self) {
-        self.next = (self.next + 1) % self.workers.len();
+        self.next = (self.next + 1) % self.handles.len();
     }
 
     fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
@@ -375,9 +365,9 @@ impl Accept {
                     Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return,
                     Err(ref e) if connection_error(e) => continue,
                     Err(e) => {
-                        // deregister socket listener temporary
+                        // deregister listener temporary
                         error!("Error accepting connection: {}", e);
-                        if let Err(err) = self.poll.registry().deregister(&mut info.lst) {
+                        if let Err(err) = self.deregister(info) {
                             error!("Can not deregister server socket {}", err);
                         }
 

@@ -235,7 +235,7 @@ mod tests {
         assert_eq!(format!("{}", addr), "127.0.0.1:8080");
 
         let addr: StdSocketAddr = "127.0.0.1:0".parse().unwrap();
-        let socket = mio::net::TcpSocket::new_v4().unwrap();
+        let socket = MioTcpSocket::new_v4().unwrap();
         socket.set_reuseaddr(true).unwrap();
         socket.bind(addr).unwrap();
         let tcp = socket.listen(128).unwrap();

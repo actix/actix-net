@@ -26,5 +26,5 @@ futures-channel = { version = "0.3.4", default-features = false }
 futures-sink = { version = "0.3.4", default-features = false }
 futures-util = { version = "0.3.4", default-features = false }
 log = "0.4"
-pin-project = "0.4.17"
+pin-project = "1.0.0"
 slab = "0.4"
