@@ -8,9 +8,10 @@
 
 ### Changed
 
-* Remove `'static` lifetime requirement for `Runtime::block_on` and `SystemRunner::block_on`. These functions would 
-accept a `&Self` when calling. Remove `'static` lifetime requirement for `System::run`. Deprecate `Arbiter::is_running`
-and `Arbiter::local_join`. `Arbiter::spawn` would panic when `System` is not in scope. [#207]
+* Remove `'static` lifetime requirement for `Runtime::block_on` and `SystemRunner::block_on`. 
+  Remove `'static` lifetime requirement for `System::run`. 
+  Deprecate `Arbiter::is_running` and `Arbiter::local_join`. 
+  `Arbiter::spawn` would panic when `System` is not in scope. [#207]
 
 ### Fixed
 
