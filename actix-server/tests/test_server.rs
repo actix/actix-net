@@ -24,14 +24,14 @@ fn test_bind() {
     let h = thread::spawn(move || {
         let mut sys = actix_rt::System::new("test");
 
-        let srv = sys.block_on(async {
+        let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .workers(1)
                 .disable_signals()
                 .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
                 .start()
-        });
+        }));
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
     });
@@ -51,14 +51,14 @@ fn test_listen() {
     let h = thread::spawn(move || {
         let mut sys = actix_rt::System::new("test");
         let lst = net::TcpListener::bind(addr).unwrap();
-        sys.block_on(async {
+        sys.block_on(lazy(|_| {
             Server::build()
                 .disable_signals()
                 .workers(1)
                 .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
                 .start()
-        });
+        }));
         let _ = tx.send(actix_rt::System::current());
         let _ = sys.run();
     });
@@ -84,7 +84,7 @@ fn test_start() {
 
     let h = thread::spawn(move || {
         let mut sys = actix_rt::System::new("test");
-        let srv = sys.block_on(async {
+        let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .backlog(100)
                 .disable_signals()
@@ -97,7 +97,7 @@ fn test_start() {
                 })
                 .unwrap()
                 .start()
-        });
+        }));
 
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
@@ -152,7 +152,7 @@ fn test_configure() {
     let h = thread::spawn(move || {
         let num = num2.clone();
         let mut sys = actix_rt::System::new("test");
-        let srv = sys.block_on(async {
+        let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .disable_signals()
                 .configure(move |cfg| {
@@ -175,7 +175,7 @@ fn test_configure() {
                 .unwrap()
                 .workers(1)
                 .start()
-        });
+        }));
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
     });
