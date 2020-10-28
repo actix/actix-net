@@ -1,6 +1,5 @@
 //! A runtime implementation that runs everything on the current thread.
-#![deny(rust_2018_idioms, warnings)]
-#![allow(clippy::type_complexity)]
+#![forbid(unsafe_code)]
 
 use std::future::Future;
 
