@@ -90,7 +90,7 @@ impl TestServer {
                     .unwrap()
                     .workers(1)
                     .disable_signals()
-                    .start()
+                    .start();
             });
 
             tx.send((System::current(), local_addr)).unwrap();
