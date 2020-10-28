@@ -2,6 +2,8 @@
 #![deny(rust_2018_idioms, warnings)]
 #![allow(clippy::type_complexity)]
 
+use std::future::Future;
+
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub use actix_macros::{main, test};
 
@@ -23,15 +25,12 @@ pub use actix_threadpool as blocking;
 /// # Panics
 ///
 /// This function panics if actix system is not running.
+#[inline]
 pub fn spawn<F>(f: F)
 where
-    F: futures_util::future::Future<Output = ()> + 'static,
+    F: Future<Output = ()> + 'static,
 {
-    if !System::is_set() {
-        panic!("System is not running");
-    }
-
-    Arbiter::spawn(f);
+    Arbiter::spawn(f)
 }
 
 /// Asynchronous signal handling
@@ -63,4 +62,8 @@ pub mod time {
     pub use tokio::time::{delay_for, delay_until, Delay};
     pub use tokio::time::{interval, interval_at, Interval};
     pub use tokio::time::{timeout, Timeout};
+}
+
+pub mod task {
+    pub use tokio::task::yield_now;
 }

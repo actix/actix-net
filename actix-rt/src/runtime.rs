@@ -24,10 +24,11 @@ impl Runtime {
             .basic_scheduler()
             .build()?;
 
-        Ok(Runtime {
-            rt,
-            local: LocalSet::new(),
-        })
+        Ok(Runtime { rt, local: LocalSet::new() })
+    }
+
+    pub(super) fn local(&self) -> &LocalSet {
+        &self.local
     }
 
     /// Spawn a future onto the single-threaded runtime.
@@ -84,7 +85,7 @@ impl Runtime {
     /// complete execution by calling `block_on` or `run`.
     pub fn block_on<F>(&mut self, f: F) -> F::Output
     where
-        F: Future + 'static,
+        F: Future,
     {
         self.local.block_on(&mut self.rt, f)
     }
