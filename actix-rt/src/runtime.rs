@@ -24,7 +24,10 @@ impl Runtime {
             .basic_scheduler()
             .build()?;
 
-        Ok(Runtime { rt, local: LocalSet::new() })
+        Ok(Runtime {
+            rt,
+            local: LocalSet::new(),
+        })
     }
 
     pub(super) fn local(&self) -> &LocalSet {

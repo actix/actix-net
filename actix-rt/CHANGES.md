@@ -6,6 +6,16 @@
 
 * Add `System::attach_to_tokio` method. [#173]
 
+### Changed
+
+* Deprecate `Arbiter::is_running`and `Arbiter::local_join`. `Arbiter::spawn` would panic when `System` is not in scope. [#207]
+
+### Fixed
+
+* Fix work load issue by removing `PENDDING` thread local. [#207]
+
+[#207]: https://github.com/actix/actix-net/pull/207
+
 ## [1.1.1] - 2020-04-30
 
 ### Fixed
