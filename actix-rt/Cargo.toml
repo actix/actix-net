@@ -24,3 +24,6 @@ tokio = { version = "0.2.6", default-features = false, features = ["rt-core", "r
 [dev-dependencies]
 futures-util = { version = "0.3.4", default-features = false, features = ["alloc"] }
 tokio = { version = "0.2.6", features = ["full"] }
+tokio-compat = "0.1.6"
+futures-01 = { package = "futures", version = "0.1" }
+tokio-01 = { package = "tokio", version = "0.1" }

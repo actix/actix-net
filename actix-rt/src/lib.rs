@@ -14,7 +14,7 @@ mod system;
 
 pub use self::arbiter::Arbiter;
 pub use self::builder::{Builder, SystemRunner};
-pub use self::runtime::Runtime;
+pub use self::runtime::{DefaultExec, ExecFactory};
 pub use self::system::System;
 
 #[doc(hidden)]
@@ -25,12 +25,15 @@ pub use actix_threadpool as blocking;
 /// # Panics
 ///
 /// This function panics if actix system is not running.
+///
+/// This function panics if actix system does not runs on default executor
+/// (tokio current-thread executor with a matching version to the actix-rt dependency).
 #[inline]
 pub fn spawn<F>(f: F)
 where
     F: Future<Output = ()> + 'static,
 {
-    Arbiter::spawn(f)
+    DefaultExec::spawn(f)
 }
 
 /// Asynchronous signal handling

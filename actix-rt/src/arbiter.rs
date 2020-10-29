@@ -2,6 +2,7 @@ use std::any::{Any, TypeId};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
@@ -10,9 +11,8 @@ use std::{fmt, thread};
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot::{channel, Canceled, Sender};
 use tokio::stream::Stream;
-use tokio::task::LocalSet;
 
-use crate::runtime::Runtime;
+use crate::runtime::{DefaultExec, ExecFactory};
 use crate::system::System;
 
 thread_local!(
@@ -60,16 +60,26 @@ impl Default for Arbiter {
 }
 
 impl Arbiter {
-    pub(crate) fn new_system(local: &LocalSet) -> Self {
+    pub(crate) fn new_system<E: ExecFactory>(exec: &mut E::Executor) -> Self {
         let (tx, rx) = unbounded();
 
         let arb = Arbiter::with_sender(tx);
         ADDR.with(|cell| *cell.borrow_mut() = Some(arb.clone()));
         STORAGE.with(|cell| cell.borrow_mut().clear());
 
-        local.spawn_local(ArbiterController { rx });
+        let controller: ArbiterController<E> = ArbiterController {
+            rx,
+            _exec: Default::default(),
+        };
+
+        E::spawn_ref(exec, controller);
 
         arb
+    }
+
+    #[deprecated(since = "1.2.0", note = "Please use actix_rt::spawn instead")]
+    pub fn spawn<F: Future<Output = ()> + 'static>(f: F) {
+        DefaultExec::spawn(f)
     }
 
     /// Returns the current thread's arbiter's address. If no Arbiter is present, then this
@@ -95,6 +105,10 @@ impl Arbiter {
     /// Spawn new thread and run event loop in spawned thread.
     /// Returns address of newly created arbiter.
     pub fn new() -> Arbiter {
+        Self::new_with::<DefaultExec>()
+    }
+
+    pub fn new_with<E: ExecFactory>() -> Arbiter {
         let id = COUNT.fetch_add(1, Ordering::Relaxed);
         let name = format!("actix-rt:worker:{}", id);
         let sys = System::current();
@@ -105,7 +119,7 @@ impl Arbiter {
             .spawn({
                 let tx = tx.clone();
                 move || {
-                    let mut rt = Runtime::new().expect("Can not create Runtime");
+                    let mut exec = E::build().expect("Can not create Runtime");
                     let arb = Arbiter::with_sender(tx);
 
                     STORAGE.with(|cell| cell.borrow_mut().clear());
@@ -121,7 +135,11 @@ impl Arbiter {
 
                     // start arbiter controller
                     // run loop
-                    rt.block_on(ArbiterController { rx });
+                    let fut: ArbiterController<E> = ArbiterController {
+                        rx,
+                        _exec: PhantomData,
+                    };
+                    E::block_on(&mut exec, fut);
 
                     // unregister arbiter
                     let _ = System::current()
@@ -137,29 +155,6 @@ impl Arbiter {
             sender: tx,
             thread_handle: Some(handle),
         }
-    }
-
-    /// Spawn a future on the current thread. This does not create a new Arbiter
-    /// or Arbiter address, it is simply a helper for spawning futures on the current
-    /// thread.
-    pub fn spawn<F>(future: F)
-    where
-        F: Future<Output = ()> + 'static,
-    {
-        tokio::task::spawn_local(future);
-    }
-
-    /// Executes a future on the current thread. This does not create a new Arbiter
-    /// or Arbiter address, it is simply a helper for executing futures on the current
-    /// thread.
-    pub fn spawn_fn<F, R>(f: F)
-    where
-        F: FnOnce() -> R + 'static,
-        R: Future<Output = ()> + 'static,
-    {
-        Arbiter::spawn(async {
-            f();
-        })
     }
 
     /// Send a future to the Arbiter's thread, and spawn it.
@@ -272,11 +267,12 @@ impl Arbiter {
     }
 }
 
-struct ArbiterController {
+struct ArbiterController<Exec> {
     rx: UnboundedReceiver<ArbiterCommand>,
+    _exec: PhantomData<Exec>,
 }
 
-impl Drop for ArbiterController {
+impl<Exec> Drop for ArbiterController<Exec> {
     fn drop(&mut self) {
         if thread::panicking() {
             if System::current().stop_on_panic() {
@@ -289,7 +285,7 @@ impl Drop for ArbiterController {
     }
 }
 
-impl Future for ArbiterController {
+impl<E: ExecFactory> Future for ArbiterController<E> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -299,7 +295,7 @@ impl Future for ArbiterController {
                 Poll::Ready(Some(item)) => match item {
                     ArbiterCommand::Stop => return Poll::Ready(()),
                     ArbiterCommand::Execute(fut) => {
-                        tokio::task::spawn_local(fut);
+                        E::spawn(fut);
                     }
                     ArbiterCommand::ExecuteFn(f) => {
                         f.call_box();
