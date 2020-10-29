@@ -33,7 +33,7 @@ pub fn spawn<F>(f: F)
 where
     F: Future<Output = ()> + 'static,
 {
-    DefaultExec::spawn(f)
+    DefaultExec::spawn(f);
 }
 
 /// Asynchronous signal handling

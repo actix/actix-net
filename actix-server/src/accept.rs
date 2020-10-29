@@ -1,9 +1,9 @@
+use std::marker::PhantomData;
 use std::sync::mpsc as sync_mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{io, thread};
 
-use actix_rt::time::{delay_until, Instant};
-use actix_rt::System;
+use actix_rt::{ExecFactory, System};
 use log::{error, info};
 use slab::Slab;
 
@@ -81,14 +81,16 @@ impl AcceptLoop {
         AcceptNotify::new(self.notify_ready.clone())
     }
 
-    pub(crate) fn start(
+    pub(crate) fn start<Exec>(
         &mut self,
         socks: Vec<(Token, StdListener)>,
         workers: Vec<WorkerClient>,
-    ) {
+    ) where
+        Exec: ExecFactory,
+    {
         let srv = self.srv.take().expect("Can not re-use AcceptInfo");
 
-        Accept::start(
+        Accept::<Exec>::start(
             self.rx.take().expect("Can not re-use AcceptInfo"),
             self.cmd_reg.take().expect("Can not re-use AcceptInfo"),
             self.notify_reg.take().expect("Can not re-use AcceptInfo"),
@@ -99,7 +101,7 @@ impl AcceptLoop {
     }
 }
 
-struct Accept {
+struct Accept<Exec> {
     poll: mio::Poll,
     rx: sync_mpsc::Receiver<Command>,
     sockets: Slab<ServerSocketInfo>,
@@ -108,6 +110,7 @@ struct Accept {
     timer: (mio::Registration, mio::SetReadiness),
     next: usize,
     backpressure: bool,
+    _exec: PhantomData<Exec>,
 }
 
 const DELTA: usize = 100;
@@ -128,7 +131,10 @@ fn connection_error(e: &io::Error) -> bool {
         || e.kind() == io::ErrorKind::ConnectionReset
 }
 
-impl Accept {
+impl<Exec> Accept<Exec>
+where
+    Exec: ExecFactory,
+{
     #![allow(clippy::too_many_arguments)]
     pub(crate) fn start(
         rx: sync_mpsc::Receiver<Command>,
@@ -145,7 +151,7 @@ impl Accept {
             .name("actix-server accept loop".to_owned())
             .spawn(move || {
                 System::set_current(sys);
-                let mut accept = Accept::new(rx, socks, workers, srv);
+                let mut accept = Accept::<Exec>::new(rx, socks, workers, srv);
 
                 // Start listening for incoming commands
                 if let Err(err) = accept.poll.register(
@@ -176,7 +182,7 @@ impl Accept {
         socks: Vec<(Token, StdListener)>,
         workers: Vec<WorkerClient>,
         srv: Server,
-    ) -> Accept {
+    ) -> Accept<Exec> {
         // Create a poll instance
         let poll = match mio::Poll::new() {
             Ok(poll) => poll,
@@ -227,6 +233,7 @@ impl Accept {
             next: 0,
             timer: (tm, tmr),
             backpressure: false,
+            _exec: PhantomData,
         }
     }
 
@@ -462,7 +469,7 @@ impl Accept {
 
                         let r = self.timer.1.clone();
                         System::current().arbiter().send(Box::pin(async move {
-                            delay_until(Instant::now() + Duration::from_millis(510)).await;
+                            Exec::sleep(Duration::from_millis(510)).await;
                             let _ = r.set_readiness(mio::Ready::readable());
                         }));
                         return;

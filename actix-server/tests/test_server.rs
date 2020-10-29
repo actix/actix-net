@@ -2,10 +2,12 @@ use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::{mpsc, Arc};
 use std::{net, thread, time};
 
+use actix_rt::DefaultExec;
 use actix_server::Server;
 use actix_service::fn_service;
 use futures_util::future::{lazy, ok};
 use socket2::{Domain, Protocol, Socket, Type};
+use tokio::net::TcpStream;
 
 fn unused_addr() -> net::SocketAddr {
     let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
@@ -28,7 +30,9 @@ fn test_bind() {
             Server::build()
                 .workers(1)
                 .disable_signals()
-                .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
+                .bind("test", addr, move || {
+                    fn_service(|_: TcpStream| ok::<_, ()>(()))
+                })
                 .unwrap()
                 .start()
         }));
@@ -165,8 +169,14 @@ fn test_configure() {
                         .listen("addr3", lst)
                         .apply(move |rt| {
                             let num = num.clone();
-                            rt.service("addr1", fn_service(|_| ok::<_, ()>(())));
-                            rt.service("addr3", fn_service(|_| ok::<_, ()>(())));
+                            rt.service::<_, _, DefaultExec>(
+                                "addr1",
+                                fn_service(|_| ok::<_, ()>(())),
+                            );
+                            rt.service::<_, _, DefaultExec>(
+                                "addr3",
+                                fn_service(|_| ok::<_, ()>(())),
+                            );
                             rt.on_start(lazy(move |_| {
                                 let _ = num.fetch_add(1, Relaxed);
                             }))

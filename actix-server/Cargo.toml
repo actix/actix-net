@@ -41,4 +41,5 @@ mio-uds = { version = "0.6.7" }
 bytes = "0.5"
 env_logger = "0.7"
 actix-testing = "1.0.0"
+async-std = { version = "1.6.5", features = ["unstable", "tokio02"] }
 tokio = { version = "0.2", features = ["io-util"] }

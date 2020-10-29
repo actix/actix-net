@@ -15,6 +15,7 @@ pub use self::builder::ServerBuilder;
 pub use self::config::{ServiceConfig, ServiceRuntime};
 pub use self::server::Server;
 pub use self::service::ServiceFactory;
+pub use self::socket::StdStream;
 
 #[doc(hidden)]
 pub use self::socket::FromStream;

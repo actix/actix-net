@@ -1,11 +1,11 @@
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use std::{io, mem, net};
 
 use actix_rt::net::TcpStream;
-use actix_rt::time::{delay_until, Instant};
-use actix_rt::{spawn, System};
+use actix_rt::{DefaultExec, ExecFactory, System};
 use futures_channel::mpsc::{unbounded, UnboundedReceiver};
 use futures_channel::oneshot;
 use futures_util::future::ready;
@@ -21,10 +21,10 @@ use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::StdListener;
 use crate::worker::{self, Worker, WorkerAvailability, WorkerClient};
-use crate::Token;
+use crate::{FromStream, Token};
 
 /// Server builder
-pub struct ServerBuilder {
+pub struct ServerBuilder<Exec = DefaultExec> {
     threads: usize,
     token: Token,
     backlog: i32,
@@ -38,6 +38,7 @@ pub struct ServerBuilder {
     cmd: UnboundedReceiver<ServerCommand>,
     server: Server,
     notify: Vec<oneshot::Sender<()>>,
+    _exec: PhantomData<Exec>,
 }
 
 impl Default for ServerBuilder {
@@ -46,9 +47,20 @@ impl Default for ServerBuilder {
     }
 }
 
-impl ServerBuilder {
-    /// Create new Server builder instance
-    pub fn new() -> ServerBuilder {
+impl<Exec> ServerBuilder<Exec>
+where
+    Exec: ExecFactory,
+{
+    /// Create new Server builder instance with default tokio executor.
+    pub fn new() -> Self {
+        ServerBuilder::<DefaultExec>::new_with()
+    }
+
+    /// Create new Server builder instance with a generic executor.
+    pub fn new_with<E>() -> ServerBuilder<E>
+    where
+        E: ExecFactory,
+    {
         let (tx, rx) = unbounded();
         let server = Server::new(tx);
 
@@ -66,6 +78,7 @@ impl ServerBuilder {
             cmd: rx,
             notify: Vec::new(),
             server,
+            _exec: Default::default(),
         }
     }
 
@@ -134,7 +147,7 @@ impl ServerBuilder {
     ///
     /// This function is useful for moving parts of configuration to a
     /// different module or even library.
-    pub fn configure<F>(mut self, f: F) -> io::Result<ServerBuilder>
+    pub fn configure<F>(mut self, f: F) -> io::Result<ServerBuilder<Exec>>
     where
         F: Fn(&mut ServiceConfig) -> io::Result<()>,
     {
@@ -143,7 +156,7 @@ impl ServerBuilder {
         f(&mut cfg)?;
 
         if let Some(apply) = cfg.apply {
-            let mut srv = ConfiguredService::new(apply);
+            let mut srv = ConfiguredService::<Exec>::new(apply);
             for (name, lst) in cfg.services {
                 let token = self.token.next();
                 srv.stream(token, name.clone(), lst.local_addr()?);
@@ -157,16 +170,18 @@ impl ServerBuilder {
     }
 
     /// Add new service to the server.
-    pub fn bind<F, U, N: AsRef<str>>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
+    pub fn bind<F, U, N, S>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
-        F: ServiceFactory<TcpStream>,
+        F: ServiceFactory<S>,
         U: net::ToSocketAddrs,
+        N: AsRef<str>,
+        S: FromStream,
     {
         let sockets = bind_addr(addr, self.backlog)?;
 
         for lst in sockets {
             let token = self.token.next();
-            self.services.push(StreamNewService::create(
+            self.services.push(StreamNewService::<_, _, Exec>::create(
                 name.as_ref().to_string(),
                 token,
                 factory.clone(),
@@ -180,11 +195,12 @@ impl ServerBuilder {
 
     #[cfg(all(unix))]
     /// Add new unix domain service to the server.
-    pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
+    pub fn bind_uds<F, U, N, S>(self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
-        N: AsRef<str>,
+        F: ServiceFactory<S>,
         U: AsRef<std::path::Path>,
+        N: AsRef<str>,
+        S: FromStream,
     {
         use std::os::unix::net::UnixListener;
 
@@ -205,19 +221,21 @@ impl ServerBuilder {
     /// Add new unix domain service to the server.
     /// Useful when running as a systemd service and
     /// a socket FD can be acquired using the systemd crate.
-    pub fn listen_uds<F, N: AsRef<str>>(
+    pub fn listen_uds<F, N, S>(
         mut self,
         name: N,
         lst: std::os::unix::net::UnixListener,
         factory: F,
     ) -> io::Result<Self>
     where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
+        F: ServiceFactory<S>,
+        N: AsRef<str>,
+        S: FromStream,
     {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
         let token = self.token.next();
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-        self.services.push(StreamNewService::create(
+        self.services.push(StreamNewService::<_, _, Exec>::create(
             name.as_ref().to_string(),
             token,
             factory,
@@ -239,7 +257,7 @@ impl ServerBuilder {
         F: ServiceFactory<TcpStream>,
     {
         let token = self.token.next();
-        self.services.push(StreamNewService::create(
+        self.services.push(StreamNewService::<_, _, Exec>::create(
             name.as_ref().to_string(),
             token,
             factory,
@@ -276,7 +294,7 @@ impl ServerBuilder {
             for sock in &self.sockets {
                 info!("Starting \"{}\" service on {}", sock.1, sock.2);
             }
-            self.accept.start(
+            self.accept.start::<Exec>(
                 mem::take(&mut self.sockets)
                     .into_iter()
                     .map(|t| (t.0, t.2))
@@ -286,12 +304,12 @@ impl ServerBuilder {
 
             // handle signals
             if !self.no_signals {
-                Signals::start(self.server.clone()).unwrap();
+                Signals::<Exec>::start(self.server.clone()).unwrap();
             }
 
             // start http server actor
             let server = self.server.clone();
-            spawn(self);
+            Exec::spawn(self);
             server
         }
     }
@@ -301,7 +319,7 @@ impl ServerBuilder {
         let services: Vec<Box<dyn InternalServiceFactory>> =
             self.services.iter().map(|v| v.clone_factory()).collect();
 
-        Worker::start(idx, services, avail, self.shutdown_timeout)
+        Worker::<Exec>::start(idx, services, avail, self.shutdown_timeout)
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) {
@@ -360,7 +378,7 @@ impl ServerBuilder {
 
                 // stop workers
                 if !self.workers.is_empty() && graceful {
-                    spawn(
+                    Exec::spawn(
                         self.workers
                             .iter()
                             .map(move |worker| worker.1.stop(graceful))
@@ -374,16 +392,10 @@ impl ServerBuilder {
                                     let _ = tx.send(());
                                 }
                                 if exit {
-                                    spawn(
-                                        async {
-                                            delay_until(
-                                                Instant::now() + Duration::from_millis(300),
-                                            )
-                                            .await;
-                                            System::current().stop();
-                                        }
-                                        .boxed(),
-                                    );
+                                    Exec::spawn(async {
+                                        Exec::sleep(Duration::from_millis(300)).await;
+                                        System::current().stop();
+                                    });
                                 }
                                 ready(())
                             }),
@@ -391,14 +403,10 @@ impl ServerBuilder {
                 } else {
                     // we need to stop system if server was spawned
                     if self.exit {
-                        spawn(
-                            delay_until(Instant::now() + Duration::from_millis(300)).then(
-                                |_| {
-                                    System::current().stop();
-                                    ready(())
-                                },
-                            ),
-                        );
+                        Exec::spawn(async {
+                            Exec::sleep(Duration::from_millis(300)).await;
+                            System::current().stop();
+                        });
                     }
                     if let Some(tx) = completion {
                         let _ = tx.send(());
@@ -441,7 +449,10 @@ impl ServerBuilder {
     }
 }
 
-impl Future for ServerBuilder {
+impl<Exec> Future for ServerBuilder<Exec>
+where
+    Exec: ExecFactory,
+{
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

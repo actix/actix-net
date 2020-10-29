@@ -12,6 +12,8 @@ use super::service::{
     BoxedServerService, InternalServiceFactory, ServerMessage, StreamService,
 };
 use super::Token;
+use actix_rt::ExecFactory;
+use std::marker::PhantomData;
 
 pub struct ServiceConfig {
     pub(crate) services: Vec<(String, net::TcpListener)>,
@@ -72,20 +74,22 @@ impl ServiceConfig {
     }
 }
 
-pub(super) struct ConfiguredService {
+pub(super) struct ConfiguredService<Exec> {
     rt: Box<dyn ServiceRuntimeConfiguration>,
     names: HashMap<Token, (String, net::SocketAddr)>,
     topics: HashMap<String, Token>,
     services: Vec<Token>,
+    _exec: PhantomData<Exec>,
 }
 
-impl ConfiguredService {
+impl<Exec> ConfiguredService<Exec> {
     pub(super) fn new(rt: Box<dyn ServiceRuntimeConfiguration>) -> Self {
         ConfiguredService {
             rt,
             names: HashMap::new(),
             topics: HashMap::new(),
             services: Vec::new(),
+            _exec: Default::default(),
         }
     }
 
@@ -96,7 +100,10 @@ impl ConfiguredService {
     }
 }
 
-impl InternalServiceFactory for ConfiguredService {
+impl<Exec> InternalServiceFactory for ConfiguredService<Exec>
+where
+    Exec: ExecFactory,
+{
     fn name(&self, token: Token) -> &str {
         &self.names[&token].0
     }
@@ -107,6 +114,7 @@ impl InternalServiceFactory for ConfiguredService {
             names: self.names.clone(),
             topics: self.topics.clone(),
             services: self.services.clone(),
+            _exec: PhantomData,
         })
     }
 
@@ -142,7 +150,7 @@ impl InternalServiceFactory for ConfiguredService {
                     let name = names.remove(&token).unwrap().0;
                     res.push((
                         token,
-                        Box::new(StreamService::new(actix::fn_service(
+                        Box::new(StreamService::<_, Exec>::new(actix::fn_service(
                             move |_: TcpStream| {
                                 error!("Service {:?} is not configured", name);
                                 ok::<_, ()>(())
@@ -207,20 +215,22 @@ impl ServiceRuntime {
     ///
     /// Name of the service must be registered during configuration stage with
     /// *ServiceConfig::bind()* or *ServiceConfig::listen()* methods.
-    pub fn service<T, F>(&mut self, name: &str, service: F)
+    pub fn service<T, F, Exec>(&mut self, name: &str, service: F)
     where
         F: actix::IntoServiceFactory<T>,
         T: actix::ServiceFactory<Config = (), Request = TcpStream> + 'static,
         T::Future: 'static,
         T::Service: 'static,
         T::InitError: fmt::Debug,
+        Exec: ExecFactory,
     {
         // let name = name.to_owned();
         if let Some(token) = self.names.get(name) {
             self.services.insert(
                 *token,
-                Box::new(ServiceFactory {
+                Box::new(ServiceFactory::<_, Exec> {
                     inner: service.into_factory(),
+                    _exec: PhantomData,
                 }),
             );
         } else {
@@ -249,17 +259,19 @@ type BoxedNewService = Box<
     >,
 >;
 
-struct ServiceFactory<T> {
+struct ServiceFactory<T, Exec> {
     inner: T,
+    _exec: PhantomData<Exec>,
 }
 
-impl<T> actix::ServiceFactory for ServiceFactory<T>
+impl<T, Exec> actix::ServiceFactory for ServiceFactory<T, Exec>
 where
     T: actix::ServiceFactory<Config = (), Request = TcpStream>,
     T::Future: 'static,
     T::Service: 'static,
     T::Error: 'static,
     T::InitError: fmt::Debug + 'static,
+    Exec: ExecFactory,
 {
     type Request = (Option<CounterGuard>, ServerMessage);
     type Response = ();
@@ -273,7 +285,7 @@ where
         let fut = self.inner.new_service(());
         async move {
             match fut.await {
-                Ok(s) => Ok(Box::new(StreamService::new(s)) as BoxedServerService),
+                Ok(s) => Ok(Box::new(StreamService::<_, Exec>::new(s)) as BoxedServerService),
                 Err(e) => {
                     error!("Can not construct service: {:?}", e);
                     Err(())

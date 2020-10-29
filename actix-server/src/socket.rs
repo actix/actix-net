@@ -1,6 +1,5 @@
 use std::{fmt, io, net};
 
-use actix_codec::{AsyncRead, AsyncWrite};
 use actix_rt::net::TcpStream;
 
 pub(crate) enum StdListener {
@@ -143,7 +142,7 @@ impl mio::Evented for SocketListener {
     }
 }
 
-pub trait FromStream: AsyncRead + AsyncWrite + Sized {
+pub trait FromStream: Sized + Send + 'static {
     fn from_stdstream(sock: StdStream) -> io::Result<Self>;
 }
 

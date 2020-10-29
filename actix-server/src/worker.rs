@@ -1,11 +1,11 @@
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time;
 
-use actix_rt::time::{delay_until, Delay, Instant};
-use actix_rt::{spawn, Arbiter};
+use actix_rt::{Arbiter, ExecFactory};
 use actix_utils::counter::Counter;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot;
@@ -125,15 +125,19 @@ impl WorkerAvailability {
 ///
 /// Worker accepts Socket objects via unbounded channel and starts stream
 /// processing.
-pub(crate) struct Worker {
+pub(crate) struct Worker<Exec>
+where
+    Exec: ExecFactory,
+{
     rx: UnboundedReceiver<WorkerCommand>,
     rx2: UnboundedReceiver<StopCommand>,
     services: Vec<WorkerService>,
     availability: WorkerAvailability,
     conns: Counter,
     factories: Vec<Box<dyn InternalServiceFactory>>,
-    state: WorkerState,
+    state: WorkerState<Exec>,
     shutdown_timeout: time::Duration,
+    _exec: PhantomData<Exec>,
 }
 
 struct WorkerService {
@@ -159,7 +163,10 @@ enum WorkerServiceStatus {
     Stopped,
 }
 
-impl Worker {
+impl<Exec> Worker<Exec>
+where
+    Exec: ExecFactory,
+{
     pub(crate) fn start(
         idx: usize,
         factories: Vec<Box<dyn InternalServiceFactory>>,
@@ -170,10 +177,10 @@ impl Worker {
         let (tx2, rx2) = unbounded();
         let avail = availability.clone();
 
-        Arbiter::new().send(
+        Arbiter::new_with::<Exec>().send(
             async move {
                 availability.set(false);
-                let mut wrk = MAX_CONNS_COUNTER.with(move |conns| Worker {
+                let mut wrk: Worker<Exec> = MAX_CONNS_COUNTER.with(move |conns| Worker {
                     rx,
                     rx2,
                     availability,
@@ -182,6 +189,7 @@ impl Worker {
                     services: Vec::new(),
                     conns: conns.clone(),
                     state: WorkerState::Unavailable(Vec::new()),
+                    _exec: PhantomData,
                 });
 
                 let mut fut: Vec<MapOk<LocalBoxFuture<'static, _>, _>> = Vec::new();
@@ -193,7 +201,7 @@ impl Worker {
                     }));
                 }
 
-                spawn(async move {
+                Exec::spawn(async move {
                     let res = join_all(fut).await;
                     let res: Result<Vec<_>, _> = res.into_iter().collect();
                     match res {
@@ -228,7 +236,7 @@ impl Worker {
             self.services.iter_mut().for_each(|srv| {
                 if srv.status == WorkerServiceStatus::Available {
                     srv.status = WorkerServiceStatus::Stopped;
-                    actix_rt::spawn(
+                    Exec::spawn(
                         srv.service
                             .call((None, ServerMessage::ForceShutdown))
                             .map(|_| ()),
@@ -240,7 +248,7 @@ impl Worker {
             self.services.iter_mut().for_each(move |srv| {
                 if srv.status == WorkerServiceStatus::Available {
                     srv.status = WorkerServiceStatus::Stopping;
-                    actix_rt::spawn(
+                    Exec::spawn(
                         srv.service
                             .call((None, ServerMessage::Shutdown(timeout)))
                             .map(|_| ()),
@@ -297,7 +305,7 @@ impl Worker {
     }
 }
 
-enum WorkerState {
+enum WorkerState<Exec: ExecFactory> {
     Available,
     Unavailable(Vec<Conn>),
     Restarting(
@@ -306,14 +314,13 @@ enum WorkerState {
         #[allow(clippy::type_complexity)]
         Pin<Box<dyn Future<Output = Result<Vec<(Token, BoxedServerService)>, ()>>>>,
     ),
-    Shutdown(
-        Pin<Box<Delay>>,
-        Pin<Box<Delay>>,
-        Option<oneshot::Sender<bool>>,
-    ),
+    Shutdown(Exec::Sleep, Exec::Sleep, Option<oneshot::Sender<bool>>),
 }
 
-impl Future for Worker {
+impl<Exec> Future for Worker<Exec>
+where
+    Exec: ExecFactory,
+{
     type Output = ();
 
     // FIXME: remove this attribute
@@ -335,8 +342,8 @@ impl Future for Worker {
                 if num != 0 {
                     info!("Graceful worker shutdown, {} connections", num);
                     self.state = WorkerState::Shutdown(
-                        Box::pin(delay_until(Instant::now() + time::Duration::from_secs(1))),
-                        Box::pin(delay_until(Instant::now() + self.shutdown_timeout)),
+                        Exec::sleep(time::Duration::from_secs(1)),
+                        Exec::sleep(self.shutdown_timeout),
                         Some(result),
                     );
                 } else {
@@ -423,31 +430,24 @@ impl Future for Worker {
                 }
 
                 // check graceful timeout
-                match t2.as_mut().poll(cx) {
-                    Poll::Pending => (),
-                    Poll::Ready(_) => {
-                        let _ = tx.take().unwrap().send(false);
-                        self.shutdown(true);
-                        Arbiter::current().stop();
-                        return Poll::Ready(());
-                    }
+                if Pin::new(t2).poll(cx).is_ready() {
+                    let _ = tx.take().unwrap().send(false);
+                    self.shutdown(true);
+                    Arbiter::current().stop();
+                    return Poll::Ready(());
                 }
 
                 // sleep for 1 second and then check again
-                match t1.as_mut().poll(cx) {
-                    Poll::Pending => (),
-                    Poll::Ready(_) => {
-                        *t1 = Box::pin(delay_until(
-                            Instant::now() + time::Duration::from_secs(1),
-                        ));
-                        let _ = t1.as_mut().poll(cx);
-                    }
+                if Pin::new(&mut *t1).poll(cx).is_ready() {
+                    *t1 = Exec::sleep(time::Duration::from_secs(1));
+                    let _ = Pin::new(t1).poll(cx);
                 }
+
                 Poll::Pending
             }
             WorkerState::Available => {
                 loop {
-                    match Pin::new(&mut self.rx).poll_next(cx) {
+                    return match Pin::new(&mut self.rx).poll_next(cx) {
                         // handle incoming io stream
                         Poll::Ready(Some(WorkerCommand(msg))) => {
                             match self.check_readiness(cx) {
@@ -478,14 +478,14 @@ impl Future for Worker {
                                     );
                                 }
                             }
-                            return self.poll(cx);
+                            self.poll(cx)
                         }
                         Poll::Pending => {
                             self.state = WorkerState::Available;
-                            return Poll::Pending;
+                            Poll::Pending
                         }
-                        Poll::Ready(None) => return Poll::Ready(()),
-                    }
+                        Poll::Ready(None) => Poll::Ready(()),
+                    };
                 }
             }
         }

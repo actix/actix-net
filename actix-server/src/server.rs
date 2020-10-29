@@ -3,6 +3,7 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use actix_rt::ExecFactory;
 use futures_channel::mpsc::UnboundedSender;
 use futures_channel::oneshot;
 use futures_util::FutureExt;
@@ -39,6 +40,11 @@ impl Server {
     /// Start server building process
     pub fn build() -> ServerBuilder {
         ServerBuilder::default()
+    }
+
+    /// Start server building process with a custom executor
+    pub fn build_with<Exec: ExecFactory>() -> ServerBuilder<Exec> {
+        ServerBuilder::<Exec>::new_with()
     }
 
     pub(crate) fn signal(&self, sig: Signal) {

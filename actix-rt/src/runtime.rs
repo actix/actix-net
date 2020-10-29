@@ -1,13 +1,16 @@
 use std::future::Future;
 use std::io;
+use std::time::Duration;
+
 use tokio::{runtime, task::LocalSet};
 
 /// A trait for construct async executor and run future on it.
 ///
 /// A factory trait is necessary as `actix` and `actix-web` can run on multiple instances of
 /// executors. Therefore the executor would be constructed multiple times
-pub trait ExecFactory: Sized + Unpin + 'static {
+pub trait ExecFactory: Sized + Send + Sync + Unpin + 'static {
     type Executor;
+    type Sleep: Future<Output = ()> + Send + Unpin + 'static;
 
     fn build() -> io::Result<Self::Executor>;
 
@@ -64,6 +67,9 @@ pub trait ExecFactory: Sized + Unpin + 'static {
     ///
     /// *. `spawn_ref` is preferred when you can choose between it and `spawn`.
     fn spawn_ref<F: Future<Output = ()> + 'static>(exec: &mut Self::Executor, f: F);
+
+    /// Get a timeout sleep future with given duration.
+    fn sleep(dur: Duration) -> Self::Sleep;
 }
 
 /// Default Single-threaded tokio executor on the current thread.
@@ -78,6 +84,7 @@ pub type DefaultExecutor = (runtime::Runtime, LocalSet);
 
 impl ExecFactory for DefaultExec {
     type Executor = DefaultExecutor;
+    type Sleep = tokio::time::Delay;
 
     fn build() -> io::Result<Self::Executor> {
         let rt = runtime::Builder::new()
@@ -95,11 +102,17 @@ impl ExecFactory for DefaultExec {
         rt.block_on(local.run_until(f))
     }
 
+    #[inline]
     fn spawn<F: Future<Output = ()> + 'static>(f: F) {
         tokio::task::spawn_local(f);
     }
 
     fn spawn_ref<F: Future<Output = ()> + 'static>(exec: &mut Self::Executor, f: F) {
         exec.1.spawn_local(f);
+    }
+
+    #[inline]
+    fn sleep(dur: Duration) -> Self::Sleep {
+        tokio::time::delay_for(dur)
     }
 }

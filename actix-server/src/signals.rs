@@ -6,6 +6,8 @@ use std::task::{Context, Poll};
 use futures_util::future::lazy;
 
 use crate::server::Server;
+use actix_rt::ExecFactory;
+use std::marker::PhantomData;
 
 /// Different types of process signals
 #[allow(dead_code)]
@@ -21,20 +23,24 @@ pub(crate) enum Signal {
     Quit,
 }
 
-pub(crate) struct Signals {
+pub(crate) struct Signals<Exec> {
     srv: Server,
     #[cfg(not(unix))]
     stream: Pin<Box<dyn Future<Output = io::Result<()>>>>,
     #[cfg(unix)]
     streams: Vec<(Signal, actix_rt::signal::unix::Signal)>,
+    _exec: PhantomData<Exec>,
 }
 
-impl Signals {
+impl<Exec> Signals<Exec>
+where
+    Exec: ExecFactory,
+{
     pub(crate) fn start(srv: Server) -> io::Result<()> {
-        actix_rt::spawn(lazy(|_| {
+        Exec::spawn(lazy(|_| {
             #[cfg(not(unix))]
             {
-                actix_rt::spawn(Signals {
+                Exec::spawn(Signals {
                     srv,
                     stream: Box::pin(actix_rt::signal::ctrl_c()),
                 });
@@ -63,7 +69,11 @@ impl Signals {
                     }
                 }
 
-                actix_rt::spawn(Signals { srv, streams })
+                Exec::spawn(Self {
+                    srv,
+                    streams,
+                    _exec: PhantomData,
+                })
             }
         }));
 
@@ -71,7 +81,10 @@ impl Signals {
     }
 }
 
-impl Future for Signals {
+impl<Exec> Future for Signals<Exec>
+where
+    Exec: Unpin,
+{
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

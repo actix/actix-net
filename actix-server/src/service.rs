@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use actix_rt::spawn;
+use actix_rt::ExecFactory;
 use actix_service::{self as actix, Service, ServiceFactory as ActixServiceFactory};
 use actix_utils::counter::CounterGuard;
 use futures_util::future::{err, ok, LocalBoxFuture, Ready};
@@ -48,22 +48,27 @@ pub(crate) type BoxedServerService = Box<
     >,
 >;
 
-pub(crate) struct StreamService<T> {
+pub(crate) struct StreamService<T, Exec> {
     service: T,
+    _exec: PhantomData<Exec>,
 }
 
-impl<T> StreamService<T> {
+impl<T, Exec> StreamService<T, Exec> {
     pub(crate) fn new(service: T) -> Self {
-        StreamService { service }
+        StreamService {
+            service,
+            _exec: PhantomData,
+        }
     }
 }
 
-impl<T, I> Service for StreamService<T>
+impl<T, I, Exec> Service for StreamService<T, Exec>
 where
     T: Service<Request = I>,
     T::Future: 'static,
     T::Error: 'static,
     I: FromStream,
+    Exec: ExecFactory,
 {
     type Request = (Option<CounterGuard>, ServerMessage);
     type Response = ();
@@ -83,7 +88,7 @@ where
 
                 if let Ok(stream) = stream {
                     let f = self.service.call(stream);
-                    spawn(async move {
+                    Exec::spawn(async move {
                         let _ = f.await;
                         drop(guard);
                     });
@@ -97,18 +102,24 @@ where
     }
 }
 
-pub(crate) struct StreamNewService<F: ServiceFactory<Io>, Io: FromStream> {
+pub(crate) struct StreamNewService<F, Io, Exec>
+where
+    F: ServiceFactory<Io>,
+    Io: FromStream,
+    Exec: ExecFactory,
+{
     name: String,
     inner: F,
     token: Token,
     addr: SocketAddr,
-    _t: PhantomData<Io>,
+    _t: PhantomData<(Io, Exec)>,
 }
 
-impl<F, Io> StreamNewService<F, Io>
+impl<F, Io, Exec> StreamNewService<F, Io, Exec>
 where
     F: ServiceFactory<Io>,
     Io: FromStream + Send + 'static,
+    Exec: ExecFactory,
 {
     pub(crate) fn create(
         name: String,
@@ -126,10 +137,11 @@ where
     }
 }
 
-impl<F, Io> InternalServiceFactory for StreamNewService<F, Io>
+impl<F, Io, Exec> InternalServiceFactory for StreamNewService<F, Io, Exec>
 where
     F: ServiceFactory<Io>,
     Io: FromStream + Send + 'static,
+    Exec: ExecFactory,
 {
     fn name(&self, _: Token) -> &str {
         &self.name
@@ -152,7 +164,8 @@ where
             .new_service(())
             .map_err(|_| ())
             .map_ok(move |inner| {
-                let service: BoxedServerService = Box::new(StreamService::new(inner));
+                let service: BoxedServerService =
+                    Box::new(StreamService::<_, Exec>::new(inner));
                 vec![(token, service)]
             })
             .boxed_local()

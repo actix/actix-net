@@ -74,6 +74,7 @@ struct TokioCompatExec;
 
 impl ExecFactory for TokioCompatExec {
     type Executor = tokio_compat::runtime::current_thread::Runtime;
+    type Sleep = tokio::time::Delay;
 
     fn build() -> std::io::Result<Self::Executor> {
         let rt = tokio_compat::runtime::current_thread::Runtime::new()?;
@@ -93,6 +94,10 @@ impl ExecFactory for TokioCompatExec {
 
     fn spawn_ref<F: Future<Output = ()> + 'static>(exec: &mut Self::Executor, f: F) {
         exec.spawn_std(f);
+    }
+
+    fn sleep(dur: Duration) -> Self::Sleep {
+        tokio::time::delay_for(dur)
     }
 }
 

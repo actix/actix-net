@@ -130,8 +130,14 @@ impl<E: ExecFactory> SystemRunner<E> {
         }
     }
 
+    pub fn spawn<F>(&mut self, fut: F)
+    where
+        F: Future<Output = ()> + 'static,
+    {
+        E::spawn_ref(&mut self.rt, fut);
+    }
+
     /// Execute a future and wait for result.
-    #[inline]
     pub fn block_on<F, O>(&mut self, fut: F) -> O
     where
         F: Future<Output = O>,
