@@ -25,9 +25,10 @@ use std::{
     },
 };
 
+use actix_rt::net::TcpStream;
 use actix_server::Server;
 use actix_service::pipeline_factory;
-use actix_tls::rustls::Acceptor as RustlsAcceptor;
+use actix_tls::rustls::{Acceptor as RustlsAcceptor, Acceptor};
 use futures_util::future::ok;
 use log::info;
 use rust_tls::{
@@ -56,7 +57,7 @@ async fn main() -> io::Result<()> {
         .set_single_cert(cert_chain, keys.remove(0))
         .unwrap();
 
-    let tls_acceptor = RustlsAcceptor::new(tls_config);
+    let tls_acceptor = RustlsAcceptor::<TcpStream>::new(tls_config);
 
     let count = Arc::new(AtomicUsize::new(0));
 

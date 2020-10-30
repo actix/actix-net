@@ -14,7 +14,7 @@ mod system;
 
 pub use self::arbiter::Arbiter;
 pub use self::builder::{Builder, SystemRunner};
-pub use self::runtime::{DefaultExec, ExecFactory};
+pub use self::runtime::{ActixExec, ExecFactory};
 pub use self::system::System;
 
 #[doc(hidden)]
@@ -33,7 +33,7 @@ pub fn spawn<F>(f: F)
 where
     F: Future<Output = ()> + 'static,
 {
-    DefaultExec::spawn(f);
+    ActixExec::spawn(f);
 }
 
 /// Asynchronous signal handling

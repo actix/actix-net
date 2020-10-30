@@ -23,6 +23,7 @@ use futures_util::future::ok;
 use log::{error, info};
 
 fn main() -> io::Result<()> {
+    // annotate executor type and block_on it
     actix_rt::System::new_with::<AsyncStdExec, _>("actix").block_on(async {
         env::set_var("RUST_LOG", "actix=trace,basic=trace");
         env_logger::init();
@@ -32,14 +33,15 @@ fn main() -> io::Result<()> {
         let addr = ("127.0.0.1", 8080);
         info!("starting server on port: {}", &addr.0);
 
-        // Bind socket address and start worker(s). By default, the server uses the number of available
-        // logical CPU cores as the worker count. For this reason, the closure passed to bind needs
-        // to return a service *factory*; so it can be created once per worker.
+        // annotate again as the server would want to spawn tasks on executor.
         Server::build_with::<AsyncStdExec>()
             .bind("echo", addr, move || {
                 let count = Arc::clone(&count);
                 let num2 = Arc::clone(&count);
 
+                // stream type must impl actix_server::FromStream trait for handling the stream.
+                // at this point stream type can be generic if you want to passing it though
+                // pipeline but at last a service must give it a concrete type to work with.
                 pipeline_factory(move |mut stream: AsyncStdTcpStream| {
                     let count = Arc::clone(&count);
 
@@ -89,19 +91,23 @@ fn main() -> io::Result<()> {
     })
 }
 
+// custom executor
 struct AsyncStdExec;
 
+// stream type can work on the custom executor
 struct AsyncStdTcpStream(async_std::net::TcpStream);
 
+// server would pass a StdStream enum and you have to convert it to your stream type.
 impl FromStream for AsyncStdTcpStream {
     fn from_stdstream(stream: StdStream) -> std::io::Result<Self> {
         match stream {
             StdStream::Tcp(tcp) => Ok(AsyncStdTcpStream(async_std::net::TcpStream::from(tcp))),
-            _ => unimplemented!(),
+            StdStream::Uds(_) => unimplemented!(),
         }
     }
 }
 
+// impl trait for custom executor so server can/block_on spawn tasks
 impl ExecFactory for AsyncStdExec {
     type Executor = ();
     type Sleep = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;

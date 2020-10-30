@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -10,7 +10,7 @@ use actix_utils::counter::Counter;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot;
 use futures_util::future::{join_all, LocalBoxFuture, MapOk};
-use futures_util::{future::Future, stream::Stream, FutureExt, TryFutureExt};
+use futures_util::{stream::Stream, FutureExt, TryFutureExt};
 use log::{error, info, trace};
 
 use crate::accept::AcceptNotify;
@@ -137,7 +137,6 @@ where
     factories: Vec<Box<dyn InternalServiceFactory>>,
     state: WorkerState<Exec>,
     shutdown_timeout: time::Duration,
-    _exec: PhantomData<Exec>,
 }
 
 struct WorkerService {
@@ -189,7 +188,6 @@ where
                     services: Vec::new(),
                     conns: conns.clone(),
                     state: WorkerState::Unavailable(Vec::new()),
-                    _exec: PhantomData,
                 });
 
                 let mut fut: Vec<MapOk<LocalBoxFuture<'static, _>, _>> = Vec::new();

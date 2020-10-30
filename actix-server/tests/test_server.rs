@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::{mpsc, Arc};
 use std::{net, thread, time};
 
-use actix_rt::DefaultExec;
+use actix_rt::ActixExec;
 use actix_server::Server;
 use actix_service::fn_service;
 use futures_util::future::{lazy, ok};
@@ -169,11 +169,11 @@ fn test_configure() {
                         .listen("addr3", lst)
                         .apply(move |rt| {
                             let num = num.clone();
-                            rt.service::<_, _, DefaultExec>(
+                            rt.service::<_, _, ActixExec>(
                                 "addr1",
                                 fn_service(|_| ok::<_, ()>(())),
                             );
-                            rt.service::<_, _, DefaultExec>(
+                            rt.service::<_, _, ActixExec>(
                                 "addr3",
                                 fn_service(|_| ok::<_, ()>(())),
                             );

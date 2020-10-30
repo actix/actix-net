@@ -78,12 +78,10 @@ pub trait ExecFactory: Sized + Send + Sync + Unpin + 'static {
 ///
 /// [mod]: index.html
 #[derive(Copy, Clone, Debug)]
-pub struct DefaultExec;
+pub struct ActixExec;
 
-pub type DefaultExecutor = (runtime::Runtime, LocalSet);
-
-impl ExecFactory for DefaultExec {
-    type Executor = DefaultExecutor;
+impl ExecFactory for ActixExec {
+    type Executor = (runtime::Runtime, LocalSet);
     type Sleep = tokio::time::Delay;
 
     fn build() -> io::Result<Self::Executor> {

@@ -12,7 +12,7 @@ use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot::{channel, Canceled, Sender};
 use tokio::stream::Stream;
 
-use crate::runtime::{DefaultExec, ExecFactory};
+use crate::runtime::{ActixExec, ExecFactory};
 use crate::system::System;
 
 thread_local!(
@@ -79,7 +79,7 @@ impl Arbiter {
 
     #[deprecated(since = "1.2.0", note = "Please use actix_rt::spawn instead")]
     pub fn spawn<F: Future<Output = ()> + 'static>(f: F) {
-        DefaultExec::spawn(f)
+        ActixExec::spawn(f)
     }
 
     /// Returns the current thread's arbiter's address. If no Arbiter is present, then this
@@ -105,7 +105,7 @@ impl Arbiter {
     /// Spawn new thread and run event loop in spawned thread.
     /// Returns address of newly created arbiter.
     pub fn new() -> Arbiter {
-        Self::new_with::<DefaultExec>()
+        Self::new_with::<ActixExec>()
     }
 
     pub fn new_with<E: ExecFactory>() -> Arbiter {

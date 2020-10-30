@@ -1,13 +1,12 @@
 use std::future::Future;
 use std::io;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures_util::future::lazy;
+use actix_rt::ExecFactory;
 
 use crate::server::Server;
-use actix_rt::ExecFactory;
-use std::marker::PhantomData;
 
 /// Different types of process signals
 #[allow(dead_code)]
@@ -37,12 +36,13 @@ where
     Exec: ExecFactory,
 {
     pub(crate) fn start(srv: Server) -> io::Result<()> {
-        Exec::spawn(lazy(|_| {
+        Exec::spawn(async {
             #[cfg(not(unix))]
             {
                 Exec::spawn(Signals {
                     srv,
                     stream: Box::pin(actix_rt::signal::ctrl_c()),
+                    _exec: PhantomData,
                 });
             }
             #[cfg(unix)]
@@ -75,7 +75,7 @@ where
                     _exec: PhantomData,
                 })
             }
-        }));
+        });
 
         Ok(())
     }

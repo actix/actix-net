@@ -7,7 +7,7 @@ use futures_channel::mpsc::UnboundedSender;
 use crate::arbiter::{Arbiter, SystemCommand};
 use crate::builder::{Builder, SystemRunner};
 use crate::runtime::ExecFactory;
-use crate::DefaultExec;
+use crate::ActixExec;
 
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -29,8 +29,8 @@ impl System {
     /// Create new system.
     ///
     /// This method panics if it can not create tokio runtime
-    pub fn new<T: Into<String>>(name: T) -> SystemRunner<DefaultExec> {
-        Self::new_with::<DefaultExec, T>(name)
+    pub fn new<T: Into<String>>(name: T) -> SystemRunner<ActixExec> {
+        Self::new_with::<ActixExec, T>(name)
     }
 
     /// This function will start tokio runtime and will finish once the
@@ -40,7 +40,7 @@ impl System {
     where
         F: FnOnce() + 'static,
     {
-        Self::run_with::<DefaultExec, F>(f)
+        Self::run_with::<ActixExec, F>(f)
     }
 
     /// Get current running system.

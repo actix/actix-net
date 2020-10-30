@@ -1,10 +1,13 @@
 use std::collections::HashMap;
+use std::future::Future;
+use std::marker::PhantomData;
 use std::{fmt, io, net};
 
 use actix_rt::net::TcpStream;
+use actix_rt::ExecFactory;
 use actix_service as actix;
 use actix_utils::counter::CounterGuard;
-use futures_util::future::{ok, Future, FutureExt, LocalBoxFuture};
+use futures_util::future::{ok, FutureExt, LocalBoxFuture};
 use log::error;
 
 use super::builder::bind_addr;
@@ -12,8 +15,6 @@ use super::service::{
     BoxedServerService, InternalServiceFactory, ServerMessage, StreamService,
 };
 use super::Token;
-use actix_rt::ExecFactory;
-use std::marker::PhantomData;
 
 pub struct ServiceConfig {
     pub(crate) services: Vec<(String, net::TcpListener)>,
@@ -276,9 +277,9 @@ where
     type Request = (Option<CounterGuard>, ServerMessage);
     type Response = ();
     type Error = ();
-    type InitError = ();
     type Config = ();
     type Service = BoxedServerService;
+    type InitError = ();
     type Future = LocalBoxFuture<'static, Result<BoxedServerService, ()>>;
 
     fn new_service(&self, _: ()) -> Self::Future {

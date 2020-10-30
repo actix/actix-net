@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -5,12 +6,12 @@ use std::time::Duration;
 use std::{io, mem, net};
 
 use actix_rt::net::TcpStream;
-use actix_rt::{DefaultExec, ExecFactory, System};
+use actix_rt::{ActixExec, ExecFactory, System};
 use futures_channel::mpsc::{unbounded, UnboundedReceiver};
 use futures_channel::oneshot;
 use futures_util::future::ready;
-use futures_util::stream::FuturesUnordered;
-use futures_util::{future::Future, ready, stream::Stream, FutureExt, StreamExt};
+use futures_util::stream::{FuturesUnordered, Stream};
+use futures_util::{ready, FutureExt, StreamExt};
 use log::{error, info};
 use socket2::{Domain, Protocol, Socket, Type};
 
@@ -24,7 +25,7 @@ use crate::worker::{self, Worker, WorkerAvailability, WorkerClient};
 use crate::{FromStream, Token};
 
 /// Server builder
-pub struct ServerBuilder<Exec = DefaultExec> {
+pub struct ServerBuilder<Exec = ActixExec> {
     threads: usize,
     token: Token,
     backlog: i32,
@@ -53,7 +54,7 @@ where
 {
     /// Create new Server builder instance with default tokio executor.
     pub fn new() -> Self {
-        ServerBuilder::<DefaultExec>::new_with()
+        ServerBuilder::<ActixExec>::new_with()
     }
 
     /// Create new Server builder instance with a generic executor.

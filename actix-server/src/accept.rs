@@ -151,7 +151,7 @@ where
             .name("actix-server accept loop".to_owned())
             .spawn(move || {
                 System::set_current(sys);
-                let mut accept = Accept::<Exec>::new(rx, socks, workers, srv);
+                let mut accept = Self::new(rx, socks, workers, srv);
 
                 // Start listening for incoming commands
                 if let Err(err) = accept.poll.register(
@@ -182,7 +182,7 @@ where
         socks: Vec<(Token, StdListener)>,
         workers: Vec<WorkerClient>,
         srv: Server,
-    ) -> Accept<Exec> {
+    ) -> Self {
         // Create a poll instance
         let poll = match mio::Poll::new() {
             Ok(poll) => poll,
