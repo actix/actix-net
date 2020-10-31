@@ -39,9 +39,9 @@ pub(crate) struct AcceptLoop {
 
 impl AcceptLoop {
     pub fn new(srv: Server) -> Self {
-        let poll = Poll::new().unwrap_or_else(|e| panic!("Can not create mio::Poll: {}", e));
+        let poll = Poll::new().unwrap_or_else(|e| panic!("Can not create `mio::Poll`: {}", e));
         let waker = WakerQueue::with_capacity(poll.registry(), 128)
-            .unwrap_or_else(|e| panic!("Can not create mio::Waker: {}", e));
+            .unwrap_or_else(|e| panic!("Can not create `mio::Waker`: {}", e));
 
         Self {
             srv: Some(srv),

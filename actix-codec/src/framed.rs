@@ -8,6 +8,7 @@ use futures_sink::Sink;
 use pin_project::pin_project;
 
 use crate::{AsyncRead, AsyncWrite, Decoder, Encoder, ReadBuf};
+use std::mem::MaybeUninit;
 
 /// Low-water mark
 const LW: usize = 1024;
@@ -221,21 +222,28 @@ impl<T, U> Framed<T, U> {
                 this.read_buf.reserve(HW - remaining)
             }
 
-            // FixMe: Is this the right way to do it for now?
-            let mut read = ReadBuf::uninit(this.read_buf.bytes_mut());
-            let cnt = match this.io.poll_read(cx, &mut read) {
+            // FIXME: Is this the right way to do it for now? (line 225 - 244)
+            let dst = this.read_buf.bytes_mut();
+            // SAFETY: `BufMut::bytes_mut` only return an empty slice when remaining is 0.
+            let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
+            let mut buf = ReadBuf::uninit(dst);
+
+            let cnt = match this.io.poll_read(cx, &mut buf) {
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
-                Poll::Ready(Ok(())) => read.filled().len(),
+                Poll::Ready(Ok(())) => buf.filled().len(),
             };
 
             if cnt == 0 {
                 this.flags.insert(Flags::EOF);
             } else {
+                // SAFETY: This is guaranteed to be the number of initialized (and read)
+                // bytes due to the invariants provided by `ReadBuf::filled`.
                 unsafe {
                     this.read_buf.advance_mut(cnt);
                 }
             }
+
             this.flags.insert(Flags::READABLE);
         }
     }

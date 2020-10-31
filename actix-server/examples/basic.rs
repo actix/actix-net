@@ -52,8 +52,7 @@ async fn main() -> io::Result<()> {
                     let mut buf = BytesMut::new();
 
                     loop {
-                        // ToDo: change to read_buf
-                        match stream.read(&mut buf).await {
+                        match stream.read_buf(&mut buf).await {
                             // end of stream; bail from loop
                             Ok(0) => break,
 
@@ -73,7 +72,7 @@ async fn main() -> io::Result<()> {
                     }
 
                     // send data down service pipeline
-                    Ok((buf.len(), size))
+                    Ok((buf.freeze(), size))
                 }
             })
             .map_err(|err| error!("Service Error: {:?}", err))

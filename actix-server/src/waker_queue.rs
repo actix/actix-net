@@ -43,7 +43,7 @@ impl WakerQueue {
     pub(crate) fn wake(&self, interest: WakerInterest) {
         let (waker, queue) = self.deref();
 
-        // ToDo: should we handle error here?
+        // FIXME: should we handle error here?
         queue
             .push(interest)
             .unwrap_or_else(|e| panic!("WakerQueue overflow: {}", e));
