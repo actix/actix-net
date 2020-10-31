@@ -60,19 +60,19 @@ impl Default for Arbiter {
 }
 
 impl Arbiter {
-    pub(crate) fn new_system<E: ExecFactory>(exec: &mut E::Executor) -> Self {
+    pub(crate) fn new_system<Exec: ExecFactory>(exec: &mut Exec::Executor) -> Self {
         let (tx, rx) = unbounded();
 
         let arb = Arbiter::with_sender(tx);
         ADDR.with(|cell| *cell.borrow_mut() = Some(arb.clone()));
         STORAGE.with(|cell| cell.borrow_mut().clear());
 
-        let controller: ArbiterController<E> = ArbiterController {
+        let controller = ArbiterController::<Exec> {
             rx,
             _exec: Default::default(),
         };
 
-        E::spawn_ref(exec, controller);
+        Exec::spawn_on(exec, controller);
 
         arb
     }
@@ -285,7 +285,7 @@ impl<Exec> Drop for ArbiterController<Exec> {
     }
 }
 
-impl<E: ExecFactory> Future for ArbiterController<E> {
+impl<Exec: ExecFactory> Future for ArbiterController<Exec> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -295,7 +295,7 @@ impl<E: ExecFactory> Future for ArbiterController<E> {
                 Poll::Ready(Some(item)) => match item {
                     ArbiterCommand::Stop => return Poll::Ready(()),
                     ArbiterCommand::Execute(fut) => {
-                        E::spawn(fut);
+                        Exec::spawn(fut);
                     }
                     ArbiterCommand::ExecuteFn(f) => {
                         f.call_box();

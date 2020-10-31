@@ -44,7 +44,7 @@ pub struct ServerBuilder<Exec = ActixExec> {
 
 impl Default for ServerBuilder {
     fn default() -> Self {
-        Self::new()
+        ServerBuilder::new()
     }
 }
 
@@ -52,16 +52,8 @@ impl<Exec> ServerBuilder<Exec>
 where
     Exec: ExecFactory,
 {
-    /// Create new Server builder instance with default tokio executor.
-    pub fn new() -> Self {
-        ServerBuilder::<ActixExec>::new_with()
-    }
-
     /// Create new Server builder instance with a generic executor.
-    pub fn new_with<E>() -> ServerBuilder<E>
-    where
-        E: ExecFactory,
-    {
+    pub fn new() -> Self {
         let (tx, rx) = unbounded();
         let server = Server::new(tx);
 

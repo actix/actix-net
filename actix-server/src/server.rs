@@ -44,7 +44,7 @@ impl Server {
 
     /// Start server building process with a custom executor
     pub fn build_with<Exec: ExecFactory>() -> ServerBuilder<Exec> {
-        ServerBuilder::<Exec>::new_with()
+        ServerBuilder::<Exec>::new()
     }
 
     pub(crate) fn signal(&self, sig: Signal) {

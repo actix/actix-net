@@ -15,21 +15,21 @@ use crate::system::System;
 /// Either use `Builder::build` to create a system and start actors.
 /// Alternatively, use `Builder::run` to start the tokio runtime and
 /// run a function in its context.
-pub struct Builder<E> {
+pub struct Builder<Exec> {
     /// Name of the System. Defaults to "actix" if unset.
     name: Cow<'static, str>,
 
     /// Whether the Arbiter will stop the whole System on uncaught panic. Defaults to false.
     stop_on_panic: bool,
-    exec: PhantomData<E>,
+    _exec: PhantomData<Exec>,
 }
 
-impl<E: ExecFactory> Builder<E> {
-    pub(crate) fn new() -> Builder<E> {
+impl<Exec: ExecFactory> Builder<Exec> {
+    pub(crate) fn new() -> Self {
         Builder {
             name: Cow::Borrowed("actix"),
             stop_on_panic: false,
-            exec: PhantomData,
+            _exec: PhantomData,
         }
     }
 
@@ -51,7 +51,7 @@ impl<E: ExecFactory> Builder<E> {
     /// Create new System.
     ///
     /// This method panics if it can not create tokio runtime
-    pub fn build(self) -> SystemRunner<E> {
+    pub fn build(self) -> SystemRunner<Exec> {
         self.create_runtime(|| {})
     }
 
@@ -65,8 +65,8 @@ impl<E: ExecFactory> Builder<E> {
         self.create_runtime(f).run()
     }
 
-    /// Create runtime with a given instance of type that impl `ExecFactory::Executor` trait.
-    pub fn create_with_runtime<F>(self, mut rt: E::Executor, f: F) -> SystemRunner<E>
+    /// Create runtime with a given instance of `ExecFactory::Executor` type.
+    pub fn create_with_runtime<F>(self, mut rt: Exec::Executor, f: F) -> SystemRunner<Exec>
     where
         F: FnOnce() + 'static,
     {
@@ -75,26 +75,26 @@ impl<E: ExecFactory> Builder<E> {
 
         let system = System::construct(
             sys_sender,
-            Arbiter::new_system::<E>(&mut rt),
+            Arbiter::new_system::<Exec>(&mut rt),
             self.stop_on_panic,
         );
 
         // system arbiter
         let arb = SystemArbiter::new(stop_tx, sys_receiver);
 
-        E::spawn_ref(&mut rt, arb);
+        Exec::spawn_on(&mut rt, arb);
 
         // init system arbiter and run configuration method
-        E::block_on(&mut rt, async { f() });
+        Exec::block_on(&mut rt, async { f() });
 
         SystemRunner { rt, stop, system }
     }
 
-    fn create_runtime<F>(self, f: F) -> SystemRunner<E>
+    fn create_runtime<F>(self, f: F) -> SystemRunner<Exec>
     where
         F: FnOnce() + 'static,
     {
-        let rt = E::build().unwrap();
+        let rt = Exec::build().unwrap();
         self.create_with_runtime(rt, f)
     }
 }
@@ -102,20 +102,20 @@ impl<E: ExecFactory> Builder<E> {
 /// Helper object that runs System's event loop
 #[must_use = "SystemRunner must be run"]
 #[derive(Debug)]
-pub struct SystemRunner<E: ExecFactory> {
-    rt: E::Executor,
+pub struct SystemRunner<Exec: ExecFactory> {
+    rt: Exec::Executor,
     stop: Receiver<i32>,
     system: System,
 }
 
-impl<E: ExecFactory> SystemRunner<E> {
+impl<Exec: ExecFactory> SystemRunner<Exec> {
     /// This function will start event loop and will finish once the
     /// `System::stop()` function is called.
     pub fn run(self) -> io::Result<()> {
         let SystemRunner { mut rt, stop, .. } = self;
 
         // run loop
-        match E::block_on(&mut rt, stop) {
+        match Exec::block_on(&mut rt, stop) {
             Ok(code) => {
                 if code != 0 {
                     Err(io::Error::new(
@@ -130,11 +130,12 @@ impl<E: ExecFactory> SystemRunner<E> {
         }
     }
 
+    /// Spawn a future on the system arbiter.
     pub fn spawn<F>(&mut self, fut: F)
     where
         F: Future<Output = ()> + 'static,
     {
-        E::spawn_ref(&mut self.rt, fut);
+        Exec::spawn_on(&mut self.rt, fut);
     }
 
     /// Execute a future and wait for result.
@@ -142,6 +143,6 @@ impl<E: ExecFactory> SystemRunner<E> {
     where
         F: Future<Output = O>,
     {
-        E::block_on(&mut self.rt, fut)
+        Exec::block_on(&mut self.rt, fut)
     }
 }

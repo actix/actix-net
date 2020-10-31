@@ -92,7 +92,7 @@ impl ExecFactory for TokioCompatExec {
             .unwrap();
     }
 
-    fn spawn_ref<F: Future<Output = ()> + 'static>(exec: &mut Self::Executor, f: F) {
+    fn spawn_on<F: Future<Output = ()> + 'static>(exec: &mut Self::Executor, f: F) {
         exec.spawn_std(f);
     }
 
@@ -103,27 +103,26 @@ impl ExecFactory for TokioCompatExec {
 
 #[test]
 fn tokio_compat() -> std::io::Result<()> {
-    // manually construct a compat executor.
-    let rt = TokioCompatExec::build()?;
+    let exec = TokioCompatExec::build()?;
 
-    // do some work with rt and pass it to builder
     actix_rt::System::builder::<TokioCompatExec>()
-        .create_with_runtime(rt, || {})
+        .create_with_runtime(exec, || {})
         .block_on(async {
             let (tx, rx) = tokio::sync::oneshot::channel();
-            tokio_01::spawn(futures_01::lazy(|| {
-                tx.send(251).unwrap();
-                Ok(())
-            }));
-
+            use futures_01::Future;
+            tokio_01::spawn(
+                tokio_01::timer::Delay::new(Instant::now() + Duration::from_millis(1))
+                    .map_err(|e| panic!("tokio 0.1 timer error: {}", e))
+                    .map(|_| tx.send(251).unwrap()),
+            );
+            TokioCompatExec::sleep(Duration::from_millis(1)).await;
             assert_eq!(251, rx.await.unwrap());
         });
 
-    // let the system construct the executor and block on it directly.
     actix_rt::System::new_with::<TokioCompatExec, _>("compat").block_on(async {
         let (tx, rx) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
-            tokio::time::delay_for(Duration::from_secs(1)).await;
+            TokioCompatExec::sleep(Duration::from_millis(1)).await;
             tx.send(996).unwrap();
         });
         assert_eq!(996, rx.await.unwrap());

@@ -32,29 +32,11 @@ pub trait ExecFactory: Sized + Send + Sync + Unpin + 'static {
     /// complete execution by calling `block_on` or `run`.
     fn block_on<F: Future>(exec: &mut Self::Executor, f: F) -> F::Output;
 
-    /// Spawn a future onto the single-threaded runtime without reference it.
+    /// Spawn a future onto an executor without reference it.
     ///
     /// See [module level][mod] documentation for more details.
     ///
     /// [mod]: index.html
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// # use futures::{future, Future, Stream};
-    /// use actix_rt::Runtime;
-    ///
-    /// # fn dox() {
-    /// // Create the runtime
-    /// let mut rt = Runtime::new().unwrap();
-    ///
-    /// // Spawn a future onto the runtime
-    /// rt.spawn(future::lazy(|_| {
-    ///     println!("running on the runtime");
-    /// }));
-    /// # }
-    /// # pub fn main() {}
-    /// ```
     ///
     /// # Panics
     ///
@@ -62,11 +44,11 @@ pub trait ExecFactory: Sized + Send + Sync + Unpin + 'static {
     /// is currently at capacity and is unable to spawn a new future.
     fn spawn<F: Future<Output = ()> + 'static>(f: F);
 
-    /// Spawn a future onto the single-threaded runtime reference. Useful when you have direct
+    /// Spawn a future onto an executor reference. Useful when you have direct
     /// access to executor.
     ///
-    /// *. `spawn_ref` is preferred when you can choose between it and `spawn`.
-    fn spawn_ref<F: Future<Output = ()> + 'static>(exec: &mut Self::Executor, f: F);
+    /// *. `spawn_on` is preferred when you can choose between it and `spawn`.
+    fn spawn_on<F: Future<Output = ()> + 'static>(exec: &mut Self::Executor, f: F);
 
     /// Get a timeout sleep future with given duration.
     fn sleep(dur: Duration) -> Self::Sleep;
@@ -105,7 +87,7 @@ impl ExecFactory for ActixExec {
         tokio::task::spawn_local(f);
     }
 
-    fn spawn_ref<F: Future<Output = ()> + 'static>(exec: &mut Self::Executor, f: F) {
+    fn spawn_on<F: Future<Output = ()> + 'static>(exec: &mut Self::Executor, f: F) {
         exec.1.spawn_local(f);
     }
 

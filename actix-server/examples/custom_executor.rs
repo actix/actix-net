@@ -107,7 +107,7 @@ impl FromStream for AsyncStdTcpStream {
     }
 }
 
-// impl trait for custom executor so server can/block_on spawn tasks
+// impl trait for custom executor so server can block_on/spawn tasks
 impl ExecFactory for AsyncStdExec {
     type Executor = ();
     type Sleep = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
@@ -124,7 +124,7 @@ impl ExecFactory for AsyncStdExec {
         async_std::task::spawn_local(f);
     }
 
-    fn spawn_ref<F: Future<Output = ()> + 'static>(_: &mut Self::Executor, f: F) {
+    fn spawn_on<F: Future<Output = ()> + 'static>(_: &mut Self::Executor, f: F) {
         async_std::task::spawn_local(f);
     }
 
