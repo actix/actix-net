@@ -45,35 +45,30 @@ pub async fn start_resolver(
 ) -> Result<AsyncResolver, ConnectError> {
     // FIXME: remove compat layer
     use tokio_compat_02::FutureExt;
-    async {
-        Ok(AsyncResolver::tokio(cfg, opts).await?)
-    }.compat().await
+    Ok(AsyncResolver::tokio(cfg, opts).compat().await?)
 }
 
 struct DefaultResolver(AsyncResolver);
 
 pub(crate) async fn get_default_resolver() -> Result<AsyncResolver, ConnectError> {
-    // FIXME: remove compat layer
-    use tokio_compat_02::FutureExt;
-    async {
+    if Arbiter::contains_item::<DefaultResolver>() {
+        Ok(Arbiter::get_item(|item: &DefaultResolver| item.0.clone()))
+    } else {
+        let (cfg, opts) = match read_system_conf() {
+            Ok((cfg, opts)) => (cfg, opts),
+            Err(e) => {
+                log::error!("TRust-DNS can not load system config: {}", e);
+                (ResolverConfig::default(), ResolverOpts::default())
+            }
+        };
 
-        if Arbiter::contains_item::<DefaultResolver>() {
-            Ok(Arbiter::get_item(|item: &DefaultResolver| item.0.clone()))
-        } else {
-            let (cfg, opts) = match read_system_conf() {
-                Ok((cfg, opts)) => (cfg, opts),
-                Err(e) => {
-                    log::error!("TRust-DNS can not load system config: {}", e);
-                    (ResolverConfig::default(), ResolverOpts::default())
-                }
-            };
+        // FIXME: remove compat layer
+        use tokio_compat_02::FutureExt;
+        let resolver = AsyncResolver::tokio(cfg, opts).compat().await?;
 
-            let resolver = AsyncResolver::tokio(cfg, opts).await?;
-
-            Arbiter::set_item(DefaultResolver(resolver.clone()));
-            Ok(resolver)
-        }
-    }.compat().await
+        Arbiter::set_item(DefaultResolver(resolver.clone()));
+        Ok(resolver)
+    }
 }
 
 pub async fn start_default_resolver() -> Result<AsyncResolver, ConnectError> {

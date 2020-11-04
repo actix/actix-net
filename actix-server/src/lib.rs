@@ -1,5 +1,7 @@
 //! General purpose TCP server.
 
+#![deny(rust_2018_idioms)]
+
 mod accept;
 mod builder;
 mod config;
