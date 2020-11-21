@@ -9,9 +9,8 @@ use actix_rt::time::{sleep_until, Instant};
 use actix_rt::{spawn, System};
 use futures_channel::mpsc::{unbounded, UnboundedReceiver};
 use futures_channel::oneshot;
-use futures_util::future::ready;
-use futures_util::stream::FuturesUnordered;
-use futures_util::{ready, stream::Stream, FutureExt, StreamExt};
+use futures_util::future::join_all;
+use futures_util::stream::Stream;
 use log::{error, info};
 
 use crate::accept::AcceptLoop;
@@ -360,31 +359,28 @@ impl ServerBuilder {
 
                 // stop workers
                 if !self.handles.is_empty() && graceful {
-                    spawn(
-                        self.handles
-                            .iter()
-                            .map(move |worker| worker.1.stop(graceful))
-                            .collect::<FuturesUnordered<_>>()
-                            .collect::<Vec<_>>()
-                            .then(move |_| {
-                                if let Some(tx) = completion {
-                                    let _ = tx.send(());
-                                }
-                                for tx in notify {
-                                    let _ = tx.send(());
-                                }
-                                if exit {
-                                    spawn(async {
-                                        sleep_until(
-                                            Instant::now() + Duration::from_millis(300),
-                                        )
-                                        .await;
-                                        System::current().stop();
-                                    });
-                                }
-                                ready(())
-                            }),
-                    )
+                    let iter = self
+                        .handles
+                        .iter()
+                        .map(move |worker| worker.1.stop(graceful));
+
+                    let fut = join_all(iter);
+
+                    spawn(async move {
+                        let _ = fut.await;
+                        if let Some(tx) = completion {
+                            let _ = tx.send(());
+                        }
+                        for tx in notify {
+                            let _ = tx.send(());
+                        }
+                        if exit {
+                            spawn(async {
+                                sleep_until(Instant::now() + Duration::from_millis(300)).await;
+                                System::current().stop();
+                            });
+                        }
+                    })
                 } else {
                     // we need to stop system if server was spawned
                     if self.exit {
@@ -439,11 +435,9 @@ impl Future for ServerBuilder {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
-            match ready!(Pin::new(&mut self.cmd).poll_next(cx)) {
-                Some(it) => self.as_mut().get_mut().handle_cmd(it),
-                None => {
-                    return Poll::Pending;
-                }
+            match Pin::new(&mut self.cmd).poll_next(cx) {
+                Poll::Ready(Some(it)) => self.as_mut().get_mut().handle_cmd(it),
+                _ => return Poll::Pending,
             }
         }
     }

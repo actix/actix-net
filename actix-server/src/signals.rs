@@ -3,8 +3,6 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures_util::future::lazy;
-
 use crate::server::Server;
 
 /// Different types of process signals
@@ -31,41 +29,39 @@ pub(crate) struct Signals {
 
 impl Signals {
     pub(crate) fn start(srv: Server) -> io::Result<()> {
-        actix_rt::spawn(lazy(|_| {
-            #[cfg(not(unix))]
-            {
-                actix_rt::spawn(Signals {
-                    srv,
-                    stream: Box::pin(actix_rt::signal::ctrl_c()),
-                });
-            }
-            #[cfg(unix)]
-            {
-                use actix_rt::signal::unix;
+        #[cfg(not(unix))]
+        {
+            actix_rt::spawn(Signals {
+                srv,
+                stream: Box::pin(actix_rt::signal::ctrl_c()),
+            });
+        }
+        #[cfg(unix)]
+        {
+            use actix_rt::signal::unix;
 
-                let mut streams = Vec::new();
+            let mut streams = Vec::new();
 
-                let sig_map = [
-                    (unix::SignalKind::interrupt(), Signal::Int),
-                    (unix::SignalKind::hangup(), Signal::Hup),
-                    (unix::SignalKind::terminate(), Signal::Term),
-                    (unix::SignalKind::quit(), Signal::Quit),
-                ];
+            let sig_map = [
+                (unix::SignalKind::interrupt(), Signal::Int),
+                (unix::SignalKind::hangup(), Signal::Hup),
+                (unix::SignalKind::terminate(), Signal::Term),
+                (unix::SignalKind::quit(), Signal::Quit),
+            ];
 
-                for (kind, sig) in sig_map.iter() {
-                    match unix::signal(*kind) {
-                        Ok(stream) => streams.push((*sig, stream)),
-                        Err(e) => log::error!(
-                            "Can not initialize stream handler for {:?} err: {}",
-                            sig,
-                            e
-                        ),
-                    }
+            for (kind, sig) in sig_map.iter() {
+                match unix::signal(*kind) {
+                    Ok(stream) => streams.push((*sig, stream)),
+                    Err(e) => log::error!(
+                        "Can not initialize stream handler for {:?} err: {}",
+                        sig,
+                        e
+                    ),
                 }
-
-                actix_rt::spawn(Signals { srv, streams })
             }
-        }));
+
+            actix_rt::spawn(Signals { srv, streams })
+        }
 
         Ok(())
     }

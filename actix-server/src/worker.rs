@@ -11,7 +11,8 @@ use actix_utils::counter::Counter;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot;
 use futures_util::future::join_all;
-use futures_util::{stream::Stream, TryFutureExt};
+use futures_util::stream::Stream;
+use futures_util::TryFutureExt;
 use log::{error, info, trace};
 
 use crate::service::{BoxedServerService, InternalServiceFactory, ServerMessage};

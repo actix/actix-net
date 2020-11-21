@@ -3,7 +3,6 @@ use std::net::SocketAddr;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use actix_rt::spawn;
 use actix_service::{self as actix, Service, ServiceFactory as ActixServiceFactory};
 use actix_utils::counter::CounterGuard;
 use futures_util::future::{ready, Ready};
@@ -75,23 +74,20 @@ where
     }
 
     fn call(&mut self, (guard, req): (Option<CounterGuard>, ServerMessage)) -> Self::Future {
-        match req {
-            ServerMessage::Connect(stream) => match FromStream::from_mio(stream) {
+        if let ServerMessage::Connect(stream) = req {
+            match FromStream::from_mio(stream) {
                 Ok(stream) => {
                     let f = self.service.call(stream);
-                    spawn(async move {
+                    actix_rt::spawn(async move {
                         let _ = f.await;
                         drop(guard);
                     });
-                    ready(Ok(()))
                 }
-                Err(e) => {
-                    error!("Can not convert to an async tcp stream: {}", e);
-                    ready(Err(()))
-                }
-            },
-            _ => ready(Ok(())),
+                Err(e) => error!("Can not convert to an async tcp stream: {}", e),
+            };
         }
+
+        ready(Ok(()))
     }
 }
 
@@ -149,7 +145,7 @@ where
         Box::pin(async move {
             match fut.await {
                 Ok(inner) => {
-                    let service = Box::new(StreamService::new(inner)) as BoxedServerService;
+                    let service = Box::new(StreamService::new(inner)) as _;
                     Ok(vec![(token, service)])
                 }
                 Err(_) => Err(()),
