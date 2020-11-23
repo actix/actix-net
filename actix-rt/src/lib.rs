@@ -16,6 +16,7 @@ pub use self::runtime::Runtime;
 pub use self::system::System;
 
 #[doc(hidden)]
+#[cfg(feature = "blocking")]
 pub use actix_threadpool as blocking;
 
 /// Spawns a future on the current arbiter.
