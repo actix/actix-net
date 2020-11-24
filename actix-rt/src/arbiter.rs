@@ -134,10 +134,7 @@ impl Arbiter {
                     .unbounded_send(SystemCommand::RegisterArbiter(id, arb));
 
                 // run loop
-                let _ = match rt.block_on(stop_rx) {
-                    Ok(code) => code,
-                    Err(_) => 1,
-                };
+                let _ = match rt.block_on(stop_rx).unwrap_or(1);
 
                 // unregister arbiter
                 let _ = System::current()
