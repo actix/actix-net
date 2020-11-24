@@ -15,13 +15,8 @@ edition = "2018"
 name = "actix_rt"
 path = "src/lib.rs"
 
-[features]
-default = ["blocking"]
-blocking = ["actix-threadpool"]
-
 [dependencies]
 actix-macros = "0.1.0"
-actix-threadpool = { version = "0.3", optional = true }
 copyless = "0.1.4"
 futures-channel = "0.3.4"
 futures-util = { version = "0.3.4", default-features = false, features = ["alloc"] }
