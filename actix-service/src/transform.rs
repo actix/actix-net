@@ -70,7 +70,7 @@ where
 ///     timeout: Duration,
 /// }
 ///
-/// impl<S> Transform<S> for TimeoutTransform<E>
+/// impl<S> Transform<S> for TimeoutTransform
 /// where
 ///     S: Service,
 /// {
