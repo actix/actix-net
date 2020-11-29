@@ -381,6 +381,7 @@ impl Accept {
             self.backpressure = true;
             for (_, info) in self.sockets.iter() {
                 let _ = self.poll.deregister(&info.sock);
+                info!("Accepting connections on {} has been paused", info.addr);
             }
         }
     }
