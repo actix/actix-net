@@ -1,6 +1,7 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
+* Added explicit info log message on accept queue pause. [#215]
 
 
 ## 1.0.4 - 2020-09-12
