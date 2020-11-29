@@ -268,6 +268,7 @@ impl Accept {
 
     fn deregister_all(&self, sockets: &mut Slab<ServerSocketInfo>) {
         sockets.iter_mut().for_each(|(_, info)| {
+            info!("Accepting connections on {} has been paused", info.addr);
             let _ = self.deregister(info);
         });
     }

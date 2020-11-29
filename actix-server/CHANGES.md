@@ -8,6 +8,9 @@
 * Remove `AcceptNotify` type and pass `WakerQueue` to `Worker` for wake up the `Accept`'s `Poll`.
 * Convert `mio::net::TcpStream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using `FromRawFd` and `IntoRawFd`(`FromRawSocket` and `IntoRawSocket` on windows).
 * Remove `AsyncRead` and `AsyncWrite` trait bound for `socket::FromStream` trait. 
+* Added explicit info log message on accept queue pause. [#215]
+
+[#215]: https://github.com/actix/actix-net/pull/215
 
 ## 1.0.4 - 2020-09-12
 * Update actix-codec to 0.3.0.
