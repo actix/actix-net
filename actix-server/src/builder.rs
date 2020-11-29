@@ -286,7 +286,7 @@ impl ServerBuilder {
 
             // handle signals
             if !self.no_signals {
-                Signals::start(self.server.clone()).unwrap();
+                Signals::start(self.server.clone());
             }
 
             // start http server actor

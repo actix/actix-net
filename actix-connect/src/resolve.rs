@@ -163,9 +163,7 @@ impl<T: Address> ResolverFuture<T> {
         ResolverFuture {
             lookup: Box::pin(async move {
                 let resolver = resolver_clone;
-                // FIXME: Remove compat layer
-                use tokio_compat_02::FutureExt;
-                resolver.lookup_ip(host_clone).compat().await
+                resolver.lookup_ip(host_clone).await
             }),
             req: Some(req),
         }

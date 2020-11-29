@@ -43,9 +43,7 @@ pub async fn start_resolver(
     cfg: ResolverConfig,
     opts: ResolverOpts,
 ) -> Result<AsyncResolver, ConnectError> {
-    // FIXME: remove compat layer
-    use tokio_compat_02::FutureExt;
-    Ok(AsyncResolver::tokio(cfg, opts).compat().await?)
+    Ok(AsyncResolver::tokio(cfg, opts)?)
 }
 
 struct DefaultResolver(AsyncResolver);
@@ -62,9 +60,7 @@ pub(crate) async fn get_default_resolver() -> Result<AsyncResolver, ConnectError
             }
         };
 
-        // FIXME: remove compat layer
-        use tokio_compat_02::FutureExt;
-        let resolver = AsyncResolver::tokio(cfg, opts).compat().await?;
+        let resolver = AsyncResolver::tokio(cfg, opts)?;
 
         Arbiter::set_item(DefaultResolver(resolver.clone()));
         Ok(resolver)

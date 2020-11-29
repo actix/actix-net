@@ -41,11 +41,10 @@ either = "1.5.3"
 futures-util = { version = "0.3.4", default-features = false }
 # FIXME: Use release version
 http = { git = "https://github.com/paolobarbolini/http.git", branch = "bytes06", optional = true }
-#http = { version = "0.2.0", optional = true }
 log = "0.4"
-tokio-compat-02 = "0.1.2"
-trust-dns-proto = { version = "0.19", default-features = false, features = ["tokio-runtime"] }
-trust-dns-resolver = { version = "0.19", default-features = false, features = ["tokio-runtime", "system-config"] }
+# FIXME: Use release version
+trust-dns-proto = { git = "https://github.com/bluejekyll/trust-dns", branch = "main", default-features = false, features = ["tokio-runtime"] }
+trust-dns-resolver = { git = "https://github.com/bluejekyll/trust-dns", branch = "main", default-features = false, features = ["tokio-runtime", "system-config"] }
 
 # openssl
 open-ssl = { package = "openssl", version = "0.10", optional = true }
@@ -59,3 +58,4 @@ webpki = { version = "0.21", optional = true }
 [dev-dependencies]
 bytes = "0.6"
 actix-testing = "1.0.0"
+futures-util = { version = "0.3.4", default-features = false, features = ["sink"] }

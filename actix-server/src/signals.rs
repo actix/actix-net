@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -28,7 +27,7 @@ pub(crate) struct Signals {
 }
 
 impl Signals {
-    pub(crate) fn start(srv: Server) -> io::Result<()> {
+    pub(crate) fn start(srv: Server) {
         #[cfg(not(unix))]
         {
             actix_rt::spawn(Signals {
@@ -60,10 +59,8 @@ impl Signals {
                 }
             }
 
-            actix_rt::spawn(Signals { srv, streams })
+            actix_rt::spawn(Signals { srv, streams });
         }
-
-        Ok(())
     }
 }
 
