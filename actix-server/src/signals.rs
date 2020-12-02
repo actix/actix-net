@@ -21,7 +21,7 @@ pub(crate) enum Signal {
 pub(crate) struct Signals {
     srv: Server,
     #[cfg(not(unix))]
-    stream: Pin<Box<dyn Future<Output = io::Result<()>>>>,
+    stream: Pin<Box<dyn Future<Output = std::io::Result<()>>>>,
     #[cfg(unix)]
     streams: Vec<(Signal, actix_rt::signal::unix::Signal)>,
 }
