@@ -34,10 +34,10 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --all --bins --examples --tests
+          args: --workspace --bins --examples --tests
 
       - name: tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all --all-features --no-fail-fast -- --nocapture
+          args: --workspace --exclude=actix-tls --no-fail-fast -- --nocapture
