@@ -221,13 +221,16 @@ impl<T, U> Framed<T, U> {
                 this.read_buf.reserve(HW - remaining)
             }
 
-            // FIXME: Use poll_read_buf from tokio_util
-            match crate::util::poll_read_buf(this.io, cx, this.read_buf) {
+            let cnt = match tokio_util::io::poll_read_buf(this.io, cx, this.read_buf) {
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
-                Poll::Ready(Ok(cnt)) if cnt == 0 => this.flags.insert(Flags::EOF),
-                _ => this.flags.insert(Flags::READABLE),
+                Poll::Ready(Ok(cnt)) => cnt,
+            };
+
+            if cnt == 0 {
+                this.flags.insert(Flags::EOF);
             }
+            this.flags.insert(Flags::READABLE);
         }
     }
 
