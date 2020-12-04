@@ -266,12 +266,7 @@ impl Accept {
         for (token, info) in self.sockets.iter_mut() {
             if let Some(inst) = info.timeout.take() {
                 if now > inst {
-                    if let Err(err) = self.poll.register(
-                        &info.sock,
-                        mio::Token(token + DELTA),
-                        mio::Ready::readable(),
-                        mio::PollOpt::edge(),
-                    ) {
+                    if let Err(err) = register(&self.poll, token, info) {
                         error!("Can not register server socket {}", err);
                     } else {
                         info!("Resume accepting connections on {}", info.addr);
@@ -298,7 +293,7 @@ impl Accept {
                     }
                     Command::Resume => {
                         for (token, info) in self.sockets.iter() {
-                            if let Err(err) = self.register(token, info) {
+                            if let Err(err) = register(&self.poll, token, info) {
                                 error!("Can not resume socket accept process: {}", err);
                             } else {
                                 info!(
@@ -333,44 +328,12 @@ impl Accept {
         true
     }
 
-    #[cfg(not(target_os = "windows"))]
-    fn register(&self, token: usize, info: &ServerSocketInfo) -> io::Result<()> {
-        self.poll.register(
-            &info.sock,
-            mio::Token(token + DELTA),
-            mio::Ready::readable(),
-            mio::PollOpt::edge(),
-        )
-    }
-
-    #[cfg(target_os = "windows")]
-    fn register(&self, token: usize, info: &ServerSocketInfo) -> io::Result<()> {
-        // On windows, calling register without deregister cause an error.
-        // See https://github.com/actix/actix-web/issues/905
-        // Calling reregister seems to fix the issue.
-        self.poll
-            .register(
-                &info.sock,
-                mio::Token(token + DELTA),
-                mio::Ready::readable(),
-                mio::PollOpt::edge(),
-            )
-            .or_else(|_| {
-                self.poll.reregister(
-                    &info.sock,
-                    mio::Token(token + DELTA),
-                    mio::Ready::readable(),
-                    mio::PollOpt::edge(),
-                )
-            })
-    }
-
     fn backpressure(&mut self, on: bool) {
         if self.backpressure {
             if !on {
                 self.backpressure = false;
                 for (token, info) in self.sockets.iter() {
-                    if let Err(err) = self.register(token, info) {
+                    if let Err(err) = register(&self.poll, token, info) {
                         error!("Can not resume socket accept process: {}", err);
                     } else {
                         info!("Accepting connections on {} has been resumed", info.addr);
@@ -476,4 +439,35 @@ impl Accept {
             self.accept_one(msg);
         }
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn register(poll: &mio::Poll, token: usize, info: &ServerSocketInfo) -> io::Result<()> {
+    poll.register(
+        &info.sock,
+        mio::Token(token + DELTA),
+        mio::Ready::readable(),
+        mio::PollOpt::edge(),
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn register(poll: &mio::Poll, token: usize, info: &ServerSocketInfo) -> io::Result<()> {
+    // On windows, calling register without deregister cause an error.
+    // See https://github.com/actix/actix-web/issues/905
+    // Calling reregister seems to fix the issue.
+    poll.register(
+        &info.sock,
+        mio::Token(token + DELTA),
+        mio::Ready::readable(),
+        mio::PollOpt::edge(),
+    )
+    .or_else(|_| {
+        poll.reregister(
+            &info.sock,
+            mio::Token(token + DELTA),
+            mio::Ready::readable(),
+            mio::PollOpt::edge(),
+        )
+    })
 }
