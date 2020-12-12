@@ -1,7 +1,9 @@
 use std::future::Future;
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+#[cfg(not(unix))]
+use std::io;
 
 use futures_util::future::lazy;
 
@@ -30,7 +32,7 @@ pub(crate) struct Signals {
 }
 
 impl Signals {
-    pub(crate) fn start(srv: Server) -> io::Result<()> {
+    pub(crate) fn start(srv: Server) {
         actix_rt::spawn(lazy(|_| {
             #[cfg(not(unix))]
             {
@@ -66,8 +68,6 @@ impl Signals {
                 actix_rt::spawn(Signals { srv, streams })
             }
         }));
-
-        Ok(())
     }
 }
 
