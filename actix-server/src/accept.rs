@@ -370,6 +370,11 @@ impl Accept {
             if !on {
                 self.backpressure = false;
                 for (token, info) in self.sockets.iter() {
+                    if info.timeout.is_some() {
+                        // socket will attempt to re-register itself when its timeout completes
+                        continue;
+                    }
+
                     if let Err(err) = self.register(token, info) {
                         error!("Can not resume socket accept process: {}", err);
                     } else {
