@@ -5,7 +5,9 @@
 //! * `rustls` - TLS acceptor using the `rustls` crate.
 //! * `nativetls` - TLS acceptor using the `native-tls` crate.
 
-#![deny(rust_2018_idioms)]
+#![deny(rust_2018_idioms, nonstandard_style)]
+#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
+#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
