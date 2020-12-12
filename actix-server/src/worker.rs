@@ -14,7 +14,7 @@ use futures_util::{future::Future, stream::Stream, FutureExt, TryFutureExt};
 use log::{error, info, trace};
 
 use crate::accept::AcceptNotify;
-use crate::service::{BoxedServerService, InternalServiceFactory, ServerMessage};
+use crate::service::{BoxedServerService, InternalServiceFactory};
 use crate::socket::{SocketAddr, StdStream};
 use crate::Token;
 
@@ -228,23 +228,12 @@ impl Worker {
             self.services.iter_mut().for_each(|srv| {
                 if srv.status == WorkerServiceStatus::Available {
                     srv.status = WorkerServiceStatus::Stopped;
-                    actix_rt::spawn(
-                        srv.service
-                            .call((None, ServerMessage::ForceShutdown))
-                            .map(|_| ()),
-                    );
                 }
             });
         } else {
-            let timeout = self.shutdown_timeout;
             self.services.iter_mut().for_each(move |srv| {
                 if srv.status == WorkerServiceStatus::Available {
                     srv.status = WorkerServiceStatus::Stopping;
-                    actix_rt::spawn(
-                        srv.service
-                            .call((None, ServerMessage::Shutdown(timeout)))
-                            .map(|_| ()),
-                    );
                 }
             });
         }
@@ -361,7 +350,7 @@ impl Future for Worker {
                             let guard = self.conns.get();
                             let _ = self.services[conn.token.0]
                                 .service
-                                .call((Some(guard), ServerMessage::Connect(conn.io)));
+                                .call((Some(guard), conn.io));
                         } else {
                             self.state = WorkerState::Available;
                             self.availability.set(true);
@@ -455,7 +444,7 @@ impl Future for Worker {
                                     let guard = self.conns.get();
                                     let _ = self.services[msg.token.0]
                                         .service
-                                        .call((Some(guard), ServerMessage::Connect(msg.io)));
+                                        .call((Some(guard), msg.io));
                                     continue;
                                 }
                                 Ok(false) => {
