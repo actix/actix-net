@@ -1,7 +1,9 @@
 //! See [`Service`](trait.Service.html) docs for information on this crate's foundational trait.
 
-#![deny(rust_2018_idioms, warnings)]
+#![deny(rust_2018_idioms, nonstandard_style)]
 #![allow(clippy::type_complexity)]
+#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
+#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 use std::cell::RefCell;
 use std::future::Future;

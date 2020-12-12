@@ -1,5 +1,8 @@
 //! Actix tracing - support for tokio tracing with Actix services.
-#![deny(rust_2018_idioms, warnings)]
+
+#![deny(rust_2018_idioms, nonstandard_style)]
+#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
+#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
