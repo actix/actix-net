@@ -36,7 +36,7 @@ impl LocalWaker {
     }
 
     #[deprecated(
-        since = "2.x.x",
+        since = "2.1.0",
         note = "In favor of `wake`. State of the register doesn't matter at `wake` up"
     )]
     #[inline]
