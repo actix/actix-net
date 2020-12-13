@@ -8,10 +8,9 @@ use futures_util::future::{ok, Future, FutureExt, LocalBoxFuture};
 use log::error;
 
 use super::builder::bind_addr;
-use super::service::{
-    BoxedServerService, InternalServiceFactory, ServerMessage, StreamService,
-};
+use super::service::{BoxedServerService, InternalServiceFactory, StreamService};
 use super::Token;
+use crate::socket::StdStream;
 
 pub struct ServiceConfig {
     pub(crate) services: Vec<(String, net::TcpListener)>,
@@ -239,7 +238,7 @@ impl ServiceRuntime {
 
 type BoxedNewService = Box<
     dyn actix::ServiceFactory<
-        Request = (Option<CounterGuard>, ServerMessage),
+        Request = (Option<CounterGuard>, StdStream),
         Response = (),
         Error = (),
         InitError = (),
@@ -261,12 +260,12 @@ where
     T::Error: 'static,
     T::InitError: fmt::Debug + 'static,
 {
-    type Request = (Option<CounterGuard>, ServerMessage);
+    type Request = (Option<CounterGuard>, StdStream);
     type Response = ();
     type Error = ();
-    type InitError = ();
     type Config = ();
     type Service = BoxedServerService;
+    type InitError = ();
     type Future = LocalBoxFuture<'static, Result<BoxedServerService, ()>>;
 
     fn new_service(&self, _: ()) -> Self::Future {

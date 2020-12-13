@@ -1,7 +1,6 @@
 use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
-use std::time::Duration;
 
 use actix_rt::spawn;
 use actix_service::{self as actix, Service, ServiceFactory as ActixServiceFactory};
@@ -12,18 +11,6 @@ use log::error;
 
 use super::Token;
 use crate::socket::{FromStream, StdStream};
-
-/// Server message
-pub(crate) enum ServerMessage {
-    /// New stream
-    Connect(StdStream),
-
-    /// Gracefully shutdown
-    Shutdown(Duration),
-
-    /// Force shutdown
-    ForceShutdown,
-}
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
     type Factory: actix::ServiceFactory<Config = (), Request = Stream>;
@@ -41,7 +28,7 @@ pub(crate) trait InternalServiceFactory: Send {
 
 pub(crate) type BoxedServerService = Box<
     dyn Service<
-        Request = (Option<CounterGuard>, ServerMessage),
+        Request = (Option<CounterGuard>, StdStream),
         Response = (),
         Error = (),
         Future = Ready<Result<(), ()>>,
@@ -65,7 +52,7 @@ where
     T::Error: 'static,
     I: FromStream,
 {
-    type Request = (Option<CounterGuard>, ServerMessage);
+    type Request = (Option<CounterGuard>, StdStream);
     type Response = ();
     type Error = ();
     type Future = Ready<Result<(), ()>>;
@@ -74,25 +61,20 @@ where
         self.service.poll_ready(ctx).map_err(|_| ())
     }
 
-    fn call(&mut self, (guard, req): (Option<CounterGuard>, ServerMessage)) -> Self::Future {
-        match req {
-            ServerMessage::Connect(stream) => {
-                let stream = FromStream::from_stdstream(stream).map_err(|e| {
-                    error!("Can not convert to an async tcp stream: {}", e);
+    fn call(&mut self, (guard, req): (Option<CounterGuard>, StdStream)) -> Self::Future {
+        match FromStream::from_stdstream(req) {
+            Ok(stream) => {
+                let f = self.service.call(stream);
+                spawn(async move {
+                    let _ = f.await;
+                    drop(guard);
                 });
-
-                if let Ok(stream) = stream {
-                    let f = self.service.call(stream);
-                    spawn(async move {
-                        let _ = f.await;
-                        drop(guard);
-                    });
-                    ok(())
-                } else {
-                    err(())
-                }
+                ok(())
             }
-            _ => ok(()),
+            Err(e) => {
+                error!("Can not convert to an async tcp stream: {}", e);
+                err(())
+            }
         }
     }
 }
@@ -156,20 +138,6 @@ where
                 vec![(token, service)]
             })
             .boxed_local()
-    }
-}
-
-impl InternalServiceFactory for Box<dyn InternalServiceFactory> {
-    fn name(&self, token: Token) -> &str {
-        self.as_ref().name(token)
-    }
-
-    fn clone_factory(&self) -> Box<dyn InternalServiceFactory> {
-        self.as_ref().clone_factory()
-    }
-
-    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>> {
-        self.as_ref().create()
     }
 }
 

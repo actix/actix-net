@@ -1,6 +1,9 @@
 //! Various helpers for Actix applications to use during testing.
-#![deny(rust_2018_idioms, warnings)]
+
+#![deny(rust_2018_idioms, nonstandard_style)]
 #![allow(clippy::type_complexity, clippy::needless_doctest_main)]
+#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
+#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 use std::sync::mpsc;
 use std::{net, thread};
