@@ -61,20 +61,20 @@ where
     }
 
     fn call(&mut self, (guard, req): (Option<CounterGuard>, MioStream)) -> Self::Future {
-        match FromStream::from_mio(stream) {
+        ready(match FromStream::from_mio(req) {
             Ok(stream) => {
                 let f = self.service.call(stream);
                 actix_rt::spawn(async move {
-                  let _ = f.await;
-                  drop(guard);
+                    let _ = f.await;
+                    drop(guard);
                 });
-                ready(Ok(()))
+                Ok(())
             }
-            Err(e) => { 
-              error!("Can not convert to an async tcp stream: {}", e);
-                ready(Err(()))
+            Err(e) => {
+                error!("Can not convert to an async tcp stream: {}", e);
+                Err(())
             }
-        };
+        })
     }
 }
 
