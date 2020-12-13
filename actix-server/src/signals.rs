@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -24,13 +23,13 @@ pub(crate) enum Signal {
 pub(crate) struct Signals {
     srv: Server,
     #[cfg(not(unix))]
-    stream: Pin<Box<dyn Future<Output = io::Result<()>>>>,
+    stream: Pin<Box<dyn Future<Output = std::io::Result<()>>>>,
     #[cfg(unix)]
     streams: Vec<(Signal, actix_rt::signal::unix::Signal)>,
 }
 
 impl Signals {
-    pub(crate) fn start(srv: Server) -> io::Result<()> {
+    pub(crate) fn start(srv: Server) {
         actix_rt::spawn(lazy(|_| {
             #[cfg(not(unix))]
             {
@@ -66,8 +65,6 @@ impl Signals {
                 actix_rt::spawn(Signals { srv, streams })
             }
         }));
-
-        Ok(())
     }
 }
 
