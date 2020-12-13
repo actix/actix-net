@@ -9,6 +9,10 @@
 * Convert `mio::net::TcpStream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using `FromRawFd` and `IntoRawFd`(`FromRawSocket` and `IntoRawSocket` on windows).
 * Remove `AsyncRead` and `AsyncWrite` trait bound for `socket::FromStream` trait. 
 * Added explicit info log message on accept queue pause. [#215]
+* Prevent double registration of sockets when back-pressure is resolved. [#223]
+
+[#215]: https://github.com/actix/actix-net/pull/215
+[#223]: https://github.com/actix/actix-net/pull/223
 
 [#215]: https://github.com/actix/actix-net/pull/215
 

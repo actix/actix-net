@@ -9,10 +9,8 @@ use futures_util::future::ready;
 use log::error;
 
 use crate::builder::bind_addr;
-use crate::service::{
-    BoxedServerService, InternalServiceFactory, ServerMessage, StreamService,
-};
-use crate::socket::{MioTcpListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
+use crate::service::{BoxedServerService, InternalServiceFactory, StreamService};
+use crate::socket::{MioStream, MioTcpListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::LocalBoxFuture;
 use crate::Token;
 
@@ -245,7 +243,7 @@ impl ServiceRuntime {
 
 type BoxedNewService = Box<
     dyn actix::ServiceFactory<
-        Request = (Option<CounterGuard>, ServerMessage),
+        Request = (Option<CounterGuard>, MioStream),
         Response = (),
         Error = (),
         InitError = (),
@@ -267,7 +265,7 @@ where
     T::Error: 'static,
     T::InitError: fmt::Debug + 'static,
 {
-    type Request = (Option<CounterGuard>, ServerMessage);
+    type Request = (Option<CounterGuard>, MioStream);
     type Response = ();
     type Error = ();
     type Config = ();

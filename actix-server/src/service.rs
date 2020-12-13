@@ -1,7 +1,6 @@
 use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
-use std::time::Duration;
 
 use actix_service::{self as actix, Service, ServiceFactory as ActixServiceFactory};
 use actix_utils::counter::CounterGuard;
@@ -11,18 +10,6 @@ use log::error;
 use crate::socket::{FromStream, MioStream};
 use crate::LocalBoxFuture;
 use crate::Token;
-
-/// Server message
-pub(crate) enum ServerMessage {
-    /// New stream
-    Connect(MioStream),
-
-    /// Gracefully shutdown
-    Shutdown(Duration),
-
-    /// Force shutdown
-    ForceShutdown,
-}
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
     type Factory: actix::ServiceFactory<Config = (), Request = Stream>;
@@ -40,7 +27,7 @@ pub(crate) trait InternalServiceFactory: Send {
 
 pub(crate) type BoxedServerService = Box<
     dyn Service<
-        Request = (Option<CounterGuard>, ServerMessage),
+        Request = (Option<CounterGuard>, MioStream),
         Response = (),
         Error = (),
         Future = Ready<Result<(), ()>>,
@@ -64,7 +51,7 @@ where
     T::Error: 'static,
     I: FromStream,
 {
-    type Request = (Option<CounterGuard>, ServerMessage);
+    type Request = (Option<CounterGuard>, MioStream);
     type Response = ();
     type Error = ();
     type Future = Ready<Result<(), ()>>;
@@ -73,21 +60,21 @@ where
         self.service.poll_ready(ctx).map_err(|_| ())
     }
 
-    fn call(&mut self, (guard, req): (Option<CounterGuard>, ServerMessage)) -> Self::Future {
-        if let ServerMessage::Connect(stream) = req {
-            match FromStream::from_mio(stream) {
-                Ok(stream) => {
-                    let f = self.service.call(stream);
-                    actix_rt::spawn(async move {
-                        let _ = f.await;
-                        drop(guard);
-                    });
-                }
-                Err(e) => error!("Can not convert to an async tcp stream: {}", e),
-            };
-        }
-
-        ready(Ok(()))
+    fn call(&mut self, (guard, req): (Option<CounterGuard>, MioStream)) -> Self::Future {
+        match FromStream::from_mio(stream) {
+            Ok(stream) => {
+                let f = self.service.call(stream);
+                actix_rt::spawn(async move {
+                  let _ = f.await;
+                  drop(guard);
+                });
+                ready(Ok(()))
+            }
+            Err(e) => { 
+              error!("Can not convert to an async tcp stream: {}", e);
+                ready(Err(()))
+            }
+        };
     }
 }
 
@@ -151,20 +138,6 @@ where
                 Err(_) => Err(()),
             }
         })
-    }
-}
-
-impl InternalServiceFactory for Box<dyn InternalServiceFactory> {
-    fn name(&self, token: Token) -> &str {
-        self.as_ref().name(token)
-    }
-
-    fn clone_factory(&self) -> Box<dyn InternalServiceFactory> {
-        self.as_ref().clone_factory()
-    }
-
-    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>> {
-        self.as_ref().create()
     }
 }
 

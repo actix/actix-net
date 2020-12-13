@@ -1,5 +1,9 @@
 //! Thread pool for blocking operations
 
+#![deny(rust_2018_idioms, nonstandard_style)]
+#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
+#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
+
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;

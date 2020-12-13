@@ -1,5 +1,8 @@
 //! Macros for use with Tokio
-extern crate proc_macro;
+
+#![deny(rust_2018_idioms, nonstandard_style)]
+#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
+#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 use proc_macro::TokenStream;
 use quote::quote;
