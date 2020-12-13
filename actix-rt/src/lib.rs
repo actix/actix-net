@@ -1,6 +1,8 @@
 //! A runtime implementation that runs everything on the current thread.
-#![deny(rust_2018_idioms)]
-#![forbid(unsafe_code)]
+#![deny(rust_2018_idioms, nonstandard_style)]
+#![allow(clippy::type_complexity)]
+#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
+#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 use std::future::Future;
 

@@ -1,5 +1,8 @@
 //! Macros for use with Tokio
-extern crate proc_macro;
+
+#![deny(rust_2018_idioms, nonstandard_style)]
+#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
+#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 use proc_macro::TokenStream;
 use quote::quote;
@@ -33,14 +36,25 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
 
     sig.asyncness = None;
 
-    (quote! {
-        #(#attrs)*
-        #vis #sig {
-            actix_rt::System::new(stringify!(#name))
-                .block_on(async move { #body })
-        }
-    })
-    .into()
+    if cfg!(feature = "actix-reexport") {
+        (quote! {
+            #(#attrs)*
+            #vis #sig {
+                actix::System::new(stringify!(#name))
+                    .block_on(async move { #body })
+            }
+        })
+        .into()
+    } else {
+        (quote! {
+            #(#attrs)*
+            #vis #sig {
+                actix_rt::System::new(stringify!(#name))
+                    .block_on(async move { #body })
+            }
+        })
+        .into()
+    }
 }
 
 /// Marks async test function to be executed by actix runtime.

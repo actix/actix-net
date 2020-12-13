@@ -1,5 +1,9 @@
 # CHANGES
 
+## 0.1.3 - 2020-12-3
+
+* Add `actix-reexport` feature
+
 ## 0.1.2 - 2020-05-18
 
 ### Changed

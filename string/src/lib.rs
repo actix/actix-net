@@ -1,5 +1,9 @@
 //! A UTF-8 encoded read-only string using Bytes as storage.
 
+#![deny(rust_2018_idioms, nonstandard_style)]
+#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
+#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
+
 use std::convert::TryFrom;
 use std::{borrow, fmt, hash, ops, str};
 
@@ -156,13 +160,13 @@ macro_rules! array_impls {
 array_impls!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
 
 impl fmt::Debug for ByteString {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         (**self).fmt(fmt)
     }
 }
 
 impl fmt::Display for ByteString {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         (**self).fmt(fmt)
     }
 }
