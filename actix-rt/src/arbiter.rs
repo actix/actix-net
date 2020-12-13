@@ -9,14 +9,18 @@ use std::{fmt, thread};
 
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot::{channel, Canceled, Sender};
-use tokio::stream::Stream;
-use tokio::task::LocalSet;
+use futures_util::stream::FuturesUnordered;
+use tokio::stream::{Stream, StreamExt};
+use tokio::task::{JoinHandle, LocalSet};
 
 use crate::runtime::Runtime;
 use crate::system::System;
 
 thread_local!(
     static ADDR: RefCell<Option<Arbiter>> = RefCell::new(None);
+    /// stores join handle for spawned async tasks.
+    static HANDLE: RefCell<FuturesUnordered<JoinHandle<()>>> =
+        RefCell::new(FuturesUnordered::new());
     static STORAGE: RefCell<HashMap<TypeId, Box<dyn Any>>> = RefCell::new(HashMap::new());
 );
 
@@ -146,7 +150,11 @@ impl Arbiter {
     where
         F: Future<Output = ()> + 'static,
     {
-        tokio::task::spawn_local(future);
+        HANDLE.with(|handle| {
+            let handle = handle.borrow();
+            handle.push(tokio::task::spawn_local(future));
+        });
+        let _ = tokio::task::spawn_local(CleanupPending);
     }
 
     /// Executes a future on the current thread. This does not create a new Arbiter
@@ -266,9 +274,27 @@ impl Arbiter {
 
     /// Returns a future that will be completed once all currently spawned futures
     /// have completed.
-    #[deprecated(note = "local_join has been removed")]
-    pub async fn local_join() {
-        unimplemented!()
+    pub fn local_join() -> impl Future<Output = ()> {
+        let handle = HANDLE.with(|fut| std::mem::take(&mut *fut.borrow_mut()));
+        async move {
+            handle.collect::<Vec<_>>().await;
+        }
+    }
+}
+
+/// Future used for cleaning-up already finished `JoinHandle`s
+/// from the `PENDING` list so the vector doesn't grow indefinitely
+struct CleanupPending;
+
+impl Future for CleanupPending {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        HANDLE.with(move |handle| {
+            let _ = Pin::new(&mut *handle.borrow_mut()).poll_next(cx);
+        });
+
+        Poll::Ready(())
     }
 }
 
@@ -299,7 +325,11 @@ impl Future for ArbiterController {
                 Poll::Ready(Some(item)) => match item {
                     ArbiterCommand::Stop => return Poll::Ready(()),
                     ArbiterCommand::Execute(fut) => {
-                        tokio::task::spawn_local(fut);
+                        HANDLE.with(|handle| {
+                            let mut handle = handle.borrow_mut();
+                            handle.push(tokio::task::spawn_local(fut));
+                            let _ = Pin::new(&mut *handle).poll_next(cx);
+                        });
                     }
                     ArbiterCommand::ExecuteFn(f) => {
                         f.call_box();
