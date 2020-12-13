@@ -2,9 +2,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[cfg(not(unix))]
-use std::io;
-
 use futures_util::future::lazy;
 
 use crate::server::Server;
@@ -26,7 +23,7 @@ pub(crate) enum Signal {
 pub(crate) struct Signals {
     srv: Server,
     #[cfg(not(unix))]
-    stream: Pin<Box<dyn Future<Output = io::Result<()>>>>,
+    stream: Pin<Box<dyn Future<Output = std::io::Result<()>>>>,
     #[cfg(unix)]
     streams: Vec<(Signal, actix_rt::signal::unix::Signal)>,
 }
