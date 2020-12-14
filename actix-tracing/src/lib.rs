@@ -60,7 +60,6 @@ where
 }
 
 /// A `Transform` implementation that wraps services with a [`TracingService`].
-///
 pub struct TracingTransform<S, U, F> {
     make_span: F,
     _p: PhantomData<fn(S, U)>,
