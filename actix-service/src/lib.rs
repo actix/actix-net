@@ -1,4 +1,4 @@
-//! See [`Service`](trait.Service.html) docs for information on this crate's foundational trait.
+//! See [`Service`] docs for information on this crate's foundational trait.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![allow(clippy::type_complexity)]
@@ -67,7 +67,7 @@ pub use self::transform::{apply, Transform};
 /// ```
 ///
 /// Sometimes it is not necessary to implement the Service trait. For example, the above service
-/// could be rewritten as a simple function and passed to [fn_service](fn.fn_service.html).
+/// could be rewritten as a simple function and passed to [fn_service](fn_service()).
 ///
 /// ```rust,ignore
 /// async fn my_service(req: u8) -> Result<u64, MyError>;

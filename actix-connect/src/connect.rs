@@ -138,7 +138,7 @@ impl<T: Address> fmt::Display for Connect<T> {
     }
 }
 
-/// Iterator over addresses in a [`Connect`](struct.Connect.html) request.
+/// Iterator over addresses in a [`Connect`] request.
 #[derive(Clone)]
 pub struct ConnectAddrsIter<'a> {
     inner: Either<Option<SocketAddr>, vec_deque::Iter<'a, SocketAddr>>,
@@ -173,7 +173,7 @@ impl ExactSizeIterator for ConnectAddrsIter<'_> {}
 
 impl FusedIterator for ConnectAddrsIter<'_> {}
 
-/// Owned iterator over addresses in a [`Connect`](struct.Connect.html) request.
+/// Owned iterator over addresses in a [`Connect`] request.
 #[derive(Debug)]
 pub struct ConnectTakeAddrsIter {
     inner: Either<Option<SocketAddr>, vec_deque::IntoIter<SocketAddr>>,
