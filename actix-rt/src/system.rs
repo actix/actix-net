@@ -66,7 +66,6 @@ impl System {
     /// It means that using this method currently it is impossible to make `actix-rt` work in the
     /// alternative `tokio` `Runtime`s (e.g. provided by [`tokio_compat`]).
     ///
-    /// [`Arbiter`]: struct.Arbiter.html
     /// [`tokio_compat`]: https://crates.io/crates/tokio-compat
     ///
     /// # Examples
@@ -131,7 +130,6 @@ impl System {
     /// It means that using this method currently it is impossible to make `actix-rt` work in the
     /// alternative `tokio` `Runtime`s (e.g. provided by `tokio_compat`).
     ///
-    /// [`Arbiter`]: struct.Arbiter.html
     /// [`tokio_compat`]: https://crates.io/crates/tokio-compat
     ///
     /// # Arguments
