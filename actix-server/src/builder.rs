@@ -214,6 +214,7 @@ impl ServerBuilder {
         F: ServiceFactory<actix_rt::net::UnixStream>,
     {
         use std::net::{IpAddr, Ipv4Addr};
+        lst.set_nonblocking(true)?;
         let token = self.token.next();
         let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         self.services.push(StreamNewService::create(
@@ -237,12 +238,15 @@ impl ServerBuilder {
     where
         F: ServiceFactory<TcpStream>,
     {
+        lst.set_nonblocking(true)?;
+        let addr = lst.local_addr()?;
+
         let token = self.token.next();
         self.services.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
             factory,
-            lst.local_addr()?,
+            addr,
         ));
 
         self.sockets
