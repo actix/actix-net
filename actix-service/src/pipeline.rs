@@ -183,17 +183,14 @@ impl<T: ServiceFactory> PipelineFactory<T> {
         factory: F,
     ) -> PipelineFactory<
         impl ServiceFactory<
-                Request = T::Request,
-                Response = U::Response,
-                Error = T::Error,
-                Config = T::Config,
-                InitError = T::InitError,
-                Service = impl Service<
-                    Request = T::Request,
-                    Response = U::Response,
-                    Error = T::Error,
-                > + Clone,
-            > + Clone,
+            Request = T::Request,
+            Response = U::Response,
+            Error = T::Error,
+            Config = T::Config,
+            InitError = T::InitError,
+            Service = impl Service<Request = T::Request, Response = U::Response, Error = T::Error>
+                          + Clone,
+        > + Clone,
     >
     where
         Self: Sized,
@@ -221,13 +218,13 @@ impl<T: ServiceFactory> PipelineFactory<T> {
         f: F,
     ) -> PipelineFactory<
         impl ServiceFactory<
-                Request = T::Request,
-                Response = Res,
-                Error = Err,
-                Config = T::Config,
-                InitError = T::InitError,
-                Service = impl Service<Request = T::Request, Response = Res, Error = Err> + Clone,
-            > + Clone,
+            Request = T::Request,
+            Response = Res,
+            Error = Err,
+            Config = T::Config,
+            InitError = T::InitError,
+            Service = impl Service<Request = T::Request, Response = Res, Error = Err> + Clone,
+        > + Clone,
     >
     where
         Self: Sized,
@@ -254,17 +251,14 @@ impl<T: ServiceFactory> PipelineFactory<T> {
         factory: F,
     ) -> PipelineFactory<
         impl ServiceFactory<
-                Request = T::Request,
-                Response = U::Response,
-                Error = T::Error,
-                Config = T::Config,
-                InitError = T::InitError,
-                Service = impl Service<
-                    Request = T::Request,
-                    Response = U::Response,
-                    Error = T::Error,
-                > + Clone,
-            > + Clone,
+            Request = T::Request,
+            Response = U::Response,
+            Error = T::Error,
+            Config = T::Config,
+            InitError = T::InitError,
+            Service = impl Service<Request = T::Request, Response = U::Response, Error = T::Error>
+                          + Clone,
+        > + Clone,
     >
     where
         Self: Sized,

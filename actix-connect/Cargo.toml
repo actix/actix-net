@@ -40,7 +40,7 @@ derive_more = "0.99.2"
 either = "1.5.3"
 futures-util = { version = "0.3.4", default-features = false }
 # FIXME: Use release version
-http = { git = "https://github.com/paolobarbolini/http.git", branch = "bytes06", optional = true }
+http = { git = "https://github.com/fakeshadow/http.git", optional = true }
 log = "0.4"
 # FIXME: Use release version
 trust-dns-proto = { git = "https://github.com/bluejekyll/trust-dns", branch = "main", default-features = false, features = ["tokio-runtime"] }
