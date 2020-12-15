@@ -4,8 +4,6 @@
 //! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].
 //! Framed streams are also known as `transports`.
 //!
-//! [`AsyncRead`]: AsyncRead
-//! [`AsyncWrite`]: AsyncWrite
 //! [`Sink`]: futures_sink::Sink
 //! [`Stream`]: futures_core::Stream
 

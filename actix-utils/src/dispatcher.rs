@@ -290,10 +290,8 @@ where
                 }
                 State::Error(_) => {
                     // flush write buffer
-                    if !this.framed.is_write_buf_empty() {
-                        if let Poll::Pending = this.framed.flush(cx) {
-                            return Poll::Pending;
-                        }
+                    if !this.framed.is_write_buf_empty() && this.framed.flush(cx).is_pending() {
+                        return Poll::Pending;
                     }
                     Poll::Ready(Err(this.state.take_error()))
                 }

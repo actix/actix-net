@@ -7,7 +7,7 @@ use tokio::{runtime, task::LocalSet};
 ///
 /// See [module level][mod] documentation for more details.
 ///
-/// [mod]: index.html
+/// [mod]: crate
 #[derive(Debug)]
 pub struct Runtime {
     local: LocalSet,
@@ -38,7 +38,7 @@ impl Runtime {
     ///
     /// See [module level][mod] documentation for more details.
     ///
-    /// [mod]: index.html
+    /// [mod]: crate
     ///
     /// # Examples
     ///
