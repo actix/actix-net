@@ -19,6 +19,7 @@ use std::{fmt, rc};
 ///
 /// A single `AtomicWaker` may be reused for any number of calls to `register` or
 /// `wake`.
+// TODO: Refactor to Cell when remove deprecated methods (@botika)
 #[derive(Default)]
 pub struct LocalWaker {
     pub(crate) waker: UnsafeCell<Option<Waker>>,
@@ -34,6 +35,10 @@ impl LocalWaker {
         }
     }
 
+    #[deprecated(
+        since = "2.1.0",
+        note = "In favor of `wake`. State of the register doesn't matter at `wake` up"
+    )]
     #[inline]
     /// Check if waker has been registered.
     pub fn is_registered(&self) -> bool {
@@ -47,9 +52,8 @@ impl LocalWaker {
     pub fn register(&self, waker: &Waker) -> bool {
         unsafe {
             let w = self.waker.get();
-            let is_registered = (*w).is_some();
-            *w = Some(waker.clone());
-            is_registered
+            let last_waker = w.replace(Some(waker.clone()));
+            last_waker.is_some()
         }
     }
 
@@ -63,6 +67,7 @@ impl LocalWaker {
         }
     }
 
+    #[inline]
     /// Returns the last `Waker` passed to `register`, so that the user can wake it.
     ///
     /// If a waker has not been registered, this returns `None`.

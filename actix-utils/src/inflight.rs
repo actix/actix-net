@@ -74,7 +74,7 @@ where
     type Future = InFlightServiceResponse<T>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if let Poll::Pending = self.service.poll_ready(cx)? {
+        if self.service.poll_ready(cx)?.is_pending() {
             Poll::Pending
         } else if !self.count.available(cx) {
             log::trace!("InFlight limit exceeded");

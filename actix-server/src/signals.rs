@@ -58,7 +58,7 @@ impl Signals {
                     ),
                 }
             }
-
+          
             actix_rt::spawn(Signals { srv, streams });
         }
     }

@@ -160,7 +160,12 @@ where
         }
 
         // check nested service
-        if let Poll::Pending = self.service.poll_ready(cx).map_err(InOrderError::Service)? {
+        if self
+            .service
+            .poll_ready(cx)
+            .map_err(InOrderError::Service)?
+            .is_pending()
+        {
             Poll::Pending
         } else {
             Poll::Ready(Ok(()))

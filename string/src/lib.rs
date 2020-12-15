@@ -11,7 +11,7 @@ use bytes::Bytes;
 
 /// A UTF-8 encoded string with [`Bytes`] as a storage.
 ///
-/// [`Bytes`]: https://docs.rs/bytes/0.5.3/bytes/struct.Bytes.html
+/// [`Bytes`]: bytes::Bytes
 #[derive(Clone, Eq, Ord, PartialOrd, Default)]
 pub struct ByteString(Bytes);
 

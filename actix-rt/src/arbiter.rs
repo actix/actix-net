@@ -333,7 +333,7 @@ impl Future for CleanupPending {
             let mut pending = cell.borrow_mut();
             let mut i = 0;
             while i != pending.len() {
-                if let Poll::Ready(_) = Pin::new(&mut pending[i]).poll(cx) {
+                if Pin::new(&mut pending[i]).poll(cx).is_ready() {
                     pending.remove(i);
                 } else {
                     i += 1;
