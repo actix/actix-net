@@ -65,7 +65,7 @@ impl Builder {
     /// Function `f` get called within tokio runtime context.
     pub fn run<F>(self, f: F) -> io::Result<()>
     where
-        F: FnOnce() + 'static,
+        F: FnOnce(),
     {
         self.create_runtime(f).run()
     }
@@ -88,7 +88,7 @@ impl Builder {
 
     fn create_runtime<F>(self, f: F) -> SystemRunner
     where
-        F: FnOnce() + 'static,
+        F: FnOnce(),
     {
         let (stop_tx, stop) = channel();
         let (sys_sender, sys_receiver) = unbounded();

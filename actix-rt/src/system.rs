@@ -256,7 +256,7 @@ impl System {
     /// Function `f` get called within tokio runtime context.
     pub fn run<F>(f: F) -> io::Result<()>
     where
-        F: FnOnce() + 'static,
+        F: FnOnce(),
     {
         Self::builder().run(f)
     }

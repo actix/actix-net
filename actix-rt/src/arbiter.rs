@@ -291,7 +291,7 @@ impl Future for CleanupPending {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         HANDLE.with(move |handle| {
-            let _ = Pin::new(&mut *handle.borrow_mut()).poll_next(cx);
+            recycle_join_handle(&mut *handle.borrow_mut(), cx);
         });
 
         Poll::Ready(())
@@ -328,7 +328,7 @@ impl Future for ArbiterController {
                         HANDLE.with(|handle| {
                             let mut handle = handle.borrow_mut();
                             handle.push(tokio::task::spawn_local(fut));
-                            let _ = Pin::new(&mut *handle).poll_next(cx);
+                            recycle_join_handle(&mut *handle, cx);
                         });
                     }
                     ArbiterCommand::ExecuteFn(f) => {
@@ -338,6 +338,20 @@ impl Future for ArbiterController {
                 Poll::Pending => return Poll::Pending,
             }
         }
+    }
+}
+
+fn recycle_join_handle(handle: &mut FuturesUnordered<JoinHandle<()>>, cx: &mut Context<'_>) {
+    let _ = Pin::new(&mut *handle).poll_next(cx);
+
+    // Try to recycle more join handles and free up memory.
+    //
+    // this is a guess. The yield limit for FuturesUnordered is 32.
+    // So poll an extra 3 times would make the total poll below 128.
+    if handle.len() > 64 {
+        (0..3).for_each(|_| {
+            let _ = Pin::new(&mut *handle).poll_next(cx);
+        })
     }
 }
 

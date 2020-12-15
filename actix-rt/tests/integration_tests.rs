@@ -98,3 +98,29 @@ fn join_current_arbiter() {
         "local_join should await only for the already spawned futures"
     );
 }
+
+#[test]
+fn non_static_block_on() {
+    let string = String::from("test_str");
+    let str = string.as_str();
+
+    let mut sys = actix_rt::System::new("borrow some");
+
+    sys.block_on(async {
+        actix_rt::time::delay_for(Duration::from_millis(1)).await;
+        assert_eq!("test_str", str);
+    });
+
+    let mut rt = actix_rt::Runtime::new().unwrap();
+
+    rt.block_on(async {
+        actix_rt::time::delay_for(Duration::from_millis(1)).await;
+        assert_eq!("test_str", str);
+    });
+
+    actix_rt::System::run(|| {
+        assert_eq!("test_str", str);
+        actix_rt::System::current().stop();
+    })
+    .unwrap();
+}
