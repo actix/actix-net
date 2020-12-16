@@ -8,12 +8,12 @@ use std::task::{Context, Poll};
 use crate::{Service, ServiceFactory};
 
 /// Convert `Fn(Config, &mut Service1) -> Future<Service2>` fn to a service factory
-pub fn apply_cfg<F, C, T, R, S, E>(
+pub fn apply_cfg<F, C, T, Req, R, S, E>(
     srv: T,
     f: F,
 ) -> impl ServiceFactory<
+    Req,
     Config = C,
-    Request = S::Request,
     Response = S::Response,
     Error = S::Error,
     Service = S,
@@ -22,9 +22,9 @@ pub fn apply_cfg<F, C, T, R, S, E>(
 > + Clone
 where
     F: FnMut(C, &mut T) -> R,
-    T: Service,
+    T: Service<Req>,
     R: Future<Output = Result<S, E>>,
-    S: Service,
+    S: Service<Req>,
 {
     ApplyConfigService {
         srv: Rc::new(RefCell::new((srv, f))),
@@ -35,12 +35,12 @@ where
 /// Convert `Fn(Config, &mut Service1) -> Future<Service2>` fn to a service factory
 ///
 /// Service1 get constructed from `T` factory.
-pub fn apply_cfg_factory<F, C, T, R, S>(
+pub fn apply_cfg_factory<F, C, Req, T, R, S>(
     factory: T,
     f: F,
 ) -> impl ServiceFactory<
+    Req,
     Config = C,
-    Request = S::Request,
     Response = S::Response,
     Error = S::Error,
     Service = S,
@@ -48,10 +48,10 @@ pub fn apply_cfg_factory<F, C, T, R, S>(
 > + Clone
 where
     F: FnMut(C, &mut T::Service) -> R,
-    T: ServiceFactory<Config = ()>,
+    T: ServiceFactory<Req, Config = ()>,
     T::InitError: From<T::Error>,
     R: Future<Output = Result<S, T::InitError>>,
-    S: Service,
+    S: Service<Req>,
 {
     ApplyConfigServiceFactory {
         srv: Rc::new(RefCell::new((factory, f))),
@@ -60,23 +60,23 @@ where
 }
 
 /// Convert `Fn(Config, &mut Server) -> Future<Service>` fn to NewService\
-struct ApplyConfigService<F, C, T, R, S, E>
+struct ApplyConfigService<F, C, Req, T, R, S, E>
 where
     F: FnMut(C, &mut T) -> R,
-    T: Service,
+    T: Service<Req>,
     R: Future<Output = Result<S, E>>,
-    S: Service,
+    S: Service<Req>,
 {
     srv: Rc<RefCell<(T, F)>>,
     _t: PhantomData<(C, R, S)>,
 }
 
-impl<F, C, T, R, S, E> Clone for ApplyConfigService<F, C, T, R, S, E>
+impl<F, C, Req, T, R, S, E> Clone for ApplyConfigService<F, C, Req, T, R, S, E>
 where
     F: FnMut(C, &mut T) -> R,
-    T: Service,
+    T: Service<Req>,
     R: Future<Output = Result<S, E>>,
-    S: Service,
+    S: Service<Req>,
 {
     fn clone(&self) -> Self {
         ApplyConfigService {
@@ -86,15 +86,14 @@ where
     }
 }
 
-impl<F, C, T, R, S, E> ServiceFactory for ApplyConfigService<F, C, T, R, S, E>
+impl<F, C, Req, T, R, S, E> ServiceFactory<Req> for ApplyConfigService<F, C, Req, T, R, S, E>
 where
     F: FnMut(C, &mut T) -> R,
-    T: Service,
+    T: Service<Req>,
     R: Future<Output = Result<S, E>>,
-    S: Service,
+    S: Service<Req>,
 {
     type Config = C;
-    type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
     type Service = S;
@@ -109,23 +108,23 @@ where
 }
 
 /// Convert `Fn(&Config) -> Future<Service>` fn to NewService
-struct ApplyConfigServiceFactory<F, C, T, R, S>
+struct ApplyConfigServiceFactory<F, C, Req, T, R, S>
 where
     F: FnMut(C, &mut T::Service) -> R,
-    T: ServiceFactory<Config = ()>,
+    T: ServiceFactory<Req, Config = ()>,
     R: Future<Output = Result<S, T::InitError>>,
-    S: Service,
+    S: Service<Req>,
 {
     srv: Rc<RefCell<(T, F)>>,
     _t: PhantomData<(C, R, S)>,
 }
 
-impl<F, C, T, R, S> Clone for ApplyConfigServiceFactory<F, C, T, R, S>
+impl<F, C, Req, T, R, S> Clone for ApplyConfigServiceFactory<F, C, Req, T, R, S>
 where
     F: FnMut(C, &mut T::Service) -> R,
-    T: ServiceFactory<Config = ()>,
+    T: ServiceFactory<Req, Config = ()>,
     R: Future<Output = Result<S, T::InitError>>,
-    S: Service,
+    S: Service<Req>,
 {
     fn clone(&self) -> Self {
         Self {
@@ -135,22 +134,21 @@ where
     }
 }
 
-impl<F, C, T, R, S> ServiceFactory for ApplyConfigServiceFactory<F, C, T, R, S>
+impl<F, C, Req, T, R, S> ServiceFactory<Req> for ApplyConfigServiceFactory<F, C, Req, T, R, S>
 where
     F: FnMut(C, &mut T::Service) -> R,
-    T: ServiceFactory<Config = ()>,
+    T: ServiceFactory<Req, Config = ()>,
     T::InitError: From<T::Error>,
     R: Future<Output = Result<S, T::InitError>>,
-    S: Service,
+    S: Service<Req>,
 {
     type Config = C;
-    type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
     type Service = S;
 
     type InitError = T::InitError;
-    type Future = ApplyConfigServiceFactoryResponse<F, C, T, R, S>;
+    type Future = ApplyConfigServiceFactoryResponse<F, C, Req, T, R, S>;
 
     fn new_service(&self, cfg: C) -> Self::Future {
         ApplyConfigServiceFactoryResponse {
@@ -162,40 +160,40 @@ where
 }
 
 #[pin_project::pin_project]
-struct ApplyConfigServiceFactoryResponse<F, C, T, R, S>
+struct ApplyConfigServiceFactoryResponse<F, C, Req, T, R, S>
 where
     F: FnMut(C, &mut T::Service) -> R,
-    T: ServiceFactory<Config = ()>,
+    T: ServiceFactory<Req, Config = ()>,
     T::InitError: From<T::Error>,
     R: Future<Output = Result<S, T::InitError>>,
-    S: Service,
+    S: Service<Req>,
 {
     cfg: Option<C>,
     store: Rc<RefCell<(T, F)>>,
     #[pin]
-    state: State<T, R, S>,
+    state: State<T, R, S, Req>,
 }
 
 #[pin_project::pin_project(project = StateProj)]
-enum State<T, R, S>
+enum State<T, R, S, Req>
 where
-    T: ServiceFactory<Config = ()>,
+    T: ServiceFactory<Req, Config = ()>,
     T::InitError: From<T::Error>,
     R: Future<Output = Result<S, T::InitError>>,
-    S: Service,
+    S: Service<Req>,
 {
     A(#[pin] T::Future),
     B(T::Service),
     C(#[pin] R),
 }
 
-impl<F, C, T, R, S> Future for ApplyConfigServiceFactoryResponse<F, C, T, R, S>
+impl<F, C, Req, T, R, S> Future for ApplyConfigServiceFactoryResponse<F, C, Req, T, R, S>
 where
     F: FnMut(C, &mut T::Service) -> R,
-    T: ServiceFactory<Config = ()>,
+    T: ServiceFactory<Req, Config = ()>,
     T::InitError: From<T::Error>,
     R: Future<Output = Result<S, T::InitError>>,
-    S: Service,
+    S: Service<Req>,
 {
     type Output = Result<S, T::InitError>;
 

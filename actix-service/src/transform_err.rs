@@ -9,65 +9,64 @@ use super::Transform;
 /// transform's init error.
 ///
 /// This is created by the `Transform::map_init_err` method.
-pub struct TransformMapInitErr<T, S, F, E> {
-    t: T,
-    f: F,
-    e: PhantomData<(S, E)>,
+pub struct TransformMapInitErr<T, S, Req, F, E> {
+    transform: T,
+    mapper: F,
+    _phantom: PhantomData<(S, Req, E)>,
 }
 
-impl<T, S, F, E> TransformMapInitErr<T, S, F, E> {
+impl<T, S, F, E, Req> TransformMapInitErr<T, S, Req, F, E> {
     pub(crate) fn new(t: T, f: F) -> Self
     where
-        T: Transform<S>,
+        T: Transform<S, Req>,
         F: Fn(T::InitError) -> E,
     {
         Self {
-            t,
-            f,
-            e: PhantomData,
+            transform: t,
+            mapper: f,
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<T, S, F, E> Clone for TransformMapInitErr<T, S, F, E>
+impl<T, S, Req, F, E> Clone for TransformMapInitErr<T, S, Req, F, E>
 where
     T: Clone,
     F: Clone,
 {
     fn clone(&self) -> Self {
         Self {
-            t: self.t.clone(),
-            f: self.f.clone(),
-            e: PhantomData,
+            transform: self.transform.clone(),
+            mapper: self.mapper.clone(),
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<T, S, F, E> Transform<S> for TransformMapInitErr<T, S, F, E>
+impl<T, S, F, E, Req> Transform<S, Req> for TransformMapInitErr<T, S, Req, F, E>
 where
-    T: Transform<S>,
+    T: Transform<S, Req>,
     F: Fn(T::InitError) -> E + Clone,
 {
-    type Request = T::Request;
     type Response = T::Response;
     type Error = T::Error;
     type Transform = T::Transform;
 
     type InitError = E;
-    type Future = TransformMapInitErrFuture<T, S, F, E>;
+    type Future = TransformMapInitErrFuture<T, S, F, E, Req>;
 
     fn new_transform(&self, service: S) -> Self::Future {
         TransformMapInitErrFuture {
-            fut: self.t.new_transform(service),
-            f: self.f.clone(),
+            fut: self.transform.new_transform(service),
+            f: self.mapper.clone(),
         }
     }
 }
 
 #[pin_project::pin_project]
-pub struct TransformMapInitErrFuture<T, S, F, E>
+pub struct TransformMapInitErrFuture<T, S, F, E, Req>
 where
-    T: Transform<S>,
+    T: Transform<S, Req>,
     F: Fn(T::InitError) -> E,
 {
     #[pin]
@@ -75,9 +74,9 @@ where
     f: F,
 }
 
-impl<T, S, F, E> Future for TransformMapInitErrFuture<T, S, F, E>
+impl<T, S, F, E, Req> Future for TransformMapInitErrFuture<T, S, F, E, Req>
 where
-    T: Transform<S>,
+    T: Transform<S, Req>,
     F: Fn(T::InitError) -> E + Clone,
 {
     type Output = Result<T::Transform, E>;

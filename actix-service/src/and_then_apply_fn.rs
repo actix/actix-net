@@ -8,10 +8,10 @@ use std::task::{Context, Poll};
 use crate::{Service, ServiceFactory};
 
 /// `Apply` service combinator
-pub(crate) struct AndThenApplyFn<A, B, F, Fut, Res, Err>
+pub(crate) struct AndThenApplyFn<A, B, F, Fut, Req, Res, Err>
 where
-    A: Service,
-    B: Service,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
     F: FnMut(A::Response, &mut B) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error> + From<B::Error>,
@@ -20,10 +20,10 @@ where
     r: PhantomData<(Fut, Res, Err)>,
 }
 
-impl<A, B, F, Fut, Res, Err> AndThenApplyFn<A, B, F, Fut, Res, Err>
+impl<A, B, F, Fut, Req, Res, Err> AndThenApplyFn<A, B, F, Fut, Req, Res, Err>
 where
-    A: Service,
-    B: Service,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
     F: FnMut(A::Response, &mut B) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error> + From<B::Error>,
@@ -37,10 +37,10 @@ where
     }
 }
 
-impl<A, B, F, Fut, Res, Err> Clone for AndThenApplyFn<A, B, F, Fut, Res, Err>
+impl<A, B, F, Fut, Req, Res, Err> Clone for AndThenApplyFn<A, B, F, Fut, Req, Res, Err>
 where
-    A: Service,
-    B: Service,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
     F: FnMut(A::Response, &mut B) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error> + From<B::Error>,
@@ -53,18 +53,17 @@ where
     }
 }
 
-impl<A, B, F, Fut, Res, Err> Service for AndThenApplyFn<A, B, F, Fut, Res, Err>
+impl<A, B, F, Fut, Req, Res, Err> Service<Req> for AndThenApplyFn<A, B, F, Fut, Req, Res, Err>
 where
-    A: Service,
-    B: Service,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
     F: FnMut(A::Response, &mut B) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error> + From<B::Error>,
 {
-    type Request = A::Request;
     type Response = Res;
     type Error = Err;
-    type Future = AndThenApplyFnFuture<A, B, F, Fut, Res, Err>;
+    type Future = AndThenApplyFnFuture<A, B, F, Fut, Req, Res, Err>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let mut inner = self.srv.borrow_mut();
@@ -76,7 +75,7 @@ where
         }
     }
 
-    fn call(&mut self, req: A::Request) -> Self::Future {
+    fn call(&mut self, req: Req) -> Self::Future {
         let fut = self.srv.borrow_mut().0.call(req);
         AndThenApplyFnFuture {
             state: State::A(fut, Some(self.srv.clone())),
@@ -85,24 +84,24 @@ where
 }
 
 #[pin_project::pin_project]
-pub(crate) struct AndThenApplyFnFuture<A, B, F, Fut, Res, Err>
+pub(crate) struct AndThenApplyFnFuture<A, B, F, Fut, Req, Res, Err>
 where
-    A: Service,
-    B: Service,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
     F: FnMut(A::Response, &mut B) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error>,
     Err: From<B::Error>,
 {
     #[pin]
-    state: State<A, B, F, Fut, Res, Err>,
+    state: State<A, B, F, Fut, Req, Res, Err>,
 }
 
 #[pin_project::pin_project(project = StateProj)]
-enum State<A, B, F, Fut, Res, Err>
+enum State<A, B, F, Fut, Req, Res, Err>
 where
-    A: Service,
-    B: Service,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
     F: FnMut(A::Response, &mut B) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error>,
@@ -113,10 +112,10 @@ where
     Empty,
 }
 
-impl<A, B, F, Fut, Res, Err> Future for AndThenApplyFnFuture<A, B, F, Fut, Res, Err>
+impl<A, B, F, Fut, Req, Res, Err> Future for AndThenApplyFnFuture<A, B, F, Fut, Req, Res, Err>
 where
-    A: Service,
-    B: Service,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
     F: FnMut(A::Response, &mut B) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error> + From<B::Error>,
@@ -150,15 +149,19 @@ where
 }
 
 /// `AndThenApplyFn` service factory
-pub(crate) struct AndThenApplyFnFactory<A, B, F, Fut, Res, Err> {
+pub(crate) struct AndThenApplyFnFactory<A, B, F, Req, Fut, Res, Err> {
     srv: Rc<(A, B, F)>,
-    r: PhantomData<(Fut, Res, Err)>,
+    r: PhantomData<(Req, Fut, Res, Err)>,
 }
 
-impl<A, B, F, Fut, Res, Err> AndThenApplyFnFactory<A, B, F, Fut, Res, Err>
+impl<A, B, F, Fut, Req, Res, Err> AndThenApplyFnFactory<A, B, F, Req, Fut, Res, Err>
 where
-    A: ServiceFactory,
-    B: ServiceFactory<Config = A::Config, InitError = A::InitError>,
+    A: ServiceFactory<Req>,
+    B: ServiceFactory<
+        Result<A::Response, A::Error>,
+        Config = A::Config,
+        InitError = A::InitError,
+    >,
     F: FnMut(A::Response, &mut B::Service) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error> + From<B::Error>,
@@ -172,7 +175,7 @@ where
     }
 }
 
-impl<A, B, F, Fut, Res, Err> Clone for AndThenApplyFnFactory<A, B, F, Fut, Res, Err> {
+impl<A, B, F, Req, Fut, Res, Err> Clone for AndThenApplyFnFactory<A, B, F, Req, Fut, Res, Err> {
     fn clone(&self) -> Self {
         Self {
             srv: self.srv.clone(),
@@ -181,22 +184,26 @@ impl<A, B, F, Fut, Res, Err> Clone for AndThenApplyFnFactory<A, B, F, Fut, Res, 
     }
 }
 
-impl<A, B, F, Fut, Res, Err> ServiceFactory for AndThenApplyFnFactory<A, B, F, Fut, Res, Err>
+impl<A, B, F, Req, Fut, Res, Err> ServiceFactory<Req>
+    for AndThenApplyFnFactory<A, B, F, Req, Fut, Res, Err>
 where
-    A: ServiceFactory,
+    A: ServiceFactory<Req>,
     A::Config: Clone,
-    B: ServiceFactory<Config = A::Config, InitError = A::InitError>,
+    B: ServiceFactory<
+        Result<A::Response, A::Error>,
+        Config = A::Config,
+        InitError = A::InitError,
+    >,
     F: FnMut(A::Response, &mut B::Service) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error> + From<B::Error>,
 {
-    type Request = A::Request;
     type Response = Res;
     type Error = Err;
-    type Service = AndThenApplyFn<A::Service, B::Service, F, Fut, Res, Err>;
+    type Service = AndThenApplyFn<A::Service, B::Service, F, Fut, Req, Res, Err>;
     type Config = A::Config;
     type InitError = A::InitError;
-    type Future = AndThenApplyFnFactoryResponse<A, B, F, Fut, Res, Err>;
+    type Future = AndThenApplyFnFactoryResponse<A, B, F, Fut, Req, Res, Err>;
 
     fn new_service(&self, cfg: A::Config) -> Self::Future {
         let srv = &*self.srv;
@@ -211,10 +218,14 @@ where
 }
 
 #[pin_project::pin_project]
-pub(crate) struct AndThenApplyFnFactoryResponse<A, B, F, Fut, Res, Err>
+pub(crate) struct AndThenApplyFnFactoryResponse<A, B, F, Fut, Req, Res, Err>
 where
-    A: ServiceFactory,
-    B: ServiceFactory<Config = A::Config, InitError = A::InitError>,
+    A: ServiceFactory<Req>,
+    B: ServiceFactory<
+        Result<A::Response, A::Error>,
+        Config = A::Config,
+        InitError = A::InitError,
+    >,
     F: FnMut(A::Response, &mut B::Service) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error>,
@@ -229,16 +240,21 @@ where
     b: Option<B::Service>,
 }
 
-impl<A, B, F, Fut, Res, Err> Future for AndThenApplyFnFactoryResponse<A, B, F, Fut, Res, Err>
+impl<A, B, F, Fut, Req, Res, Err> Future
+    for AndThenApplyFnFactoryResponse<A, B, F, Fut, Req, Res, Err>
 where
-    A: ServiceFactory,
-    B: ServiceFactory<Config = A::Config, InitError = A::InitError>,
+    A: ServiceFactory<Req>,
+    B: ServiceFactory<
+        Result<A::Response, A::Error>,
+        Config = A::Config,
+        InitError = A::InitError,
+    >,
     F: FnMut(A::Response, &mut B::Service) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
     Err: From<A::Error> + From<B::Error>,
 {
     type Output =
-        Result<AndThenApplyFn<A::Service, B::Service, F, Fut, Res, Err>, A::InitError>;
+        Result<AndThenApplyFn<A::Service, B::Service, F, Fut, Req, Res, Err>, A::InitError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
@@ -280,8 +296,7 @@ mod tests {
 
     #[derive(Clone)]
     struct Srv;
-    impl Service for Srv {
-        type Request = ();
+    impl Service<()> for Srv {
         type Response = ();
         type Error = ();
         type Future = Ready<Result<(), ()>>;
@@ -291,16 +306,17 @@ mod tests {
         }
 
         #[allow(clippy::unit_arg)]
-        fn call(&mut self, req: Self::Request) -> Self::Future {
+        fn call(&mut self, req: ()) -> Self::Future {
             ok(req)
         }
     }
 
     #[actix_rt::test]
     async fn test_service() {
-        let mut srv = pipeline(ok).and_then_apply_fn(Srv, |req: &'static str, s| {
-            s.call(()).map_ok(move |res| (req, res))
-        });
+        let mut srv = pipeline(|| async { Ok(2) })
+            .and_then_apply_fn(Srv, |req: &'static str, s| {
+                s.call(()).map_ok(move |res| (req, res))
+            });
         let res = lazy(|cx| srv.poll_ready(cx)).await;
         assert_eq!(res, Poll::Ready(Ok(())));
 

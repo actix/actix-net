@@ -72,14 +72,11 @@ pub use self::transform::{apply, Transform};
 /// ```rust,ignore
 /// async fn my_service(req: u8) -> Result<u64, MyError>;
 /// ```
-pub trait Service {
-    /// Requests handled by the service.
-    type Request;
-
+pub trait Service<Req> {
     /// Responses given by the service.
     type Response;
 
-    /// Errors produced by the service.
+    /// Errors produced by the service when polling readiness or executing call.
     type Error;
 
     /// The future response value.
@@ -109,7 +106,7 @@ pub trait Service {
     ///
     /// Calling `call` without calling `poll_ready` is permitted. The
     /// implementation must be resilient to this fact.
-    fn call(&mut self, req: Self::Request) -> Self::Future;
+    fn call(&mut self, req: Req) -> Self::Future;
 
     /// Map this service's output to a different type, returning a new service
     /// of the resulting type.
@@ -120,7 +117,7 @@ pub trait Service {
     /// Note that this function consumes the receiving service and returns a
     /// wrapped version of it, similar to the existing `map` methods in the
     /// standard library.
-    fn map<F, R>(self, f: F) -> crate::dev::Map<Self, F, R>
+    fn map<F, R>(self, f: F) -> crate::dev::Map<Self, F, Req, R>
     where
         Self: Sized,
         F: FnMut(Self::Response) -> R,
@@ -136,7 +133,7 @@ pub trait Service {
     ///
     /// Note that this function consumes the receiving service and returns a
     /// wrapped version of it.
-    fn map_err<F, E>(self, f: F) -> crate::dev::MapErr<Self, F, E>
+    fn map_err<F, E>(self, f: F) -> crate::dev::MapErr<Self, Req, F, E>
     where
         Self: Sized,
         F: Fn(Self::Error) -> E,
@@ -154,10 +151,7 @@ pub trait Service {
 /// requests on that new TCP stream.
 ///
 /// `Config` is a service factory configuration type.
-pub trait ServiceFactory {
-    /// Requests handled by the created services.
-    type Request;
-
+pub trait ServiceFactory<Req> {
     /// Responses given by the created services.
     type Response;
 
@@ -168,11 +162,7 @@ pub trait ServiceFactory {
     type Config;
 
     /// The kind of `Service` created by this factory.
-    type Service: Service<
-        Request = Self::Request,
-        Response = Self::Response,
-        Error = Self::Error,
-    >;
+    type Service: Service<Req, Response = Self::Response, Error = Self::Error>;
 
     /// Errors potentially raised while building a service.
     type InitError;
@@ -185,7 +175,7 @@ pub trait ServiceFactory {
 
     /// Map this service's output to a different type, returning a new service
     /// of the resulting type.
-    fn map<F, R>(self, f: F) -> crate::map::MapServiceFactory<Self, F, R>
+    fn map<F, R>(self, f: F) -> crate::map::MapServiceFactory<Self, F, Req, R>
     where
         Self: Sized,
         F: FnMut(Self::Response) -> R + Clone,
@@ -194,7 +184,7 @@ pub trait ServiceFactory {
     }
 
     /// Map this service's error to a different error, returning a new service.
-    fn map_err<F, E>(self, f: F) -> crate::map_err::MapErrServiceFactory<Self, F, E>
+    fn map_err<F, E>(self, f: F) -> crate::map_err::MapErrServiceFactory<Self, Req, F, E>
     where
         Self: Sized,
         F: Fn(Self::Error) -> E + Clone,
@@ -203,7 +193,7 @@ pub trait ServiceFactory {
     }
 
     /// Map this factory's init error to a different error, returning a new service.
-    fn map_init_err<F, E>(self, f: F) -> crate::map_init_err::MapInitErr<Self, F, E>
+    fn map_init_err<F, E>(self, f: F) -> crate::map_init_err::MapInitErr<Self, F, Req, E>
     where
         Self: Sized,
         F: Fn(Self::InitError) -> E + Clone,
@@ -212,11 +202,10 @@ pub trait ServiceFactory {
     }
 }
 
-impl<'a, S> Service for &'a mut S
+impl<'a, S, Req> Service<Req> for &'a mut S
 where
-    S: Service + 'a,
+    S: Service<Req> + 'a,
 {
-    type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
@@ -225,16 +214,15 @@ where
         (**self).poll_ready(ctx)
     }
 
-    fn call(&mut self, request: Self::Request) -> S::Future {
+    fn call(&mut self, request: Req) -> S::Future {
         (**self).call(request)
     }
 }
 
-impl<S> Service for Box<S>
+impl<S, Req> Service<Req> for Box<S>
 where
-    S: Service + ?Sized,
+    S: Service<Req> + ?Sized,
 {
-    type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
@@ -243,16 +231,15 @@ where
         (**self).poll_ready(ctx)
     }
 
-    fn call(&mut self, request: Self::Request) -> S::Future {
+    fn call(&mut self, request: Req) -> S::Future {
         (**self).call(request)
     }
 }
 
-impl<S> Service for RefCell<S>
+impl<S, Req> Service<Req> for RefCell<S>
 where
-    S: Service,
+    S: Service<Req>,
 {
-    type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
@@ -261,16 +248,15 @@ where
         self.borrow_mut().poll_ready(ctx)
     }
 
-    fn call(&mut self, request: Self::Request) -> S::Future {
+    fn call(&mut self, request: Req) -> S::Future {
         self.borrow_mut().call(request)
     }
 }
 
-impl<S> Service for Rc<RefCell<S>>
+impl<S, Req> Service<Req> for Rc<RefCell<S>>
 where
-    S: Service,
+    S: Service<Req>,
 {
-    type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
@@ -279,16 +265,15 @@ where
         self.borrow_mut().poll_ready(ctx)
     }
 
-    fn call(&mut self, request: Self::Request) -> S::Future {
+    fn call(&mut self, request: Req) -> S::Future {
         (&mut (**self).borrow_mut()).call(request)
     }
 }
 
-impl<S> ServiceFactory for Rc<S>
+impl<S, Req> ServiceFactory<Req> for Rc<S>
 where
-    S: ServiceFactory,
+    S: ServiceFactory<Req>,
 {
-    type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
     type Config = S::Config;
@@ -301,11 +286,10 @@ where
     }
 }
 
-impl<S> ServiceFactory for Arc<S>
+impl<S, Req> ServiceFactory<Req> for Arc<S>
 where
-    S: ServiceFactory,
+    S: ServiceFactory<Req>,
 {
-    type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
     type Config = S::Config;
@@ -319,35 +303,35 @@ where
 }
 
 /// Trait for types that can be converted to a `Service`
-pub trait IntoService<T>
+pub trait IntoService<T, Req>
 where
-    T: Service,
+    T: Service<Req>,
 {
     /// Convert to a `Service`
     fn into_service(self) -> T;
 }
 
 /// Trait for types that can be converted to a `ServiceFactory`
-pub trait IntoServiceFactory<T>
+pub trait IntoServiceFactory<T, Req>
 where
-    T: ServiceFactory,
+    T: ServiceFactory<Req>,
 {
     /// Convert `Self` to a `ServiceFactory`
     fn into_factory(self) -> T;
 }
 
-impl<T> IntoService<T> for T
+impl<T, Req> IntoService<T, Req> for T
 where
-    T: Service,
+    T: Service<Req>,
 {
     fn into_service(self) -> T {
         self
     }
 }
 
-impl<T> IntoServiceFactory<T> for T
+impl<T, Req> IntoServiceFactory<T, Req> for T
 where
-    T: ServiceFactory,
+    T: ServiceFactory<Req>,
 {
     fn into_factory(self) -> T {
         self
@@ -355,10 +339,10 @@ where
 }
 
 /// Convert object of type `T` to a service `S`
-pub fn into_service<T, S>(tp: T) -> S
+pub fn into_service<T, S, Req>(tp: T) -> S
 where
-    S: Service,
-    T: IntoService<S>,
+    S: Service<Req>,
+    T: IntoService<S, Req>,
 {
     tp.into_service()
 }
