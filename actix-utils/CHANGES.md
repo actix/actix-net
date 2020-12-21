@@ -2,6 +2,7 @@
 
 ## Unreleased - 2020-xx-xx
 * Upgrade `pin-project` to `1.0`.
+* Deprecated `condition`,`either`,`inflight`,`keepalive`,`oneshot`,`order`,`stream` and `time` mod.
 
 ## 2.0.0 - 2020-08-23
 * No changes from beta 1.

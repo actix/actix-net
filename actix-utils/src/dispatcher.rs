@@ -2,13 +2,14 @@
 
 #![allow(type_alias_bounds)]
 
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::{fmt, mem};
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use core::{fmt, mem};
 
 use actix_codec::{AsyncRead, AsyncWrite, Decoder, Encoder, Framed};
 use actix_service::{IntoService, Service};
-use futures_util::{future::Future, stream::Stream, FutureExt};
+use futures_core::stream::Stream;
 use log::debug;
 
 use crate::mpsc;
@@ -72,7 +73,7 @@ where
     T: AsyncRead + AsyncWrite,
     U: Encoder<I> + Decoder,
     I: 'static,
-    <U as Encoder<I>>::Error: std::fmt::Debug,
+    <U as Encoder<I>>::Error: fmt::Debug,
 {
     service: S,
     state: State<S, U, I>,
@@ -114,8 +115,8 @@ where
     T: AsyncRead + AsyncWrite,
     U: Decoder + Encoder<I>,
     I: 'static,
-    <U as Decoder>::Error: std::fmt::Debug,
-    <U as Encoder<I>>::Error: std::fmt::Debug,
+    <U as Decoder>::Error: fmt::Debug,
+    <U as Encoder<I>>::Error: fmt::Debug,
 {
     pub fn new<F: IntoService<S>>(framed: Framed<T, U>, service: F) -> Self {
         let (tx, rx) = mpsc::channel();
@@ -178,7 +179,7 @@ where
         T: AsyncRead + AsyncWrite,
         U: Decoder + Encoder<I>,
         I: 'static,
-        <U as Encoder<I>>::Error: std::fmt::Debug,
+        <U as Encoder<I>>::Error: fmt::Debug,
     {
         loop {
             let this = self.as_mut().project();
@@ -198,9 +199,11 @@ where
                     };
 
                     let tx = this.tx.clone();
-                    actix_rt::spawn(this.service.call(item).map(move |item| {
+                    let fut = this.service.call(item);
+                    actix_rt::spawn(async move {
+                        let item = fut.await;
                         let _ = tx.send(item.map(Message::Item));
-                    }));
+                    });
                 }
                 Poll::Pending => return false,
                 Poll::Ready(Err(err)) => {
@@ -220,7 +223,7 @@ where
         T: AsyncRead + AsyncWrite,
         U: Decoder + Encoder<I>,
         I: 'static,
-        <U as Encoder<I>>::Error: std::fmt::Debug,
+        <U as Encoder<I>>::Error: fmt::Debug,
     {
         loop {
             let mut this = self.as_mut().project();
@@ -271,8 +274,8 @@ where
     T: AsyncRead + AsyncWrite,
     U: Decoder + Encoder<I>,
     I: 'static,
-    <U as Encoder<I>>::Error: std::fmt::Debug,
-    <U as Decoder>::Error: std::fmt::Debug,
+    <U as Encoder<I>>::Error: fmt::Debug,
+    <U as Decoder>::Error: fmt::Debug,
 {
     type Output = Result<(), DispatcherError<S::Error, U, I>>;
 

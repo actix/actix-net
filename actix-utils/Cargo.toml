@@ -19,12 +19,11 @@ path = "src/lib.rs"
 actix-codec = "0.3.0"
 actix-rt = "1.1.1"
 actix-service = "1.0.6"
-bitflags = "1.2.1"
-bytes = "0.5.3"
-either = "1.5.3"
-futures-channel = { version = "0.3.4", default-features = false }
+
+futures-core = { version = "0.3.4", default-features = false }
 futures-sink = { version = "0.3.4", default-features = false }
-futures-util = { version = "0.3.4", default-features = false }
 log = "0.4"
 pin-project = "1.0.0"
-slab = "0.4"
+
+[dev-dependencies]
+futures-util = { version = "0.3.4", default-features = false }
