@@ -299,7 +299,7 @@ impl ServerBuilder {
 
     pub fn on_stop<F, Fut>(mut self, future: F) -> Self
     where
-        F: Fn() -> Fut + 'static,
+        F: FnOnce() -> Fut + 'static,
         Fut: Future<Output = ()>,
     {
         self.on_stop = Box::pin(async move { future().await });

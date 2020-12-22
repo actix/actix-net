@@ -201,11 +201,8 @@ fn test_on_stop() {
             let srv: Server = Server::build()
                 .backlog(100)
                 .disable_signals()
-                .on_stop(move || {
-                    let bool = bool.clone();
-                    async move {
-                        bool.store(true, Ordering::SeqCst);
-                    }
+                .on_stop(|| async move {
+                    bool.store(true, Ordering::SeqCst);
                 })
                 .bind("test", addr, move || {
                     fn_service(|io: TcpStream| async move {
