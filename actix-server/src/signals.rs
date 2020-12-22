@@ -33,7 +33,7 @@ impl Signals {
         {
             actix_rt::spawn(Signals {
                 srv,
-                stream: Box::pin(actix_rt::signal::ctrl_c()),
+                signals: Box::pin(actix_rt::signal::ctrl_c()),
             });
         }
         #[cfg(unix)]
@@ -75,7 +75,7 @@ impl Future for Signals {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         #[cfg(not(unix))]
-        match Pin::new(&mut self.stream).poll(cx) {
+        match self.signals.as_mut().poll(cx) {
             Poll::Ready(_) => {
                 self.srv.signal(Signal::Int);
                 Poll::Ready(())
