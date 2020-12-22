@@ -53,9 +53,9 @@ where
     type Request = R;
     type Response = R;
     type Error = E;
-    type InitError = Infallible;
     type Config = ();
     type Service = KeepAliveService<R, E, F>;
+    type InitError = Infallible;
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
@@ -71,7 +71,7 @@ pub struct KeepAliveService<R, E, F> {
     f: F,
     ka: Duration,
     time: LowResTimeService,
-    delay: Sleep,
+    delay: Pin<Box<Sleep>>,
     expire: Instant,
     _t: PhantomData<(R, E)>,
 }
@@ -87,7 +87,7 @@ where
             ka,
             time,
             expire,
-            delay: sleep_until(expire),
+            delay: Box::pin(sleep_until(expire)),
             _t: PhantomData,
         }
     }
@@ -103,13 +103,13 @@ where
     type Future = Ready<Result<R, E>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match Pin::new(&mut self.delay).poll(cx) {
+        match self.delay.as_mut().poll(cx) {
             Poll::Ready(_) => {
                 let now = Instant::from_std(self.time.now());
                 if self.expire <= now {
                     Poll::Ready(Err((self.f)()))
                 } else {
-                    self.delay.reset(self.expire);
+                    self.delay.as_mut().reset(self.expire);
                     let _ = Pin::new(&mut self.delay).poll(cx);
                     Poll::Ready(Ok(()))
                 }

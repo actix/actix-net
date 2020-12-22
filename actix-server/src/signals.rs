@@ -1,6 +1,6 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+// use std::future::Future;
+// use std::pin::Pin;
+// use std::task::{Context, Poll};
 
 use crate::server::Server;
 
@@ -19,11 +19,11 @@ pub(crate) enum Signal {
 }
 
 pub(crate) struct Signals {
-    srv: Server,
-    #[cfg(not(unix))]
-    stream: Pin<Box<dyn Future<Output = std::io::Result<()>>>>,
-    #[cfg(unix)]
-    streams: Vec<(Signal, actix_rt::signal::unix::Signal)>,
+    // srv: Server,
+// #[cfg(not(unix))]
+// stream: Pin<Box<dyn Future<Output = std::io::Result<()>>>>,
+// #[cfg(unix)]
+// streams: Vec<(Signal, actix_rt::signal::unix::Signal)>,
 }
 
 impl Signals {
@@ -39,8 +39,6 @@ impl Signals {
         {
             use actix_rt::signal::unix;
 
-            let mut streams = Vec::new();
-
             let sig_map = [
                 (unix::SignalKind::interrupt(), Signal::Int),
                 (unix::SignalKind::hangup(), Signal::Hup),
@@ -50,7 +48,14 @@ impl Signals {
 
             for (kind, sig) in sig_map.iter() {
                 match unix::signal(*kind) {
-                    Ok(stream) => streams.push((*sig, stream)),
+                    Ok(mut stream) => {
+                        let sig = *sig;
+                        let srv = srv.clone();
+                        actix_rt::spawn(async move {
+                            stream.recv().await;
+                            srv.signal(sig);
+                        });
+                    }
                     Err(e) => log::error!(
                         "Can not initialize stream handler for {:?} err: {}",
                         sig,
@@ -59,40 +64,51 @@ impl Signals {
                 }
             }
 
-            actix_rt::spawn(Signals { srv, streams });
+            // for (kind, sig) in sig_map.iter() {
+            //     match unix::signal(*kind) {
+            //         Ok(stream) => streams.push((*sig, stream)),
+            //         Err(e) => log::error!(
+            //             "Can not initialize stream handler for {:?} err: {}",
+            //             sig,
+            //             e
+            //         ),
+            //     }
+            // }
+            //
+            // actix_rt::spawn(Signals { srv, streams });
         }
     }
 }
 
-impl Future for Signals {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        #[cfg(not(unix))]
-        match Pin::new(&mut self.stream).poll(cx) {
-            Poll::Ready(_) => {
-                self.srv.signal(Signal::Int);
-                Poll::Ready(())
-            }
-            Poll::Pending => Poll::Pending,
-        }
-        #[cfg(unix)]
-        {
-            use futures_util::stream::Stream;
-
-            for idx in 0..self.streams.len() {
-                loop {
-                    match Pin::new(&mut self.streams[idx].1).poll_next(cx) {
-                        Poll::Ready(None) => return Poll::Ready(()),
-                        Poll::Pending => break,
-                        Poll::Ready(Some(_)) => {
-                            let sig = self.streams[idx].0;
-                            self.srv.signal(sig);
-                        }
-                    }
-                }
-            }
-            Poll::Pending
-        }
-    }
-}
+// impl Future for Signals {
+//     type Output = ();
+//
+//     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+//         #[cfg(not(unix))]
+//         match Pin::new(&mut self.stream).poll(cx) {
+//             Poll::Ready(_) => {
+//                 self.srv.signal(Signal::Int);
+//                 Poll::Ready(())
+//             }
+//             Poll::Pending => Poll::Pending,
+//         }
+//         #[cfg(unix)]
+//         {
+//             use futures_util::stream::Stream;
+//
+//             for idx in 0..self.streams.len() {
+//                 loop {
+//                     match Pin::new(&mut self.streams[idx].1).poll_next(cx) {
+//                         Poll::Ready(None) => return Poll::Ready(()),
+//                         Poll::Pending => break,
+//                         Poll::Ready(Some(_)) => {
+//                             let sig = self.streams[idx].0;
+//                             self.srv.signal(sig);
+//                         }
+//                     }
+//                 }
+//             }
+//             Poll::Pending
+//         }
+//     }
+// }

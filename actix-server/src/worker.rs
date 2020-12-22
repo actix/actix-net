@@ -299,7 +299,11 @@ enum WorkerState {
         Token,
         LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>>,
     ),
-    Shutdown(Sleep, Sleep, Option<oneshot::Sender<bool>>),
+    Shutdown(
+        Pin<Box<Sleep>>,
+        Pin<Box<Sleep>>,
+        Option<oneshot::Sender<bool>>,
+    ),
 }
 
 impl Future for Worker {
@@ -322,8 +326,8 @@ impl Future for Worker {
                 if num != 0 {
                     info!("Graceful worker shutdown, {} connections", num);
                     self.state = WorkerState::Shutdown(
-                        sleep_until(Instant::now() + Duration::from_secs(1)),
-                        sleep_until(Instant::now() + self.shutdown_timeout),
+                        Box::pin(sleep_until(Instant::now() + Duration::from_secs(1))),
+                        Box::pin(sleep_until(Instant::now() + self.shutdown_timeout)),
                         Some(result),
                     );
                 } else {
@@ -398,9 +402,9 @@ impl Future for Worker {
                 }
 
                 // sleep for 1 second and then check again
-                if Pin::new(&mut *t1).poll(cx).is_ready() {
-                    *t1 = sleep_until(Instant::now() + Duration::from_secs(1));
-                    let _ = Pin::new(t1).poll(cx);
+                if t1.as_mut().poll(cx).is_ready() {
+                    *t1 = Box::pin(sleep_until(Instant::now() + Duration::from_secs(1)));
+                    let _ = t1.as_mut().poll(cx);
                 }
 
                 Poll::Pending

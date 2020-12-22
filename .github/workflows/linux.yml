@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - 1.43.0
+          - 1.44.0
           - stable
           - nightly
 

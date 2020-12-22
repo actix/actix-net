@@ -56,6 +56,6 @@ tokio-rustls = { version = "0.20.0", optional = true }
 webpki = { version = "0.21", optional = true }
 
 [dev-dependencies]
-bytes = "0.6"
+bytes = "1"
 actix-testing = "1.0.0"
 futures-util = { version = "0.3.4", default-features = false, features = ["sink"] }
