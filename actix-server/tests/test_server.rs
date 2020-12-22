@@ -183,7 +183,7 @@ fn test_configure() {
 
 #[test]
 #[cfg(unix)]
-fn test_on_stop() {
+fn test_on_stop_graceful() {
     use actix_codec::{BytesCodec, Framed};
     use actix_rt::net::TcpStream;
     use bytes::Bytes;
@@ -222,6 +222,56 @@ fn test_on_stop() {
     let (srv, sys) = rx.recv().unwrap();
 
     let _ = srv.stop(true);
+
+    thread::sleep(time::Duration::from_millis(100));
+
+    assert!(bool.load(Ordering::SeqCst));
+
+    sys.stop();
+    let _ = h.join();
+}
+
+#[test]
+#[cfg(unix)]
+fn test_on_stop_force() {
+    use actix_codec::{BytesCodec, Framed};
+    use actix_rt::net::TcpStream;
+    use bytes::Bytes;
+    use futures_util::sink::SinkExt;
+
+    let bool = std::sync::Arc::new(AtomicBool::new(false));
+
+    let addr = unused_addr();
+    let (tx, rx) = mpsc::channel();
+
+    let h = thread::spawn({
+        let bool = bool.clone();
+        move || {
+            let sys = actix_rt::System::new("test");
+            let srv: Server = Server::build()
+                .backlog(100)
+                .disable_signals()
+                .on_stop(|| async move {
+                    bool.store(true, Ordering::SeqCst);
+                })
+                .bind("test", addr, move || {
+                    fn_service(|io: TcpStream| async move {
+                        let mut f = Framed::new(io, BytesCodec);
+                        f.send(Bytes::from_static(b"test")).await.unwrap();
+                        Ok::<_, ()>(())
+                    })
+                })
+                .unwrap()
+                .start();
+
+            let _ = tx.send((srv, actix_rt::System::current()));
+            let _ = sys.run();
+        }
+    });
+
+    let (srv, sys) = rx.recv().unwrap();
+
+    let _ = srv.stop(false);
 
     thread::sleep(time::Duration::from_millis(100));
 

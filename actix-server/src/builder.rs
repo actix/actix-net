@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -9,7 +10,7 @@ use actix_rt::{spawn, System};
 use futures_channel::mpsc::{unbounded, UnboundedReceiver};
 use futures_channel::oneshot;
 use futures_util::stream::FuturesUnordered;
-use futures_util::{future::Future, ready, stream::Stream, StreamExt};
+use futures_util::{ready, stream::Stream, StreamExt};
 use log::{error, info};
 use socket2::{Domain, Protocol, Socket, Type};
 
@@ -297,13 +298,19 @@ impl ServerBuilder {
         }
     }
 
+    /// Async closure that would run before Server is shutdown.
+    ///
+    /// The exact timing is after `ServerCommand::Stop` is received.
+    /// Before worker threads stopped if the shutdown is graceful.
+    ///
+    /// Or before `actix::System` is stopped when not graceful.
+    /// (If `ServerBuilder::system_exit` is set to true)
     pub fn on_stop<F, Fut>(mut self, future: F) -> Self
     where
         F: FnOnce() -> Fut + 'static,
         Fut: Future<Output = ()>,
     {
         self.on_stop = Box::pin(async move { future().await });
-
         self
     }
 
@@ -369,6 +376,7 @@ impl ServerBuilder {
                 self.accept.send(Command::Stop);
                 let notify = std::mem::take(&mut self.notify);
 
+                // take the on_stop future.
                 let mut on_stop = Box::pin(async {}) as _;
                 std::mem::swap(&mut self.on_stop, &mut on_stop);
 
@@ -398,22 +406,21 @@ impl ServerBuilder {
                         }
                     });
                 // we need to stop system if server was spawned
-                } else if self.exit {
+                } else {
                     spawn(async move {
                         on_stop.await;
-                        delay_until(Instant::now() + Duration::from_millis(300)).await;
-                        System::current().stop();
+                        if exit {
+                            delay_until(Instant::now() + Duration::from_millis(300)).await;
+                            System::current().stop();
+                        }
                     });
+
                     if let Some(tx) = completion {
                         let _ = tx.send(());
                     }
                     for tx in notify {
                         let _ = tx.send(());
                     }
-                } else {
-                    spawn(async move {
-                        on_stop.await;
-                    });
                 }
             }
             ServerCommand::WorkerFaulted(idx) => {

@@ -3,10 +3,11 @@
 ## Unreleased - 2020-xx-xx
 * Added explicit info log message on accept queue pause. [#215]
 * Prevent double registration of sockets when back-pressure is resolved. [#223]
+* Added ServerBuilder::on_stop to run an async closure before Server shutdown [#230]
 
 [#215]: https://github.com/actix/actix-net/pull/215
 [#223]: https://github.com/actix/actix-net/pull/223
-
+[#230]: https://github.com/actix/actix-net/pull/230
 
 ## 1.0.4 - 2020-09-12
 * Update actix-codec to 0.3.0.
