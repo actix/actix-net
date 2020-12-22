@@ -8,9 +8,8 @@ use actix_rt::time::{delay_until, Instant};
 use actix_rt::{spawn, System};
 use futures_channel::mpsc::{unbounded, UnboundedReceiver};
 use futures_channel::oneshot;
-use futures_util::future::ready;
 use futures_util::stream::FuturesUnordered;
-use futures_util::{future::Future, ready, stream::Stream, FutureExt, StreamExt};
+use futures_util::{future::Future, ready, stream::Stream, StreamExt};
 use log::{error, info};
 use socket2::{Domain, Protocol, Socket, Type};
 
@@ -37,6 +36,7 @@ pub struct ServerBuilder {
     no_signals: bool,
     cmd: UnboundedReceiver<ServerCommand>,
     server: Server,
+    on_stop: Pin<Box<dyn Future<Output = ()>>>,
     notify: Vec<oneshot::Sender<()>>,
 }
 
@@ -66,6 +66,7 @@ impl ServerBuilder {
             cmd: rx,
             notify: Vec::new(),
             server,
+            on_stop: Box::pin(async {}),
         }
     }
 
@@ -296,6 +297,16 @@ impl ServerBuilder {
         }
     }
 
+    pub fn on_stop<F, Fut>(mut self, future: F) -> Self
+    where
+        F: Fn() -> Fut + 'static,
+        Fut: Future<Output = ()>,
+    {
+        self.on_stop = Box::pin(async move { future().await });
+
+        self
+    }
+
     fn start_worker(&self, idx: usize, notify: AcceptNotify) -> WorkerClient {
         let avail = WorkerAvailability::new(notify);
         let services: Vec<Box<dyn InternalServiceFactory>> =
@@ -358,54 +369,51 @@ impl ServerBuilder {
                 self.accept.send(Command::Stop);
                 let notify = std::mem::take(&mut self.notify);
 
+                let mut on_stop = Box::pin(async {}) as _;
+                std::mem::swap(&mut self.on_stop, &mut on_stop);
+
                 // stop workers
                 if !self.workers.is_empty() && graceful {
-                    spawn(
-                        self.workers
-                            .iter()
-                            .map(move |worker| worker.1.stop(graceful))
-                            .collect::<FuturesUnordered<_>>()
-                            .collect::<Vec<_>>()
-                            .then(move |_| {
-                                if let Some(tx) = completion {
-                                    let _ = tx.send(());
-                                }
-                                for tx in notify {
-                                    let _ = tx.send(());
-                                }
-                                if exit {
-                                    spawn(
-                                        async {
-                                            delay_until(
-                                                Instant::now() + Duration::from_millis(300),
-                                            )
-                                            .await;
-                                            System::current().stop();
-                                        }
-                                        .boxed(),
-                                    );
-                                }
-                                ready(())
-                            }),
-                    )
-                } else {
-                    // we need to stop system if server was spawned
-                    if self.exit {
-                        spawn(
-                            delay_until(Instant::now() + Duration::from_millis(300)).then(
-                                |_| {
-                                    System::current().stop();
-                                    ready(())
-                                },
-                            ),
-                        );
-                    }
+                    let stop_workers = self
+                        .workers
+                        .iter()
+                        .map(move |worker| worker.1.stop(graceful))
+                        .collect::<FuturesUnordered<_>>()
+                        .collect::<Vec<_>>();
+
+                    spawn(async move {
+                        on_stop.await;
+                        stop_workers.await;
+                        if let Some(tx) = completion {
+                            let _ = tx.send(());
+                        }
+                        for tx in notify {
+                            let _ = tx.send(());
+                        }
+                        if exit {
+                            spawn(async {
+                                delay_until(Instant::now() + Duration::from_millis(300)).await;
+                                System::current().stop();
+                            });
+                        }
+                    });
+                // we need to stop system if server was spawned
+                } else if self.exit {
+                    spawn(async move {
+                        on_stop.await;
+                        delay_until(Instant::now() + Duration::from_millis(300)).await;
+                        System::current().stop();
+                    });
                     if let Some(tx) = completion {
                         let _ = tx.send(());
                     }
                     for tx in notify {
                         let _ = tx.send(());
                     }
+                } else {
+                    spawn(async move {
+                        on_stop.await;
+                    });
                 }
             }
             ServerCommand::WorkerFaulted(idx) => {
