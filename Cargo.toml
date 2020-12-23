@@ -30,6 +30,6 @@ actix-utils = { path = "actix-utils" }
 actix-router = { path = "router" }
 bytestring = { path = "string" }
 
-bytes = { git = "https://github.com/tokio-rs/bytes.git" }
+# FIXME: remove these overrides
 tokio = { git = "https://github.com/tokio-rs/tokio.git" }
 tokio-util = { git = "https://github.com/tokio-rs/tokio.git" }
