@@ -115,6 +115,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin> Future for AcceptorServiceResponse<T> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
             match self.as_mut().get_mut() {
+                // Init branch only used to return the error in future
+                // on success goes to Accept branch directly.
                 AcceptorServiceResponse::Init(res, guard) => {
                     let guard = guard.take();
                     let stream = res.take().unwrap()?;
