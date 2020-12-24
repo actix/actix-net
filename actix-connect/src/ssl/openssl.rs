@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use std::{fmt, io};
 
 pub use open_ssl::ssl::{Error as SslError, SslConnector, SslMethod};
-pub use tokio_openssl::{HandshakeError, SslStream};
+pub use tokio_openssl::SslStream;
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_rt::net::TcpStream;
@@ -112,8 +112,13 @@ where
         match self.connector.configure() {
             Err(e) => Either::Right(err(io::Error::new(io::ErrorKind::Other, e))),
             Ok(config) => Either::Left(ConnectAsyncExt {
-                fut: async move { tokio_openssl::connect(config, &host, io).await }
-                    .boxed_local(),
+                // TODO: unbox this future.
+                fut: Box::pin(async move {
+                    let ssl = config.into_ssl(host.as_str())?;
+                    let mut io = tokio_openssl::SslStream::new(ssl, io)?;
+                    Pin::new(&mut io).connect().await?;
+                    Ok(io)
+                }),
                 stream: Some(stream),
                 _t: PhantomData,
             }),
@@ -122,7 +127,7 @@ where
 }
 
 pub struct ConnectAsyncExt<T, U> {
-    fut: LocalBoxFuture<'static, Result<SslStream<U>, HandshakeError<U>>>,
+    fut: LocalBoxFuture<'static, Result<SslStream<U>, SslError>>,
     stream: Option<Connection<T, ()>>,
     _t: PhantomData<U>,
 }
