@@ -9,7 +9,7 @@ use actix_utils::counter::{Counter, CounterGuard};
 use futures_util::future::{ready, Ready};
 use futures_util::ready;
 
-pub use open_ssl::ssl::{AlpnError, Error, Ssl, SslAcceptor};
+pub use open_ssl::ssl::{AlpnError, Error, Ssl, SslAcceptor, SslAcceptorBuilder};
 pub use tokio_openssl::SslStream;
 
 use crate::MAX_CONN_COUNTER;

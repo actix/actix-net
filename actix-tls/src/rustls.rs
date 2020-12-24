@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
-use futures_util::future::{ok, Ready};
+use futures_util::future::{ready, Ready};
 use tokio_rustls::{Accept, TlsAcceptor};
 
 pub use rust_tls::{ServerConfig, Session};
@@ -50,19 +50,19 @@ impl<T: AsyncRead + AsyncWrite + Unpin> ServiceFactory for Acceptor<T> {
     type Request = T;
     type Response = TlsStream<T>;
     type Error = io::Error;
-    type Service = AcceptorService<T>;
-
     type Config = ();
+
+    type Service = AcceptorService<T>;
     type InitError = ();
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         MAX_CONN_COUNTER.with(|conns| {
-            ok(AcceptorService {
+            ready(Ok(AcceptorService {
                 acceptor: self.config.clone().into(),
                 conns: conns.clone(),
                 io: PhantomData,
-            })
+            }))
         })
     }
 }
@@ -109,11 +109,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin> Future for AcceptorServiceFut<T> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-
-        let res = futures_util::ready!(Pin::new(&mut this.fut).poll(cx));
-        match res {
-            Ok(io) => Poll::Ready(Ok(io)),
-            Err(e) => Poll::Ready(Err(e)),
-        }
+        Pin::new(&mut this.fut).poll(cx)
     }
 }
