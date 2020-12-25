@@ -20,8 +20,7 @@ impl Clone for SrvUC {
     }
 }
 
-impl Service for SrvUC {
-    type Request = ();
+impl Service<()> for SrvUC {
     type Response = usize;
     type Error = ();
     type Future = Ready<Result<Self::Response, ()>>;
@@ -50,8 +49,7 @@ impl Clone for SrvRC {
     }
 }
 
-impl Service for SrvRC {
-    type Request = ();
+impl Service<()> for SrvRC {
     type Response = usize;
     type Error = ();
     type Future = Ready<Result<Self::Response, ()>>;
@@ -83,7 +81,7 @@ impl Service for SrvRC {
 /// async_service_direct    time:   [1.0908 us 1.1656 us 1.2613 us]
 pub fn bench_async_service<S>(c: &mut Criterion, srv: S, name: &str)
 where
-    S: Service<Request = (), Response = usize, Error = ()> + Clone + 'static,
+    S: Service<(), Response = usize, Error = ()> + Clone + 'static,
 {
     let mut rt = actix_rt::System::new("test");
 
