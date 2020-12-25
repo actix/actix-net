@@ -76,8 +76,8 @@ pub async fn start_default_resolver() -> Result<AsyncResolver, ConnectError> {
 /// Create TCP connector service.
 pub fn new_connector<T: Address + 'static>(
     resolver: AsyncResolver,
-) -> impl Service<Request = Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError>
-       + Clone {
+) -> impl Service<Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError> + Clone
+{
     pipeline(Resolver::new(resolver)).and_then(TcpConnector::new())
 }
 
@@ -85,8 +85,8 @@ pub fn new_connector<T: Address + 'static>(
 pub fn new_connector_factory<T: Address + 'static>(
     resolver: AsyncResolver,
 ) -> impl ServiceFactory<
+    Connect<T>,
     Config = (),
-    Request = Connect<T>,
     Response = Connection<T, TcpStream>,
     Error = ConnectError,
     InitError = (),
@@ -96,15 +96,15 @@ pub fn new_connector_factory<T: Address + 'static>(
 
 /// Create connector service with default parameters.
 pub fn default_connector<T: Address + 'static>(
-) -> impl Service<Request = Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError>
-       + Clone {
+) -> impl Service<Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError> + Clone
+{
     pipeline(Resolver::default()).and_then(TcpConnector::new())
 }
 
 /// Create connector service factory with default parameters.
 pub fn default_connector_factory<T: Address + 'static>() -> impl ServiceFactory<
+    Connect<T>,
     Config = (),
-    Request = Connect<T>,
     Response = Connection<T, TcpStream>,
     Error = ConnectError,
     InitError = (),
