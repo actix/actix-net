@@ -55,7 +55,7 @@ where
 /// ```
 pub fn fn_factory<F, Cfg, Srv, Req, Fut, Err>(
     f: F,
-) -> FnServiceNoConfig<F, Cfg, Srv, Fut, Req, Err>
+) -> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
 where
     Srv: Service<Req>,
     F: Fn() -> Fut,
@@ -247,7 +247,7 @@ where
     Srv: Service<Req>,
 {
     f: F,
-    _t: PhantomData<(Fut, Cfg, Srv, Err)>,
+    _t: PhantomData<(Fut, Cfg, Req, Srv, Err)>,
 }
 
 impl<F, Fut, Cfg, Srv, Req, Err> FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
@@ -303,7 +303,7 @@ where
     Fut: Future<Output = Result<Srv, Err>>,
 {
     f: F,
-    _t: PhantomData<Cfg>,
+    _t: PhantomData<(Cfg, Req)>,
 }
 
 impl<F, Cfg, Srv, Req, Fut, Err> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>

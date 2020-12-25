@@ -104,7 +104,7 @@ where
 pub struct MapServiceFactory<A, F, Req, Res> {
     a: A,
     f: F,
-    r: PhantomData<Res>,
+    r: PhantomData<(Res, Req)>,
 }
 
 impl<A, F, Req, Res> MapServiceFactory<A, F, Req, Res> {

@@ -121,6 +121,7 @@ where
     >,
 {
     inner: Rc<(A, B)>,
+    _phantom: PhantomData<Req>,
 }
 
 impl<A, B, Req> AndThenServiceFactory<A, B, Req>
@@ -138,6 +139,7 @@ where
     pub(crate) fn new(a: A, b: B) -> Self {
         Self {
             inner: Rc::new((a, b)),
+            _phantom: PhantomData,
         }
     }
 }
@@ -184,6 +186,7 @@ where
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
+            _phantom: PhantomData,
         }
     }
 }

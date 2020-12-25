@@ -303,52 +303,52 @@ where
 }
 
 /// Trait for types that can be converted to a `Service`
-pub trait IntoService<T, Req>
+pub trait IntoService<S, Req>
 where
-    T: Service<Req>,
+    S: Service<Req>,
 {
     /// Convert to a `Service`
-    fn into_service(self) -> T;
+    fn into_service(self) -> S;
 }
 
 /// Trait for types that can be converted to a `ServiceFactory`
-pub trait IntoServiceFactory<T, Req>
+pub trait IntoServiceFactory<SF, Req>
 where
-    T: ServiceFactory<Req>,
+    SF: ServiceFactory<Req>,
 {
     /// Convert `Self` to a `ServiceFactory`
-    fn into_factory(self) -> T;
+    fn into_factory(self) -> SF;
 }
 
-impl<T, Req> IntoService<T, Req> for T
+impl<S, Req> IntoService<S, Req> for S
 where
-    T: Service<Req>,
+    S: Service<Req>,
 {
-    fn into_service(self) -> T {
+    fn into_service(self) -> S {
         self
     }
 }
 
-impl<T, Req> IntoServiceFactory<T, Req> for T
+impl<SF, Req> IntoServiceFactory<SF, Req> for SF
 where
-    T: ServiceFactory<Req>,
+    SF: ServiceFactory<Req>,
 {
-    fn into_factory(self) -> T {
+    fn into_factory(self) -> SF {
         self
     }
 }
 
 /// Convert object of type `T` to a service `S`
-pub fn into_service<T, S, Req>(tp: T) -> S
+pub fn into_service<U, S, Req>(tp: U) -> S
 where
+    U: IntoService<S, Req>,
     S: Service<Req>,
-    T: IntoService<S, Req>,
 {
     tp.into_service()
 }
 
 pub mod dev {
-    pub use crate::apply::{Apply, ApplyServiceFactory};
+    pub use crate::apply::{Apply, ApplyFactory};
     pub use crate::fn_service::{
         FnService, FnServiceConfig, FnServiceFactory, FnServiceNoConfig,
     };

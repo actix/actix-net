@@ -1,6 +1,6 @@
-use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{future::Future, marker::PhantomData};
 
 use futures_util::future::FutureExt;
 
@@ -36,9 +36,10 @@ where
 pub fn service<S, Req>(service: S) -> BoxService<Req, S::Response, S::Error>
 where
     S: Service<Req> + 'static,
+    Req: 'static,
     S::Future: 'static,
 {
-    Box::new(ServiceWrapper(service))
+    Box::new(ServiceWrapper(service, PhantomData))
 }
 
 type Inner<C, Req, Res, Err, InitErr> = Box<
@@ -74,9 +75,12 @@ where
     }
 }
 
-struct FactoryWrapper<C, T: ServiceFactory<Req>, Req> {
+struct FactoryWrapper<C, T, Req>
+where
+    T: ServiceFactory<Req>,
+{
     factory: T,
-    _t: std::marker::PhantomData<C>,
+    _t: PhantomData<(C, Req)>,
 }
 
 impl<C, T, Req, Res, Err, InitErr> ServiceFactory<Req> for FactoryWrapper<C, T, Req>
@@ -106,15 +110,16 @@ where
     }
 }
 
-struct ServiceWrapper<S: Service<Req>, Req>(S);
+struct ServiceWrapper<S: Service<Req>, Req>(S, PhantomData<Req>);
 
 impl<S, Req> ServiceWrapper<S, Req>
 where
     S: Service<Req> + 'static,
+    Req: 'static,
     S::Future: 'static,
 {
     fn boxed(service: S) -> BoxService<Req, S::Response, S::Error> {
-        Box::new(ServiceWrapper(service))
+        Box::new(ServiceWrapper(service, PhantomData))
     }
 }
 

@@ -68,7 +68,7 @@ where
     S: Service<Req>,
 {
     srv: Rc<RefCell<(T, F)>>,
-    _t: PhantomData<(C, R, S)>,
+    _t: PhantomData<(C, Req, R, S)>,
 }
 
 impl<F, C, Req, T, R, S, E> Clone for ApplyConfigService<F, C, Req, T, R, S, E>
@@ -116,7 +116,7 @@ where
     S: Service<Req>,
 {
     srv: Rc<RefCell<(T, F)>>,
-    _t: PhantomData<(C, R, S)>,
+    _t: PhantomData<(C, Req, R, S)>,
 }
 
 impl<F, C, Req, T, R, S> Clone for ApplyConfigServiceFactory<F, C, Req, T, R, S>

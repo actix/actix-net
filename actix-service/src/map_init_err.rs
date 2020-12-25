@@ -12,7 +12,7 @@ pub struct MapInitErr<A, F, Req, Err> {
     e: PhantomData<(Req, Err)>,
 }
 
-impl<A, Req, F, Err> MapInitErr<A, Req, F, Err>
+impl<A, F, Req, Err> MapInitErr<A, F, Req, Err>
 where
     A: ServiceFactory<Req>,
     F: Fn(A::InitError) -> Err,
@@ -41,7 +41,7 @@ where
     }
 }
 
-impl<A, Req, F, E> ServiceFactory<Req> for MapInitErr<A, Req, F, E>
+impl<A, F, Req, E> ServiceFactory<Req> for MapInitErr<A, F, Req, E>
 where
     A: ServiceFactory<Req>,
     F: Fn(A::InitError) -> E + Clone,
@@ -52,7 +52,7 @@ where
     type Config = A::Config;
     type Service = A::Service;
     type InitError = E;
-    type Future = MapInitErrFuture<A, Req, F, E>;
+    type Future = MapInitErrFuture<A, F, Req, E>;
 
     fn new_service(&self, cfg: A::Config) -> Self::Future {
         MapInitErrFuture::new(self.a.new_service(cfg), self.f.clone())
@@ -60,7 +60,7 @@ where
 }
 
 #[pin_project::pin_project]
-pub struct MapInitErrFuture<A, Req, F, E>
+pub struct MapInitErrFuture<A, F, Req, E>
 where
     A: ServiceFactory<Req>,
     F: Fn(A::InitError) -> E,
@@ -70,7 +70,7 @@ where
     fut: A::Future,
 }
 
-impl<A, Req, F, E> MapInitErrFuture<A, Req, F, E>
+impl<A, F, Req, E> MapInitErrFuture<A, F, Req, E>
 where
     A: ServiceFactory<Req>,
     F: Fn(A::InitError) -> E,
@@ -80,7 +80,7 @@ where
     }
 }
 
-impl<A, Req, F, E> Future for MapInitErrFuture<A, Req, F, E>
+impl<A, F, Req, E> Future for MapInitErrFuture<A, F, Req, E>
 where
     A: ServiceFactory<Req>,
     F: Fn(A::InitError) -> E,
