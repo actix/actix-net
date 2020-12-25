@@ -18,8 +18,8 @@ path = "src/lib.rs"
 [dependencies]
 bitflags = "1.2.1"
 bytes = "1"
-futures-core = { version = "0.3.4", default-features = false }
-futures-sink = { version = "0.3.4", default-features = false }
+futures-core = { version = "0.3.7", default-features = false }
+futures-sink = { version = "0.3.7", default-features = false }
 log = "0.4"
 pin-project = "1.0.0"
 tokio = "1"

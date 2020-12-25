@@ -84,9 +84,13 @@ impl<T: AsyncRead + AsyncWrite + Unpin + 'static> Service for AcceptorService<T>
     }
 
     fn call(&mut self, req: Self::Request) -> Self::Future {
-        let guard = self.conns.get();
-        let stream = self.ssl_stream(req);
-        AcceptorServiceResponse::Init(Some(stream), Some(guard))
+        match self.ssl_stream(req) {
+            Ok(stream) => {
+                let guard = self.conns.get();
+                AcceptorServiceResponse::Accept(Some(stream), Some(guard))
+            }
+            Err(e) => AcceptorServiceResponse::Error(Some(e)),
+        }
     }
 }
 
@@ -105,32 +109,21 @@ pub enum AcceptorServiceResponse<T>
 where
     T: AsyncRead + AsyncWrite,
 {
-    Init(Option<Result<SslStream<T>, Error>>, Option<CounterGuard>),
     Accept(Option<SslStream<T>>, Option<CounterGuard>),
+    Error(Option<Error>),
 }
 
 impl<T: AsyncRead + AsyncWrite + Unpin> Future for AcceptorServiceResponse<T> {
     type Output = Result<SslStream<T>, Error>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        loop {
-            match self.as_mut().get_mut() {
-                // Init branch only used to return the error in future
-                // on success goes to Accept branch directly.
-                AcceptorServiceResponse::Init(res, guard) => {
-                    let guard = guard.take();
-                    let stream = res.take().unwrap()?;
-                    let state = AcceptorServiceResponse::Accept(Some(stream), guard);
-                    self.as_mut().set(state);
-                }
-                AcceptorServiceResponse::Accept(stream, guard) => {
-                    ready!(Pin::new(stream.as_mut().unwrap()).poll_accept(cx))?;
-                    // drop counter guard a little early as the accept has finished
-                    guard.take();
-
-                    let stream = stream.take().unwrap();
-                    return Poll::Ready(Ok(stream));
-                }
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.get_mut() {
+            AcceptorServiceResponse::Error(e) => Poll::Ready(Err(e.take().unwrap())),
+            AcceptorServiceResponse::Accept(stream, guard) => {
+                ready!(Pin::new(stream.as_mut().unwrap()).poll_accept(cx))?;
+                // drop counter guard a little early as the accept has finished
+                guard.take();
+                Poll::Ready(Ok(stream.take().unwrap()))
             }
         }
     }

@@ -1,10 +1,12 @@
+use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
-use futures_util::future::{self, FutureExt, LocalBoxFuture, TryFutureExt};
+use futures_util::future::{ready, Ready};
 
 pub use native_tls::Error;
 pub use tokio_native_tls::{TlsAcceptor, TlsStream};
@@ -50,19 +52,19 @@ where
     type Request = T;
     type Response = TlsStream<T>;
     type Error = Error;
-    type Service = NativeTlsAcceptorService<T>;
-
     type Config = ();
+
+    type Service = NativeTlsAcceptorService<T>;
     type InitError = ();
-    type Future = future::Ready<Result<Self::Service, Self::InitError>>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         MAX_CONN_COUNTER.with(|conns| {
-            future::ok(NativeTlsAcceptorService {
+            ready(Ok(NativeTlsAcceptorService {
                 acceptor: self.acceptor.clone(),
                 conns: conns.clone(),
                 io: PhantomData,
-            })
+            }))
         })
     }
 }
@@ -82,6 +84,8 @@ impl<T> Clone for NativeTlsAcceptorService<T> {
         }
     }
 }
+
+type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
 impl<T> Service for NativeTlsAcceptorService<T>
 where
@@ -103,12 +107,10 @@ where
     fn call(&mut self, req: Self::Request) -> Self::Future {
         let guard = self.conns.get();
         let this = self.clone();
-        async move { this.acceptor.accept(req).await }
-            .map_ok(move |io| {
-                // Required to preserve `CounterGuard` until `Self::Future` is completely resolved.
-                let _ = guard;
-                io
-            })
-            .boxed_local()
+        Box::pin(async move {
+            let res = this.acceptor.accept(req).await;
+            drop(guard);
+            res
+        })
     }
 }

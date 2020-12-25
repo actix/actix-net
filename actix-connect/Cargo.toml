@@ -38,7 +38,7 @@ actix-rt = "1.1.1"
 
 derive_more = "0.99.2"
 either = "1.5.3"
-futures-util = { version = "0.3.4", default-features = false }
+futures-util = { version = "0.3.7", default-features = false }
 # FIXME: update to 0.3
 http = { version = "0.2.2", optional = true }
 log = "0.4"
@@ -58,4 +58,4 @@ webpki = { version = "0.21", optional = true }
 [dev-dependencies]
 bytes = "1"
 actix-testing = "1.0.0"
-futures-util = { version = "0.3.4", default-features = false, features = ["sink"] }
+futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }

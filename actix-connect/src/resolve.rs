@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::{ok, Either, Ready};
+use futures_util::future::{ready, Ready};
 use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 use trust_dns_resolver::{error::ResolveError, lookup_ip::LookupIp};
 
@@ -64,7 +64,7 @@ impl<T: Address> ServiceFactory for ResolverFactory<T> {
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(self.service())
+        ready(Ok(self.service()))
     }
 }
 
@@ -106,11 +106,7 @@ impl<T: Address> Service for Resolver<T> {
     type Request = Connect<T>;
     type Response = Connect<T>;
     type Error = ConnectError;
-    #[allow(clippy::type_complexity)]
-    type Future = Either<
-        Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>,
-        Ready<Result<Connect<T>, Self::Error>>,
-    >;
+    type Future = ResolverServiceFuture<T>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -118,13 +114,13 @@ impl<T: Address> Service for Resolver<T> {
 
     fn call(&mut self, mut req: Connect<T>) -> Self::Future {
         if req.addr.is_some() {
-            Either::Right(ok(req))
+            ResolverServiceFuture::NoLookUp(Some(req))
         } else if let Ok(ip) = req.host().parse() {
             req.addr = Some(either::Either::Left(SocketAddr::new(ip, req.port())));
-            Either::Right(ok(req))
+            ResolverServiceFuture::NoLookUp(Some(req))
         } else {
             let resolver = self.resolver.as_ref().map(AsyncResolver::clone);
-            Either::Left(Box::pin(async move {
+            ResolverServiceFuture::LookUp(Box::pin(async move {
                 trace!("DNS resolver: resolving host {:?}", req.host());
                 let resolver = if let Some(resolver) = resolver {
                     resolver
@@ -139,13 +135,30 @@ impl<T: Address> Service for Resolver<T> {
     }
 }
 
-type LookupIpFuture = Pin<Box<dyn Future<Output = Result<LookupIp, ResolveError>>>>;
+type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
+#[doc(hidden)]
+pub enum ResolverServiceFuture<T: Address> {
+    NoLookUp(Option<Connect<T>>),
+    LookUp(LocalBoxFuture<'static, Result<Connect<T>, ConnectError>>),
+}
+
+impl<T: Address> Future for ResolverServiceFuture<T> {
+    type Output = Result<Connect<T>, ConnectError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.get_mut() {
+            Self::NoLookUp(conn) => Poll::Ready(Ok(conn.take().unwrap())),
+            Self::LookUp(fut) => fut.as_mut().poll(cx),
+        }
+    }
+}
 
 #[doc(hidden)]
 /// Resolver future
 pub struct ResolverFuture<T: Address> {
     req: Option<Connect<T>>,
-    lookup: LookupIpFuture,
+    lookup: LocalBoxFuture<'static, Result<LookupIp, ResolveError>>,
 }
 
 impl<T: Address> ResolverFuture<T> {

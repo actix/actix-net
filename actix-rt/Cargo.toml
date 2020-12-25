@@ -18,8 +18,8 @@ path = "src/lib.rs"
 [dependencies]
 actix-macros = "0.1.0"
 copyless = "0.1.4"
-futures-channel = "0.3.4"
-futures-util = { version = "0.3.4", default-features = false, features = ["alloc"] }
+futures-channel = "0.3.7"
+futures-util = { version = "0.3.7", default-features = false, features = ["alloc"] }
 smallvec = "1"
 tokio = { version = "1", features = ["rt", "net", "signal", "time"] }
 

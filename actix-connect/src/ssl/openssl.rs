@@ -10,7 +10,8 @@ pub use tokio_openssl::SslStream;
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::{err, ok, Either, FutureExt, LocalBoxFuture, Ready};
+use futures_util::future::{ready, Ready};
+use futures_util::ready;
 use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 
 use crate::{
@@ -68,10 +69,10 @@ where
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(OpensslConnectorService {
+        ready(Ok(OpensslConnectorService {
             connector: self.connector.clone(),
             _t: PhantomData,
-        })
+        }))
     }
 }
 
@@ -97,62 +98,79 @@ where
     type Request = Connection<T, U>;
     type Response = Connection<T, SslStream<U>>;
     type Error = io::Error;
-    #[allow(clippy::type_complexity)]
-    type Future = Either<ConnectAsyncExt<T, U>, Ready<Result<Self::Response, Self::Error>>>;
+    type Future = OpensslConnectorServiceFuture<T, U>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, stream: Connection<T, U>) -> Self::Future {
-        trace!("SSL Handshake start for: {:?}", stream.host());
-        let (io, stream) = stream.replace(());
-        let host = stream.host().to_string();
-
-        match self.connector.configure() {
-            Err(e) => Either::Right(err(io::Error::new(io::ErrorKind::Other, e))),
-            Ok(config) => Either::Left(ConnectAsyncExt {
-                // TODO: unbox this future.
-                fut: Box::pin(async move {
-                    let ssl = config.into_ssl(host.as_str())?;
-                    let mut io = tokio_openssl::SslStream::new(ssl, io)?;
-                    Pin::new(&mut io).connect().await?;
-                    Ok(io)
-                }),
-                stream: Some(stream),
-                _t: PhantomData,
-            }),
+        match self.ssl_stream(stream) {
+            Ok(acc) => OpensslConnectorServiceFuture::Accept(Some(acc)),
+            Err(e) => OpensslConnectorServiceFuture::Error(Some(e)),
         }
     }
 }
 
-pub struct ConnectAsyncExt<T, U> {
-    fut: LocalBoxFuture<'static, Result<SslStream<U>, SslError>>,
-    stream: Option<Connection<T, ()>>,
-    _t: PhantomData<U>,
+impl<T, U> OpensslConnectorService<T, U>
+where
+    T: Address + 'static,
+    U: AsyncRead + AsyncWrite + Unpin + fmt::Debug + 'static,
+{
+    // construct SslStream with connector.
+    // At this point SslStream does not perform any I/O.
+    // handshake would happen later in OpensslConnectorServiceFuture
+    fn ssl_stream(
+        &self,
+        stream: Connection<T, U>,
+    ) -> Result<(SslStream<U>, Connection<T, ()>), SslError> {
+        trace!("SSL Handshake start for: {:?}", stream.host());
+        let (stream, connection) = stream.replace(());
+        let host = connection.host().to_string();
+
+        let config = self.connector.configure()?;
+        let ssl = config.into_ssl(host.as_str())?;
+        let stream = tokio_openssl::SslStream::new(ssl, stream)?;
+        Ok((stream, connection))
+    }
 }
 
-impl<T: Address, U> Future for ConnectAsyncExt<T, U>
+#[doc(hidden)]
+pub enum OpensslConnectorServiceFuture<T, U>
 where
+    T: Address + 'static,
+    U: AsyncRead + AsyncWrite + Unpin + fmt::Debug + 'static,
+{
+    Accept(Option<(SslStream<U>, Connection<T, ()>)>),
+    Error(Option<SslError>),
+}
+
+impl<T, U> Future for OpensslConnectorServiceFuture<T, U>
+where
+    T: Address,
     U: AsyncRead + AsyncWrite + Unpin + fmt::Debug + 'static,
 {
     type Output = Result<Connection<T, SslStream<U>>, io::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
+        let e = match self.get_mut() {
+            Self::Error(e) => e.take().unwrap(),
+            Self::Accept(acc) => {
+                let (stream, _) = acc.as_mut().unwrap();
+                match ready!(Pin::new(stream).poll_accept(cx)) {
+                    Ok(()) => {
+                        let (stream, connection) = acc.take().unwrap();
+                        trace!("SSL Handshake success: {:?}", connection.host());
+                        let (_, connection) = connection.replace(stream);
+                        return Poll::Ready(Ok(connection));
+                    }
+                    Err(e) => e,
+                }
+            }
+        };
 
-        match Pin::new(&mut this.fut).poll(cx) {
-            Poll::Ready(Ok(stream)) => {
-                let s = this.stream.take().unwrap();
-                trace!("SSL Handshake success: {:?}", s.host());
-                Poll::Ready(Ok(s.replace(stream).1))
-            }
-            Poll::Ready(Err(e)) => {
-                trace!("SSL Handshake error: {:?}", e);
-                Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, format!("{}", e))))
-            }
-            Poll::Pending => Poll::Pending,
-        }
+        trace!("SSL Handshake error: {:?}", e);
+        Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, format!("{}", e))))
     }
 }
 
@@ -209,7 +227,7 @@ impl<T: Address + 'static> ServiceFactory for OpensslConnectServiceFactory<T> {
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(self.service())
+        ready(Ok(self.service()))
     }
 }
 
