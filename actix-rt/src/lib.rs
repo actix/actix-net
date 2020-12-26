@@ -4,6 +4,8 @@
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
+use std::future::Future;
+
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub use actix_macros::{main, test};
 
@@ -22,15 +24,12 @@ pub use self::system::System;
 /// # Panics
 ///
 /// This function panics if actix system is not running.
+#[inline]
 pub fn spawn<F>(f: F)
 where
-    F: futures_util::future::Future<Output = ()> + 'static,
+    F: Future<Output = ()> + 'static,
 {
-    if !System::is_set() {
-        panic!("System is not running");
-    }
-
-    Arbiter::spawn(f);
+    Arbiter::spawn(f)
 }
 
 /// Asynchronous signal handling

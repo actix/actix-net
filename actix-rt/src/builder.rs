@@ -1,9 +1,9 @@
 use std::borrow::Cow;
+use std::future::Future;
 use std::io;
 
 use futures_channel::mpsc::unbounded;
 use futures_channel::oneshot::{channel, Receiver};
-use futures_util::future::{lazy, Future, FutureExt};
 use tokio::task::LocalSet;
 
 use crate::arbiter::{Arbiter, SystemArbiter};
@@ -65,7 +65,7 @@ impl Builder {
     /// Function `f` get called within tokio runtime context.
     pub fn run<F>(self, f: F) -> io::Result<()>
     where
-        F: FnOnce() + 'static,
+        F: FnOnce(),
     {
         self.create_runtime(f).run()
     }
@@ -74,7 +74,8 @@ impl Builder {
         let (stop_tx, stop) = channel();
         let (sys_sender, sys_receiver) = unbounded();
 
-        let system = System::construct(sys_sender, Arbiter::new_system(), self.stop_on_panic);
+        let system =
+            System::construct(sys_sender, Arbiter::new_system(local), self.stop_on_panic);
 
         // system arbiter
         let arb = SystemArbiter::new(stop_tx, sys_receiver);
@@ -87,21 +88,26 @@ impl Builder {
 
     fn create_runtime<F>(self, f: F) -> SystemRunner
     where
-        F: FnOnce() + 'static,
+        F: FnOnce(),
     {
         let (stop_tx, stop) = channel();
         let (sys_sender, sys_receiver) = unbounded();
 
-        let system = System::construct(sys_sender, Arbiter::new_system(), self.stop_on_panic);
+        let mut rt = Runtime::new().unwrap();
+
+        let system = System::construct(
+            sys_sender,
+            Arbiter::new_system(rt.local()),
+            self.stop_on_panic,
+        );
 
         // system arbiter
         let arb = SystemArbiter::new(stop_tx, sys_receiver);
 
-        let mut rt = Runtime::new().unwrap();
         rt.spawn(arb);
 
         // init system arbiter and run configuration method
-        rt.block_on(lazy(move |_| f()));
+        rt.block_on(async { f() });
 
         SystemRunner { rt, stop, system }
     }
@@ -120,27 +126,21 @@ impl AsyncSystemRunner {
         let AsyncSystemRunner { stop, .. } = self;
 
         // run loop
-        lazy(|_| {
-            Arbiter::run_system(None);
-            async {
-                let res = match stop.await {
-                    Ok(code) => {
-                        if code != 0 {
-                            Err(io::Error::new(
-                                io::ErrorKind::Other,
-                                format!("Non-zero exit code: {}", code),
-                            ))
-                        } else {
-                            Ok(())
-                        }
+        async {
+            match stop.await {
+                Ok(code) => {
+                    if code != 0 {
+                        Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Non-zero exit code: {}", code),
+                        ))
+                    } else {
+                        Ok(())
                     }
-                    Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
-                };
-                Arbiter::stop_system();
-                res
+                }
+                Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
             }
-        })
-        .flatten()
+        }
     }
 }
 
@@ -160,8 +160,7 @@ impl SystemRunner {
         let SystemRunner { mut rt, stop, .. } = self;
 
         // run loop
-        Arbiter::run_system(Some(&rt));
-        let result = match rt.block_on(stop) {
+        match rt.block_on(stop) {
             Ok(code) => {
                 if code != 0 {
                     Err(io::Error::new(
@@ -173,19 +172,15 @@ impl SystemRunner {
                 }
             }
             Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
-        };
-        Arbiter::stop_system();
-        result
+        }
     }
 
     /// Execute a future and wait for result.
+    #[inline]
     pub fn block_on<F, O>(&mut self, fut: F) -> O
     where
-        F: Future<Output = O> + 'static,
+        F: Future<Output = O>,
     {
-        Arbiter::run_system(Some(&self.rt));
-        let res = self.rt.block_on(fut);
-        Arbiter::stop_system();
-        res
+        self.rt.block_on(fut)
     }
 }

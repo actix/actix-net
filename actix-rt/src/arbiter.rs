@@ -1,6 +1,7 @@
 use std::any::{Any, TypeId};
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
@@ -8,24 +9,23 @@ use std::{fmt, thread};
 
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures_channel::oneshot::{channel, Canceled, Sender};
-use futures_util::{
-    future::{self, Future, FutureExt},
-    stream::Stream,
-};
+// use futures_util::stream::FuturesUnordered;
+// use tokio::task::JoinHandle;
+// use tokio::stream::StreamExt;
+use tokio::stream::Stream;
+use tokio::task::LocalSet;
 
 use crate::runtime::Runtime;
 use crate::system::System;
 
-use copyless::BoxHelper;
-
-use smallvec::SmallVec;
-pub use tokio::task::JoinHandle;
-
 thread_local!(
     static ADDR: RefCell<Option<Arbiter>> = RefCell::new(None);
-    static RUNNING: Cell<bool> = Cell::new(false);
-    static Q: RefCell<Vec<Pin<Box<dyn Future<Output = ()>>>>> = RefCell::new(Vec::new());
-    static PENDING: RefCell<SmallVec<[JoinHandle<()>; 8]>> = RefCell::new(SmallVec::new());
+    // TODO: Commented out code are for Arbiter::local_join function.
+    // It can be safely removed if this function is not used in actix-*.
+    //
+    // /// stores join handle for spawned async tasks.
+    // static HANDLE: RefCell<FuturesUnordered<JoinHandle<()>>> =
+    //     RefCell::new(FuturesUnordered::new());
     static STORAGE: RefCell<HashMap<TypeId, Box<dyn Any>>> = RefCell::new(HashMap::new());
 );
 
@@ -69,14 +69,14 @@ impl Default for Arbiter {
 }
 
 impl Arbiter {
-    pub(crate) fn new_system() -> Self {
+    pub(crate) fn new_system(local: &LocalSet) -> Self {
         let (tx, rx) = unbounded();
 
         let arb = Arbiter::with_sender(tx);
         ADDR.with(|cell| *cell.borrow_mut() = Some(arb.clone()));
-        RUNNING.with(|cell| cell.set(false));
         STORAGE.with(|cell| cell.borrow_mut().clear());
-        Arbiter::spawn(ArbiterController { stop: None, rx });
+
+        local.spawn_local(ArbiterController { rx });
 
         arb
     }
@@ -91,8 +91,9 @@ impl Arbiter {
     }
 
     /// Check if current arbiter is running.
+    #[deprecated(note = "Thread local variables for running state of Arbiter is removed")]
     pub fn is_running() -> bool {
-        RUNNING.with(|cell| cell.get())
+        false
     }
 
     /// Stop arbiter from continuing it's event loop.
@@ -106,67 +107,45 @@ impl Arbiter {
         let id = COUNT.fetch_add(1, Ordering::Relaxed);
         let name = format!("actix-rt:worker:{}", id);
         let sys = System::current();
-        let (arb_tx, arb_rx) = unbounded();
-        let arb_tx2 = arb_tx.clone();
+        let (tx, rx) = unbounded();
 
         let handle = thread::Builder::new()
             .name(name.clone())
-            .spawn(move || {
-                let mut rt = Runtime::new().expect("Can not create Runtime");
-                let arb = Arbiter::with_sender(arb_tx);
+            .spawn({
+                let tx = tx.clone();
+                move || {
+                    let mut rt = Runtime::new().expect("Can not create Runtime");
+                    let arb = Arbiter::with_sender(tx);
 
-                let (stop, stop_rx) = channel();
-                RUNNING.with(|cell| cell.set(true));
-                STORAGE.with(|cell| cell.borrow_mut().clear());
+                    STORAGE.with(|cell| cell.borrow_mut().clear());
 
-                System::set_current(sys);
+                    System::set_current(sys);
 
-                // start arbiter controller
-                rt.spawn(ArbiterController {
-                    stop: Some(stop),
-                    rx: arb_rx,
-                });
-                ADDR.with(|cell| *cell.borrow_mut() = Some(arb.clone()));
+                    ADDR.with(|cell| *cell.borrow_mut() = Some(arb.clone()));
 
-                // register arbiter
-                let _ = System::current()
-                    .sys()
-                    .unbounded_send(SystemCommand::RegisterArbiter(id, arb));
+                    // register arbiter
+                    let _ = System::current()
+                        .sys()
+                        .unbounded_send(SystemCommand::RegisterArbiter(id, arb));
 
-                // run loop
-                let _ = rt.block_on(stop_rx).unwrap_or(1);
+                    // start arbiter controller
+                    // run loop
+                    rt.block_on(ArbiterController { rx });
 
-                // unregister arbiter
-                let _ = System::current()
-                    .sys()
-                    .unbounded_send(SystemCommand::UnregisterArbiter(id));
+                    // unregister arbiter
+                    let _ = System::current()
+                        .sys()
+                        .unbounded_send(SystemCommand::UnregisterArbiter(id));
+                }
             })
             .unwrap_or_else(|err| {
                 panic!("Cannot spawn an arbiter's thread {:?}: {:?}", &name, err)
             });
 
         Arbiter {
-            sender: arb_tx2,
+            sender: tx,
             thread_handle: Some(handle),
         }
-    }
-
-    pub(crate) fn run_system(rt: Option<&Runtime>) {
-        RUNNING.with(|cell| cell.set(true));
-        Q.with(|cell| {
-            let mut v = cell.borrow_mut();
-            for fut in v.drain(..) {
-                if let Some(rt) = rt {
-                    rt.spawn(fut);
-                } else {
-                    tokio::task::spawn_local(fut);
-                }
-            }
-        });
-    }
-
-    pub(crate) fn stop_system() {
-        RUNNING.with(|cell| cell.set(false));
     }
 
     /// Spawn a future on the current thread. This does not create a new Arbiter
@@ -176,26 +155,12 @@ impl Arbiter {
     where
         F: Future<Output = ()> + 'static,
     {
-        RUNNING.with(move |cell| {
-            if cell.get() {
-                // Spawn the future on running executor
-                let len = PENDING.with(move |cell| {
-                    let mut p = cell.borrow_mut();
-                    p.push(tokio::task::spawn_local(future));
-                    p.len()
-                });
-                if len > 7 {
-                    // Before reaching the inline size
-                    tokio::task::spawn_local(CleanupPending);
-                }
-            } else {
-                // Box the future and push it to the queue, this results in double boxing
-                // because the executor boxes the future again, but works for now
-                Q.with(move |cell| {
-                    cell.borrow_mut().push(Pin::from(Box::alloc().init(future)))
-                });
-            }
-        });
+        // HANDLE.with(|handle| {
+        //     let handle = handle.borrow();
+        //     handle.push(tokio::task::spawn_local(future));
+        // });
+        // let _ = tokio::task::spawn_local(CleanupPending);
+        let _ = tokio::task::spawn_local(future);
     }
 
     /// Executes a future on the current thread. This does not create a new Arbiter
@@ -206,7 +171,9 @@ impl Arbiter {
         F: FnOnce() -> R + 'static,
         R: Future<Output = ()> + 'static,
     {
-        Arbiter::spawn(future::lazy(|_| f()).flatten())
+        Arbiter::spawn(async {
+            f();
+        })
     }
 
     /// Send a future to the Arbiter's thread, and spawn it.
@@ -313,40 +280,33 @@ impl Arbiter {
 
     /// Returns a future that will be completed once all currently spawned futures
     /// have completed.
-    pub fn local_join() -> impl Future<Output = ()> {
-        PENDING.with(move |cell| {
-            let current = cell.replace(SmallVec::new());
-            future::join_all(current).map(|_| ())
-        })
+    #[deprecated(since = "1.2.0", note = "Arbiter::local_join function is removed.")]
+    pub async fn local_join() {
+        // let handle = HANDLE.with(|fut| std::mem::take(&mut *fut.borrow_mut()));
+        // async move {
+        //     handle.collect::<Vec<_>>().await;
+        // }
+        unimplemented!("Arbiter::local_join function is removed.")
     }
 }
 
-/// Future used for cleaning-up already finished `JoinHandle`s
-/// from the `PENDING` list so the vector doesn't grow indefinitely
-struct CleanupPending;
-
-impl Future for CleanupPending {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        PENDING.with(move |cell| {
-            let mut pending = cell.borrow_mut();
-            let mut i = 0;
-            while i != pending.len() {
-                if Pin::new(&mut pending[i]).poll(cx).is_ready() {
-                    pending.remove(i);
-                } else {
-                    i += 1;
-                }
-            }
-        });
-
-        Poll::Ready(())
-    }
-}
+// /// Future used for cleaning-up already finished `JoinHandle`s
+// /// from the `PENDING` list so the vector doesn't grow indefinitely
+// struct CleanupPending;
+//
+// impl Future for CleanupPending {
+//     type Output = ();
+//
+//     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+//         HANDLE.with(move |handle| {
+//             recycle_join_handle(&mut *handle.borrow_mut(), cx);
+//         });
+//
+//         Poll::Ready(())
+//     }
+// }
 
 struct ArbiterController {
-    stop: Option<Sender<i32>>,
     rx: UnboundedReceiver<ArbiterCommand>,
 }
 
@@ -371,22 +331,14 @@ impl Future for ArbiterController {
             match Pin::new(&mut self.rx).poll_next(cx) {
                 Poll::Ready(None) => return Poll::Ready(()),
                 Poll::Ready(Some(item)) => match item {
-                    ArbiterCommand::Stop => {
-                        if let Some(stop) = self.stop.take() {
-                            let _ = stop.send(0);
-                        };
-                        return Poll::Ready(());
-                    }
+                    ArbiterCommand::Stop => return Poll::Ready(()),
                     ArbiterCommand::Execute(fut) => {
-                        let len = PENDING.with(move |cell| {
-                            let mut p = cell.borrow_mut();
-                            p.push(tokio::task::spawn_local(fut));
-                            p.len()
-                        });
-                        if len > 7 {
-                            // Before reaching the inline size
-                            tokio::task::spawn_local(CleanupPending);
-                        }
+                        // HANDLE.with(|handle| {
+                        //     let mut handle = handle.borrow_mut();
+                        //     handle.push(tokio::task::spawn_local(fut));
+                        //     recycle_join_handle(&mut *handle, cx);
+                        // });
+                        tokio::task::spawn_local(fut);
                     }
                     ArbiterCommand::ExecuteFn(f) => {
                         f.call_box();
@@ -397,6 +349,20 @@ impl Future for ArbiterController {
         }
     }
 }
+
+// fn recycle_join_handle(handle: &mut FuturesUnordered<JoinHandle<()>>, cx: &mut Context<'_>) {
+//     let _ = Pin::new(&mut *handle).poll_next(cx);
+//
+//     // Try to recycle more join handles and free up memory.
+//     //
+//     // this is a guess. The yield limit for FuturesUnordered is 32.
+//     // So poll an extra 3 times would make the total poll below 128.
+//     if handle.len() > 64 {
+//         (0..3).for_each(|_| {
+//             let _ = Pin::new(&mut *handle).poll_next(cx);
+//         })
+//     }
+// }
 
 #[derive(Debug)]
 pub(crate) enum SystemCommand {
