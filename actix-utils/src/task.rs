@@ -1,7 +1,7 @@
-use std::cell::UnsafeCell;
-use std::marker::PhantomData;
-use std::task::Waker;
-use std::{fmt, rc};
+use core::cell::UnsafeCell;
+use core::fmt;
+use core::marker::PhantomData;
+use core::task::Waker;
 
 /// A synchronization primitive for task wakeup.
 ///
@@ -23,7 +23,8 @@ use std::{fmt, rc};
 #[derive(Default)]
 pub struct LocalWaker {
     pub(crate) waker: UnsafeCell<Option<Waker>>,
-    _t: PhantomData<rc::Rc<()>>,
+    // mark LocalWaker as a !Send type.
+    _t: PhantomData<*const ()>,
 }
 
 impl LocalWaker {

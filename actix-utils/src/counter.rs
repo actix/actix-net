@@ -1,6 +1,7 @@
-use std::cell::Cell;
+use core::cell::Cell;
+use core::task;
+
 use std::rc::Rc;
-use std::task;
 
 use crate::task::LocalWaker;
 
