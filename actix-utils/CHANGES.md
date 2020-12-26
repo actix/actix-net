@@ -1,8 +1,10 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
-* Upgrade `pin-project` to `1.0`.
-* Deprecated `condition`,`either`,`inflight`,`keepalive`,`oneshot`,`order`,`stream` and `time` mod.
+* Use `pin-project-lite` to replace `pin-project`. [#229]
+* Remove `condition`,`either`,`inflight`,`keepalive`,`oneshot`,`order`,`stream` and `time` mods. [#229]
+
+[#229]: https://github.com/actix/actix-net/pull/229
 
 ## 2.0.0 - 2020-08-23
 * No changes from beta 1.

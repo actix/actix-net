@@ -62,25 +62,28 @@ pub enum Message<T> {
     Close,
 }
 
-/// Dispatcher is a future that reads frames from Framed object
-/// and passes them to the service.
-#[pin_project::pin_project]
-pub struct Dispatcher<S, T, U, I>
-where
-    S: Service<Request = <U as Decoder>::Item, Response = I>,
-    S::Error: 'static,
-    S::Future: 'static,
-    T: AsyncRead + AsyncWrite,
-    U: Encoder<I> + Decoder,
-    I: 'static,
-    <U as Encoder<I>>::Error: fmt::Debug,
-{
-    service: S,
-    state: State<S, U, I>,
-    #[pin]
-    framed: Framed<T, U>,
-    rx: mpsc::Receiver<Result<Message<I>, S::Error>>,
-    tx: mpsc::Sender<Result<Message<I>, S::Error>>,
+pin_project_lite::pin_project! {
+    /// Dispatcher is a future that reads frames from Framed object
+    /// and passes them to the service.
+    pub struct Dispatcher<S, T, U, I>
+    where
+        S: Service<Request = <U as Decoder>::Item, Response = I>,
+        S::Error: 'static,
+        S::Future: 'static,
+        T: AsyncRead,
+        T: AsyncWrite,
+        U: Encoder<I>,
+        U: Decoder,
+        I: 'static,
+        <U as Encoder<I>>::Error: fmt::Debug,
+    {
+        service: S,
+        state: State<S, U, I>,
+        #[pin]
+        framed: Framed<T, U>,
+        rx: mpsc::Receiver<Result<Message<I>, S::Error>>,
+        tx: mpsc::Sender<Result<Message<I>, S::Error>>,
+    }
 }
 
 enum State<S: Service, U: Encoder<I> + Decoder, I> {

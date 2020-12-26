@@ -159,13 +159,14 @@ where
     }
 }
 
-/// `TimeoutService` response future
-#[pin_project::pin_project]
-#[derive(Debug)]
-pub struct TimeoutServiceResponse<T: Service> {
-    #[pin]
-    fut: T::Future,
-    sleep: Delay,
+pin_project_lite::pin_project! {
+    /// `TimeoutService` response future
+    #[derive(Debug)]
+    pub struct TimeoutServiceResponse<T: Service> {
+        #[pin]
+        fut: T::Future,
+        sleep: Delay,
+    }
 }
 
 impl<T> Future for TimeoutServiceResponse<T>
