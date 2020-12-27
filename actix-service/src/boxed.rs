@@ -6,10 +6,10 @@ use futures_util::future::FutureExt;
 
 use crate::{Service, ServiceFactory};
 
-pub type BoxFuture<I, E> = Pin<Box<dyn Future<Output = Result<I, E>>>>;
+pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T>>>;
 
 pub type BoxService<Req, Res, Err> =
-    Box<dyn Service<Req, Response = Res, Error = Err, Future = BoxFuture<Res, Err>>>;
+    Box<dyn Service<Req, Response = Res, Error = Err, Future = BoxFuture<Result<Res, Err>>>>;
 
 pub struct BoxServiceFactory<Cfg, Req, Res, Err, InitErr>(Inner<Cfg, Req, Res, Err, InitErr>);
 
@@ -50,7 +50,7 @@ type Inner<C, Req, Res, Err, InitErr> = Box<
         Error = Err,
         InitError = InitErr,
         Service = BoxService<Req, Res, Err>,
-        Future = BoxFuture<BoxService<Req, Res, Err>, InitErr>,
+        Future = BoxFuture<Result<BoxService<Req, Res, Err>, InitErr>>,
     >,
 >;
 
@@ -68,7 +68,7 @@ where
     type Config = C;
     type Service = BoxService<Req, Res, Err>;
 
-    type Future = BoxFuture<Self::Service, InitErr>;
+    type Future = BoxFuture<Result<Self::Service, InitErr>>;
 
     fn new_service(&self, cfg: C) -> Self::Future {
         self.0.new_service(cfg)
@@ -99,7 +99,7 @@ where
     type InitError = InitErr;
     type Config = Cfg;
     type Service = BoxService<Req, Res, Err>;
-    type Future = BoxFuture<Self::Service, Self::InitError>;
+    type Future = BoxFuture<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, cfg: Cfg) -> Self::Future {
         Box::pin(
@@ -130,7 +130,7 @@ where
 {
     type Response = Res;
     type Error = Err;
-    type Future = BoxFuture<Res, Err>;
+    type Future = BoxFuture<Result<Res, Err>>;
 
     fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.0.poll_ready(ctx)
