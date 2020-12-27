@@ -6,8 +6,6 @@ use core::{
     task::{Context, Poll},
 };
 
-use futures_util::future::FutureExt;
-
 use crate::{Service, ServiceFactory};
 
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T>>>;
@@ -103,11 +101,11 @@ where
     type Future = BoxFuture<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, cfg: Cfg) -> Self::Future {
-        Box::pin(
-            self.factory
-                .new_service(cfg)
-                .map(|res| res.map(ServiceWrapper::boxed)),
-        )
+        let fut = self.factory.new_service(cfg);
+        Box::pin(async {
+            let res = fut.await;
+            res.map(ServiceWrapper::boxed)
+        })
     }
 }
 

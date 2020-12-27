@@ -199,10 +199,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use futures_util::future::{lazy, ok, Ready};
+    use futures_util::future::lazy;
 
     use super::*;
-    use crate::{IntoServiceFactory, Service, ServiceFactory};
+    use crate::{
+        ok, IntoServiceFactory, Ready, Service, ServiceExt, ServiceFactory, ServiceFactoryExt,
+    };
 
     struct Srv;
 

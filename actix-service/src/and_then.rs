@@ -279,9 +279,11 @@ mod tests {
         task::{Context, Poll},
     };
 
-    use futures_util::future::{lazy, ok, ready, Ready};
+    use futures_util::future::lazy;
 
-    use crate::{fn_factory, pipeline, pipeline_factory, Service, ServiceFactory};
+    use crate::{
+        fn_factory, ok, pipeline, pipeline_factory, ready, Ready, Service, ServiceFactory,
+    };
 
     struct Srv1(Rc<Cell<usize>>);
 

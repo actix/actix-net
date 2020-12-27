@@ -1,8 +1,6 @@
 use core::{future::Future, marker::PhantomData, task::Poll};
 
-use futures_util::future::{ok, Ready};
-
-use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
+use crate::{ok, IntoService, IntoServiceFactory, Ready, Service, ServiceFactory};
 
 /// Create `ServiceFactory` for function that can act as a `Service`
 pub fn fn_service<F, Fut, Req, Res, Err, Cfg>(
@@ -357,10 +355,10 @@ where
 mod tests {
     use core::task::Poll;
 
-    use futures_util::future::{lazy, ok};
+    use futures_util::future::lazy;
 
     use super::*;
-    use crate::{Service, ServiceFactory};
+    use crate::{ok, Service, ServiceFactory};
 
     #[actix_rt::test]
     async fn test_fn_service() {

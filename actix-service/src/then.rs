@@ -254,9 +254,9 @@ mod tests {
         task::{Context, Poll},
     };
 
-    use futures_util::future::{err, lazy, ok, ready, Ready};
+    use futures_util::future::lazy;
 
-    use crate::{pipeline, pipeline_factory, Service, ServiceFactory};
+    use crate::{err, ok, pipeline, pipeline_factory, ready, Ready, Service, ServiceFactory};
 
     #[derive(Clone)]
     struct Srv1(Rc<Cell<usize>>);
