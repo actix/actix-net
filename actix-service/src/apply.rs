@@ -5,7 +5,9 @@ use core::{
     task::{Context, Poll},
 };
 
-use futures_util::ready;
+
+use pin_project_lite::pin_project;
+use futures_core::ready;
 
 use super::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
@@ -160,17 +162,18 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
-where
-    SF: ServiceFactory<In, Error = Err>,
-    F: FnMut(Req, &mut SF::Service) -> Fut,
-    Fut: Future<Output = Result<Res, Err>>,
-{
-    #[pin]
-    fut: SF::Future,
-    wrap_fn: Option<F>,
-    _phantom: PhantomData<(Req, Res)>,
+pin_project! {
+    pub struct ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
+    where
+        SF: ServiceFactory<In, Error = Err>,
+        F: FnMut(Req, &mut SF::Service) -> Fut,
+        Fut: Future<Output = Result<Res, Err>>,
+    {
+        #[pin]
+        fut: SF::Future,
+        wrap_fn: Option<F>,
+        _phantom: PhantomData<(Req, Res)>,
+    }
 }
 
 impl<SF, F, Fut, Req, In, Res, Err> ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>

@@ -5,6 +5,8 @@ use core::{
     task::{Context, Poll},
 };
 
+use pin_project_lite::pin_project;
+
 use super::Transform;
 
 /// Transform for the `map_init_err` combinator, changing the type of a new
@@ -65,15 +67,16 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct TransformMapInitErrFuture<T, S, F, E, Req>
-where
+pin_project! {
+    pub struct TransformMapInitErrFuture<T, S, F, E, Req>
+    where
     T: Transform<S, Req>,
     F: Fn(T::InitError) -> E,
-{
-    #[pin]
-    fut: T::Future,
-    f: F,
+    {
+        #[pin]
+        fut: T::Future,
+        f: F,
+    }
 }
 
 impl<T, S, F, E, Req> Future for TransformMapInitErrFuture<T, S, F, E, Req>

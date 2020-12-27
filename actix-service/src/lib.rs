@@ -16,7 +16,6 @@ use core::{
 };
 
 mod and_then;
-mod and_then_apply_fn;
 mod apply;
 mod apply_cfg;
 pub mod boxed;

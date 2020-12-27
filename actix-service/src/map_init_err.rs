@@ -5,6 +5,8 @@ use core::{
     task::{Context, Poll},
 };
 
+use pin_project_lite::pin_project;
+
 use super::ServiceFactory;
 
 /// `MapInitErr` service combinator
@@ -61,15 +63,16 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct MapInitErrFuture<A, F, Req, E>
-where
-    A: ServiceFactory<Req>,
-    F: Fn(A::InitError) -> E,
-{
-    f: F,
-    #[pin]
-    fut: A::Future,
+pin_project! {
+    pub struct MapInitErrFuture<A, F, Req, E>
+    where
+        A: ServiceFactory<Req>,
+        F: Fn(A::InitError) -> E,
+    {
+        f: F,
+        #[pin]
+        fut: A::Future,
+    }
 }
 
 impl<A, F, Req, E> MapInitErrFuture<A, F, Req, E>

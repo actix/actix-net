@@ -5,6 +5,8 @@ use core::{
     task::{Context, Poll},
 };
 
+use pin_project_lite::pin_project;
+
 use super::{Service, ServiceFactory};
 
 /// Service for the `map_err` combinator, changing the type of a service's
@@ -64,15 +66,16 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct MapErrFuture<A, Req, F, E>
-where
-    A: Service<Req>,
-    F: Fn(A::Error) -> E,
-{
-    f: F,
-    #[pin]
-    fut: A::Future,
+pin_project! {
+    pub struct MapErrFuture<A, Req, F, E>
+    where
+        A: Service<Req>,
+        F: Fn(A::Error) -> E,
+    {
+        f: F,
+        #[pin]
+        fut: A::Future,
+    }
 }
 
 impl<A, Req, F, E> MapErrFuture<A, Req, F, E>
@@ -159,15 +162,16 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct MapErrServiceFuture<A, Req, F, E>
-where
-    A: ServiceFactory<Req>,
-    F: Fn(A::Error) -> E,
-{
-    #[pin]
-    fut: A::Future,
-    f: F,
+pin_project! {
+    pub struct MapErrServiceFuture<A, Req, F, E>
+    where
+        A: ServiceFactory<Req>,
+        F: Fn(A::Error) -> E,
+    {
+        #[pin]
+        fut: A::Future,
+        f: F,
+    }
 }
 
 impl<A, Req, F, E> MapErrServiceFuture<A, Req, F, E>

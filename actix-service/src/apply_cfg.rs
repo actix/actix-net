@@ -7,6 +7,8 @@ use core::{
     task::{Context, Poll},
 };
 
+use pin_project_lite::pin_project;
+
 use crate::{Service, ServiceFactory};
 
 /// Convert `Fn(Config, &mut Service1) -> Future<Service2>` fn to a service factory.
@@ -158,37 +160,42 @@ where
         ApplyConfigServiceFactoryResponse {
             cfg: Some(cfg),
             store: self.srv.clone(),
-            state: State::A(self.srv.borrow().0.new_service(())),
+            state: State::A {
+                fut: self.srv.borrow().0.new_service(()),
+            },
         }
     }
 }
 
-#[pin_project::pin_project]
-struct ApplyConfigServiceFactoryResponse<SF, Req, F, Cfg, Fut, S>
-where
-    SF: ServiceFactory<Req, Config = ()>,
-    SF::InitError: From<SF::Error>,
-    F: FnMut(Cfg, &mut SF::Service) -> Fut,
-    Fut: Future<Output = Result<S, SF::InitError>>,
-    S: Service<Req>,
-{
-    cfg: Option<Cfg>,
-    store: Rc<RefCell<(SF, F)>>,
-    #[pin]
-    state: State<SF, Fut, S, Req>,
+pin_project! {
+    struct ApplyConfigServiceFactoryResponse<SF, Req, F, Cfg, Fut, S>
+    where
+        SF: ServiceFactory<Req, Config = ()>,
+        SF::InitError: From<SF::Error>,
+        F: FnMut(Cfg, &mut SF::Service) -> Fut,
+        Fut: Future<Output = Result<S, SF::InitError>>,
+        S: Service<Req>,
+    {
+        cfg: Option<Cfg>,
+        store: Rc<RefCell<(SF, F)>>,
+        #[pin]
+        state: State<SF, Fut, S, Req>,
+    }
 }
 
-#[pin_project::pin_project(project = StateProj)]
-enum State<SF, Fut, S, Req>
-where
-    SF: ServiceFactory<Req, Config = ()>,
-    SF::InitError: From<SF::Error>,
-    Fut: Future<Output = Result<S, SF::InitError>>,
-    S: Service<Req>,
-{
-    A(#[pin] SF::Future),
-    B(SF::Service),
-    C(#[pin] Fut),
+pin_project! {
+    #[project = StateProj]
+    enum State<SF, Fut, S, Req>
+    where
+        SF: ServiceFactory<Req, Config = ()>,
+        SF::InitError: From<SF::Error>,
+        Fut: Future<Output = Result<S, SF::InitError>>,
+        S: Service<Req>,
+    {
+        A { #[pin] fut: SF::Future },
+        B { svc: SF::Service },
+        C { #[pin] fut: Fut },
+    }
 }
 
 impl<SF, Req, F, Cfg, Fut, S> Future
@@ -206,25 +213,25 @@ where
         let mut this = self.as_mut().project();
 
         match this.state.as_mut().project() {
-            StateProj::A(fut) => match fut.poll(cx)? {
+            StateProj::A { fut } => match fut.poll(cx)? {
                 Poll::Pending => Poll::Pending,
-                Poll::Ready(srv) => {
-                    this.state.set(State::B(srv));
+                Poll::Ready(svc) => {
+                    this.state.set(State::B { svc });
                     self.poll(cx)
                 }
             },
-            StateProj::B(srv) => match srv.poll_ready(cx)? {
+            StateProj::B { svc } => match svc.poll_ready(cx)? {
                 Poll::Ready(_) => {
                     {
                         let (_, f) = &mut *this.store.borrow_mut();
-                        let fut = f(this.cfg.take().unwrap(), srv);
-                        this.state.set(State::C(fut));
+                        let fut = f(this.cfg.take().unwrap(), svc);
+                        this.state.set(State::C { fut });
                     }
                     self.poll(cx)
                 }
                 Poll::Pending => Poll::Pending,
             },
-            StateProj::C(fut) => fut.poll(cx),
+            StateProj::C { fut } => fut.poll(cx),
         }
     }
 }

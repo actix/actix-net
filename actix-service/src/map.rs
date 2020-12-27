@@ -5,6 +5,8 @@ use core::{
     task::{Context, Poll},
 };
 
+use pin_project_lite::pin_project;
+
 use super::{Service, ServiceFactory};
 
 /// Service for the `map` combinator, changing the type of a service's response.
@@ -61,15 +63,16 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct MapFuture<A, F, Req, Res>
-where
-    A: Service<Req>,
-    F: FnMut(A::Response) -> Res,
-{
-    f: F,
-    #[pin]
-    fut: A::Future,
+pin_project! {
+    pub struct MapFuture<A, F, Req, Res>
+    where
+        A: Service<Req>,
+        F: FnMut(A::Response) -> Res,
+    {
+        f: F,
+        #[pin]
+        fut: A::Future,
+    }
 }
 
 impl<A, F, Req, Res> MapFuture<A, F, Req, Res>
@@ -154,15 +157,16 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct MapServiceFuture<A, F, Req, Res>
-where
-    A: ServiceFactory<Req>,
-    F: FnMut(A::Response) -> Res,
-{
-    #[pin]
-    fut: A::Future,
-    f: Option<F>,
+pin_project! {
+    pub struct MapServiceFuture<A, F, Req, Res>
+    where
+        A: ServiceFactory<Req>,
+        F: FnMut(A::Response) -> Res,
+    {
+        #[pin]
+        fut: A::Future,
+        f: Option<F>,
+    }
 }
 
 impl<A, F, Req, Res> MapServiceFuture<A, F, Req, Res>
