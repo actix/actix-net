@@ -1,11 +1,12 @@
-use std::{
+use core::{
     future::Future,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
 
-use futures_util::ready;
+use futures_core::ready;
+use pin_project_lite::pin_project;
 
 use super::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
@@ -94,9 +95,7 @@ where
     type Error = Err;
     type Future = Fut;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(ready!(self.service.poll_ready(cx)))
-    }
+    crate::forward_ready!(service);
 
     fn call(&mut self, req: Req) -> Self::Future {
         (self.wrap_fn)(req, &mut self.service)
@@ -162,17 +161,18 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
-where
-    SF: ServiceFactory<In, Error = Err>,
-    F: FnMut(Req, &mut SF::Service) -> Fut,
-    Fut: Future<Output = Result<Res, Err>>,
-{
-    #[pin]
-    fut: SF::Future,
-    wrap_fn: Option<F>,
-    _phantom: PhantomData<(Req, Res)>,
+pin_project! {
+    pub struct ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
+    where
+        SF: ServiceFactory<In, Error = Err>,
+        F: FnMut(Req, &mut SF::Service) -> Fut,
+        Fut: Future<Output = Result<Res, Err>>,
+    {
+        #[pin]
+        fut: SF::Future,
+        wrap_fn: Option<F>,
+        _phantom: PhantomData<(Req, Res)>,
+    }
 }
 
 impl<SF, F, Fut, Req, In, Res, Err> ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
@@ -203,13 +203,13 @@ where
         let this = self.project();
 
         let svc = ready!(this.fut.poll(cx))?;
-        Poll::Ready(Ok(Apply::new(svc, Option::take(this.wrap_fn).unwrap())))
+        Poll::Ready(Ok(Apply::new(svc, this.wrap_fn.take().unwrap())))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::task::{Context, Poll};
+    use core::task::Poll;
 
     use futures_util::future::{lazy, ok, Ready};
 
@@ -224,9 +224,7 @@ mod tests {
         type Error = ();
         type Future = Ready<Result<(), ()>>;
 
-        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
+        crate::always_ready!();
 
         fn call(&mut self, _: ()) -> Self::Future {
             ok(())

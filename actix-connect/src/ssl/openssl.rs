@@ -100,9 +100,7 @@ where
     #[allow(clippy::type_complexity)]
     type Future = Either<ConnectAsyncExt<T, U>, Ready<Result<Self::Response, Self::Error>>>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    actix_service::always_ready!();
 
     fn call(&mut self, stream: Connection<T, U>) -> Self::Future {
         trace!("SSL Handshake start for: {:?}", stream.host());
@@ -220,9 +218,7 @@ impl<T: Address + 'static> Service for OpensslConnectService<T> {
     type Error = ConnectError;
     type Future = OpensslConnectServiceResponse<T>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    actix_service::always_ready!();
 
     fn call(&mut self, req: Connect<T>) -> Self::Future {
         OpensslConnectServiceResponse {

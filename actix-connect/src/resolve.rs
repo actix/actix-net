@@ -110,9 +110,7 @@ impl<T: Address> Service<Connect<T>> for Resolver<T> {
         Ready<Result<Connect<T>, Self::Error>>,
     >;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    actix_service::always_ready!();
 
     fn call(&mut self, mut req: Connect<T>) -> Self::Future {
         if req.addr.is_some() {

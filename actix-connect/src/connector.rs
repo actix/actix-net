@@ -75,9 +75,7 @@ impl<T: Address> Service<Connect<T>> for TcpConnector<T> {
     #[allow(clippy::type_complexity)]
     type Future = Either<TcpConnectorResponse<T>, Ready<Result<Self::Response, Self::Error>>>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    actix_service::always_ready!();
 
     fn call(&mut self, req: Connect<T>) -> Self::Future {
         let port = req.port();

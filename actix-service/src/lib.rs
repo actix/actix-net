@@ -1,18 +1,21 @@
 //! See [`Service`] docs for information on this crate's foundational trait.
 
+#![no_std]
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
-use std::cell::RefCell;
-use std::future::Future;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::task::{self, Context, Poll};
+extern crate alloc;
+
+use alloc::{boxed::Box, rc::Rc, sync::Arc};
+use core::{
+    cell::RefCell,
+    future::Future,
+    task::{self, Context, Poll},
+};
 
 mod and_then;
-mod and_then_apply_fn;
 mod apply;
 mod apply_cfg;
 pub mod boxed;
@@ -358,4 +361,28 @@ pub mod dev {
     pub use crate::map_init_err::MapInitErr;
     pub use crate::transform::ApplyTransform;
     pub use crate::transform_err::TransformMapInitErr;
+}
+
+#[macro_export]
+macro_rules! always_ready {
+    () => {
+        fn poll_ready(
+            &mut self,
+            _: &mut ::core::task::Context<'_>,
+        ) -> ::core::task::Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! forward_ready {
+    ($field:ident) => {
+        fn poll_ready(
+            &mut self,
+            cx: &mut ::core::task::Context<'_>,
+        ) -> ::core::task::Poll<Result<(), Self::Error>> {
+            self.$field.poll_ready(cx)
+        }
+    };
 }

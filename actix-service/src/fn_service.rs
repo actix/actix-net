@@ -1,6 +1,4 @@
-use std::future::Future;
-use std::marker::PhantomData;
-use std::task::{Context, Poll};
+use core::{future::Future, marker::PhantomData, task::Poll};
 
 use futures_util::future::{ok, Ready};
 
@@ -143,9 +141,7 @@ where
     type Error = Err;
     type Future = Fut;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    crate::always_ready!();
 
     fn call(&mut self, req: Req) -> Self::Future {
         (self.f)(req)
@@ -200,9 +196,7 @@ where
     type Error = Err;
     type Future = Fut;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    crate::always_ready!();
 
     fn call(&mut self, req: Req) -> Self::Future {
         (self.f)(req)
@@ -361,7 +355,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::task::Poll;
+    use core::task::Poll;
 
     use futures_util::future::{lazy, ok};
 

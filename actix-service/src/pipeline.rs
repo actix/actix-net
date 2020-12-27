@@ -1,8 +1,9 @@
-use std::task::{Context, Poll};
-use std::{future::Future, marker::PhantomData};
+use core::{
+    marker::PhantomData,
+    task::{Context, Poll},
+};
 
 use crate::and_then::{AndThenService, AndThenServiceFactory};
-use crate::and_then_apply_fn::{AndThenApplyFn, AndThenApplyFnFactory};
 use crate::map::{Map, MapServiceFactory};
 use crate::map_err::{MapErr, MapErrServiceFactory};
 use crate::map_init_err::MapInitErr;
@@ -63,28 +64,6 @@ where
     {
         Pipeline {
             service: AndThenService::new(self.service, service.into_service()),
-            _phantom: PhantomData,
-        }
-    }
-
-    /// Apply function to specified service and use it as a next service in chain.
-    ///
-    /// Short version of `pipeline_factory(...).and_then(apply_fn(...))`
-    pub fn and_then_apply_fn<I, S1, F, Fut, In, Res, Err>(
-        self,
-        service: I,
-        wrap_fn: F,
-    ) -> Pipeline<impl Service<Req, Response = Res, Error = Err> + Clone, Req>
-    where
-        Self: Sized,
-        I: IntoService<S1, In>,
-        S1: Service<In>,
-        F: FnMut(S::Response, &mut S1) -> Fut,
-        Fut: Future<Output = Result<Res, Err>>,
-        Err: From<S::Error> + From<S1::Error>,
-    {
-        Pipeline {
-            service: AndThenApplyFn::new(self.service, service.into_service(), wrap_fn),
             _phantom: PhantomData,
         }
     }
@@ -215,39 +194,6 @@ where
     {
         PipelineFactory {
             factory: AndThenServiceFactory::new(self.factory, factory.into_factory()),
-            _phantom: PhantomData,
-        }
-    }
-
-    /// Apply function to specified service and use it as a next service in chain.
-    ///
-    /// Short version of `pipeline_factory(...).and_then(apply_fn_factory(...))`
-    pub fn and_then_apply_fn<I, SF1, Fut, F, In, Res, Err>(
-        self,
-        factory: I,
-        wrap_fn: F,
-    ) -> PipelineFactory<
-        impl ServiceFactory<
-                Req,
-                Response = Res,
-                Error = Err,
-                Config = SF::Config,
-                InitError = SF::InitError,
-                Service = impl Service<Req, Response = Res, Error = Err> + Clone,
-            > + Clone,
-        Req,
-    >
-    where
-        Self: Sized,
-        SF::Config: Clone,
-        I: IntoServiceFactory<SF1, In>,
-        SF1: ServiceFactory<In, Config = SF::Config, InitError = SF::InitError>,
-        F: FnMut(SF::Response, &mut SF1::Service) -> Fut + Clone,
-        Fut: Future<Output = Result<Res, Err>>,
-        Err: From<SF::Error> + From<SF1::Error>,
-    {
-        PipelineFactory {
-            factory: AndThenApplyFnFactory::new(self.factory, factory.into_factory(), wrap_fn),
             _phantom: PhantomData,
         }
     }

@@ -1,7 +1,11 @@
-use std::future::Future;
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use core::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use pin_project_lite::pin_project;
 
 use super::{Service, ServiceFactory};
 
@@ -52,24 +56,23 @@ where
     type Error = A::Error;
     type Future = MapFuture<A, F, Req, Res>;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.service.poll_ready(ctx)
-    }
+    crate::forward_ready!(service);
 
     fn call(&mut self, req: Req) -> Self::Future {
         MapFuture::new(self.service.call(req), self.f.clone())
     }
 }
 
-#[pin_project::pin_project]
-pub struct MapFuture<A, F, Req, Res>
-where
-    A: Service<Req>,
-    F: FnMut(A::Response) -> Res,
-{
-    f: F,
-    #[pin]
-    fut: A::Future,
+pin_project! {
+    pub struct MapFuture<A, F, Req, Res>
+    where
+        A: Service<Req>,
+        F: FnMut(A::Response) -> Res,
+    {
+        f: F,
+        #[pin]
+        fut: A::Future,
+    }
 }
 
 impl<A, F, Req, Res> MapFuture<A, F, Req, Res>
@@ -154,15 +157,16 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct MapServiceFuture<A, F, Req, Res>
-where
-    A: ServiceFactory<Req>,
-    F: FnMut(A::Response) -> Res,
-{
-    #[pin]
-    fut: A::Future,
-    f: Option<F>,
+pin_project! {
+    pub struct MapServiceFuture<A, F, Req, Res>
+    where
+        A: ServiceFactory<Req>,
+        F: FnMut(A::Response) -> Res,
+    {
+        #[pin]
+        fut: A::Future,
+        f: Option<F>,
+    }
 }
 
 impl<A, F, Req, Res> MapServiceFuture<A, F, Req, Res>
@@ -207,9 +211,7 @@ mod tests {
         type Error = ();
         type Future = Ready<Result<(), ()>>;
 
-        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
+        crate::always_ready!();
 
         fn call(&mut self, _: ()) -> Self::Future {
             ok(())
