@@ -75,12 +75,9 @@ where
     }
 }
 
-struct FactoryWrapper<SF, Req, C>
-where
-    SF: ServiceFactory<Req>,
-{
+struct FactoryWrapper<SF, Req, Cfg> {
     factory: SF,
-    _t: PhantomData<(C, Req)>,
+    _t: PhantomData<(Req, Cfg)>,
 }
 
 impl<SF, Req, Cfg, Res, Err, InitErr> ServiceFactory<Req> for FactoryWrapper<SF, Req, Cfg>

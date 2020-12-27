@@ -207,9 +207,7 @@ mod tests {
         type Error = ();
         type Future = Ready<Result<(), ()>>;
 
-        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
+        crate::always_ready!();
 
         fn call(&mut self, _: ()) -> Self::Future {
             ok(())

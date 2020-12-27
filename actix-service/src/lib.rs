@@ -359,3 +359,15 @@ pub mod dev {
     pub use crate::transform::ApplyTransform;
     pub use crate::transform_err::TransformMapInitErr;
 }
+
+#[macro_export]
+macro_rules! always_ready {
+    () => {
+        fn poll_ready(
+            &mut self,
+            _: &mut ::std::task::Context<'_>,
+        ) -> ::std::task::Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+    };
+}

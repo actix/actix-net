@@ -96,9 +96,7 @@ where
     type Error = std::io::Error;
     type Future = ConnectAsyncExt<T, U>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    actix_service::always_ready!();
 
     fn call(&mut self, stream: Connection<T, U>) -> Self::Future {
         trace!("SSL Handshake start for: {:?}", stream.host());
