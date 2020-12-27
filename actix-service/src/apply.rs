@@ -94,9 +94,7 @@ where
     type Error = Err;
     type Future = Fut;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(ready!(self.service.poll_ready(cx)))
-    }
+    crate::forward_ready!(service);
 
     fn call(&mut self, req: Req) -> Self::Future {
         (self.wrap_fn)(req, &mut self.service)

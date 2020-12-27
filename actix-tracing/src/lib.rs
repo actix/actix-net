@@ -5,7 +5,6 @@
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 use std::marker::PhantomData;
-use std::task::{Context, Poll};
 
 use actix_service::{
     apply, dev::ApplyTransform, IntoServiceFactory, Service, ServiceFactory, Transform,
@@ -36,9 +35,7 @@ where
     type Error = S::Error;
     type Future = Either<S::Future, Instrumented<S::Future>>;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(ctx)
-    }
+    actix_service::forward_ready!(inner);
 
     fn call(&mut self, req: Req) -> Self::Future {
         let span = (self.make_span)(&req);

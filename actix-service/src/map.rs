@@ -52,9 +52,7 @@ where
     type Error = A::Error;
     type Future = MapFuture<A, F, Req, Res>;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.service.poll_ready(ctx)
-    }
+    crate::forward_ready!(service);
 
     fn call(&mut self, req: Req) -> Self::Future {
         MapFuture::new(self.service.call(req), self.f.clone())

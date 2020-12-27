@@ -371,3 +371,15 @@ macro_rules! always_ready {
         }
     };
 }
+
+#[macro_export]
+macro_rules! forward_ready {
+    ($field:ident) => {
+        fn poll_ready(
+            &mut self,
+            cx: &mut ::std::task::Context<'_>,
+        ) -> ::std::task::Poll<Result<(), Self::Error>> {
+            self.$field.poll_ready(cx)
+        }
+    };
+}
