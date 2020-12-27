@@ -2,6 +2,7 @@
 //!
 //! If the response does not complete within the specified timeout, the response
 //! will be aborted.
+
 use core::future::Future;
 use core::marker::PhantomData;
 use core::pin::Pin;
@@ -10,6 +11,7 @@ use core::{fmt, time};
 
 use actix_rt::time::{delay_for, Delay};
 use actix_service::{IntoService, Service, Transform};
+use pin_project_lite::pin_project;
 
 /// Applies a timeout to requests.
 #[derive(Debug)]
@@ -77,21 +79,21 @@ impl<E> Clone for Timeout<E> {
     }
 }
 
-impl<S, E> Transform<S> for Timeout<E>
+impl<S, E, Req> Transform<S, Req> for Timeout<E>
 where
-    S: Service,
+    S: Service<Req>,
 {
-    type Request = S::Request;
     type Response = S::Response;
     type Error = TimeoutError<S::Error>;
-    type Transform = TimeoutService<S>;
     type InitError = E;
+    type Transform = TimeoutService<S, Req>;
     type Future = TimeoutFuture<Self::Transform, Self::InitError>;
 
     fn new_transform(&self, service: S) -> Self::Future {
         let service = TimeoutService {
             service,
             timeout: self.timeout,
+            _phantom: PhantomData,
         };
 
         TimeoutFuture {
@@ -118,40 +120,41 @@ impl<T, E> Future for TimeoutFuture<T, E> {
 
 /// Applies a timeout to requests.
 #[derive(Debug, Clone)]
-pub struct TimeoutService<S> {
+pub struct TimeoutService<S, Req> {
     service: S,
     timeout: time::Duration,
+    _phantom: PhantomData<Req>,
 }
 
-impl<S> TimeoutService<S>
+impl<S, Req> TimeoutService<S, Req>
 where
-    S: Service,
+    S: Service<Req>,
 {
     pub fn new<U>(timeout: time::Duration, service: U) -> Self
     where
-        U: IntoService<S>,
+        U: IntoService<S, Req>,
     {
         TimeoutService {
             timeout,
             service: service.into_service(),
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<S> Service for TimeoutService<S>
+impl<S, Req> Service<Req> for TimeoutService<S, Req>
 where
-    S: Service,
+    S: Service<Req>,
 {
-    type Request = S::Request;
     type Response = S::Response;
     type Error = TimeoutError<S::Error>;
-    type Future = TimeoutServiceResponse<S>;
+    type Future = TimeoutServiceResponse<S, Req>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx).map_err(TimeoutError::Service)
     }
 
-    fn call(&mut self, request: S::Request) -> Self::Future {
+    fn call(&mut self, request: Req) -> Self::Future {
         TimeoutServiceResponse {
             fut: self.service.call(request),
             sleep: delay_for(self.timeout),
@@ -159,21 +162,24 @@ where
     }
 }
 
-pin_project_lite::pin_project! {
+pin_project! {
     /// `TimeoutService` response future
     #[derive(Debug)]
-    pub struct TimeoutServiceResponse<T: Service> {
+    pub struct TimeoutServiceResponse<S, Req>
+    where
+        S: Service<Req>
+    {
         #[pin]
-        fut: T::Future,
+        fut: S::Future,
         sleep: Delay,
     }
 }
 
-impl<T> Future for TimeoutServiceResponse<T>
+impl<S, Req> Future for TimeoutServiceResponse<S, Req>
 where
-    T: Service,
+    S: Service<Req>,
 {
-    type Output = Result<T::Response, TimeoutError<T::Error>>;
+    type Output = Result<S::Response, TimeoutError<S::Error>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
@@ -204,8 +210,7 @@ mod tests {
 
     struct SleepService(Duration);
 
-    impl Service for SleepService {
-        type Request = ();
+    impl Service<()> for SleepService {
         type Response = ();
         type Error = ();
         type Future = LocalBoxFuture<'static, Result<(), ()>>;

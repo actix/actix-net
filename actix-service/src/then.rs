@@ -1,8 +1,8 @@
-use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
+use std::{cell::RefCell, marker::PhantomData};
 
 use super::{Service, ServiceFactory};
 
@@ -10,34 +10,33 @@ use super::{Service, ServiceFactory};
 /// another service.
 ///
 /// This is created by the `Pipeline::then` method.
-pub(crate) struct ThenService<A, B>(Rc<RefCell<(A, B)>>);
+pub(crate) struct ThenService<A, B, Req>(Rc<RefCell<(A, B)>>, PhantomData<Req>);
 
-impl<A, B> ThenService<A, B> {
+impl<A, B, Req> ThenService<A, B, Req> {
     /// Create new `.then()` combinator
-    pub(crate) fn new(a: A, b: B) -> ThenService<A, B>
+    pub(crate) fn new(a: A, b: B) -> ThenService<A, B, Req>
     where
-        A: Service,
-        B: Service<Request = Result<A::Response, A::Error>, Error = A::Error>,
+        A: Service<Req>,
+        B: Service<Result<A::Response, A::Error>, Error = A::Error>,
     {
-        Self(Rc::new(RefCell::new((a, b))))
+        Self(Rc::new(RefCell::new((a, b))), PhantomData)
     }
 }
 
-impl<A, B> Clone for ThenService<A, B> {
+impl<A, B, Req> Clone for ThenService<A, B, Req> {
     fn clone(&self) -> Self {
-        ThenService(self.0.clone())
+        ThenService(self.0.clone(), PhantomData)
     }
 }
 
-impl<A, B> Service for ThenService<A, B>
+impl<A, B, Req> Service<Req> for ThenService<A, B, Req>
 where
-    A: Service,
-    B: Service<Request = Result<A::Response, A::Error>, Error = A::Error>,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>, Error = A::Error>,
 {
-    type Request = A::Request;
     type Response = B::Response;
     type Error = B::Error;
-    type Future = ThenServiceResponse<A, B>;
+    type Future = ThenServiceResponse<A, B, Req>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let mut srv = self.0.borrow_mut();
@@ -49,7 +48,7 @@ where
         }
     }
 
-    fn call(&mut self, req: A::Request) -> Self::Future {
+    fn call(&mut self, req: Req) -> Self::Future {
         ThenServiceResponse {
             state: State::A(self.0.borrow_mut().0.call(req), Some(self.0.clone())),
         }
@@ -57,30 +56,30 @@ where
 }
 
 #[pin_project::pin_project]
-pub(crate) struct ThenServiceResponse<A, B>
+pub(crate) struct ThenServiceResponse<A, B, Req>
 where
-    A: Service,
-    B: Service<Request = Result<A::Response, A::Error>>,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
 {
     #[pin]
-    state: State<A, B>,
+    state: State<A, B, Req>,
 }
 
 #[pin_project::pin_project(project = StateProj)]
-enum State<A, B>
+enum State<A, B, Req>
 where
-    A: Service,
-    B: Service<Request = Result<A::Response, A::Error>>,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
 {
     A(#[pin] A::Future, Option<Rc<RefCell<(A, B)>>>),
     B(#[pin] B::Future),
     Empty,
 }
 
-impl<A, B> Future for ThenServiceResponse<A, B>
+impl<A, B, Req> Future for ThenServiceResponse<A, B, Req>
 where
-    A: Service,
-    B: Service<Request = Result<A::Response, A::Error>>,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
 {
     type Output = Result<B::Response, B::Error>;
 
@@ -110,44 +109,43 @@ where
 }
 
 /// `.then()` service factory combinator
-pub(crate) struct ThenServiceFactory<A, B>(Rc<(A, B)>);
+pub(crate) struct ThenServiceFactory<A, B, Req>(Rc<(A, B)>, PhantomData<Req>);
 
-impl<A, B> ThenServiceFactory<A, B>
+impl<A, B, Req> ThenServiceFactory<A, B, Req>
 where
-    A: ServiceFactory,
+    A: ServiceFactory<Req>,
     A::Config: Clone,
     B: ServiceFactory<
+        Result<A::Response, A::Error>,
         Config = A::Config,
-        Request = Result<A::Response, A::Error>,
         Error = A::Error,
         InitError = A::InitError,
     >,
 {
     /// Create new `AndThen` combinator
     pub(crate) fn new(a: A, b: B) -> Self {
-        Self(Rc::new((a, b)))
+        Self(Rc::new((a, b)), PhantomData)
     }
 }
 
-impl<A, B> ServiceFactory for ThenServiceFactory<A, B>
+impl<A, B, Req> ServiceFactory<Req> for ThenServiceFactory<A, B, Req>
 where
-    A: ServiceFactory,
+    A: ServiceFactory<Req>,
     A::Config: Clone,
     B: ServiceFactory<
+        Result<A::Response, A::Error>,
         Config = A::Config,
-        Request = Result<A::Response, A::Error>,
         Error = A::Error,
         InitError = A::InitError,
     >,
 {
-    type Request = A::Request;
     type Response = B::Response;
     type Error = A::Error;
 
     type Config = A::Config;
-    type Service = ThenService<A::Service, B::Service>;
+    type Service = ThenService<A::Service, B::Service, Req>;
     type InitError = A::InitError;
-    type Future = ThenServiceFactoryResponse<A, B>;
+    type Future = ThenServiceFactoryResponse<A, B, Req>;
 
     fn new_service(&self, cfg: A::Config) -> Self::Future {
         let srv = &*self.0;
@@ -155,19 +153,19 @@ where
     }
 }
 
-impl<A, B> Clone for ThenServiceFactory<A, B> {
+impl<A, B, Req> Clone for ThenServiceFactory<A, B, Req> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        Self(self.0.clone(), PhantomData)
     }
 }
 
 #[pin_project::pin_project]
-pub(crate) struct ThenServiceFactoryResponse<A, B>
+pub(crate) struct ThenServiceFactoryResponse<A, B, Req>
 where
-    A: ServiceFactory,
+    A: ServiceFactory<Req>,
     B: ServiceFactory<
+        Result<A::Response, A::Error>,
         Config = A::Config,
-        Request = Result<A::Response, A::Error>,
         Error = A::Error,
         InitError = A::InitError,
     >,
@@ -180,12 +178,12 @@ where
     b: Option<B::Service>,
 }
 
-impl<A, B> ThenServiceFactoryResponse<A, B>
+impl<A, B, Req> ThenServiceFactoryResponse<A, B, Req>
 where
-    A: ServiceFactory,
+    A: ServiceFactory<Req>,
     B: ServiceFactory<
+        Result<A::Response, A::Error>,
         Config = A::Config,
-        Request = Result<A::Response, A::Error>,
         Error = A::Error,
         InitError = A::InitError,
     >,
@@ -200,17 +198,17 @@ where
     }
 }
 
-impl<A, B> Future for ThenServiceFactoryResponse<A, B>
+impl<A, B, Req> Future for ThenServiceFactoryResponse<A, B, Req>
 where
-    A: ServiceFactory,
+    A: ServiceFactory<Req>,
     B: ServiceFactory<
+        Result<A::Response, A::Error>,
         Config = A::Config,
-        Request = Result<A::Response, A::Error>,
         Error = A::Error,
         InitError = A::InitError,
     >,
 {
-    type Output = Result<ThenService<A::Service, B::Service>, A::InitError>;
+    type Output = Result<ThenService<A::Service, B::Service, Req>, A::InitError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
@@ -249,8 +247,7 @@ mod tests {
     #[derive(Clone)]
     struct Srv1(Rc<Cell<usize>>);
 
-    impl Service for Srv1 {
-        type Request = Result<&'static str, &'static str>;
+    impl Service<Result<&'static str, &'static str>> for Srv1 {
         type Response = &'static str;
         type Error = ();
         type Future = Ready<Result<Self::Response, Self::Error>>;
@@ -270,8 +267,7 @@ mod tests {
 
     struct Srv2(Rc<Cell<usize>>);
 
-    impl Service for Srv2 {
-        type Request = Result<&'static str, ()>;
+    impl Service<Result<&'static str, ()>> for Srv2 {
         type Response = (&'static str, &'static str);
         type Error = ();
         type Future = Ready<Result<Self::Response, ()>>;

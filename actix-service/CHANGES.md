@@ -1,7 +1,13 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
+* `Service`, other traits, and many type signatures now take the the request type as a type
+  parameter instead of an associated type. [#232]
 * Upgrade `pin-project` to `1.0`.
+
+
+[#232]: https://github.com/actix/actix-net/pull/232
+
 
 ## 1.0.6 - 2020-08-09
 
