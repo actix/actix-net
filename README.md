@@ -14,7 +14,7 @@ Actix net - framework for composable network services
 ## Documentation & community resources
 
 * [Chat on Gitter](https://gitter.im/actix/actix)
-* Minimum supported Rust version: 1.42 or later
+* Minimum supported Rust version: 1.46 or later
 
 ## Example
 
