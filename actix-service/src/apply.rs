@@ -1,203 +1,209 @@
-use std::future::Future;
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use futures_util::ready;
 
 use super::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
 /// Apply transform function to a service.
-pub fn apply_fn<T, F, R, In, Out, Err, U>(service: U, f: F) -> Apply<T, F, R, In, Out, Err>
+///
+/// The In and Out type params refer to the request and response types for the wrapped service.
+pub fn apply_fn<I, S, F, Fut, Req, In, Res, Err>(
+    service: I,
+    wrap_fn: F,
+) -> Apply<S, F, Req, In, Res, Err>
 where
-    T: Service<Error = Err>,
-    F: FnMut(In, &mut T) -> R,
-    R: Future<Output = Result<Out, Err>>,
-    U: IntoService<T>,
+    I: IntoService<S, In>,
+    S: Service<In, Error = Err>,
+    F: FnMut(Req, &mut S) -> Fut,
+    Fut: Future<Output = Result<Res, Err>>,
 {
-    Apply::new(service.into_service(), f)
+    Apply::new(service.into_service(), wrap_fn)
 }
 
 /// Service factory that produces `apply_fn` service.
-pub fn apply_fn_factory<T, F, R, In, Out, Err, U>(
-    service: U,
+///
+/// The In and Out type params refer to the request and response types for the wrapped service.
+pub fn apply_fn_factory<I, SF, F, Fut, Req, In, Res, Err>(
+    service: I,
     f: F,
-) -> ApplyServiceFactory<T, F, R, In, Out, Err>
+) -> ApplyFactory<SF, F, Req, In, Res, Err>
 where
-    T: ServiceFactory<Error = Err>,
-    F: FnMut(In, &mut T::Service) -> R + Clone,
-    R: Future<Output = Result<Out, Err>>,
-    U: IntoServiceFactory<T>,
+    I: IntoServiceFactory<SF, In>,
+    SF: ServiceFactory<In, Error = Err>,
+    F: FnMut(Req, &mut SF::Service) -> Fut + Clone,
+    Fut: Future<Output = Result<Res, Err>>,
 {
-    ApplyServiceFactory::new(service.into_factory(), f)
+    ApplyFactory::new(service.into_factory(), f)
 }
 
-/// `Apply` service combinator
-pub struct Apply<T, F, R, In, Out, Err>
+/// `Apply` service combinator.
+///
+/// The In and Out type params refer to the request and response types for the wrapped service.
+pub struct Apply<S, F, Req, In, Res, Err>
 where
-    T: Service<Error = Err>,
+    S: Service<In, Error = Err>,
 {
-    service: T,
-    f: F,
-    r: PhantomData<(In, Out, R)>,
+    service: S,
+    wrap_fn: F,
+    _phantom: PhantomData<(Req, In, Res, Err)>,
 }
 
-impl<T, F, R, In, Out, Err> Apply<T, F, R, In, Out, Err>
+impl<S, F, Fut, Req, In, Res, Err> Apply<S, F, Req, In, Res, Err>
 where
-    T: Service<Error = Err>,
-    F: FnMut(In, &mut T) -> R,
-    R: Future<Output = Result<Out, Err>>,
+    S: Service<In, Error = Err>,
+    F: FnMut(Req, &mut S) -> Fut,
+    Fut: Future<Output = Result<Res, Err>>,
 {
     /// Create new `Apply` combinator
-    fn new(service: T, f: F) -> Self {
+    fn new(service: S, wrap_fn: F) -> Self {
         Self {
             service,
-            f,
-            r: PhantomData,
+            wrap_fn,
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<T, F, R, In, Out, Err> Clone for Apply<T, F, R, In, Out, Err>
+impl<S, F, Fut, Req, In, Res, Err> Clone for Apply<S, F, Req, In, Res, Err>
 where
-    T: Service<Error = Err> + Clone,
-    F: FnMut(In, &mut T) -> R + Clone,
-    R: Future<Output = Result<Out, Err>>,
+    S: Service<In, Error = Err> + Clone,
+    F: FnMut(Req, &mut S) -> Fut + Clone,
+    Fut: Future<Output = Result<Res, Err>>,
 {
     fn clone(&self) -> Self {
         Apply {
             service: self.service.clone(),
-            f: self.f.clone(),
-            r: PhantomData,
+            wrap_fn: self.wrap_fn.clone(),
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<T, F, R, In, Out, Err> Service for Apply<T, F, R, In, Out, Err>
+impl<S, F, Fut, Req, In, Res, Err> Service<Req> for Apply<S, F, Req, In, Res, Err>
 where
-    T: Service<Error = Err>,
-    F: FnMut(In, &mut T) -> R,
-    R: Future<Output = Result<Out, Err>>,
+    S: Service<In, Error = Err>,
+    F: FnMut(Req, &mut S) -> Fut,
+    Fut: Future<Output = Result<Res, Err>>,
 {
-    type Request = In;
-    type Response = Out;
+    type Response = Res;
     type Error = Err;
-    type Future = R;
+    type Future = Fut;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(futures_util::ready!(self.service.poll_ready(cx)))
+        Poll::Ready(ready!(self.service.poll_ready(cx)))
     }
 
-    fn call(&mut self, req: In) -> Self::Future {
-        (self.f)(req, &mut self.service)
+    fn call(&mut self, req: Req) -> Self::Future {
+        (self.wrap_fn)(req, &mut self.service)
     }
 }
 
-/// `apply()` service factory
-pub struct ApplyServiceFactory<T, F, R, In, Out, Err>
-where
-    T: ServiceFactory<Error = Err>,
-    F: FnMut(In, &mut T::Service) -> R + Clone,
-    R: Future<Output = Result<Out, Err>>,
-{
-    service: T,
-    f: F,
-    r: PhantomData<(R, In, Out)>,
+/// `ApplyFactory` service factory combinator.
+pub struct ApplyFactory<SF, F, Req, In, Res, Err> {
+    factory: SF,
+    wrap_fn: F,
+    _phantom: PhantomData<(Req, In, Res, Err)>,
 }
 
-impl<T, F, R, In, Out, Err> ApplyServiceFactory<T, F, R, In, Out, Err>
+impl<SF, F, Fut, Req, In, Res, Err> ApplyFactory<SF, F, Req, In, Res, Err>
 where
-    T: ServiceFactory<Error = Err>,
-    F: FnMut(In, &mut T::Service) -> R + Clone,
-    R: Future<Output = Result<Out, Err>>,
+    SF: ServiceFactory<In, Error = Err>,
+    F: FnMut(Req, &mut SF::Service) -> Fut + Clone,
+    Fut: Future<Output = Result<Res, Err>>,
 {
-    /// Create new `ApplyNewService` new service instance
-    fn new(service: T, f: F) -> Self {
+    /// Create new `ApplyFactory` new service instance
+    fn new(factory: SF, wrap_fn: F) -> Self {
         Self {
-            f,
-            service,
-            r: PhantomData,
+            factory,
+            wrap_fn,
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<T, F, R, In, Out, Err> Clone for ApplyServiceFactory<T, F, R, In, Out, Err>
+impl<SF, F, Fut, Req, In, Res, Err> Clone for ApplyFactory<SF, F, Req, In, Res, Err>
 where
-    T: ServiceFactory<Error = Err> + Clone,
-    F: FnMut(In, &mut T::Service) -> R + Clone,
-    R: Future<Output = Result<Out, Err>>,
+    SF: ServiceFactory<In, Error = Err> + Clone,
+    F: FnMut(Req, &mut SF::Service) -> Fut + Clone,
+    Fut: Future<Output = Result<Res, Err>>,
 {
     fn clone(&self) -> Self {
         Self {
-            service: self.service.clone(),
-            f: self.f.clone(),
-            r: PhantomData,
+            factory: self.factory.clone(),
+            wrap_fn: self.wrap_fn.clone(),
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<T, F, R, In, Out, Err> ServiceFactory for ApplyServiceFactory<T, F, R, In, Out, Err>
+impl<SF, F, Fut, Req, In, Res, Err> ServiceFactory<Req>
+    for ApplyFactory<SF, F, Req, In, Res, Err>
 where
-    T: ServiceFactory<Error = Err>,
-    F: FnMut(In, &mut T::Service) -> R + Clone,
-    R: Future<Output = Result<Out, Err>>,
+    SF: ServiceFactory<In, Error = Err>,
+    F: FnMut(Req, &mut SF::Service) -> Fut + Clone,
+    Fut: Future<Output = Result<Res, Err>>,
 {
-    type Request = In;
-    type Response = Out;
+    type Response = Res;
     type Error = Err;
 
-    type Config = T::Config;
-    type Service = Apply<T::Service, F, R, In, Out, Err>;
-    type InitError = T::InitError;
-    type Future = ApplyServiceFactoryResponse<T, F, R, In, Out, Err>;
+    type Config = SF::Config;
+    type Service = Apply<SF::Service, F, Req, In, Res, Err>;
+    type InitError = SF::InitError;
+    type Future = ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>;
 
-    fn new_service(&self, cfg: T::Config) -> Self::Future {
-        ApplyServiceFactoryResponse::new(self.service.new_service(cfg), self.f.clone())
+    fn new_service(&self, cfg: SF::Config) -> Self::Future {
+        let svc = self.factory.new_service(cfg);
+        ApplyServiceFactoryResponse::new(svc, self.wrap_fn.clone())
     }
 }
 
 #[pin_project::pin_project]
-pub struct ApplyServiceFactoryResponse<T, F, R, In, Out, Err>
+pub struct ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
 where
-    T: ServiceFactory<Error = Err>,
-    F: FnMut(In, &mut T::Service) -> R,
-    R: Future<Output = Result<Out, Err>>,
+    SF: ServiceFactory<In, Error = Err>,
+    F: FnMut(Req, &mut SF::Service) -> Fut,
+    Fut: Future<Output = Result<Res, Err>>,
 {
     #[pin]
-    fut: T::Future,
-    f: Option<F>,
-    r: PhantomData<(In, Out)>,
+    fut: SF::Future,
+    wrap_fn: Option<F>,
+    _phantom: PhantomData<(Req, Res)>,
 }
 
-impl<T, F, R, In, Out, Err> ApplyServiceFactoryResponse<T, F, R, In, Out, Err>
+impl<SF, F, Fut, Req, In, Res, Err> ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
 where
-    T: ServiceFactory<Error = Err>,
-    F: FnMut(In, &mut T::Service) -> R,
-    R: Future<Output = Result<Out, Err>>,
+    SF: ServiceFactory<In, Error = Err>,
+    F: FnMut(Req, &mut SF::Service) -> Fut,
+    Fut: Future<Output = Result<Res, Err>>,
 {
-    fn new(fut: T::Future, f: F) -> Self {
+    fn new(fut: SF::Future, wrap_fn: F) -> Self {
         Self {
-            f: Some(f),
             fut,
-            r: PhantomData,
+            wrap_fn: Some(wrap_fn),
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<T, F, R, In, Out, Err> Future for ApplyServiceFactoryResponse<T, F, R, In, Out, Err>
+impl<SF, F, Fut, Req, In, Res, Err> Future
+    for ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
 where
-    T: ServiceFactory<Error = Err>,
-    F: FnMut(In, &mut T::Service) -> R,
-    R: Future<Output = Result<Out, Err>>,
+    SF: ServiceFactory<In, Error = Err>,
+    F: FnMut(Req, &mut SF::Service) -> Fut,
+    Fut: Future<Output = Result<Res, Err>>,
 {
-    type Output = Result<Apply<T::Service, F, R, In, Out, Err>, T::InitError>;
+    type Output = Result<Apply<SF::Service, F, Req, In, Res, Err>, SF::InitError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
 
-        if let Poll::Ready(svc) = this.fut.poll(cx)? {
-            Poll::Ready(Ok(Apply::new(svc, this.f.take().unwrap())))
-        } else {
-            Poll::Pending
-        }
+        let svc = ready!(this.fut.poll(cx))?;
+        Poll::Ready(Ok(Apply::new(svc, Option::take(this.wrap_fn).unwrap())))
     }
 }
 
@@ -213,8 +219,7 @@ mod tests {
     #[derive(Clone)]
     struct Srv;
 
-    impl Service for Srv {
-        type Request = ();
+    impl Service<()> for Srv {
         type Response = ();
         type Error = ();
         type Future = Ready<Result<(), ()>>;

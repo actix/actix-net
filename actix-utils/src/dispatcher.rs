@@ -1,4 +1,4 @@
-//! Framed dispatcher service and related utilities
+//! Framed dispatcher service and related utilities.
 
 #![allow(type_alias_bounds)]
 
@@ -11,6 +11,7 @@ use actix_codec::{AsyncRead, AsyncWrite, Decoder, Encoder, Framed};
 use actix_service::{IntoService, Service};
 use futures_core::stream::Stream;
 use log::debug;
+use pin_project_lite::pin_project;
 
 use crate::mpsc;
 
@@ -62,12 +63,12 @@ pub enum Message<T> {
     Close,
 }
 
-pin_project_lite::pin_project! {
+pin_project! {
     /// Dispatcher is a future that reads frames from Framed object
     /// and passes them to the service.
     pub struct Dispatcher<S, T, U, I>
     where
-        S: Service<Request = <U as Decoder>::Item, Response = I>,
+        S: Service<<U as Decoder>::Item, Response = I>,
         S::Error: 'static,
         S::Future: 'static,
         T: AsyncRead,
@@ -86,7 +87,11 @@ pin_project_lite::pin_project! {
     }
 }
 
-enum State<S: Service, U: Encoder<I> + Decoder, I> {
+enum State<S, U, I>
+where
+    S: Service<<U as Decoder>::Item>,
+    U: Encoder<I> + Decoder,
+{
     Processing,
     Error(DispatcherError<S::Error, U, I>),
     FramedError(DispatcherError<S::Error, U, I>),
@@ -94,7 +99,11 @@ enum State<S: Service, U: Encoder<I> + Decoder, I> {
     Stopping,
 }
 
-impl<S: Service, U: Encoder<I> + Decoder, I> State<S, U, I> {
+impl<S, U, I> State<S, U, I>
+where
+    S: Service<<U as Decoder>::Item>,
+    U: Encoder<I> + Decoder,
+{
     fn take_error(&mut self) -> DispatcherError<S::Error, U, I> {
         match mem::replace(self, State::Processing) {
             State::Error(err) => err,
@@ -112,7 +121,7 @@ impl<S: Service, U: Encoder<I> + Decoder, I> State<S, U, I> {
 
 impl<S, T, U, I> Dispatcher<S, T, U, I>
 where
-    S: Service<Request = <U as Decoder>::Item, Response = I>,
+    S: Service<<U as Decoder>::Item, Response = I>,
     S::Error: 'static,
     S::Future: 'static,
     T: AsyncRead + AsyncWrite,
@@ -121,7 +130,10 @@ where
     <U as Decoder>::Error: fmt::Debug,
     <U as Encoder<I>>::Error: fmt::Debug,
 {
-    pub fn new<F: IntoService<S>>(framed: Framed<T, U>, service: F) -> Self {
+    pub fn new<F>(framed: Framed<T, U>, service: F) -> Self
+    where
+        F: IntoService<S, <U as Decoder>::Item>,
+    {
         let (tx, rx) = mpsc::channel();
         Dispatcher {
             framed,
@@ -133,11 +145,14 @@ where
     }
 
     /// Construct new `Dispatcher` instance with customer `mpsc::Receiver`
-    pub fn with_rx<F: IntoService<S>>(
+    pub fn with_rx<F>(
         framed: Framed<T, U>,
         service: F,
         rx: mpsc::Receiver<Result<Message<I>, S::Error>>,
-    ) -> Self {
+    ) -> Self
+    where
+        F: IntoService<S, <U as Decoder>::Item>,
+    {
         let tx = rx.sender();
         Dispatcher {
             framed,
@@ -176,7 +191,7 @@ where
 
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> bool
     where
-        S: Service<Request = <U as Decoder>::Item, Response = I>,
+        S: Service<<U as Decoder>::Item, Response = I>,
         S::Error: 'static,
         S::Future: 'static,
         T: AsyncRead + AsyncWrite,
@@ -220,7 +235,7 @@ where
     /// write to framed object
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> bool
     where
-        S: Service<Request = <U as Decoder>::Item, Response = I>,
+        S: Service<<U as Decoder>::Item, Response = I>,
         S::Error: 'static,
         S::Future: 'static,
         T: AsyncRead + AsyncWrite,
@@ -271,7 +286,7 @@ where
 
 impl<S, T, U, I> Future for Dispatcher<S, T, U, I>
 where
-    S: Service<Request = <U as Decoder>::Item, Response = I>,
+    S: Service<<U as Decoder>::Item, Response = I>,
     S::Error: 'static,
     S::Future: 'static,
     T: AsyncRead + AsyncWrite,

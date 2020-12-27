@@ -70,8 +70,7 @@ impl<T> Clone for ConnectServiceFactory<T> {
     }
 }
 
-impl<T: Address> ServiceFactory for ConnectServiceFactory<T> {
-    type Request = Connect<T>;
+impl<T: Address> ServiceFactory<Connect<T>> for ConnectServiceFactory<T> {
     type Response = Connection<T, TcpStream>;
     type Error = ConnectError;
     type Config = ();
@@ -90,8 +89,7 @@ pub struct ConnectService<T> {
     resolver: Resolver<T>,
 }
 
-impl<T: Address> Service for ConnectService<T> {
-    type Request = Connect<T>;
+impl<T: Address> Service<Connect<T>> for ConnectService<T> {
     type Response = Connection<T, TcpStream>;
     type Error = ConnectError;
     type Future = ConnectServiceResponse<T>;
@@ -109,8 +107,8 @@ impl<T: Address> Service for ConnectService<T> {
 }
 
 enum ConnectState<T: Address> {
-    Resolve(<Resolver<T> as Service>::Future),
-    Connect(<TcpConnector<T> as Service>::Future),
+    Resolve(<Resolver<T> as Service<Connect<T>>>::Future),
+    Connect(<TcpConnector<T> as Service<Connect<T>>>::Future),
 }
 
 impl<T: Address> ConnectState<T> {
@@ -160,8 +158,7 @@ pub struct TcpConnectService<T> {
     resolver: Resolver<T>,
 }
 
-impl<T: Address + 'static> Service for TcpConnectService<T> {
-    type Request = Connect<T>;
+impl<T: Address + 'static> Service<Connect<T>> for TcpConnectService<T> {
     type Response = TcpStream;
     type Error = ConnectError;
     type Future = TcpConnectServiceResponse<T>;
@@ -179,8 +176,8 @@ impl<T: Address + 'static> Service for TcpConnectService<T> {
 }
 
 enum TcpConnectState<T: Address> {
-    Resolve(<Resolver<T> as Service>::Future),
-    Connect(<TcpConnector<T> as Service>::Future),
+    Resolve(<Resolver<T> as Service<Connect<T>>>::Future),
+    Connect(<TcpConnector<T> as Service<Connect<T>>>::Future),
 }
 
 impl<T: Address> TcpConnectState<T> {

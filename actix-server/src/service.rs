@@ -2,7 +2,8 @@ use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
 
-use actix_service::{self as actix, Service, ServiceFactory as ActixServiceFactory};
+use actix_rt::spawn;
+use actix_service::{Service, ServiceFactory as BaseServiceFactory};
 use actix_utils::counter::CounterGuard;
 use futures_util::future::{ready, Ready};
 use log::error;
@@ -12,7 +13,7 @@ use crate::LocalBoxFuture;
 use crate::Token;
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
-    type Factory: actix::ServiceFactory<Config = (), Request = Stream>;
+    type Factory: BaseServiceFactory<Stream, Config = ()>;
 
     fn create(&self) -> Self::Factory;
 }
@@ -27,31 +28,34 @@ pub(crate) trait InternalServiceFactory: Send {
 
 pub(crate) type BoxedServerService = Box<
     dyn Service<
-        Request = (Option<CounterGuard>, MioStream),
+        (Option<CounterGuard>, MioStream),
         Response = (),
         Error = (),
         Future = Ready<Result<(), ()>>,
     >,
 >;
 
-pub(crate) struct StreamService<T> {
-    service: T,
+pub(crate) struct StreamService<S, I> {
+    service: S,
+    _phantom: PhantomData<I>,
 }
 
-impl<T> StreamService<T> {
-    pub(crate) fn new(service: T) -> Self {
-        StreamService { service }
+impl<S, I> StreamService<S, I> {
+    pub(crate) fn new(service: S) -> Self {
+        StreamService {
+            service,
+            _phantom: PhantomData,
+        }
     }
 }
 
-impl<T, I> Service for StreamService<T>
+impl<S, I> Service<(Option<CounterGuard>, MioStream)> for StreamService<S, I>
 where
-    T: Service<Request = I>,
-    T::Future: 'static,
-    T::Error: 'static,
+    S: Service<I>,
+    S::Future: 'static,
+    S::Error: 'static,
     I: FromStream,
 {
-    type Request = (Option<CounterGuard>, MioStream);
     type Response = ();
     type Error = ();
     type Future = Ready<Result<(), ()>>;
@@ -144,7 +148,7 @@ where
 impl<F, T, I> ServiceFactory<I> for F
 where
     F: Fn() -> T + Send + Clone + 'static,
-    T: actix::ServiceFactory<Config = (), Request = I>,
+    T: BaseServiceFactory<I, Config = ()>,
     I: FromStream,
 {
     type Factory = T;

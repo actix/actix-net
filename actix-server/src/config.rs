@@ -3,7 +3,10 @@ use std::future::Future;
 use std::{fmt, io};
 
 use actix_rt::net::TcpStream;
-use actix_service as actix;
+use actix_service::{
+    fn_service, IntoServiceFactory as IntoBaseServiceFactory,
+    ServiceFactory as BaseServiceFactory,
+};
 use actix_utils::counter::CounterGuard;
 use futures_util::future::ready;
 use log::error;
@@ -147,12 +150,10 @@ impl InternalServiceFactory for ConfiguredService {
                     let name = names.remove(&token).unwrap().0;
                     res.push((
                         token,
-                        Box::new(StreamService::new(actix::fn_service(
-                            move |_: TcpStream| {
-                                error!("Service {:?} is not configured", name);
-                                ready::<Result<_, ()>>(Ok(()))
-                            },
-                        ))),
+                        Box::new(StreamService::new(fn_service(move |_: TcpStream| {
+                            error!("Service {:?} is not configured", name);
+                            ready::<Result<_, ()>>(Ok(()))
+                        }))),
                     ));
                 };
             }
@@ -213,8 +214,8 @@ impl ServiceRuntime {
     /// *ServiceConfig::bind()* or *ServiceConfig::listen()* methods.
     pub fn service<T, F>(&mut self, name: &str, service: F)
     where
-        F: actix::IntoServiceFactory<T>,
-        T: actix::ServiceFactory<Config = (), Request = TcpStream> + 'static,
+        F: IntoBaseServiceFactory<T, TcpStream>,
+        T: BaseServiceFactory<TcpStream, Config = ()> + 'static,
         T::Future: 'static,
         T::Service: 'static,
         T::InitError: fmt::Debug,
@@ -242,8 +243,8 @@ impl ServiceRuntime {
 }
 
 type BoxedNewService = Box<
-    dyn actix::ServiceFactory<
-        Request = (Option<CounterGuard>, MioStream),
+    dyn BaseServiceFactory<
+        (Option<CounterGuard>, MioStream),
         Response = (),
         Error = (),
         InitError = (),
@@ -257,15 +258,14 @@ struct ServiceFactory<T> {
     inner: T,
 }
 
-impl<T> actix::ServiceFactory for ServiceFactory<T>
+impl<T> BaseServiceFactory<(Option<CounterGuard>, MioStream)> for ServiceFactory<T>
 where
-    T: actix::ServiceFactory<Config = (), Request = TcpStream>,
+    T: BaseServiceFactory<TcpStream, Config = ()>,
     T::Future: 'static,
     T::Service: 'static,
     T::Error: 'static,
     T::InitError: fmt::Debug + 'static,
 {
-    type Request = (Option<CounterGuard>, MioStream);
     type Response = ();
     type Error = ();
     type Config = ();

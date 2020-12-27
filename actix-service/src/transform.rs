@@ -1,18 +1,18 @@
-use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::{future::Future, marker::PhantomData};
 
 use crate::transform_err::TransformMapInitErr;
 use crate::{IntoServiceFactory, Service, ServiceFactory};
 
 /// Apply transform to a service.
-pub fn apply<T, S, U>(t: T, factory: U) -> ApplyTransform<T, S>
+pub fn apply<T, S, I, Req>(t: T, factory: I) -> ApplyTransform<T, S, Req>
 where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
-    U: IntoServiceFactory<S>,
+    I: IntoServiceFactory<S, Req>,
+    S: ServiceFactory<Req>,
+    T: Transform<S::Service, Req, InitError = S::InitError>,
 {
     ApplyTransform::new(t, factory.into_factory())
 }
@@ -89,10 +89,7 @@ where
 ///     }
 /// }
 /// ```
-pub trait Transform<S> {
-    /// Requests handled by the service.
-    type Request;
-
+pub trait Transform<S, Req> {
     /// Responses given by the service.
     type Response;
 
@@ -100,11 +97,7 @@ pub trait Transform<S> {
     type Error;
 
     /// The `TransformService` value created by this factory
-    type Transform: Service<
-        Request = Self::Request,
-        Response = Self::Response,
-        Error = Self::Error,
-    >;
+    type Transform: Service<Req, Response = Self::Response, Error = Self::Error>;
 
     /// Errors produced while building a transform service.
     type InitError;
@@ -117,7 +110,7 @@ pub trait Transform<S> {
 
     /// Map this transform's factory error to a different error,
     /// returning a new transform service factory.
-    fn map_init_err<F, E>(self, f: F) -> TransformMapInitErr<Self, S, F, E>
+    fn map_init_err<F, E>(self, f: F) -> TransformMapInitErr<Self, S, Req, F, E>
     where
         Self: Sized,
         F: Fn(Self::InitError) -> E + Clone,
@@ -126,11 +119,10 @@ pub trait Transform<S> {
     }
 }
 
-impl<T, S> Transform<S> for Rc<T>
+impl<T, S, Req> Transform<S, Req> for Rc<T>
 where
-    T: Transform<S>,
+    T: Transform<S, Req>,
 {
-    type Request = T::Request;
     type Response = T::Response;
     type Error = T::Error;
     type InitError = T::InitError;
@@ -142,11 +134,10 @@ where
     }
 }
 
-impl<T, S> Transform<S> for Arc<T>
+impl<T, S, Req> Transform<S, Req> for Arc<T>
 where
-    T: Transform<S>,
+    T: Transform<S, Req>,
 {
-    type Request = T::Request;
     type Response = T::Response;
     type Error = T::Error;
     type InitError = T::InitError;
@@ -159,38 +150,37 @@ where
 }
 
 /// `Apply` transform to new service
-pub struct ApplyTransform<T, S>(Rc<(T, S)>);
+pub struct ApplyTransform<T, S, Req>(Rc<(T, S)>, PhantomData<Req>);
 
-impl<T, S> ApplyTransform<T, S>
+impl<T, S, Req> ApplyTransform<T, S, Req>
 where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
+    S: ServiceFactory<Req>,
+    T: Transform<S::Service, Req, InitError = S::InitError>,
 {
     /// Create new `ApplyTransform` new service instance
     fn new(t: T, service: S) -> Self {
-        Self(Rc::new((t, service)))
+        Self(Rc::new((t, service)), PhantomData)
     }
 }
 
-impl<T, S> Clone for ApplyTransform<T, S> {
+impl<T, S, Req> Clone for ApplyTransform<T, S, Req> {
     fn clone(&self) -> Self {
-        ApplyTransform(self.0.clone())
+        ApplyTransform(self.0.clone(), PhantomData)
     }
 }
 
-impl<T, S> ServiceFactory for ApplyTransform<T, S>
+impl<T, S, Req> ServiceFactory<Req> for ApplyTransform<T, S, Req>
 where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
+    S: ServiceFactory<Req>,
+    T: Transform<S::Service, Req, InitError = S::InitError>,
 {
-    type Request = T::Request;
     type Response = T::Response;
     type Error = T::Error;
 
     type Config = S::Config;
     type Service = T::Transform;
     type InitError = T::InitError;
-    type Future = ApplyTransformFuture<T, S>;
+    type Future = ApplyTransformFuture<T, S, Req>;
 
     fn new_service(&self, cfg: S::Config) -> Self::Future {
         ApplyTransformFuture {
@@ -201,30 +191,30 @@ where
 }
 
 #[pin_project::pin_project]
-pub struct ApplyTransformFuture<T, S>
+pub struct ApplyTransformFuture<T, S, Req>
 where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
+    S: ServiceFactory<Req>,
+    T: Transform<S::Service, Req, InitError = S::InitError>,
 {
     store: Rc<(T, S)>,
     #[pin]
-    state: ApplyTransformFutureState<T, S>,
+    state: ApplyTransformFutureState<T, S, Req>,
 }
 
 #[pin_project::pin_project(project = ApplyTransformFutureStateProj)]
-pub enum ApplyTransformFutureState<T, S>
+pub enum ApplyTransformFutureState<T, S, Req>
 where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
+    S: ServiceFactory<Req>,
+    T: Transform<S::Service, Req, InitError = S::InitError>,
 {
     A(#[pin] S::Future),
     B(#[pin] T::Future),
 }
 
-impl<T, S> Future for ApplyTransformFuture<T, S>
+impl<T, S, Req> Future for ApplyTransformFuture<T, S, Req>
 where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
+    S: ServiceFactory<Req>,
+    T: Transform<S::Service, Req, InitError = S::InitError>,
 {
     type Output = Result<T::Transform, T::InitError>;
 

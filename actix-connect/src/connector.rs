@@ -40,8 +40,7 @@ impl<T> Clone for TcpConnectorFactory<T> {
     }
 }
 
-impl<T: Address> ServiceFactory for TcpConnectorFactory<T> {
-    type Request = Connect<T>;
+impl<T: Address> ServiceFactory<Connect<T>> for TcpConnectorFactory<T> {
     type Response = Connection<T, TcpStream>;
     type Error = ConnectError;
     type Config = ();
@@ -70,8 +69,7 @@ impl<T> Clone for TcpConnector<T> {
     }
 }
 
-impl<T: Address> Service for TcpConnector<T> {
-    type Request = Connect<T>;
+impl<T: Address> Service<Connect<T>> for TcpConnector<T> {
     type Response = Connection<T, TcpStream>;
     type Error = ConnectError;
     type Future = TcpConnectorResponse<T>;

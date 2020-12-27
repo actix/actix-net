@@ -6,121 +6,123 @@ use super::{IntoServiceFactory, ServiceFactory};
 ///
 /// Note that this function consumes the receiving service factory and returns
 /// a wrapped version of it.
-pub fn map_config<T, U, F, C>(factory: U, f: F) -> MapConfig<T, F, C>
+pub fn map_config<I, SF, S, Req, F, Cfg>(factory: I, f: F) -> MapConfig<SF, Req, F, Cfg>
 where
-    T: ServiceFactory,
-    U: IntoServiceFactory<T>,
-    F: Fn(C) -> T::Config,
+    I: IntoServiceFactory<SF, Req>,
+    SF: ServiceFactory<Req>,
+    F: Fn(Cfg) -> SF::Config,
 {
     MapConfig::new(factory.into_factory(), f)
 }
 
-/// Replace config with unit
-pub fn unit_config<T, U, C>(factory: U) -> UnitConfig<T, C>
+/// Replace config with unit.
+pub fn unit_config<I, SF, Cfg, Req>(factory: I) -> UnitConfig<SF, Cfg, Req>
 where
-    T: ServiceFactory<Config = ()>,
-    U: IntoServiceFactory<T>,
+    I: IntoServiceFactory<SF, Req>,
+    SF: ServiceFactory<Req, Config = ()>,
 {
     UnitConfig::new(factory.into_factory())
 }
 
 /// `map_config()` adapter service factory
-pub struct MapConfig<A, F, C> {
-    a: A,
-    f: F,
-    e: PhantomData<C>,
+pub struct MapConfig<SF, Req, F, Cfg> {
+    factory: SF,
+    cfg_mapper: F,
+    e: PhantomData<(Cfg, Req)>,
 }
 
-impl<A, F, C> MapConfig<A, F, C> {
+impl<SF, Req, F, Cfg> MapConfig<SF, Req, F, Cfg> {
     /// Create new `MapConfig` combinator
-    pub(crate) fn new(a: A, f: F) -> Self
+    pub(crate) fn new(factory: SF, cfg_mapper: F) -> Self
     where
-        A: ServiceFactory,
-        F: Fn(C) -> A::Config,
+        SF: ServiceFactory<Req>,
+        F: Fn(Cfg) -> SF::Config,
     {
         Self {
-            a,
-            f,
+            factory,
+            cfg_mapper,
             e: PhantomData,
         }
     }
 }
 
-impl<A, F, C> Clone for MapConfig<A, F, C>
+impl<SF, Req, F, Cfg> Clone for MapConfig<SF, Req, F, Cfg>
 where
-    A: Clone,
+    SF: Clone,
     F: Clone,
 {
     fn clone(&self) -> Self {
         Self {
-            a: self.a.clone(),
-            f: self.f.clone(),
+            factory: self.factory.clone(),
+            cfg_mapper: self.cfg_mapper.clone(),
             e: PhantomData,
         }
     }
 }
 
-impl<A, F, C> ServiceFactory for MapConfig<A, F, C>
+impl<SF, Req, F, Cfg> ServiceFactory<Req> for MapConfig<SF, Req, F, Cfg>
 where
-    A: ServiceFactory,
-    F: Fn(C) -> A::Config,
+    SF: ServiceFactory<Req>,
+    F: Fn(Cfg) -> SF::Config,
 {
-    type Request = A::Request;
-    type Response = A::Response;
-    type Error = A::Error;
+    type Response = SF::Response;
+    type Error = SF::Error;
 
-    type Config = C;
-    type Service = A::Service;
-    type InitError = A::InitError;
-    type Future = A::Future;
+    type Config = Cfg;
+    type Service = SF::Service;
+    type InitError = SF::InitError;
+    type Future = SF::Future;
 
-    fn new_service(&self, cfg: C) -> Self::Future {
-        self.a.new_service((self.f)(cfg))
+    fn new_service(&self, cfg: Self::Config) -> Self::Future {
+        let mapped_cfg = (self.cfg_mapper)(cfg);
+        self.factory.new_service(mapped_cfg)
     }
 }
 
 /// `unit_config()` config combinator
-pub struct UnitConfig<A, C> {
-    a: A,
-    e: PhantomData<C>,
+pub struct UnitConfig<SF, Cfg, Req> {
+    factory: SF,
+    _phantom: PhantomData<(Cfg, Req)>,
 }
 
-impl<A, C> UnitConfig<A, C>
+impl<SF, Cfg, Req> UnitConfig<SF, Cfg, Req>
 where
-    A: ServiceFactory<Config = ()>,
+    SF: ServiceFactory<Req, Config = ()>,
 {
     /// Create new `UnitConfig` combinator
-    pub(crate) fn new(a: A) -> Self {
-        Self { a, e: PhantomData }
-    }
-}
-
-impl<A, C> Clone for UnitConfig<A, C>
-where
-    A: Clone,
-{
-    fn clone(&self) -> Self {
+    pub(crate) fn new(factory: SF) -> Self {
         Self {
-            a: self.a.clone(),
-            e: PhantomData,
+            factory,
+            _phantom: PhantomData,
         }
     }
 }
 
-impl<A, C> ServiceFactory for UnitConfig<A, C>
+impl<SF, Cfg, Req> Clone for UnitConfig<SF, Cfg, Req>
 where
-    A: ServiceFactory<Config = ()>,
+    SF: Clone,
 {
-    type Request = A::Request;
-    type Response = A::Response;
-    type Error = A::Error;
+    fn clone(&self) -> Self {
+        Self {
+            factory: self.factory.clone(),
+            _phantom: PhantomData,
+        }
+    }
+}
 
-    type Config = C;
-    type Service = A::Service;
-    type InitError = A::InitError;
-    type Future = A::Future;
+impl<SF, Cfg, Req> ServiceFactory<Req> for UnitConfig<SF, Cfg, Req>
+where
+    SF: ServiceFactory<Req, Config = ()>,
+{
+    type Response = SF::Response;
+    type Error = SF::Error;
 
-    fn new_service(&self, _: C) -> Self::Future {
-        self.a.new_service(())
+    type Config = Cfg;
+    type Service = SF::Service;
+    type InitError = SF::InitError;
+    type Future = SF::Future;
+
+    fn new_service(&self, _: Cfg) -> Self::Future {
+        self.factory.new_service(())
     }
 }

@@ -54,8 +54,7 @@ impl<T> Clone for ResolverFactory<T> {
     }
 }
 
-impl<T: Address> ServiceFactory for ResolverFactory<T> {
-    type Request = Connect<T>;
+impl<T: Address> ServiceFactory<Connect<T>> for ResolverFactory<T> {
     type Response = Connect<T>;
     type Error = ConnectError;
     type Config = ();
@@ -102,8 +101,7 @@ impl<T> Clone for Resolver<T> {
     }
 }
 
-impl<T: Address> Service for Resolver<T> {
-    type Request = Connect<T>;
+impl<T: Address> Service<Connect<T>> for Resolver<T> {
     type Response = Connect<T>;
     type Error = ConnectError;
     type Future = ResolverServiceFuture<T>;
