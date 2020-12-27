@@ -165,21 +165,21 @@ where
 pin_project! {
     /// `TimeoutService` response future
     #[derive(Debug)]
-    pub struct TimeoutServiceResponse<T, Req>
+    pub struct TimeoutServiceResponse<S, Req>
     where
-        T: Service<Req>
+        S: Service<Req>
     {
         #[pin]
-        fut: T::Future,
+        fut: S::Future,
         sleep: Delay,
     }
 }
 
-impl<T, Req> Future for TimeoutServiceResponse<T, Req>
+impl<S, Req> Future for TimeoutServiceResponse<S, Req>
 where
-    T: Service<Req>,
+    S: Service<Req>,
 {
-    type Output = Result<T::Response, TimeoutError<T::Error>>;
+    type Output = Result<S::Response, TimeoutError<S::Error>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();

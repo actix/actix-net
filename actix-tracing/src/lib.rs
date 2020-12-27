@@ -103,14 +103,14 @@ where
 ///     |req: &Request| Some(span!(Level::INFO, "request", req.id))
 /// );
 /// ```
-pub fn trace<S, Req, U, F>(
-    service_factory: U,
+pub fn trace<S, Req, I, F>(
+    service_factory: I,
     make_span: F,
 ) -> ApplyTransform<TracingTransform<S::Service, S, F>, S, Req>
 where
+    I: IntoServiceFactory<S, Req>,
     S: ServiceFactory<Req>,
     F: Fn(&Req) -> Option<tracing::Span> + Clone,
-    U: IntoServiceFactory<S, Req>,
 {
     apply(
         TracingTransform::new(make_span),

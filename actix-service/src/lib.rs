@@ -338,10 +338,10 @@ where
     }
 }
 
-/// Convert object of type `T` to a service `S`
-pub fn into_service<U, S, Req>(tp: U) -> S
+/// Convert object of type `U` to a service `S`
+pub fn into_service<I, S, Req>(tp: I) -> S
 where
-    U: IntoService<S, Req>,
+    I: IntoService<S, Req>,
     S: Service<Req>,
 {
     tp.into_service()

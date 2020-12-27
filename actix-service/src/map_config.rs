@@ -6,9 +6,9 @@ use super::{IntoServiceFactory, ServiceFactory};
 ///
 /// Note that this function consumes the receiving service factory and returns
 /// a wrapped version of it.
-pub fn map_config<U, SF, S, Req, F, Cfg>(factory: U, f: F) -> MapConfig<SF, Req, F, Cfg>
+pub fn map_config<I, SF, S, Req, F, Cfg>(factory: I, f: F) -> MapConfig<SF, Req, F, Cfg>
 where
-    U: IntoServiceFactory<SF, Req>,
+    I: IntoServiceFactory<SF, Req>,
     SF: ServiceFactory<Req>,
     F: Fn(Cfg) -> SF::Config,
 {
@@ -16,9 +16,9 @@ where
 }
 
 /// Replace config with unit.
-pub fn unit_config<U, SF, Cfg, Req>(factory: U) -> UnitConfig<SF, Cfg, Req>
+pub fn unit_config<I, SF, Cfg, Req>(factory: I) -> UnitConfig<SF, Cfg, Req>
 where
-    U: IntoServiceFactory<SF, Req>,
+    I: IntoServiceFactory<SF, Req>,
     SF: ServiceFactory<Req, Config = ()>,
 {
     UnitConfig::new(factory.into_factory())

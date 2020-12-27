@@ -10,9 +10,9 @@ use crate::then::{ThenService, ThenServiceFactory};
 use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
 /// Construct new pipeline with one service in pipeline chain.
-pub fn pipeline<U, S, Req>(service: U) -> Pipeline<S, Req>
+pub fn pipeline<I, S, Req>(service: I) -> Pipeline<S, Req>
 where
-    U: IntoService<S, Req>,
+    I: IntoService<S, Req>,
     S: Service<Req>,
 {
     Pipeline {
@@ -22,9 +22,9 @@ where
 }
 
 /// Construct new pipeline factory with one service factory.
-pub fn pipeline_factory<U, SF, Req>(factory: U) -> PipelineFactory<SF, Req>
+pub fn pipeline_factory<I, SF, Req>(factory: I) -> PipelineFactory<SF, Req>
 where
-    U: IntoServiceFactory<SF, Req>,
+    I: IntoServiceFactory<SF, Req>,
     SF: ServiceFactory<Req>,
 {
     PipelineFactory {
@@ -52,14 +52,14 @@ where
     ///
     /// Note that this function consumes the receiving service and returns a
     /// wrapped version of it.
-    pub fn and_then<F, U>(
+    pub fn and_then<I, S1>(
         self,
-        service: F,
-    ) -> Pipeline<impl Service<Req, Response = U::Response, Error = S::Error> + Clone, Req>
+        service: I,
+    ) -> Pipeline<impl Service<Req, Response = S1::Response, Error = S::Error> + Clone, Req>
     where
         Self: Sized,
-        F: IntoService<U, S::Response>,
-        U: Service<S::Response, Error = S::Error>,
+        I: IntoService<S1, S::Response>,
+        S1: Service<S::Response, Error = S::Error>,
     {
         Pipeline {
             service: AndThenService::new(self.service, service.into_service()),
@@ -70,14 +70,14 @@ where
     /// Apply function to specified service and use it as a next service in chain.
     ///
     /// Short version of `pipeline_factory(...).and_then(apply_fn(...))`
-    pub fn and_then_apply_fn<U, S1, F, Fut, In, Res, Err>(
+    pub fn and_then_apply_fn<I, S1, F, Fut, In, Res, Err>(
         self,
-        service: U,
+        service: I,
         wrap_fn: F,
     ) -> Pipeline<impl Service<Req, Response = Res, Error = Err> + Clone, Req>
     where
         Self: Sized,
-        U: IntoService<S1, In>,
+        I: IntoService<S1, In>,
         S1: Service<In>,
         F: FnMut(S::Response, &mut S1) -> Fut,
         Fut: Future<Output = Result<Res, Err>>,
@@ -94,14 +94,14 @@ where
     ///
     /// Note that this function consumes the receiving pipeline and returns a
     /// wrapped version of it.
-    pub fn then<F, U>(
+    pub fn then<F, S1>(
         self,
         service: F,
-    ) -> Pipeline<impl Service<Req, Response = U::Response, Error = S::Error> + Clone, Req>
+    ) -> Pipeline<impl Service<Req, Response = S1::Response, Error = S::Error> + Clone, Req>
     where
         Self: Sized,
-        F: IntoService<U, Result<S::Response, S::Error>>,
-        U: Service<Result<S::Response, S::Error>, Error = S::Error>,
+        F: IntoService<S1, Result<S::Response, S::Error>>,
+        S1: Service<Result<S::Response, S::Error>, Error = S::Error>,
     {
         Pipeline {
             service: ThenService::new(self.service, service.into_service()),
@@ -161,13 +161,13 @@ where
     }
 }
 
-impl<T: Service<Req>, Req> Service<Req> for Pipeline<T, Req> {
-    type Response = T::Response;
-    type Error = T::Error;
-    type Future = T::Future;
+impl<S: Service<Req>, Req> Service<Req> for Pipeline<S, Req> {
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
 
     #[inline]
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), T::Error>> {
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
         self.service.poll_ready(ctx)
     }
 
@@ -188,25 +188,25 @@ where
     SF: ServiceFactory<Req>,
 {
     /// Call another service after call to this one has resolved successfully.
-    pub fn and_then<F, U>(
+    pub fn and_then<I, SF1>(
         self,
-        factory: F,
+        factory: I,
     ) -> PipelineFactory<
         impl ServiceFactory<
                 Req,
-                Response = U::Response,
+                Response = SF1::Response,
                 Error = SF::Error,
                 Config = SF::Config,
                 InitError = SF::InitError,
-                Service = impl Service<Req, Response = U::Response, Error = SF::Error> + Clone,
+                Service = impl Service<Req, Response = SF1::Response, Error = SF::Error> + Clone,
             > + Clone,
         Req,
     >
     where
         Self: Sized,
         SF::Config: Clone,
-        F: IntoServiceFactory<U, SF::Response>,
-        U: ServiceFactory<
+        I: IntoServiceFactory<SF1, SF::Response>,
+        SF1: ServiceFactory<
             SF::Response,
             Config = SF::Config,
             Error = SF::Error,
@@ -222,9 +222,9 @@ where
     /// Apply function to specified service and use it as a next service in chain.
     ///
     /// Short version of `pipeline_factory(...).and_then(apply_fn_factory(...))`
-    pub fn and_then_apply_fn<U, SF1, Fut, F, In, Res, Err>(
+    pub fn and_then_apply_fn<I, SF1, Fut, F, In, Res, Err>(
         self,
-        factory: U,
+        factory: I,
         wrap_fn: F,
     ) -> PipelineFactory<
         impl ServiceFactory<
@@ -240,7 +240,7 @@ where
     where
         Self: Sized,
         SF::Config: Clone,
-        U: IntoServiceFactory<SF1, In>,
+        I: IntoServiceFactory<SF1, In>,
         SF1: ServiceFactory<In, Config = SF::Config, InitError = SF::InitError>,
         F: FnMut(SF::Response, &mut SF1::Service) -> Fut + Clone,
         Fut: Future<Output = Result<Res, Err>>,
@@ -258,25 +258,25 @@ where
     ///
     /// Note that this function consumes the receiving pipeline and returns a
     /// wrapped version of it.
-    pub fn then<F, U>(
+    pub fn then<I, SF1>(
         self,
-        factory: F,
+        factory: I,
     ) -> PipelineFactory<
         impl ServiceFactory<
                 Req,
-                Response = U::Response,
+                Response = SF1::Response,
                 Error = SF::Error,
                 Config = SF::Config,
                 InitError = SF::InitError,
-                Service = impl Service<Req, Response = U::Response, Error = SF::Error> + Clone,
+                Service = impl Service<Req, Response = SF1::Response, Error = SF::Error> + Clone,
             > + Clone,
         Req,
     >
     where
         Self: Sized,
         SF::Config: Clone,
-        F: IntoServiceFactory<U, Result<SF::Response, SF::Error>>,
-        U: ServiceFactory<
+        I: IntoServiceFactory<SF1, Result<SF::Response, SF::Error>>,
+        SF1: ServiceFactory<
             Result<SF::Response, SF::Error>,
             Config = SF::Config,
             Error = SF::Error,
@@ -342,16 +342,19 @@ where
     }
 }
 
-impl<T: ServiceFactory<Req>, Req> ServiceFactory<Req> for PipelineFactory<T, Req> {
-    type Config = T::Config;
-    type Response = T::Response;
-    type Error = T::Error;
-    type Service = T::Service;
-    type InitError = T::InitError;
-    type Future = T::Future;
+impl<SF, Req> ServiceFactory<Req> for PipelineFactory<SF, Req>
+where
+    SF: ServiceFactory<Req>,
+{
+    type Config = SF::Config;
+    type Response = SF::Response;
+    type Error = SF::Error;
+    type Service = SF::Service;
+    type InitError = SF::InitError;
+    type Future = SF::Future;
 
     #[inline]
-    fn new_service(&self, cfg: T::Config) -> Self::Future {
+    fn new_service(&self, cfg: SF::Config) -> Self::Future {
         self.factory.new_service(cfg)
     }
 }

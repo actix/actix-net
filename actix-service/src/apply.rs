@@ -12,12 +12,12 @@ use super::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 /// Apply transform function to a service.
 ///
 /// The In and Out type params refer to the request and response types for the wrapped service.
-pub fn apply_fn<U, S, F, Fut, Req, In, Res, Err>(
-    service: U,
+pub fn apply_fn<I, S, F, Fut, Req, In, Res, Err>(
+    service: I,
     wrap_fn: F,
 ) -> Apply<S, F, Req, In, Res, Err>
 where
-    U: IntoService<S, In>,
+    I: IntoService<S, In>,
     S: Service<In, Error = Err>,
     F: FnMut(Req, &mut S) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
@@ -28,12 +28,12 @@ where
 /// Service factory that produces `apply_fn` service.
 ///
 /// The In and Out type params refer to the request and response types for the wrapped service.
-pub fn apply_fn_factory<U, SF, F, Fut, Req, In, Res, Err>(
-    service: U,
+pub fn apply_fn_factory<I, SF, F, Fut, Req, In, Res, Err>(
+    service: I,
     f: F,
 ) -> ApplyFactory<SF, F, Req, In, Res, Err>
 where
-    U: IntoServiceFactory<SF, In>,
+    I: IntoServiceFactory<SF, In>,
     SF: ServiceFactory<In, Error = Err>,
     F: FnMut(Req, &mut SF::Service) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,

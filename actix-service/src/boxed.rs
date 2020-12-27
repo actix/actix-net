@@ -14,17 +14,17 @@ pub type BoxService<Req, Res, Err> =
 pub struct BoxServiceFactory<Cfg, Req, Res, Err, InitErr>(Inner<Cfg, Req, Res, Err, InitErr>);
 
 /// Create boxed service factory
-pub fn factory<T, Req>(
-    factory: T,
-) -> BoxServiceFactory<T::Config, Req, T::Response, T::Error, T::InitError>
+pub fn factory<SF, Req>(
+    factory: SF,
+) -> BoxServiceFactory<SF::Config, Req, SF::Response, SF::Error, SF::InitError>
 where
-    T: ServiceFactory<Req> + 'static,
+    SF: ServiceFactory<Req> + 'static,
     Req: 'static,
-    T::Response: 'static,
-    T::Service: 'static,
-    T::Future: 'static,
-    T::Error: 'static,
-    T::InitError: 'static,
+    SF::Response: 'static,
+    SF::Service: 'static,
+    SF::Future: 'static,
+    SF::Error: 'static,
+    SF::InitError: 'static,
 {
     BoxServiceFactory(Box::new(FactoryWrapper {
         factory,
@@ -75,33 +75,33 @@ where
     }
 }
 
-struct FactoryWrapper<C, T, Req>
+struct FactoryWrapper<SF, Req, C>
 where
-    T: ServiceFactory<Req>,
+    SF: ServiceFactory<Req>,
 {
-    factory: T,
+    factory: SF,
     _t: PhantomData<(C, Req)>,
 }
 
-impl<C, T, Req, Res, Err, InitErr> ServiceFactory<Req> for FactoryWrapper<C, T, Req>
+impl<SF, Req, Cfg, Res, Err, InitErr> ServiceFactory<Req> for FactoryWrapper<SF, Req, Cfg>
 where
     Req: 'static,
     Res: 'static,
     Err: 'static,
     InitErr: 'static,
-    T: ServiceFactory<Req, Config = C, Response = Res, Error = Err, InitError = InitErr>,
-    T::Future: 'static,
-    T::Service: 'static,
-    <T::Service as Service<Req>>::Future: 'static,
+    SF: ServiceFactory<Req, Config = Cfg, Response = Res, Error = Err, InitError = InitErr>,
+    SF::Future: 'static,
+    SF::Service: 'static,
+    <SF::Service as Service<Req>>::Future: 'static,
 {
     type Response = Res;
     type Error = Err;
     type InitError = InitErr;
-    type Config = C;
+    type Config = Cfg;
     type Service = BoxService<Req, Res, Err>;
     type Future = BoxFuture<Self::Service, Self::InitError>;
 
-    fn new_service(&self, cfg: C) -> Self::Future {
+    fn new_service(&self, cfg: Cfg) -> Self::Future {
         Box::pin(
             self.factory
                 .new_service(cfg)
@@ -123,10 +123,10 @@ where
     }
 }
 
-impl<T, Req, Res, Err> Service<Req> for ServiceWrapper<T, Req>
+impl<S, Req, Res, Err> Service<Req> for ServiceWrapper<S, Req>
 where
-    T: Service<Req, Response = Res, Error = Err>,
-    T::Future: 'static,
+    S: Service<Req, Response = Res, Error = Err>,
+    S::Future: 'static,
 {
     type Response = Res;
     type Error = Err;

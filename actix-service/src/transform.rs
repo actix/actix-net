@@ -8,11 +8,11 @@ use crate::transform_err::TransformMapInitErr;
 use crate::{IntoServiceFactory, Service, ServiceFactory};
 
 /// Apply transform to a service.
-pub fn apply<T, S, U, Req>(t: T, factory: U) -> ApplyTransform<T, S, Req>
+pub fn apply<T, S, I, Req>(t: T, factory: I) -> ApplyTransform<T, S, Req>
 where
+    I: IntoServiceFactory<S, Req>,
     S: ServiceFactory<Req>,
     T: Transform<S::Service, Req, InitError = S::InitError>,
-    U: IntoServiceFactory<S, Req>,
 {
     ApplyTransform::new(t, factory.into_factory())
 }
