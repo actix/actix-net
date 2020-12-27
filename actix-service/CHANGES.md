@@ -6,7 +6,8 @@
 * Add `always_ready!` and `forward_ready!` macros. [#233]
 * Crate is now `no_std`. [#233]
 * Migrate pin projections to `pin-project-lite`. [#233]
-
+* Remove `AndThenApplyFn` and Pipeline `and_then_apply_fn`. Use the
+  `.and_then(apply_fn(...))` construction. [#233]
 
 [#232]: https://github.com/actix/actix-net/pull/232
 [#233]: https://github.com/actix/actix-net/pull/233
