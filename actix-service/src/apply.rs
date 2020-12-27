@@ -5,9 +5,8 @@ use core::{
     task::{Context, Poll},
 };
 
-
-use pin_project_lite::pin_project;
 use futures_core::ready;
+use pin_project_lite::pin_project;
 
 use super::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
@@ -204,7 +203,7 @@ where
         let this = self.project();
 
         let svc = ready!(this.fut.poll(cx))?;
-        Poll::Ready(Ok(Apply::new(svc, Option::take(this.wrap_fn).unwrap())))
+        Poll::Ready(Ok(Apply::new(svc, this.wrap_fn.take().unwrap())))
     }
 }
 
