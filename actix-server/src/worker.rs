@@ -8,18 +8,15 @@ use std::time::Duration;
 use actix_rt::time::{sleep_until, Instant, Sleep};
 use actix_rt::{spawn, Arbiter};
 use actix_utils::counter::Counter;
-use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
-use futures_channel::oneshot;
-use futures_util::future::join_all;
-use futures_util::stream::Stream;
-use futures_util::TryFutureExt;
+use futures_core::future::LocalBoxFuture;
 use log::{error, info, trace};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::oneshot;
 
 use crate::service::{BoxedServerService, InternalServiceFactory};
 use crate::socket::{MioStream, SocketAddr};
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::LocalBoxFuture;
-use crate::Token;
+use crate::{join_all, Token};
 
 pub(crate) struct WorkerCommand(Conn);
 
@@ -84,9 +81,7 @@ impl WorkerHandle {
     }
 
     pub fn send(&self, msg: Conn) -> Result<(), Conn> {
-        self.tx1
-            .unbounded_send(WorkerCommand(msg))
-            .map_err(|msg| msg.into_inner().0)
+        self.tx1.send(WorkerCommand(msg)).map_err(|msg| msg.0 .0)
     }
 
     pub fn available(&self) -> bool {
@@ -95,7 +90,7 @@ impl WorkerHandle {
 
     pub fn stop(&self, graceful: bool) -> oneshot::Receiver<bool> {
         let (result, rx) = oneshot::channel();
-        let _ = self.tx2.unbounded_send(StopCommand { graceful, result });
+        let _ = self.tx2.send(StopCommand { graceful, result });
         rx
     }
 }
@@ -172,8 +167,8 @@ impl Worker {
         availability: WorkerAvailability,
         shutdown_timeout: Duration,
     ) -> WorkerHandle {
-        let (tx1, rx) = unbounded();
-        let (tx2, rx2) = unbounded();
+        let (tx1, rx) = unbounded_channel();
+        let (tx2, rx2) = unbounded_channel();
         let avail = availability.clone();
 
         // every worker runs in it's own arbiter.
@@ -195,9 +190,12 @@ impl Worker {
                 .iter()
                 .enumerate()
                 .map(|(idx, factory)| {
-                    factory.create().map_ok(move |r| {
-                        r.into_iter().map(|(t, s)| (idx, t, s)).collect::<Vec<_>>()
-                    })
+                    let fut = factory.create();
+                    async move {
+                        fut.await.map(|r| {
+                            r.into_iter().map(|(t, s)| (idx, t, s)).collect::<Vec<_>>()
+                        })
+                    }
                 })
                 .collect::<Vec<_>>();
 
@@ -312,7 +310,7 @@ impl Future for Worker {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // `StopWorker` message handler
         if let Poll::Ready(Some(StopCommand { graceful, result })) =
-            Pin::new(&mut self.rx2).poll_next(cx)
+            Pin::new(&mut self.rx2).poll_recv(cx)
         {
             self.availability.set(false);
             let num = num_connections();
@@ -432,7 +430,7 @@ impl Future for Worker {
                     }
                 }
 
-                match Pin::new(&mut self.rx).poll_next(cx) {
+                match Pin::new(&mut self.rx).poll_recv(cx) {
                     // handle incoming io stream
                     Poll::Ready(Some(WorkerCommand(msg))) => {
                         let guard = self.conns.get();

@@ -10,6 +10,7 @@
 * Update `tokio` dependency to `1`
 * Rename `time` module `delay_for` to `sleep`, `delay_until` to `sleep_until`, `Delay` to `Sleep` to keep inline with tokio.
 * Remove `'static` lifetime requirement for `Runtime::block_on` and `SystemRunner::block_on`. 
+  These methods would accept a &Self when calling.
   Remove `'static` lifetime requirement for `System::run` and `Builder::run`.
   `Arbiter::spawn` would panic when `System` is not in scope. [#207]
 

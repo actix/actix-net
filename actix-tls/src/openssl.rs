@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -17,38 +16,32 @@ use crate::MAX_CONN_COUNTER;
 /// Accept TLS connections via `openssl` package.
 ///
 /// `openssl` feature enables this `Acceptor` type.
-pub struct Acceptor<T: AsyncRead + AsyncWrite> {
+pub struct Acceptor {
     acceptor: SslAcceptor,
-    io: PhantomData<T>,
 }
 
-impl<T: AsyncRead + AsyncWrite> Acceptor<T> {
+impl Acceptor {
     /// Create OpenSSL based `Acceptor` service factory.
     #[inline]
     pub fn new(acceptor: SslAcceptor) -> Self {
-        Acceptor {
-            acceptor,
-            io: PhantomData,
-        }
+        Acceptor { acceptor }
     }
 }
 
-impl<T: AsyncRead + AsyncWrite> Clone for Acceptor<T> {
+impl Clone for Acceptor {
     #[inline]
     fn clone(&self) -> Self {
         Self {
             acceptor: self.acceptor.clone(),
-            io: PhantomData,
         }
     }
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin + 'static> ServiceFactory for Acceptor<T> {
-    type Request = T;
+impl<T: AsyncRead + AsyncWrite + Unpin + 'static> ServiceFactory<T> for Acceptor {
     type Response = SslStream<T>;
     type Error = Error;
     type Config = ();
-    type Service = AcceptorService<T>;
+    type Service = AcceptorService;
     type InitError = ();
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
@@ -57,23 +50,20 @@ impl<T: AsyncRead + AsyncWrite + Unpin + 'static> ServiceFactory for Acceptor<T>
             ready(Ok(AcceptorService {
                 acceptor: self.acceptor.clone(),
                 conns: conns.clone(),
-                io: PhantomData,
             }))
         })
     }
 }
 
-pub struct AcceptorService<T> {
+pub struct AcceptorService {
     acceptor: SslAcceptor,
     conns: Counter,
-    io: PhantomData<T>,
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin + 'static> Service for AcceptorService<T> {
-    type Request = T;
-    type Response = SslStream<T>;
+impl<Req: AsyncRead + AsyncWrite + Unpin + 'static> Service<Req> for AcceptorService {
+    type Response = SslStream<Req>;
     type Error = Error;
-    type Future = AcceptorServiceResponse<T>;
+    type Future = AcceptorServiceResponse<Req>;
 
     fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(ctx) {
@@ -83,7 +73,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + 'static> Service for AcceptorService<T>
         }
     }
 
-    fn call(&mut self, req: Self::Request) -> Self::Future {
+    fn call(&mut self, req: Req) -> Self::Future {
         match self.ssl_stream(req) {
             Ok(stream) => {
                 let guard = self.conns.get();
@@ -94,27 +84,33 @@ impl<T: AsyncRead + AsyncWrite + Unpin + 'static> Service for AcceptorService<T>
     }
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin + 'static> AcceptorService<T> {
+impl AcceptorService {
     // construct a new SslStream.
     // At this point the SslStream does not perform any IO.
     // The handshake would happen later in AcceptorServiceResponse
-    fn ssl_stream(&self, stream: T) -> Result<SslStream<T>, Error> {
+    fn ssl_stream<Req: AsyncRead + AsyncWrite + Unpin + 'static>(
+        &self,
+        stream: Req,
+    ) -> Result<SslStream<Req>, Error> {
         let ssl = Ssl::new(self.acceptor.context())?;
         let stream = SslStream::new(ssl, stream)?;
         Ok(stream)
     }
 }
 
-pub enum AcceptorServiceResponse<T>
+pub enum AcceptorServiceResponse<Req>
 where
-    T: AsyncRead + AsyncWrite,
+    Req: AsyncRead + AsyncWrite,
 {
-    Accept(Option<SslStream<T>>, Option<CounterGuard>),
+    Accept(Option<SslStream<Req>>, Option<CounterGuard>),
     Error(Option<Error>),
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin> Future for AcceptorServiceResponse<T> {
-    type Output = Result<SslStream<T>, Error>;
+impl<Req: AsyncRead + AsyncWrite + Unpin> Future for AcceptorServiceResponse<Req>
+where
+    Req: AsyncRead + AsyncWrite + Unpin,
+{
+    type Output = Result<SslStream<Req>, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.get_mut() {

@@ -2,15 +2,13 @@ use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
 
-use actix_rt::spawn;
 use actix_service::{Service, ServiceFactory as BaseServiceFactory};
 use actix_utils::counter::CounterGuard;
-use futures_util::future::{ready, Ready};
+use futures_core::future::LocalBoxFuture;
 use log::error;
 
 use crate::socket::{FromStream, MioStream};
-use crate::LocalBoxFuture;
-use crate::Token;
+use crate::{ready, Ready, Token};
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
     type Factory: BaseServiceFactory<Stream, Config = ()>;

@@ -33,7 +33,7 @@ uri = ["http"]
 [dependencies]
 actix-service = "1.0.6"
 actix-codec = "0.3.0"
-actix-utils = "3.0.0"
+actix-utils = "2.0.0"
 actix-rt = "1.1.1"
 
 derive_more = "0.99.2"
@@ -43,8 +43,8 @@ futures-util = { version = "0.3.7", default-features = false }
 http = { version = "0.2.2", optional = true }
 log = "0.4"
 # FIXME: Use release version
-trust-dns-proto = { git = "https://github.com/bluejekyll/trust-dns", branch = "main" }
-trust-dns-resolver = { git = "https://github.com/bluejekyll/trust-dns", branch = "main" }
+trust-dns-proto = "0.20.0-alpha.3"
+trust-dns-resolver = "0.20.0-alpha.3"
 
 # openssl
 open-ssl = { package = "openssl", version = "0.10", optional = true }

@@ -1,8 +1,12 @@
-use std::pin::Pin;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::{future::Future, marker::PhantomData};
+use alloc::{rc::Rc, sync::Arc};
+use core::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use pin_project_lite::pin_project;
 
 use crate::transform_err::TransformMapInitErr;
 use crate::{IntoServiceFactory, Service, ServiceFactory};
@@ -185,30 +189,35 @@ where
     fn new_service(&self, cfg: S::Config) -> Self::Future {
         ApplyTransformFuture {
             store: self.0.clone(),
-            state: ApplyTransformFutureState::A(self.0.as_ref().1.new_service(cfg)),
+            state: ApplyTransformFutureState::A {
+                fut: self.0.as_ref().1.new_service(cfg),
+            },
         }
     }
 }
 
-#[pin_project::pin_project]
-pub struct ApplyTransformFuture<T, S, Req>
-where
-    S: ServiceFactory<Req>,
-    T: Transform<S::Service, Req, InitError = S::InitError>,
-{
-    store: Rc<(T, S)>,
-    #[pin]
-    state: ApplyTransformFutureState<T, S, Req>,
+pin_project! {
+    pub struct ApplyTransformFuture<T, S, Req>
+    where
+        S: ServiceFactory<Req>,
+        T: Transform<S::Service, Req, InitError = S::InitError>,
+    {
+        store: Rc<(T, S)>,
+        #[pin]
+        state: ApplyTransformFutureState<T, S, Req>,
+    }
 }
 
-#[pin_project::pin_project(project = ApplyTransformFutureStateProj)]
-pub enum ApplyTransformFutureState<T, S, Req>
-where
-    S: ServiceFactory<Req>,
-    T: Transform<S::Service, Req, InitError = S::InitError>,
-{
-    A(#[pin] S::Future),
-    B(#[pin] T::Future),
+pin_project! {
+    #[project = ApplyTransformFutureStateProj]
+    pub enum ApplyTransformFutureState<T, S, Req>
+    where
+        S: ServiceFactory<Req>,
+        T: Transform<S::Service, Req, InitError = S::InitError>,
+    {
+        A { #[pin] fut: S::Future },
+        B { #[pin] fut: T::Future },
+    }
 }
 
 impl<T, S, Req> Future for ApplyTransformFuture<T, S, Req>
@@ -222,15 +231,15 @@ where
         let mut this = self.as_mut().project();
 
         match this.state.as_mut().project() {
-            ApplyTransformFutureStateProj::A(fut) => match fut.poll(cx)? {
+            ApplyTransformFutureStateProj::A { fut } => match fut.poll(cx)? {
                 Poll::Ready(srv) => {
                     let fut = this.store.0.new_transform(srv);
-                    this.state.set(ApplyTransformFutureState::B(fut));
+                    this.state.set(ApplyTransformFutureState::B { fut });
                     self.poll(cx)
                 }
                 Poll::Pending => Poll::Pending,
             },
-            ApplyTransformFutureStateProj::B(fut) => fut.poll(cx),
+            ApplyTransformFutureStateProj::B { fut } => fut.poll(cx),
         }
     }
 }

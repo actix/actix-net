@@ -5,7 +5,6 @@ use std::{fmt, io};
 use bytes::{Buf, BytesMut};
 use futures_core::{ready, Stream};
 use futures_sink::Sink;
-use pin_project::pin_project;
 
 use crate::{AsyncRead, AsyncWrite, Decoder, Encoder};
 
@@ -21,22 +20,23 @@ bitflags::bitflags! {
     }
 }
 
-/// A unified `Stream` and `Sink` interface to an underlying I/O object, using
-/// the `Encoder` and `Decoder` traits to encode and decode frames.
-///
-/// Raw I/O objects work with byte sequences, but higher-level code usually
-/// wants to batch these into meaningful chunks, called "frames". This
-/// method layers framing on top of an I/O object, by using the `Encoder`/`Decoder`
-/// traits to handle encoding and decoding of message frames. Note that
-/// the incoming and outgoing frame types may be distinct.
-#[pin_project]
-pub struct Framed<T, U> {
-    #[pin]
-    io: T,
-    codec: U,
-    flags: Flags,
-    read_buf: BytesMut,
-    write_buf: BytesMut,
+pin_project_lite::pin_project! {
+    /// A unified `Stream` and `Sink` interface to an underlying I/O object, using
+    /// the `Encoder` and `Decoder` traits to encode and decode frames.
+    ///
+    /// Raw I/O objects work with byte sequences, but higher-level code usually
+    /// wants to batch these into meaningful chunks, called "frames". This
+    /// method layers framing on top of an I/O object, by using the `Encoder`/`Decoder`
+    /// traits to handle encoding and decoding of message frames. Note that
+    /// the incoming and outgoing frame types may be distinct.
+    pub struct Framed<T, U> {
+        #[pin]
+        io: T,
+        codec: U,
+        flags: Flags,
+        read_buf: BytesMut,
+        write_buf: BytesMut,
+    }
 }
 
 impl<T, U> Framed<T, U>

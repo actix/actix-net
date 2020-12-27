@@ -1,6 +1,5 @@
 use std::fmt;
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -18,88 +17,70 @@ use webpki::DNSNameRef;
 use crate::{Address, Connection};
 
 /// Rustls connector factory
-pub struct RustlsConnector<T, U> {
+pub struct RustlsConnector {
     connector: Arc<ClientConfig>,
-    _t: PhantomData<(T, U)>,
 }
 
-impl<T, U> RustlsConnector<T, U> {
+impl RustlsConnector {
     pub fn new(connector: Arc<ClientConfig>) -> Self {
-        RustlsConnector {
-            connector,
-            _t: PhantomData,
-        }
+        RustlsConnector { connector }
     }
 }
 
-impl<T, U> RustlsConnector<T, U>
-where
-    T: Address,
-    U: AsyncRead + AsyncWrite + Unpin + fmt::Debug,
-{
-    pub fn service(connector: Arc<ClientConfig>) -> RustlsConnectorService<T, U> {
-        RustlsConnectorService {
-            connector,
-            _t: PhantomData,
-        }
+impl RustlsConnector {
+    pub fn service(connector: Arc<ClientConfig>) -> RustlsConnectorService {
+        RustlsConnectorService { connector }
     }
 }
 
-impl<T, U> Clone for RustlsConnector<T, U> {
+impl Clone for RustlsConnector {
     fn clone(&self) -> Self {
         Self {
             connector: self.connector.clone(),
-            _t: PhantomData,
         }
     }
 }
 
-impl<T: Address, U> ServiceFactory for RustlsConnector<T, U>
+impl<T: Address, U> ServiceFactory<Connection<T, U>> for RustlsConnector
 where
     U: AsyncRead + AsyncWrite + Unpin + fmt::Debug,
 {
-    type Request = Connection<T, U>;
     type Response = Connection<T, TlsStream<U>>;
     type Error = std::io::Error;
     type Config = ();
-    type Service = RustlsConnectorService<T, U>;
+    type Service = RustlsConnectorService;
     type InitError = ();
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         ready(Ok(RustlsConnectorService {
             connector: self.connector.clone(),
-            _t: PhantomData,
         }))
     }
 }
 
-pub struct RustlsConnectorService<T, U> {
+pub struct RustlsConnectorService {
     connector: Arc<ClientConfig>,
-    _t: PhantomData<(T, U)>,
 }
 
-impl<T, U> Clone for RustlsConnectorService<T, U> {
+impl Clone for RustlsConnectorService {
     fn clone(&self) -> Self {
         Self {
             connector: self.connector.clone(),
-            _t: PhantomData,
         }
     }
 }
 
-impl<T: Address, U> Service for RustlsConnectorService<T, U>
+impl<T, U> Service<Connection<T, U>> for RustlsConnectorService
 where
+    T: Address,
     U: AsyncRead + AsyncWrite + Unpin + fmt::Debug,
 {
-    type Request = Connection<T, U>;
     type Response = Connection<T, TlsStream<U>>;
     type Error = std::io::Error;
     type Future = ConnectAsyncExt<T, U>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    actix_service::always_ready!();
 
     fn call(&mut self, stream: Connection<T, U>) -> Self::Future {
         trace!("SSL Handshake start for: {:?}", stream.host());

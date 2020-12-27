@@ -23,19 +23,19 @@ default = []
 actix-service = "1.0.6"
 actix-rt = "1.1.1"
 actix-codec = "0.3.0"
-actix-utils = "3.0.0"
+actix-utils = "2.0.0"
 
 concurrent-queue = "1.2.2"
-futures-channel = { version = "0.3.7", default-features = false }
-futures-util = { version = "0.3.7", default-features = false }
+futures-core = { version = "0.3.7", default-features = false }
 log = "0.4"
 mio = { version = "0.7.3", features = [ "os-poll", "tcp", "uds"] }
 num_cpus = "1.13"
 slab = "0.4"
+tokio = { version = "1", features = ["sync"] }
 
 [dev-dependencies]
 actix-testing = "1.0.0"
 bytes = "1"
 env_logger = "0.7"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["io-util"] }

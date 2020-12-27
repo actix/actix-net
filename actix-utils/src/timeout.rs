@@ -200,7 +200,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::task::{Context, Poll};
+    use std::task::Poll;
     use std::time::Duration;
 
     use super::*;
@@ -214,9 +214,7 @@ mod tests {
         type Error = ();
         type Future = LocalBoxFuture<'static, Result<(), ()>>;
 
-        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
+        actix_service::always_ready!();
 
         fn call(&mut self, _: ()) -> Self::Future {
             actix_rt::time::sleep(self.0)

@@ -2,8 +2,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use futures_core::future::LocalBoxFuture;
+
 use crate::server::Server;
-use crate::LocalBoxFuture;
 
 /// Different types of process signals
 #[allow(dead_code)]

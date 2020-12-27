@@ -31,4 +31,6 @@ actix-router = { path = "router" }
 bytestring = { path = "string" }
 
 #FIXME: remove override
-http = { git = "https://github.com/fakeshadow/http.git" }
+#http = { git = "https://github.com/fakeshadow/http.git" }
+trust-dns-proto = { git = "https://github.com/messense/trust-dns.git", branch = "tokio-1" }
+trust-dns-resolver = { git = "https://github.com/messense/trust-dns.git", branch = "tokio-1" }

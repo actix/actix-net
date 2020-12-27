@@ -7,11 +7,9 @@ use std::{io, mem};
 use actix_rt::net::TcpStream;
 use actix_rt::time::{sleep_until, Instant};
 use actix_rt::{spawn, System};
-use futures_channel::mpsc::{unbounded, UnboundedReceiver};
-use futures_channel::oneshot;
-use futures_util::future::join_all;
-use futures_util::stream::Stream;
 use log::{error, info};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+use tokio::sync::oneshot;
 
 use crate::accept::AcceptLoop;
 use crate::config::{ConfiguredService, ServiceConfig};
@@ -22,7 +20,7 @@ use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
 use crate::waker_queue::{WakerInterest, WakerQueue};
 use crate::worker::{self, Worker, WorkerAvailability, WorkerHandle};
-use crate::Token;
+use crate::{join_all, Token};
 
 /// Server builder
 pub struct ServerBuilder {
@@ -50,7 +48,7 @@ impl Default for ServerBuilder {
 impl ServerBuilder {
     /// Create new Server builder instance
     pub fn new() -> ServerBuilder {
-        let (tx, rx) = unbounded();
+        let (tx, rx) = unbounded_channel();
         let server = Server::new(tx);
 
         ServerBuilder {
@@ -366,7 +364,8 @@ impl ServerBuilder {
                     let iter = self
                         .handles
                         .iter()
-                        .map(move |worker| worker.1.stop(graceful));
+                        .map(move |worker| worker.1.stop(graceful))
+                        .collect();
 
                     let fut = join_all(iter);
 
@@ -439,7 +438,7 @@ impl Future for ServerBuilder {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
-            match Pin::new(&mut self.cmd).poll_next(cx) {
+            match Pin::new(&mut self.cmd).poll_recv(cx) {
                 Poll::Ready(Some(it)) => self.as_mut().get_mut().handle_cmd(it),
                 _ => return Poll::Pending,
             }

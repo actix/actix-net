@@ -1,8 +1,10 @@
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::{future::Future, marker::PhantomData};
-
-use futures_util::future::FutureExt;
+use alloc::boxed::Box;
+use core::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use crate::{Service, ServiceFactory};
 
@@ -28,7 +30,7 @@ where
 {
     BoxServiceFactory(Box::new(FactoryWrapper {
         factory,
-        _t: std::marker::PhantomData,
+        _t: PhantomData,
     }))
 }
 
@@ -75,12 +77,9 @@ where
     }
 }
 
-struct FactoryWrapper<SF, Req, C>
-where
-    SF: ServiceFactory<Req>,
-{
+struct FactoryWrapper<SF, Req, Cfg> {
     factory: SF,
-    _t: PhantomData<(C, Req)>,
+    _t: PhantomData<(Req, Cfg)>,
 }
 
 impl<SF, Req, Cfg, Res, Err, InitErr> ServiceFactory<Req> for FactoryWrapper<SF, Req, Cfg>
@@ -102,11 +101,11 @@ where
     type Future = BoxFuture<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, cfg: Cfg) -> Self::Future {
-        Box::pin(
-            self.factory
-                .new_service(cfg)
-                .map(|res| res.map(ServiceWrapper::boxed)),
-        )
+        let fut = self.factory.new_service(cfg);
+        Box::pin(async {
+            let res = fut.await;
+            res.map(ServiceWrapper::boxed)
+        })
     }
 }
 

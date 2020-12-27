@@ -1,8 +1,13 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::rc::Rc;
-use std::task::{Context, Poll};
-use std::{cell::RefCell, marker::PhantomData};
+use alloc::rc::Rc;
+use core::{
+    cell::RefCell,
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use pin_project_lite::pin_project;
 
 use super::{Service, ServiceFactory};
 
@@ -50,30 +55,36 @@ where
 
     fn call(&mut self, req: Req) -> Self::Future {
         ThenServiceResponse {
-            state: State::A(self.0.borrow_mut().0.call(req), Some(self.0.clone())),
+            state: State::A {
+                fut: self.0.borrow_mut().0.call(req),
+                b: Some(self.0.clone()),
+            },
         }
     }
 }
 
-#[pin_project::pin_project]
-pub(crate) struct ThenServiceResponse<A, B, Req>
-where
-    A: Service<Req>,
-    B: Service<Result<A::Response, A::Error>>,
-{
-    #[pin]
-    state: State<A, B, Req>,
+pin_project! {
+    pub(crate) struct ThenServiceResponse<A, B, Req>
+    where
+        A: Service<Req>,
+        B: Service<Result<A::Response, A::Error>>,
+    {
+        #[pin]
+        state: State<A, B, Req>,
+    }
 }
 
-#[pin_project::pin_project(project = StateProj)]
-enum State<A, B, Req>
-where
-    A: Service<Req>,
-    B: Service<Result<A::Response, A::Error>>,
-{
-    A(#[pin] A::Future, Option<Rc<RefCell<(A, B)>>>),
-    B(#[pin] B::Future),
-    Empty,
+pin_project! {
+    #[project = StateProj]
+    enum State<A, B, Req>
+    where
+        A: Service<Req>,
+        B: Service<Result<A::Response, A::Error>>,
+    {
+        A { #[pin] fut: A::Future, b: Option<Rc<RefCell<(A, B)>>> },
+        B { #[pin] fut: B::Future },
+        Empty,
+    }
 }
 
 impl<A, B, Req> Future for ThenServiceResponse<A, B, Req>
@@ -87,17 +98,17 @@ where
         let mut this = self.as_mut().project();
 
         match this.state.as_mut().project() {
-            StateProj::A(fut, b) => match fut.poll(cx) {
+            StateProj::A { fut, b } => match fut.poll(cx) {
                 Poll::Ready(res) => {
                     let b = b.take().unwrap();
                     this.state.set(State::Empty); // drop fut A
                     let fut = b.borrow_mut().1.call(res);
-                    this.state.set(State::B(fut));
+                    this.state.set(State::B { fut });
                     self.poll(cx)
                 }
                 Poll::Pending => Poll::Pending,
             },
-            StateProj::B(fut) => fut.poll(cx).map(|r| {
+            StateProj::B { fut } => fut.poll(cx).map(|r| {
                 this.state.set(State::Empty);
                 r
             }),
@@ -159,23 +170,24 @@ impl<A, B, Req> Clone for ThenServiceFactory<A, B, Req> {
     }
 }
 
-#[pin_project::pin_project]
-pub(crate) struct ThenServiceFactoryResponse<A, B, Req>
-where
-    A: ServiceFactory<Req>,
-    B: ServiceFactory<
-        Result<A::Response, A::Error>,
-        Config = A::Config,
-        Error = A::Error,
-        InitError = A::InitError,
-    >,
-{
-    #[pin]
-    fut_b: B::Future,
-    #[pin]
-    fut_a: A::Future,
-    a: Option<A::Service>,
-    b: Option<B::Service>,
+pin_project! {
+    pub(crate) struct ThenServiceFactoryResponse<A, B, Req>
+    where
+        A: ServiceFactory<Req>,
+        B: ServiceFactory<
+            Result<A::Response, A::Error>,
+            Config = A::Config,
+            Error = A::Error,
+            InitError = A::InitError,
+        >,
+    {
+        #[pin]
+        fut_b: B::Future,
+        #[pin]
+        fut_a: A::Future,
+        a: Option<A::Service>,
+        b: Option<B::Service>,
+    }
 }
 
 impl<A, B, Req> ThenServiceFactoryResponse<A, B, Req>
@@ -236,13 +248,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
-    use std::rc::Rc;
-    use std::task::{Context, Poll};
+    use alloc::rc::Rc;
+    use core::{
+        cell::Cell,
+        task::{Context, Poll},
+    };
 
-    use futures_util::future::{err, lazy, ok, ready, Ready};
+    use futures_util::future::lazy;
 
-    use crate::{pipeline, pipeline_factory, Service, ServiceFactory};
+    use crate::{err, ok, pipeline, pipeline_factory, ready, Ready, Service, ServiceFactory};
 
     #[derive(Clone)]
     struct Srv1(Rc<Cell<usize>>);

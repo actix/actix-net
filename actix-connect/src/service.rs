@@ -94,9 +94,7 @@ impl<T: Address> Service<Connect<T>> for ConnectService<T> {
     type Error = ConnectError;
     type Future = ConnectServiceResponse<T>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    actix_service::always_ready!();
 
     fn call(&mut self, req: Connect<T>) -> Self::Future {
         ConnectServiceResponse {
@@ -163,9 +161,7 @@ impl<T: Address + 'static> Service<Connect<T>> for TcpConnectService<T> {
     type Error = ConnectError;
     type Future = TcpConnectServiceResponse<T>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    actix_service::always_ready!();
 
     fn call(&mut self, req: Connect<T>) -> Self::Future {
         TcpConnectServiceResponse {

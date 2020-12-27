@@ -32,9 +32,9 @@ impl WakerQueue {
     ///
     /// A fixed `WAKER_TOKEN` is used to identify the wake interest and the `Poll` needs to match
     /// event's token for it to properly handle `WakerInterest`.
-    pub(crate) fn with_capacity(registry: &Registry, cap: usize) -> std::io::Result<Self> {
+    pub(crate) fn new(registry: &Registry) -> std::io::Result<Self> {
         let waker = Waker::new(registry, WAKER_TOKEN)?;
-        let queue = ConcurrentQueue::bounded(cap);
+        let queue = ConcurrentQueue::unbounded();
 
         Ok(Self(Arc::new((waker, queue))))
     }
@@ -43,10 +43,9 @@ impl WakerQueue {
     pub(crate) fn wake(&self, interest: WakerInterest) {
         let (waker, queue) = self.deref();
 
-        // FIXME: should we handle error here?
         queue
             .push(interest)
-            .unwrap_or_else(|e| panic!("WakerQueue overflow: {}", e));
+            .unwrap_or_else(|e| panic!("WakerQueue closed: {}", e));
 
         waker
             .wake()

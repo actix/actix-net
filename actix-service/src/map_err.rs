@@ -1,7 +1,11 @@
-use std::future::Future;
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use core::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use pin_project_lite::pin_project;
 
 use super::{Service, ServiceFactory};
 
@@ -62,15 +66,16 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct MapErrFuture<A, Req, F, E>
-where
-    A: Service<Req>,
-    F: Fn(A::Error) -> E,
-{
-    f: F,
-    #[pin]
-    fut: A::Future,
+pin_project! {
+    pub struct MapErrFuture<A, Req, F, E>
+    where
+        A: Service<Req>,
+        F: Fn(A::Error) -> E,
+    {
+        f: F,
+        #[pin]
+        fut: A::Future,
+    }
 }
 
 impl<A, Req, F, E> MapErrFuture<A, Req, F, E>
@@ -157,15 +162,16 @@ where
     }
 }
 
-#[pin_project::pin_project]
-pub struct MapErrServiceFuture<A, Req, F, E>
-where
-    A: ServiceFactory<Req>,
-    F: Fn(A::Error) -> E,
-{
-    #[pin]
-    fut: A::Future,
-    f: F,
+pin_project! {
+    pub struct MapErrServiceFuture<A, Req, F, E>
+    where
+        A: ServiceFactory<Req>,
+        F: Fn(A::Error) -> E,
+    {
+        #[pin]
+        fut: A::Future,
+        f: F,
+    }
 }
 
 impl<A, Req, F, E> MapErrServiceFuture<A, Req, F, E>
@@ -197,10 +203,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use futures_util::future::{err, lazy, ok, Ready};
+    use futures_util::future::lazy;
 
     use super::*;
-    use crate::{IntoServiceFactory, Service, ServiceFactory};
+    use crate::{
+        err, ok, IntoServiceFactory, Ready, Service, ServiceExt, ServiceFactory,
+        ServiceFactoryExt,
+    };
 
     struct Srv;
 

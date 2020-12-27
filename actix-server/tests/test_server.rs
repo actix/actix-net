@@ -49,14 +49,14 @@ fn test_listen() {
     let h = thread::spawn(move || {
         let sys = actix_rt::System::new("test");
         let lst = net::TcpListener::bind(addr).unwrap();
-        sys.block_on(lazy(|_| {
+        sys.block_on(async {
             Server::build()
                 .disable_signals()
                 .workers(1)
                 .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
                 .start()
-        }));
+        });
         let _ = tx.send(actix_rt::System::current());
         let _ = sys.run();
     });
