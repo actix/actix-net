@@ -8,9 +8,11 @@
 * Migrate pin projections to `pin-project-lite`. [#233]
 * Remove `AndThenApplyFn` and Pipeline `and_then_apply_fn`. Use the
   `.and_then(apply_fn(...))` construction. [#233]
+* Move non-vital methods to `ServiceExt` and `ServiceFactoryExt` extension traits. [#235]
 
 [#232]: https://github.com/actix/actix-net/pull/232
 [#233]: https://github.com/actix/actix-net/pull/233
+[#235]: https://github.com/actix/actix-net/pull/235
 
 
 ## 1.0.6 - 2020-08-09

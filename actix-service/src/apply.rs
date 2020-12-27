@@ -211,10 +211,10 @@ where
 mod tests {
     use core::task::Poll;
 
-    use futures_util::future::{lazy, ok, Ready};
+    use futures_util::future::lazy;
 
     use super::*;
-    use crate::{pipeline, pipeline_factory, Service, ServiceFactory};
+    use crate::{ok, pipeline, pipeline_factory, Ready, Service, ServiceFactory};
 
     #[derive(Clone)]
     struct Srv;

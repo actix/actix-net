@@ -19,22 +19,28 @@ mod and_then;
 mod apply;
 mod apply_cfg;
 pub mod boxed;
+mod ext;
 mod fn_service;
 mod map;
 mod map_config;
 mod map_err;
 mod map_init_err;
 mod pipeline;
+mod ready;
 mod then;
 mod transform;
 mod transform_err;
 
 pub use self::apply::{apply_fn, apply_fn_factory};
 pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
+pub use self::ext::{ServiceExt, ServiceFactoryExt};
 pub use self::fn_service::{fn_factory, fn_factory_with_config, fn_service};
 pub use self::map_config::{map_config, unit_config};
 pub use self::pipeline::{pipeline, pipeline_factory, Pipeline, PipelineFactory};
 pub use self::transform::{apply, Transform};
+
+#[allow(unused_imports)]
+use self::ready::{err, ok, ready, Ready};
 
 /// An asynchronous operation from `Request` to a `Response`.
 ///
@@ -110,39 +116,6 @@ pub trait Service<Req> {
     /// Calling `call` without calling `poll_ready` is permitted. The
     /// implementation must be resilient to this fact.
     fn call(&mut self, req: Req) -> Self::Future;
-
-    /// Map this service's output to a different type, returning a new service
-    /// of the resulting type.
-    ///
-    /// This function is similar to the `Option::map` or `Iterator::map` where
-    /// it will change the type of the underlying service.
-    ///
-    /// Note that this function consumes the receiving service and returns a
-    /// wrapped version of it, similar to the existing `map` methods in the
-    /// standard library.
-    fn map<F, R>(self, f: F) -> crate::dev::Map<Self, F, Req, R>
-    where
-        Self: Sized,
-        F: FnMut(Self::Response) -> R,
-    {
-        crate::dev::Map::new(self, f)
-    }
-
-    /// Map this service's error to a different error, returning a new service.
-    ///
-    /// This function is similar to the `Result::map_err` where it will change
-    /// the error type of the underlying service. For example, this can be useful to
-    /// ensure that services have the same error type.
-    ///
-    /// Note that this function consumes the receiving service and returns a
-    /// wrapped version of it.
-    fn map_err<F, E>(self, f: F) -> crate::dev::MapErr<Self, Req, F, E>
-    where
-        Self: Sized,
-        F: Fn(Self::Error) -> E,
-    {
-        crate::dev::MapErr::new(self, f)
-    }
 }
 
 /// Factory for creating `Service`s.
@@ -175,34 +148,6 @@ pub trait ServiceFactory<Req> {
 
     /// Create and return a new service asynchronously.
     fn new_service(&self, cfg: Self::Config) -> Self::Future;
-
-    /// Map this service's output to a different type, returning a new service
-    /// of the resulting type.
-    fn map<F, R>(self, f: F) -> crate::map::MapServiceFactory<Self, F, Req, R>
-    where
-        Self: Sized,
-        F: FnMut(Self::Response) -> R + Clone,
-    {
-        crate::map::MapServiceFactory::new(self, f)
-    }
-
-    /// Map this service's error to a different error, returning a new service.
-    fn map_err<F, E>(self, f: F) -> crate::map_err::MapErrServiceFactory<Self, Req, F, E>
-    where
-        Self: Sized,
-        F: Fn(Self::Error) -> E + Clone,
-    {
-        crate::map_err::MapErrServiceFactory::new(self, f)
-    }
-
-    /// Map this factory's init error to a different error, returning a new service.
-    fn map_init_err<F, E>(self, f: F) -> crate::map_init_err::MapInitErr<Self, F, Req, E>
-    where
-        Self: Sized,
-        F: Fn(Self::InitError) -> E + Clone,
-    {
-        crate::map_init_err::MapInitErr::new(self, f)
-    }
 }
 
 impl<'a, S, Req> Service<Req> for &'a mut S

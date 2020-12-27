@@ -17,10 +17,9 @@ name = "actix_service"
 path = "src/lib.rs"
 
 [dependencies]
-pin-project-lite = "0.2"
-futures-util = { version = "0.3.7", default-features = false }
 futures-core = { version = "0.3.7", default-features = false }
+pin-project-lite = "0.2"
 
 [dev-dependencies]
 actix-rt = "1.0.0"
-criterion = "0.3"
+futures-util = { version = "0.3.7", default-features = false }
