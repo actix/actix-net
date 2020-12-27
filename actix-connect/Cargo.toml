@@ -33,7 +33,7 @@ uri = ["http"]
 [dependencies]
 actix-service = "1.0.6"
 actix-codec = "0.3.0"
-actix-utils = "2.0.0"
+actix-utils = "3.0.0"
 actix-rt = "1.1.1"
 
 derive_more = "0.99.2"

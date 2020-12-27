@@ -87,11 +87,14 @@ impl TestServer {
             let tcp = net::TcpListener::bind("127.0.0.1:0").unwrap();
             let local_addr = tcp.local_addr().unwrap();
 
-            Server::build()
-                .listen("test", tcp, factory)?
-                .workers(1)
-                .disable_signals()
-                .start();
+            sys.block_on(async {
+                Server::build()
+                    .listen("test", tcp, factory)
+                    .unwrap()
+                    .workers(1)
+                    .disable_signals()
+                    .start();
+            });
 
             tx.send((System::current(), local_addr)).unwrap();
             sys.run()

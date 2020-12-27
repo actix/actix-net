@@ -29,6 +29,10 @@ impl Runtime {
         })
     }
 
+    pub(super) fn local(&self) -> &LocalSet {
+        &self.local
+    }
+
     /// Spawn a future onto the single-threaded runtime.
     ///
     /// See [module level][mod] documentation for more details.
@@ -43,7 +47,7 @@ impl Runtime {
     ///
     /// # fn dox() {
     /// // Create the runtime
-    /// let mut rt = Runtime::new().unwrap();
+    /// let rt = Runtime::new().unwrap();
     ///
     /// // Spawn a future onto the runtime
     /// rt.spawn(future::lazy(|_| {

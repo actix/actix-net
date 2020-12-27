@@ -23,7 +23,7 @@ default = []
 actix-service = "1.0.6"
 actix-rt = "1.1.1"
 actix-codec = "0.3.0"
-actix-utils = "2.0.0"
+actix-utils = "3.0.0"
 
 concurrent-queue = "1.2.2"
 futures-channel = { version = "0.3.7", default-features = false }

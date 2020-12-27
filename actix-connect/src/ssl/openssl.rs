@@ -157,7 +157,7 @@ where
             Self::Error(e) => e.take().unwrap(),
             Self::Accept(acc) => {
                 let (stream, _) = acc.as_mut().unwrap();
-                match ready!(Pin::new(stream).poll_accept(cx)) {
+                match ready!(Pin::new(stream).poll_connect(cx)) {
                     Ok(()) => {
                         let (stream, connection) = acc.take().unwrap();
                         trace!("SSL Handshake success: {:?}", connection.host());

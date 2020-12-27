@@ -37,7 +37,7 @@ nativetls = ["native-tls", "tokio-native-tls"]
 [dependencies]
 actix-service = "1.0.0"
 actix-codec = "0.3.0"
-actix-utils = "2.0.0"
+actix-utils = "3.0.0"
 
 futures-util = { version = "0.3.7", default-features = false }
 
