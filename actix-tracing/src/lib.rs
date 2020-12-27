@@ -4,7 +4,7 @@
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 use actix_service::{
     apply, dev::ApplyTransform, IntoServiceFactory, Service, ServiceFactory, Transform,

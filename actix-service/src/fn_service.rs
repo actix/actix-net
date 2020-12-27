@@ -1,6 +1,4 @@
-use std::future::Future;
-use std::marker::PhantomData;
-use std::task::Poll;
+use core::{future::Future, marker::PhantomData, task::Poll};
 
 use futures_util::future::{ok, Ready};
 
@@ -357,7 +355,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::task::Poll;
+    use core::task::Poll;
 
     use futures_util::future::{lazy, ok};
 

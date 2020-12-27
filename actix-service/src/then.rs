@@ -1,8 +1,11 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::rc::Rc;
-use std::task::{Context, Poll};
-use std::{cell::RefCell, marker::PhantomData};
+use alloc::rc::Rc;
+use core::{
+    cell::RefCell,
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use super::{Service, ServiceFactory};
 
@@ -236,9 +239,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
-    use std::rc::Rc;
-    use std::task::{Context, Poll};
+    use alloc::rc::Rc;
+    use core::{
+        cell::Cell,
+        task::{Context, Poll},
+    };
 
     use futures_util::future::{err, lazy, ok, ready, Ready};
 

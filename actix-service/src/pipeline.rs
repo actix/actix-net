@@ -1,5 +1,8 @@
-use std::task::{Context, Poll};
-use std::{future::Future, marker::PhantomData};
+use core::{
+    future::Future,
+    marker::PhantomData,
+    task::{Context, Poll},
+};
 
 use crate::and_then::{AndThenService, AndThenServiceFactory};
 use crate::and_then_apply_fn::{AndThenApplyFn, AndThenApplyFnFactory};

@@ -1,6 +1,10 @@
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::{future::Future, marker::PhantomData};
+use alloc::boxed::Box;
+use core::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use futures_util::future::FutureExt;
 
@@ -28,7 +32,7 @@ where
 {
     BoxServiceFactory(Box::new(FactoryWrapper {
         factory,
-        _t: std::marker::PhantomData,
+        _t: PhantomData,
     }))
 }
 
