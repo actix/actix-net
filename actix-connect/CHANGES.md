@@ -2,6 +2,9 @@
 
 ## Unreleased - 2020-xx-xx
 
+### Changed
+
+* Bumped `rustls` to `0.19`
 
 ## 2.0.0 - 2020-09-02
 - No significant changes from `2.0.0-alpha.4`.
