@@ -18,7 +18,7 @@ members = [
 [patch.crates-io]
 actix-codec = { path = "actix-codec" }
 actix-connect = { path = "actix-connect" }
-actix-rt = { git = "https://github.com/actix/actix-net.git", ref = "ba44ea7d0bafaf5fccb9a34003d503e1910943eepath" }
+actix-rt = { git = "https://github.com/actix/actix-net.git", ref = "ba44ea7d0bafaf5fccb9a34003d503e1910943ee" }
 actix-macros = { path = "actix-macros" }
 actix-server = { path = "actix-server" }
 actix-service = { path = "actix-service" }
