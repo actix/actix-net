@@ -1,4 +1,4 @@
-//! Actix utils - various helper services
+//! Various network related services and utilities for the Actix ecosystem.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![allow(clippy::type_complexity)]

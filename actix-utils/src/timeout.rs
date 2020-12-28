@@ -1,7 +1,6 @@
 //! Service that applies a timeout to requests.
 //!
-//! If the response does not complete within the specified timeout, the response
-//! will be aborted.
+//! If the response does not complete within the specified timeout, the response will be aborted.
 
 use core::future::Future;
 use core::marker::PhantomData;

@@ -1,4 +1,5 @@
 //! A multi-producer, single-consumer, futures-aware, FIFO queue.
+
 use core::any::Any;
 use core::cell::RefCell;
 use core::fmt;
