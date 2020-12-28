@@ -295,6 +295,10 @@ impl Accept {
             if !on {
                 self.backpressure = false;
                 for (token, info) in sockets.iter_mut() {
+                    if info.timeout.is_some() {
+                        // socket will attempt to re-register itself when its timeout completes
+                        continue;
+                    }
                     self.register_logged(token, info);
                 }
             }
