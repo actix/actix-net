@@ -55,9 +55,9 @@ fn test_listen() {
                 .workers(1)
                 .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
-                .start()
+                .start();
+            let _ = tx.send(actix_rt::System::current());
         });
-        let _ = tx.send(actix_rt::System::current());
         let _ = sys.run();
     });
     let sys = rx.recv().unwrap();
