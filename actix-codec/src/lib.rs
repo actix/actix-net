@@ -1,4 +1,4 @@
-//! Utilities for encoding and decoding frames.
+//! Codec utilities for working with framed protocols.
 //!
 //! Contains adapters to go from streams of bytes, [`AsyncRead`] and
 //! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].

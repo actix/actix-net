@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
+
+
+## 2.0.0-beta.1 - 2020-12-28
 * `Service`, other traits, and many type signatures now take the the request type as a type
   parameter instead of an associated type. [#232]
 * Add `always_ready!` and `forward_ready!` macros. [#233]
@@ -19,7 +22,10 @@
 
 ### Fixed
 
-* Removed unsound custom Cell implementation that allowed obtaining several mutable references to the same data, which is undefined behavior in Rust and could lead to violations of memory safety. External code could obtain several mutable references to the same data through service combinators. Attempts to acquire several mutable references to the same data will instead result in a panic.
+* Removed unsound custom Cell implementation that allowed obtaining several mutable references to
+  the same data, which is undefined behavior in Rust and could lead to violations of memory safety. External code could obtain several mutable references to the same data through
+  service combinators. Attempts to acquire several mutable references to the same data will instead
+  result in a panic.
 
 ## [1.0.5] - 2020-01-16
 

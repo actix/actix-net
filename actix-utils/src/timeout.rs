@@ -1,7 +1,6 @@
 //! Service that applies a timeout to requests.
 //!
-//! If the response does not complete within the specified timeout, the response
-//! will be aborted.
+//! If the response does not complete within the specified timeout, the response will be aborted.
 
 use core::future::Future;
 use core::marker::PhantomData;
@@ -85,8 +84,8 @@ where
 {
     type Response = S::Response;
     type Error = TimeoutError<S::Error>;
-    type InitError = E;
     type Transform = TimeoutService<S, Req>;
+    type InitError = E;
     type Future = TimeoutFuture<Self::Transform, Self::InitError>;
 
     fn new_transform(&self, service: S) -> Self::Future {
@@ -200,12 +199,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::task::Poll;
-    use std::time::Duration;
+    use core::task::Poll;
+    use core::time::Duration;
 
     use super::*;
     use actix_service::{apply, fn_factory, Service, ServiceFactory};
-    use futures_util::future::{ok, FutureExt, LocalBoxFuture};
+    use futures_core::future::LocalBoxFuture;
 
     struct SleepService(Duration);
 
@@ -217,9 +216,11 @@ mod tests {
         actix_service::always_ready!();
 
         fn call(&mut self, _: ()) -> Self::Future {
-            actix_rt::time::sleep(self.0)
-                .then(|_| ok::<_, ()>(()))
-                .boxed_local()
+            let sleep = actix_rt::time::sleep(self.0);
+            Box::pin(async move {
+                sleep.await;
+                Ok(())
+            })
         }
     }
 
@@ -248,7 +249,7 @@ mod tests {
 
         let timeout = apply(
             Timeout::new(resolution),
-            fn_factory(|| ok::<_, ()>(SleepService(wait_time))),
+            fn_factory(|| async { Ok::<_, ()>(SleepService(wait_time)) }),
         );
         let mut srv = timeout.new_service(&()).await.unwrap();
 
