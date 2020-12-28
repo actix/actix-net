@@ -59,6 +59,6 @@ tokio-tls = { version = "0.3", optional = true }
 bytes = "0.5"
 log = "0.4"
 env_logger = "0.7"
-actix-testing = "1.0.0"
-actix-server = "1"
+actix-testing = "2.0.0-beta.1"
+actix-server = "2.0.0-beta.1"
 actix-rt = "1"
