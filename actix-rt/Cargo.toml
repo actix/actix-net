@@ -18,9 +18,4 @@ path = "src/lib.rs"
 [dependencies]
 actix-macros = "0.1.0"
 
-futures-channel = "0.3.7"
-tokio = { version = "0.2.6", default-features = false, features = ["rt-core", "rt-util", "io-driver", "tcp", "uds", "udp", "time", "signal", "stream"] }
-
-[dev-dependencies]
-futures-util = { version = "0.3.7", default-features = false, features = ["alloc"] }
-tokio = { version = "0.2.6", features = ["full"] }
+tokio = { version = "1", features = ["rt", "net", "signal", "sync", "time"] }

@@ -7,12 +7,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll};
 use std::{fmt, thread};
 
-use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
-use futures_channel::oneshot::{channel, Canceled, Sender};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::oneshot::{channel, error::RecvError as Canceled, Sender};
 // use futures_util::stream::FuturesUnordered;
 // use tokio::task::JoinHandle;
 // use tokio::stream::StreamExt;
-use tokio::stream::Stream;
 use tokio::task::LocalSet;
 
 use crate::runtime::Runtime;
@@ -70,7 +69,7 @@ impl Default for Arbiter {
 
 impl Arbiter {
     pub(crate) fn new_system(local: &LocalSet) -> Self {
-        let (tx, rx) = unbounded();
+        let (tx, rx) = unbounded_channel();
 
         let arb = Arbiter::with_sender(tx);
         ADDR.with(|cell| *cell.borrow_mut() = Some(arb.clone()));
@@ -98,7 +97,7 @@ impl Arbiter {
 
     /// Stop arbiter from continuing it's event loop.
     pub fn stop(&self) {
-        let _ = self.sender.unbounded_send(ArbiterCommand::Stop);
+        let _ = self.sender.send(ArbiterCommand::Stop);
     }
 
     /// Spawn new thread and run event loop in spawned thread.
@@ -107,14 +106,14 @@ impl Arbiter {
         let id = COUNT.fetch_add(1, Ordering::Relaxed);
         let name = format!("actix-rt:worker:{}", id);
         let sys = System::current();
-        let (tx, rx) = unbounded();
+        let (tx, rx) = unbounded_channel();
 
         let handle = thread::Builder::new()
             .name(name.clone())
             .spawn({
                 let tx = tx.clone();
                 move || {
-                    let mut rt = Runtime::new().expect("Can not create Runtime");
+                    let rt = Runtime::new().expect("Can not create Runtime");
                     let arb = Arbiter::with_sender(tx);
 
                     STORAGE.with(|cell| cell.borrow_mut().clear());
@@ -126,7 +125,7 @@ impl Arbiter {
                     // register arbiter
                     let _ = System::current()
                         .sys()
-                        .unbounded_send(SystemCommand::RegisterArbiter(id, arb));
+                        .send(SystemCommand::RegisterArbiter(id, arb));
 
                     // start arbiter controller
                     // run loop
@@ -135,7 +134,7 @@ impl Arbiter {
                     // unregister arbiter
                     let _ = System::current()
                         .sys()
-                        .unbounded_send(SystemCommand::UnregisterArbiter(id));
+                        .send(SystemCommand::UnregisterArbiter(id));
                 }
             })
             .unwrap_or_else(|err| {
@@ -181,9 +180,7 @@ impl Arbiter {
     where
         F: Future<Output = ()> + Send + Unpin + 'static,
     {
-        let _ = self
-            .sender
-            .unbounded_send(ArbiterCommand::Execute(Box::new(future)));
+        let _ = self.sender.send(ArbiterCommand::Execute(Box::new(future)));
     }
 
     /// Send a function to the Arbiter's thread, and execute it. Any result from the function
@@ -194,7 +191,7 @@ impl Arbiter {
     {
         let _ = self
             .sender
-            .unbounded_send(ArbiterCommand::ExecuteFn(Box::new(move || {
+            .send(ArbiterCommand::ExecuteFn(Box::new(move || {
                 f();
             })));
     }
@@ -210,8 +207,8 @@ impl Arbiter {
         let (tx, rx) = channel();
         let _ = self
             .sender
-            .unbounded_send(ArbiterCommand::ExecuteFn(Box::new(move || {
-                if !tx.is_canceled() {
+            .send(ArbiterCommand::ExecuteFn(Box::new(move || {
+                if !tx.is_closed() {
                     let _ = tx.send(f());
                 }
             })));
@@ -328,7 +325,7 @@ impl Future for ArbiterController {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
-            match Pin::new(&mut self.rx).poll_next(cx) {
+            match Pin::new(&mut self.rx).poll_recv(cx) {
                 Poll::Ready(None) => return Poll::Ready(()),
                 Poll::Ready(Some(item)) => match item {
                     ArbiterCommand::Stop => return Poll::Ready(()),
@@ -393,7 +390,7 @@ impl Future for SystemArbiter {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
-            match Pin::new(&mut self.commands).poll_next(cx) {
+            match Pin::new(&mut self.commands).poll_recv(cx) {
                 Poll::Ready(None) => return Poll::Ready(()),
                 Poll::Ready(Some(cmd)) => match cmd {
                     SystemCommand::Exit(code) => {

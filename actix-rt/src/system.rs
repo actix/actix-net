@@ -3,7 +3,7 @@ use std::future::Future;
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use futures_channel::mpsc::UnboundedSender;
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::LocalSet;
 
 use crate::arbiter::{Arbiter, SystemCommand};
@@ -70,7 +70,7 @@ impl System {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// use tokio::{runtime::Runtime, task::LocalSet};
     /// use actix_rt::System;
     /// use futures_util::future::try_join_all;
@@ -94,10 +94,9 @@ impl System {
     /// }
     ///
     ///
-    /// let mut runtime = tokio::runtime::Builder::new()
-    ///     .core_threads(2)
+    /// let runtime = tokio::runtime::Builder::new_multi_thread()
+    ///     .worker_threads(2)
     ///     .enable_all()
-    ///     .threaded_scheduler()
     ///     .build()
     ///     .unwrap();
     ///
@@ -140,7 +139,7 @@ impl System {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// use tokio::runtime::Runtime;
     /// use actix_rt::System;
     /// use futures_util::future::try_join_all;
@@ -164,10 +163,9 @@ impl System {
     /// }
     ///
     ///
-    /// let runtime = tokio::runtime::Builder::new()
-    ///     .core_threads(2)
+    /// let runtime = tokio::runtime::Builder::new_multi_thread()
+    ///     .worker_threads(2)
     ///     .enable_all()
-    ///     .threaded_scheduler()
     ///     .build()
     ///     .unwrap();
     ///
@@ -176,7 +174,7 @@ impl System {
     /// ```
     pub fn attach_to_tokio<Fut, R>(
         name: impl Into<String>,
-        mut runtime: tokio::runtime::Runtime,
+        runtime: tokio::runtime::Runtime,
         rest_operations: Fut,
     ) -> R
     where
@@ -233,7 +231,7 @@ impl System {
 
     /// Stop the system with a particular exit code.
     pub fn stop_with_code(&self, code: i32) {
-        let _ = self.sys.unbounded_send(SystemCommand::Exit(code));
+        let _ = self.sys.send(SystemCommand::Exit(code));
     }
 
     pub(crate) fn sys(&self) -> &UnboundedSender<SystemCommand> {

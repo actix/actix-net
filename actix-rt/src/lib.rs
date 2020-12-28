@@ -58,7 +58,7 @@ pub mod net {
 /// Utilities for tracking time.
 pub mod time {
     pub use tokio::time::Instant;
-    pub use tokio::time::{delay_for, delay_until, Delay};
     pub use tokio::time::{interval, interval_at, Interval};
+    pub use tokio::time::{sleep, sleep_until, Sleep};
     pub use tokio::time::{timeout, Timeout};
 }

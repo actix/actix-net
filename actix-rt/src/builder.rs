@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::future::Future;
 use std::io;
 
-use futures_channel::mpsc::unbounded;
-use futures_channel::oneshot::{channel, Receiver};
+use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::oneshot::{channel, Receiver};
 use tokio::task::LocalSet;
 
 use crate::arbiter::{Arbiter, SystemArbiter};
@@ -72,7 +72,7 @@ impl Builder {
 
     fn create_async_runtime(self, local: &LocalSet) -> AsyncSystemRunner {
         let (stop_tx, stop) = channel();
-        let (sys_sender, sys_receiver) = unbounded();
+        let (sys_sender, sys_receiver) = unbounded_channel();
 
         let system =
             System::construct(sys_sender, Arbiter::new_system(local), self.stop_on_panic);
@@ -91,9 +91,9 @@ impl Builder {
         F: FnOnce(),
     {
         let (stop_tx, stop) = channel();
-        let (sys_sender, sys_receiver) = unbounded();
+        let (sys_sender, sys_receiver) = unbounded_channel();
 
-        let mut rt = Runtime::new().unwrap();
+        let rt = Runtime::new().unwrap();
 
         let system = System::construct(
             sys_sender,
@@ -157,7 +157,7 @@ impl SystemRunner {
     /// This function will start event loop and will finish once the
     /// `System::stop()` function is called.
     pub fn run(self) -> io::Result<()> {
-        let SystemRunner { mut rt, stop, .. } = self;
+        let SystemRunner { rt, stop, .. } = self;
 
         // run loop
         match rt.block_on(stop) {
@@ -177,10 +177,7 @@ impl SystemRunner {
 
     /// Execute a future and wait for result.
     #[inline]
-    pub fn block_on<F, O>(&mut self, fut: F) -> O
-    where
-        F: Future<Output = O>,
-    {
+    pub fn block_on<F: Future>(&self, fut: F) -> F::Output {
         self.rt.block_on(fut)
     }
 }
