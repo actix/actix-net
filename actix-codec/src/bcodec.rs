@@ -14,7 +14,7 @@ impl Encoder<Bytes> for BytesCodec {
 
     #[inline]
     fn encode(&mut self, item: Bytes, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        dst.extend_from_slice(item.bytes());
+        dst.extend_from_slice(item.chunk());
         Ok(())
     }
 }

@@ -9,7 +9,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 use core::{fmt, time};
 
-use actix_rt::time::{delay_for, Delay};
+use actix_rt::time::{sleep, Sleep};
 use actix_service::{IntoService, Service, Transform};
 use pin_project_lite::pin_project;
 
@@ -85,8 +85,8 @@ where
 {
     type Response = S::Response;
     type Error = TimeoutError<S::Error>;
-    type InitError = E;
     type Transform = TimeoutService<S, Req>;
+    type InitError = E;
     type Future = TimeoutFuture<Self::Transform, Self::InitError>;
 
     fn new_transform(&self, service: S) -> Self::Future {
@@ -157,7 +157,7 @@ where
     fn call(&mut self, request: Req) -> Self::Future {
         TimeoutServiceResponse {
             fut: self.service.call(request),
-            sleep: delay_for(self.timeout),
+            sleep: sleep(self.timeout),
         }
     }
 }
@@ -171,7 +171,8 @@ pin_project! {
     {
         #[pin]
         fut: S::Future,
-        sleep: Delay,
+        #[pin]
+        sleep: Sleep,
     }
 }
 
@@ -193,20 +194,18 @@ where
         }
 
         // Now check the sleep
-        Pin::new(this.sleep)
-            .poll(cx)
-            .map(|_| Err(TimeoutError::Timeout))
+        this.sleep.poll(cx).map(|_| Err(TimeoutError::Timeout))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::task::Poll;
-    use std::time::Duration;
+    use core::task::Poll;
+    use core::time::Duration;
 
     use super::*;
     use actix_service::{apply, fn_factory, Service, ServiceFactory};
-    use futures_util::future::{ok, FutureExt, LocalBoxFuture};
+    use futures_core::future::LocalBoxFuture;
 
     struct SleepService(Duration);
 
@@ -218,9 +217,11 @@ mod tests {
         actix_service::always_ready!();
 
         fn call(&mut self, _: ()) -> Self::Future {
-            actix_rt::time::delay_for(self.0)
-                .then(|_| ok::<_, ()>(()))
-                .boxed_local()
+            let sleep = actix_rt::time::sleep(self.0);
+            Box::pin(async move {
+                sleep.await;
+                Ok(())
+            })
         }
     }
 
@@ -249,7 +250,7 @@ mod tests {
 
         let timeout = apply(
             Timeout::new(resolution),
-            fn_factory(|| ok::<_, ()>(SleepService(wait_time))),
+            fn_factory(|| async { Ok::<_, ()>(SleepService(wait_time)) }),
         );
         let mut srv = timeout.new_service(&()).await.unwrap();
 
