@@ -1,6 +1,7 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
+* Update `bytes` dependency to `1`.
 * Use `pin-project-lite` to replace `pin-project`. [#229]
 * Remove `condition`,`either`,`inflight`,`keepalive`,`oneshot`,`order`,`stream` and `time` mods. [#229]
 
