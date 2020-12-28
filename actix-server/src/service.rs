@@ -2,15 +2,13 @@ use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
 
-use actix_rt::spawn;
 use actix_service::{Service, ServiceFactory as BaseServiceFactory};
 use actix_utils::counter::CounterGuard;
-use futures_util::future::{err, ok, LocalBoxFuture, Ready};
-use futures_util::{FutureExt, TryFutureExt};
+use futures_core::future::LocalBoxFuture;
 use log::error;
 
-use super::Token;
-use crate::socket::{FromStream, StdStream};
+use crate::socket::{FromStream, MioStream};
+use crate::{ready, Ready, Token};
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
     type Factory: BaseServiceFactory<Stream, Config = ()>;
@@ -28,7 +26,7 @@ pub(crate) trait InternalServiceFactory: Send {
 
 pub(crate) type BoxedServerService = Box<
     dyn Service<
-        (Option<CounterGuard>, StdStream),
+        (Option<CounterGuard>, MioStream),
         Response = (),
         Error = (),
         Future = Ready<Result<(), ()>>,
@@ -49,7 +47,7 @@ impl<S, I> StreamService<S, I> {
     }
 }
 
-impl<S, I> Service<(Option<CounterGuard>, StdStream)> for StreamService<S, I>
+impl<S, I> Service<(Option<CounterGuard>, MioStream)> for StreamService<S, I>
 where
     S: Service<I>,
     S::Future: 'static,
@@ -64,21 +62,21 @@ where
         self.service.poll_ready(ctx).map_err(|_| ())
     }
 
-    fn call(&mut self, (guard, req): (Option<CounterGuard>, StdStream)) -> Self::Future {
-        match FromStream::from_stdstream(req) {
+    fn call(&mut self, (guard, req): (Option<CounterGuard>, MioStream)) -> Self::Future {
+        ready(match FromStream::from_mio(req) {
             Ok(stream) => {
                 let f = self.service.call(stream);
-                spawn(async move {
+                actix_rt::spawn(async move {
                     let _ = f.await;
                     drop(guard);
                 });
-                ok(())
+                Ok(())
             }
             Err(e) => {
                 error!("Can not convert to an async tcp stream: {}", e);
-                err(())
+                Err(())
             }
-        }
+        })
     }
 }
 
@@ -132,15 +130,16 @@ where
 
     fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>> {
         let token = self.token;
-        self.inner
-            .create()
-            .new_service(())
-            .map_err(|_| ())
-            .map_ok(move |inner| {
-                let service: BoxedServerService = Box::new(StreamService::new(inner));
-                vec![(token, service)]
-            })
-            .boxed_local()
+        let fut = self.inner.create().new_service(());
+        Box::pin(async move {
+            match fut.await {
+                Ok(inner) => {
+                    let service = Box::new(StreamService::new(inner)) as _;
+                    Ok(vec![(token, service)])
+                }
+                Err(_) => Err(()),
+            }
+        })
     }
 }
 
