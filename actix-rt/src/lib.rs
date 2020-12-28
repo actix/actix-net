@@ -1,4 +1,5 @@
-//! A runtime implementation that runs everything on the current thread.
+//! Tokio-based single-thread async runtime for the Actix ecosystem.
+
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
