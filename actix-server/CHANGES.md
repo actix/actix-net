@@ -3,6 +3,12 @@
 ## Unreleased - 2020-xx-xx
 * Added explicit info log message on accept queue pause. [#215]
 * Prevent double registration of sockets when back-pressure is resolved. [#223]
+* Update `mio` dependency to `0.7.3`.
+* Remove `socket2` dependency.
+* `ServerBuilder::backlog` would accept `u32` instead of `i32`.
+* Remove `AcceptNotify` type and pass `WakerQueue` to `Worker` for wake up the `Accept`'s `Poll`.
+* Convert `mio::net::TcpStream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using `FromRawFd` and `IntoRawFd`(`FromRawSocket` and `IntoRawSocket` on windows).
+* Remove `AsyncRead` and `AsyncWrite` trait bound for `socket::FromStream` trait.
 
 [#215]: https://github.com/actix/actix-net/pull/215
 [#223]: https://github.com/actix/actix-net/pull/223

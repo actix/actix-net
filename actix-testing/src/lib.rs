@@ -83,7 +83,7 @@ impl TestServer {
 
         // run server in separate thread
         thread::spawn(move || {
-            let mut sys = System::new("actix-test-server");
+            let sys = System::new("actix-test-server");
             let tcp = net::TcpListener::bind("127.0.0.1:0").unwrap();
             let local_addr = tcp.local_addr().unwrap();
 
@@ -94,9 +94,8 @@ impl TestServer {
                     .workers(1)
                     .disable_signals()
                     .start();
+                tx.send((System::current(), local_addr)).unwrap();
             });
-
-            tx.send((System::current(), local_addr)).unwrap();
             sys.run()
         });
 

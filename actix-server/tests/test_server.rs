@@ -5,14 +5,13 @@ use std::{net, thread, time};
 use actix_server::Server;
 use actix_service::fn_service;
 use futures_util::future::{lazy, ok};
-use socket2::{Domain, Protocol, Socket, Type};
 
 fn unused_addr() -> net::SocketAddr {
     let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-    let socket = Socket::new(Domain::ipv4(), Type::stream(), Some(Protocol::tcp())).unwrap();
-    socket.bind(&addr.into()).unwrap();
-    socket.set_reuse_address(true).unwrap();
-    let tcp = socket.into_tcp_listener();
+    let socket = mio::net::TcpSocket::new_v4().unwrap();
+    socket.bind(addr).unwrap();
+    socket.set_reuseaddr(true).unwrap();
+    let tcp = socket.listen(32).unwrap();
     tcp.local_addr().unwrap()
 }
 
@@ -22,8 +21,7 @@ fn test_bind() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let mut sys = actix_rt::System::new("test");
-
+        let sys = actix_rt::System::new("test");
         let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .workers(1)
@@ -49,16 +47,16 @@ fn test_listen() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let mut sys = actix_rt::System::new("test");
+        let sys = actix_rt::System::new("test");
         let lst = net::TcpListener::bind(addr).unwrap();
-        sys.block_on(lazy(|_| {
+        sys.block_on(async {
             Server::build()
                 .disable_signals()
                 .workers(1)
                 .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
                 .start()
-        }));
+        });
         let _ = tx.send(actix_rt::System::current());
         let _ = sys.run();
     });
@@ -83,7 +81,7 @@ fn test_start() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let mut sys = actix_rt::System::new("test");
+        let sys = actix_rt::System::new("test");
         let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .backlog(100)
@@ -102,6 +100,7 @@ fn test_start() {
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
     });
+
     let (srv, sys) = rx.recv().unwrap();
 
     let mut buf = [1u8; 4];
@@ -151,7 +150,7 @@ fn test_configure() {
 
     let h = thread::spawn(move || {
         let num = num2.clone();
-        let mut sys = actix_rt::System::new("test");
+        let sys = actix_rt::System::new("test");
         let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .disable_signals()
