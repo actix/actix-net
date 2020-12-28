@@ -1,17 +1,22 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
+
+
+## 2.0.0-beta.1 - 2020-12-28
 * Added explicit info log message on accept queue pause. [#215]
 * Prevent double registration of sockets when back-pressure is resolved. [#223]
-* Update `mio` dependency to `0.7.3`.
-* Remove `socket2` dependency.
-* `ServerBuilder::backlog` would accept `u32` instead of `i32`.
-* Remove `AcceptNotify` type and pass `WakerQueue` to `Worker` for wake up the `Accept`'s `Poll`.
-* Convert `mio::net::TcpStream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using `FromRawFd` and `IntoRawFd`(`FromRawSocket` and `IntoRawSocket` on windows).
-* Remove `AsyncRead` and `AsyncWrite` trait bound for `socket::FromStream` trait.
+* Update `mio` dependency to `0.7.3`. [#239]
+* Remove `socket2` dependency. [#239]
+* `ServerBuilder::backlog` now accepts `u32` instead of `i32`. [#239]
+* Remove `AcceptNotify` type and pass `WakerQueue` to `Worker` to wake up `Accept`'s `Poll`. [#239]
+* Convert `mio::net::TcpStream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using
+  `FromRawFd` and `IntoRawFd`(`FromRawSocket` and `IntoRawSocket` on windows). [#239]
+* Remove `AsyncRead` and `AsyncWrite` trait bound for `socket::FromStream` trait. [#239]
 
 [#215]: https://github.com/actix/actix-net/pull/215
 [#223]: https://github.com/actix/actix-net/pull/223
+[#239]: https://github.com/actix/actix-net/pull/239
 
 
 ## 1.0.4 - 2020-09-12
