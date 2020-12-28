@@ -6,12 +6,17 @@ use std::task::{Context, Poll};
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
-use futures_util::future::{ok, FutureExt, LocalBoxFuture, Ready};
+use futures_util::{
+    future::{ok, Ready},
+    ready,
+};
 
-pub use open_ssl::ssl::{AlpnError, SslAcceptor, SslAcceptorBuilder};
-pub use tokio_openssl::{HandshakeError, SslStream};
+pub use openssl::ssl::{
+    AlpnError, Error as SslError, HandshakeError, Ssl, SslAcceptor, SslAcceptorBuilder,
+};
+pub use tokio_openssl::SslStream;
 
-use crate::MAX_CONN_COUNTER;
+use super::MAX_CONN_COUNTER;
 
 /// Accept TLS connections via `openssl` package.
 ///
@@ -42,10 +47,12 @@ impl<T: AsyncRead + AsyncWrite> Clone for Acceptor<T> {
     }
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin + 'static> ServiceFactory for Acceptor<T> {
-    type Request = T;
+impl<T> ServiceFactory<T> for Acceptor<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin + 'static,
+{
     type Response = SslStream<T>;
-    type Error = HandshakeError<T>;
+    type Error = SslError;
     type Config = ();
     type Service = AcceptorService<T>;
     type InitError = ();
@@ -68,10 +75,12 @@ pub struct AcceptorService<T> {
     io: PhantomData<T>,
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin + 'static> Service for AcceptorService<T> {
-    type Request = T;
+impl<T> Service<T> for AcceptorService<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin + 'static,
+{
     type Response = SslStream<T>;
-    type Error = HandshakeError<T>;
+    type Error = SslError;
     type Future = AcceptorServiceResponse<T>;
 
     fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -82,15 +91,14 @@ impl<T: AsyncRead + AsyncWrite + Unpin + 'static> Service for AcceptorService<T>
         }
     }
 
-    fn call(&mut self, req: Self::Request) -> Self::Future {
+    fn call(&mut self, io: T) -> Self::Future {
         let acc = self.acceptor.clone();
+        let ssl_ctx = acc.into_context();
+        let ssl = Ssl::new(&ssl_ctx).expect("Provided SSL acceptor was invalid.");
+
         AcceptorServiceResponse {
             _guard: self.conns.get(),
-            fut: async move {
-                let acc = acc;
-                tokio_openssl::accept(&acc, req).await
-            }
-            .boxed_local(),
+            stream: Some(SslStream::new(ssl, io).unwrap()),
         }
     }
 }
@@ -99,15 +107,15 @@ pub struct AcceptorServiceResponse<T>
 where
     T: AsyncRead + AsyncWrite,
 {
-    fut: LocalBoxFuture<'static, Result<SslStream<T>, HandshakeError<T>>>,
+    stream: Option<SslStream<T>>,
     _guard: CounterGuard,
 }
 
 impl<T: AsyncRead + AsyncWrite + Unpin> Future for AcceptorServiceResponse<T> {
-    type Output = Result<SslStream<T>, HandshakeError<T>>;
+    type Output = Result<SslStream<T>, SslError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let io = futures_util::ready!(Pin::new(&mut self.fut).poll(cx))?;
-        Poll::Ready(Ok(io))
+        ready!(Pin::new(self.stream.as_mut().unwrap()).poll_connect(cx))?;
+        Poll::Ready(Ok(self.stream.take().expect("SSL connect has resolved.")))
     }
 }

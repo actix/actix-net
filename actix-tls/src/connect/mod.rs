@@ -5,22 +5,12 @@
 //! * `openssl` - enables TLS support via `openssl` crate
 //! * `rustls` - enables TLS support via `rustls` crate
 
-#![deny(rust_2018_idioms, nonstandard_style)]
-#![recursion_limit = "128"]
-#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
-#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
-
-#[macro_use]
-extern crate log;
-
 mod connect;
 mod connector;
 mod error;
 mod resolve;
 mod service;
 pub mod ssl;
-
-#[cfg(feature = "uri")]
 mod uri;
 
 use actix_rt::{net::TcpStream, Arbiter};
