@@ -1,7 +1,6 @@
 [workspace]
 members = [
   "actix-codec",
-  "actix-connect",
   "actix-rt",
   "actix-macros",
   "actix-service",
@@ -16,16 +15,15 @@ members = [
 ]
 
 [patch.crates-io]
-actix-codec = { git = "https://github.com/actix/actix-net.git", rev = "ba44ea7d0bafaf5fccb9a34003d503e1910943ee" }
-actix-connect = { path = "actix-connect" }
-actix-rt = { git = "https://github.com/actix/actix-net.git", rev = "ba44ea7d0bafaf5fccb9a34003d503e1910943ee" }
+actix-codec = { path = "actix-codec" }
+actix-rt = { path = "actix-rt" }
 actix-macros = { path = "actix-macros" }
 actix-server = { path = "actix-server" }
-actix-service = { git = "https://github.com/actix/actix-net.git", rev = "ba44ea7d0bafaf5fccb9a34003d503e1910943ee" }
+actix-service = { path = "actix-service" }
 actix-testing = { path = "actix-testing" }
 actix-threadpool = { path = "actix-threadpool" }
 actix-tls = { path = "actix-tls" }
 actix-tracing = { path = "actix-tracing" }
-actix-utils = { git = "https://github.com/actix/actix-net.git", rev = "ba44ea7d0bafaf5fccb9a34003d503e1910943ee" }
+actix-utils = { path = "actix-utils" }
 actix-router = { path = "router" }
 bytestring = { path = "string" }

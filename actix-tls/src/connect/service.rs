@@ -8,10 +8,10 @@ use either::Either;
 use futures_util::future::{ok, Ready};
 use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 
-use crate::connect::{Address, Connect, Connection};
-use crate::connector::{TcpConnector, TcpConnectorFactory};
-use crate::error::ConnectError;
-use crate::resolve::{Resolver, ResolverFactory};
+use super::connect::{Address, Connect, Connection};
+use super::connector::{TcpConnector, TcpConnectorFactory};
+use super::error::ConnectError;
+use super::resolve::{Resolver, ResolverFactory};
 
 pub struct ConnectServiceFactory<T> {
     tcp: TcpConnectorFactory<T>,

@@ -9,6 +9,7 @@ use std::task::{Context, Poll};
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
 use futures_util::future::{err, ok, BoxFuture, Either, FutureExt, Ready};
+use log::{error, trace};
 
 use super::connect::{Address, Connect, Connection};
 use super::error::ConnectError;

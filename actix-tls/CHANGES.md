@@ -1,6 +1,11 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
+* Move acceptors under `accept` module. [#238]
+* Merge `actix-connect` crate under `connect` module. [#238]
+* Add feature flags to enable acceptors and/or connectors individually.
+
+[#238]: https://github.com/actix/actix-net/pull/238
 
 
 ## 2.0.0 - 2020-09-03

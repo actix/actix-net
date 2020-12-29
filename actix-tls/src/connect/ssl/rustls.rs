@@ -5,16 +5,17 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-pub use rust_tls::Session;
+pub use rustls::Session;
 pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use futures_util::future::{ok, Ready};
+use log::trace;
 use tokio_rustls::{Connect, TlsConnector};
 use webpki::DNSNameRef;
 
-use crate::{Address, Connection};
+use crate::connect::{Address, Connection};
 
 /// Rustls connector factory
 pub struct RustlsConnector<T, U> {
@@ -53,11 +54,10 @@ impl<T, U> Clone for RustlsConnector<T, U> {
     }
 }
 
-impl<T: Address, U> ServiceFactory for RustlsConnector<T, U>
+impl<T: Address, U> ServiceFactory<Connection<T, U>> for RustlsConnector<T, U>
 where
     U: AsyncRead + AsyncWrite + Unpin + fmt::Debug,
 {
-    type Request = Connection<T, U>;
     type Response = Connection<T, TlsStream<U>>;
     type Error = std::io::Error;
     type Config = ();
@@ -87,11 +87,10 @@ impl<T, U> Clone for RustlsConnectorService<T, U> {
     }
 }
 
-impl<T: Address, U> Service for RustlsConnectorService<T, U>
+impl<T: Address, U> Service<Connection<T, U>> for RustlsConnectorService<T, U>
 where
     U: AsyncRead + AsyncWrite + Unpin + fmt::Debug,
 {
-    type Request = Connection<T, U>;
     type Response = Connection<T, TlsStream<U>>;
     type Error = std::io::Error;
     type Future = ConnectAsyncExt<T, U>;

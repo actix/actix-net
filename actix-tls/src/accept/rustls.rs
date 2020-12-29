@@ -11,11 +11,11 @@ use actix_utils::counter::{Counter, CounterGuard};
 use futures_util::future::{ok, Ready};
 use tokio_rustls::{Accept, TlsAcceptor};
 
-pub use rust_tls::{ServerConfig, Session};
+pub use rustls::{ServerConfig, Session};
 pub use tokio_rustls::server::TlsStream;
 pub use webpki_roots::TLS_SERVER_ROOTS;
 
-use crate::MAX_CONN_COUNTER;
+use super::MAX_CONN_COUNTER;
 
 /// Accept TLS connections via `rustls` package.
 ///
@@ -25,7 +25,10 @@ pub struct Acceptor<T> {
     io: PhantomData<T>,
 }
 
-impl<T: AsyncRead + AsyncWrite> Acceptor<T> {
+impl<T> Acceptor<T>
+where
+    T: AsyncRead + AsyncWrite,
+{
     /// Create Rustls based `Acceptor` service factory.
     #[inline]
     pub fn new(config: ServerConfig) -> Self {
@@ -46,8 +49,10 @@ impl<T> Clone for Acceptor<T> {
     }
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin> ServiceFactory for Acceptor<T> {
-    type Request = T;
+impl<T> ServiceFactory<T> for Acceptor<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
     type Response = TlsStream<T>;
     type Error = io::Error;
     type Service = AcceptorService<T>;
@@ -74,8 +79,10 @@ pub struct AcceptorService<T> {
     conns: Counter,
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin> Service for AcceptorService<T> {
-    type Request = T;
+impl<T> Service<T> for AcceptorService<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
     type Response = TlsStream<T>;
     type Error = io::Error;
     type Future = AcceptorServiceFut<T>;
@@ -88,7 +95,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> Service for AcceptorService<T> {
         }
     }
 
-    fn call(&mut self, req: Self::Request) -> Self::Future {
+    fn call(&mut self, req: T) -> Self::Future {
         AcceptorServiceFut {
             _guard: self.conns.get(),
             fut: self.acceptor.accept(req),
@@ -104,7 +111,10 @@ where
     _guard: CounterGuard,
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin> Future for AcceptorServiceFut<T> {
+impl<T> Future for AcceptorServiceFut<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
     type Output = Result<TlsStream<T>, io::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

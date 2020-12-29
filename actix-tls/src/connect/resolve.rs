@@ -6,12 +6,13 @@ use std::task::{Context, Poll};
 
 use actix_service::{Service, ServiceFactory};
 use futures_util::future::{ok, Either, Ready};
+use log::trace;
 use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 use trust_dns_resolver::{error::ResolveError, lookup_ip::LookupIp};
 
-use crate::connect::{Address, Connect};
-use crate::error::ConnectError;
-use crate::get_default_resolver;
+use super::connect::{Address, Connect};
+use super::error::ConnectError;
+use super::get_default_resolver;
 
 /// DNS Resolver Service factory
 pub struct ResolverFactory<T> {

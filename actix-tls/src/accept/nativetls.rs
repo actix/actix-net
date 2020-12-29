@@ -7,13 +7,13 @@ use actix_utils::counter::Counter;
 use futures_util::future::{self, FutureExt, LocalBoxFuture, TryFutureExt};
 
 pub use native_tls::Error;
-pub use tokio_tls::{TlsAcceptor, TlsStream};
+pub use tokio_native_tls::{TlsAcceptor, TlsStream};
 
-use crate::MAX_CONN_COUNTER;
+use super::MAX_CONN_COUNTER;
 
 /// Accept TLS connections via `native-tls` package.
 ///
-/// `nativetls` feature enables this `Acceptor` type.
+/// `native-tls` feature enables this `Acceptor` type.
 pub struct Acceptor<T> {
     acceptor: TlsAcceptor,
     io: PhantomData<T>,
@@ -43,11 +43,10 @@ impl<T> Clone for Acceptor<T> {
     }
 }
 
-impl<T> ServiceFactory for Acceptor<T>
+impl<T> ServiceFactory<T> for Acceptor<T>
 where
     T: AsyncRead + AsyncWrite + Unpin + 'static,
 {
-    type Request = T;
     type Response = TlsStream<T>;
     type Error = Error;
     type Service = NativeTlsAcceptorService<T>;
@@ -83,11 +82,10 @@ impl<T> Clone for NativeTlsAcceptorService<T> {
     }
 }
 
-impl<T> Service for NativeTlsAcceptorService<T>
+impl<T> Service<T> for NativeTlsAcceptorService<T>
 where
     T: AsyncRead + AsyncWrite + Unpin + 'static,
 {
-    type Request = T;
     type Response = TlsStream<T>;
     type Error = Error;
     type Future = LocalBoxFuture<'static, Result<TlsStream<T>, Error>>;
@@ -100,10 +98,10 @@ where
         }
     }
 
-    fn call(&mut self, req: Self::Request) -> Self::Future {
+    fn call(&mut self, io: T) -> Self::Future {
         let guard = self.conns.get();
         let this = self.clone();
-        async move { this.acceptor.accept(req).await }
+        async move { this.acceptor.accept(io).await }
             .map_ok(move |io| {
                 // Required to preserve `CounterGuard` until `Self::Future` is completely resolved.
                 let _ = guard;
