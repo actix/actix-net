@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -7,7 +6,7 @@ use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
 use futures_util::{
-    future::{ok, Ready},
+    future::{ready, Ready},
     ready,
 };
 
@@ -21,61 +20,54 @@ use super::MAX_CONN_COUNTER;
 /// Accept TLS connections via `openssl` package.
 ///
 /// `openssl` feature enables this `Acceptor` type.
-pub struct Acceptor<T: AsyncRead + AsyncWrite> {
+pub struct Acceptor {
     acceptor: SslAcceptor,
-    io: PhantomData<T>,
 }
 
-impl<T: AsyncRead + AsyncWrite> Acceptor<T> {
+impl Acceptor {
     /// Create OpenSSL based `Acceptor` service factory.
     #[inline]
     pub fn new(acceptor: SslAcceptor) -> Self {
-        Acceptor {
-            acceptor,
-            io: PhantomData,
-        }
+        Acceptor { acceptor }
     }
 }
 
-impl<T: AsyncRead + AsyncWrite> Clone for Acceptor<T> {
+impl Clone for Acceptor {
     #[inline]
     fn clone(&self) -> Self {
         Self {
             acceptor: self.acceptor.clone(),
-            io: PhantomData,
         }
     }
 }
 
-impl<T> ServiceFactory<T> for Acceptor<T>
+impl<T> ServiceFactory<T> for Acceptor
 where
     T: AsyncRead + AsyncWrite + Unpin + 'static,
 {
     type Response = SslStream<T>;
     type Error = SslError;
     type Config = ();
-    type Service = AcceptorService<T>;
+    type Service = AcceptorService;
     type InitError = ();
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         MAX_CONN_COUNTER.with(|conns| {
-            ok(AcceptorService {
+            ready(Ok(AcceptorService {
                 acceptor: self.acceptor.clone(),
                 conns: conns.clone(),
-                io: PhantomData,
-            })
+            }))
         })
     }
 }
 
-pub struct AcceptorService<T> {
+pub struct AcceptorService {
     acceptor: SslAcceptor,
     conns: Counter,
-    io: PhantomData<T>,
 }
 
-impl<T> Service<T> for AcceptorService<T>
+impl<T> Service<T> for AcceptorService
 where
     T: AsyncRead + AsyncWrite + Unpin + 'static,
 {

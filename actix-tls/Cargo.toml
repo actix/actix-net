@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 edition = "2018"
 
 [package.metadata.docs.rs]
-features = ["openssl", "rustls", "native-tls", "accept", "connect", "http"]
+features = ["openssl", "rustls", "native-tls", "accept", "connect", "uri"]
 
 [lib]
 name = "actix_tls"
@@ -23,13 +23,13 @@ name = "basic"
 required-features = ["accept", "rustls"]
 
 [features]
-default = ["accept", "connect", "http"]
+default = ["accept", "connect", "uri"]
 
 # enable acceptor services
 accept = []
 
 # enable connector services
-connect = []
+connect = ["trust-dns-proto/tokio-runtime", "trust-dns-resolver/tokio-runtime", "trust-dns-resolver/system-config"]
 
 # use openssl impls
 openssl = ["tls-openssl", "tokio-openssl"]
@@ -40,6 +40,9 @@ rustls = ["tls-rustls", "webpki", "webpki-roots", "tokio-rustls"]
 # use native-tls impls
 native-tls = ["tls-native-tls", "tokio-native-tls"]
 
+# support http::Uri as connect address
+uri = ["http"]
+
 [dependencies]
 actix-codec = "0.4.0-beta.1"
 actix-rt = "2.0.0-beta.1"
@@ -49,10 +52,12 @@ actix-utils = "3.0.0-beta.1"
 derive_more = "0.99.5"
 either = "1.6"
 futures-util = { version = "0.3.7", default-features = false }
-http = { version = "0.2.0", optional = true }
+http = { version = "0.2.2", optional = true }
 log = "0.4"
-trust-dns-proto = { version = "0.19", default-features = false, features = ["tokio-runtime"] }
-trust-dns-resolver = { version = "0.19", default-features = false, features = ["tokio-runtime", "system-config"] }
+
+# resolver
+trust-dns-proto = { version = "0.20.0-alpha.3", default-features = false, optional = true }
+trust-dns-resolver = { version = "0.20.0-alpha.3", default-features = false, optional = true }
 
 # openssl
 tls-openssl = { package = "openssl", version = "0.10", optional = true }
@@ -73,5 +78,6 @@ tokio-native-tls = { version = "0.3", optional = true }
 [dev-dependencies]
 actix-server = "2.0.0-beta.1"
 bytes = "1"
-log = "0.4"
 env_logger = "0.8"
+futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
+log = "0.4"
