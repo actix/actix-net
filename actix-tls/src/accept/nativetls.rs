@@ -1,10 +1,9 @@
-use std::marker::PhantomData;
 use std::task::{Context, Poll};
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
-use futures_util::future::{self, FutureExt, LocalBoxFuture, TryFutureExt};
+use futures_util::future::{ready, LocalBoxFuture, Ready};
 
 pub use native_tls::Error;
 pub use tokio_native_tls::{TlsAcceptor, TlsStream};
@@ -14,75 +13,64 @@ use super::MAX_CONN_COUNTER;
 /// Accept TLS connections via `native-tls` package.
 ///
 /// `native-tls` feature enables this `Acceptor` type.
-pub struct Acceptor<T> {
+pub struct Acceptor {
     acceptor: TlsAcceptor,
-    io: PhantomData<T>,
 }
 
-impl<T> Acceptor<T>
-where
-    T: AsyncRead + AsyncWrite + Unpin,
-{
+impl Acceptor {
     /// Create `native-tls` based `Acceptor` service factory.
     #[inline]
     pub fn new(acceptor: TlsAcceptor) -> Self {
-        Acceptor {
-            acceptor,
-            io: PhantomData,
-        }
+        Acceptor { acceptor }
     }
 }
 
-impl<T> Clone for Acceptor<T> {
+impl Clone for Acceptor {
     #[inline]
     fn clone(&self) -> Self {
         Self {
             acceptor: self.acceptor.clone(),
-            io: PhantomData,
         }
     }
 }
 
-impl<T> ServiceFactory<T> for Acceptor<T>
+impl<T> ServiceFactory<T> for Acceptor
 where
     T: AsyncRead + AsyncWrite + Unpin + 'static,
 {
     type Response = TlsStream<T>;
     type Error = Error;
-    type Service = NativeTlsAcceptorService<T>;
-
     type Config = ();
+
+    type Service = NativeTlsAcceptorService;
     type InitError = ();
-    type Future = future::Ready<Result<Self::Service, Self::InitError>>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         MAX_CONN_COUNTER.with(|conns| {
-            future::ok(NativeTlsAcceptorService {
+            ready(Ok(NativeTlsAcceptorService {
                 acceptor: self.acceptor.clone(),
                 conns: conns.clone(),
-                io: PhantomData,
-            })
+            }))
         })
     }
 }
 
-pub struct NativeTlsAcceptorService<T> {
+pub struct NativeTlsAcceptorService {
     acceptor: TlsAcceptor,
-    io: PhantomData<T>,
     conns: Counter,
 }
 
-impl<T> Clone for NativeTlsAcceptorService<T> {
+impl Clone for NativeTlsAcceptorService {
     fn clone(&self) -> Self {
         Self {
             acceptor: self.acceptor.clone(),
-            io: PhantomData,
             conns: self.conns.clone(),
         }
     }
 }
 
-impl<T> Service<T> for NativeTlsAcceptorService<T>
+impl<T> Service<T> for NativeTlsAcceptorService
 where
     T: AsyncRead + AsyncWrite + Unpin + 'static,
 {
@@ -101,12 +89,10 @@ where
     fn call(&mut self, io: T) -> Self::Future {
         let guard = self.conns.get();
         let this = self.clone();
-        async move { this.acceptor.accept(io).await }
-            .map_ok(move |io| {
-                // Required to preserve `CounterGuard` until `Self::Future` is completely resolved.
-                let _ = guard;
-                io
-            })
-            .boxed_local()
+        Box::pin(async move {
+            let io = this.acceptor.accept(io).await;
+            drop(guard);
+            io
+        })
     }
 }

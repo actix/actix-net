@@ -11,6 +11,7 @@ mod error;
 mod resolve;
 mod service;
 pub mod ssl;
+#[cfg(feature = "uri")]
 mod uri;
 
 use actix_rt::{net::TcpStream, Arbiter};
@@ -35,7 +36,7 @@ pub async fn start_resolver(
     cfg: ResolverConfig,
     opts: ResolverOpts,
 ) -> Result<AsyncResolver, ConnectError> {
-    Ok(AsyncResolver::tokio(cfg, opts).await?)
+    Ok(AsyncResolver::tokio(cfg, opts)?)
 }
 
 struct DefaultResolver(AsyncResolver);
@@ -52,7 +53,7 @@ pub(crate) async fn get_default_resolver() -> Result<AsyncResolver, ConnectError
             }
         };
 
-        let resolver = AsyncResolver::tokio(cfg, opts).await?;
+        let resolver = AsyncResolver::tokio(cfg, opts)?;
 
         Arbiter::set_item(DefaultResolver(resolver.clone()));
         Ok(resolver)

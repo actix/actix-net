@@ -1,6 +1,5 @@
 use std::future::Future;
 use std::io;
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -8,7 +7,7 @@ use std::task::{Context, Poll};
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
-use futures_util::future::{ok, Ready};
+use futures_util::future::{ready, Ready};
 use tokio_rustls::{Accept, TlsAcceptor};
 
 pub use rustls::{ServerConfig, Session};
@@ -20,66 +19,58 @@ use super::MAX_CONN_COUNTER;
 /// Accept TLS connections via `rustls` package.
 ///
 /// `rustls` feature enables this `Acceptor` type.
-pub struct Acceptor<T> {
+pub struct Acceptor {
     config: Arc<ServerConfig>,
-    io: PhantomData<T>,
 }
 
-impl<T> Acceptor<T>
-where
-    T: AsyncRead + AsyncWrite,
-{
+impl Acceptor {
     /// Create Rustls based `Acceptor` service factory.
     #[inline]
     pub fn new(config: ServerConfig) -> Self {
         Acceptor {
             config: Arc::new(config),
-            io: PhantomData,
         }
     }
 }
 
-impl<T> Clone for Acceptor<T> {
+impl Clone for Acceptor {
     #[inline]
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),
-            io: PhantomData,
         }
     }
 }
 
-impl<T> ServiceFactory<T> for Acceptor<T>
+impl<T> ServiceFactory<T> for Acceptor
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
     type Response = TlsStream<T>;
     type Error = io::Error;
-    type Service = AcceptorService<T>;
-
     type Config = ();
+
+    type Service = AcceptorService;
     type InitError = ();
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         MAX_CONN_COUNTER.with(|conns| {
-            ok(AcceptorService {
+            ready(Ok(AcceptorService {
                 acceptor: self.config.clone().into(),
                 conns: conns.clone(),
-                io: PhantomData,
-            })
+            }))
         })
     }
 }
 
 /// Rustls based `Acceptor` service
-pub struct AcceptorService<T> {
+pub struct AcceptorService {
     acceptor: TlsAcceptor,
-    io: PhantomData<T>,
     conns: Counter,
 }
 
-impl<T> Service<T> for AcceptorService<T>
+impl<T> Service<T> for AcceptorService
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
@@ -119,11 +110,6 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-
-        let res = futures_util::ready!(Pin::new(&mut this.fut).poll(cx));
-        match res {
-            Ok(io) => Poll::Ready(Ok(io)),
-            Err(e) => Poll::Ready(Err(e)),
-        }
+        Pin::new(&mut this.fut).poll(cx)
     }
 }
