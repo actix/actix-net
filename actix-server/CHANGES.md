@@ -1,7 +1,7 @@
 # Changes
 
 ## Unreleased - 2020-xx-xx
-
+* Merge `actix-testing` to `actix-server` as `test_server` mod.
 
 ## 2.0.0-beta.1 - 2020-12-28
 * Added explicit info log message on accept queue pause. [#215]
