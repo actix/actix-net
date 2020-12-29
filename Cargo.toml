@@ -5,7 +5,6 @@ members = [
   "actix-macros",
   "actix-service",
   "actix-server",
-  "actix-testing",
   "actix-threadpool",
   "actix-tls",
   "actix-tracing",
@@ -20,7 +19,6 @@ actix-rt = { path = "actix-rt" }
 actix-macros = { path = "actix-macros" }
 actix-server = { path = "actix-server" }
 actix-service = { path = "actix-service" }
-actix-testing = { path = "actix-testing" }
 actix-threadpool = { path = "actix-threadpool" }
 actix-tls = { path = "actix-tls" }
 actix-tracing = { path = "actix-tracing" }

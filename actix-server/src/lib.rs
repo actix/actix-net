@@ -11,6 +11,7 @@ mod server;
 mod service;
 mod signals;
 mod socket;
+mod test_server;
 mod waker_queue;
 mod worker;
 
@@ -18,6 +19,7 @@ pub use self::builder::ServerBuilder;
 pub use self::config::{ServiceConfig, ServiceRuntime};
 pub use self::server::Server;
 pub use self::service::ServiceFactory;
+pub use self::test_server::TestServer;
 
 #[doc(hidden)]
 pub use self::socket::FromStream;
