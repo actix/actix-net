@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::{err, ok, BoxFuture, Either, FutureExt, Ready};
+use futures_util::future::{ready, Ready};
 use log::{error, trace};
 
 use super::connect::{Address, Connect, Connection};
@@ -50,7 +50,7 @@ impl<T: Address> ServiceFactory<Connect<T>> for TcpConnectorFactory<T> {
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(self.service())
+        ready(Ok(self.service()))
     }
 }
 
@@ -73,8 +73,7 @@ impl<T> Clone for TcpConnector<T> {
 impl<T: Address> Service<Connect<T>> for TcpConnector<T> {
     type Response = Connection<T, TcpStream>;
     type Error = ConnectError;
-    #[allow(clippy::type_complexity)]
-    type Future = Either<TcpConnectorResponse<T>, Ready<Result<Self::Response, Self::Error>>>;
+    type Future = TcpConnectorResponse<T>;
 
     actix_service::always_ready!();
 
@@ -83,21 +82,26 @@ impl<T: Address> Service<Connect<T>> for TcpConnector<T> {
         let Connect { req, addr, .. } = req;
 
         if let Some(addr) = addr {
-            Either::Left(TcpConnectorResponse::new(req, port, addr))
+            TcpConnectorResponse::new(req, port, addr)
         } else {
             error!("TCP connector: got unresolved address");
-            Either::Right(err(ConnectError::Unresolved))
+            TcpConnectorResponse::Error(Some(ConnectError::Unresolved))
         }
     }
 }
 
+type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
 #[doc(hidden)]
 /// TCP stream connector response future
-pub struct TcpConnectorResponse<T> {
-    req: Option<T>,
-    port: u16,
-    addrs: Option<VecDeque<SocketAddr>>,
-    stream: Option<BoxFuture<'static, Result<TcpStream, io::Error>>>,
+pub enum TcpConnectorResponse<T> {
+    Response {
+        req: Option<T>,
+        port: u16,
+        addrs: Option<VecDeque<SocketAddr>>,
+        stream: Option<LocalBoxFuture<'static, Result<TcpStream, io::Error>>>,
+    },
+    Error(Option<ConnectError>),
 }
 
 impl<T: Address> TcpConnectorResponse<T> {
@@ -113,13 +117,13 @@ impl<T: Address> TcpConnectorResponse<T> {
         );
 
         match addr {
-            either::Either::Left(addr) => TcpConnectorResponse {
+            either::Either::Left(addr) => TcpConnectorResponse::Response {
                 req: Some(req),
                 port,
                 addrs: None,
-                stream: Some(TcpStream::connect(addr).boxed()),
+                stream: Some(Box::pin(TcpStream::connect(addr))),
             },
-            either::Either::Right(addrs) => TcpConnectorResponse {
+            either::Either::Right(addrs) => TcpConnectorResponse::Response {
                 req: Some(req),
                 port,
                 addrs: Some(addrs),
@@ -134,36 +138,43 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-
-        // connect
-        loop {
-            if let Some(new) = this.stream.as_mut() {
-                match new.as_mut().poll(cx) {
-                    Poll::Ready(Ok(sock)) => {
-                        let req = this.req.take().unwrap();
-                        trace!(
-                            "TCP connector - successfully connected to connecting to {:?} - {:?}",
-                            req.host(), sock.peer_addr()
-                        );
-                        return Poll::Ready(Ok(Connection::new(sock, req)));
-                    }
-                    Poll::Pending => return Poll::Pending,
-                    Poll::Ready(Err(err)) => {
-                        trace!(
-                            "TCP connector - failed to connect to connecting to {:?} port: {}",
-                            this.req.as_ref().unwrap().host(),
-                            this.port,
-                        );
-                        if this.addrs.is_none() || this.addrs.as_ref().unwrap().is_empty() {
-                            return Poll::Ready(Err(err.into()));
+        match this {
+            TcpConnectorResponse::Error(e) => Poll::Ready(Err(e.take().unwrap())),
+            // connect
+            TcpConnectorResponse::Response {
+                req,
+                port,
+                addrs,
+                stream,
+            } => loop {
+                if let Some(new) = stream.as_mut() {
+                    match new.as_mut().poll(cx) {
+                        Poll::Ready(Ok(sock)) => {
+                            let req = req.take().unwrap();
+                            trace!(
+                                "TCP connector - successfully connected to connecting to {:?} - {:?}",
+                                req.host(), sock.peer_addr()
+                            );
+                            return Poll::Ready(Ok(Connection::new(sock, req)));
+                        }
+                        Poll::Pending => return Poll::Pending,
+                        Poll::Ready(Err(err)) => {
+                            trace!(
+                                "TCP connector - failed to connect to connecting to {:?} port: {}",
+                                req.as_ref().unwrap().host(),
+                                port,
+                            );
+                            if addrs.is_none() || addrs.as_ref().unwrap().is_empty() {
+                                return Poll::Ready(Err(err.into()));
+                            }
                         }
                     }
                 }
-            }
 
-            // try to connect
-            let addr = this.addrs.as_mut().unwrap().pop_front().unwrap();
-            this.stream = Some(TcpStream::connect(addr).boxed());
+                // try to connect
+                let addr = addrs.as_mut().unwrap().pop_front().unwrap();
+                *stream = Some(Box::pin(TcpStream::connect(addr)));
+            },
         }
     }
 }

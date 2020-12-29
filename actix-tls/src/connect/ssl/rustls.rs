@@ -1,6 +1,5 @@
 use std::fmt;
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -10,7 +9,10 @@ pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::{ok, Ready};
+use futures_util::{
+    future::{ready, Ready},
+    ready,
+};
 use log::trace;
 use tokio_rustls::{Connect, TlsConnector};
 use webpki::DNSNameRef;
@@ -18,77 +20,63 @@ use webpki::DNSNameRef;
 use crate::connect::{Address, Connection};
 
 /// Rustls connector factory
-pub struct RustlsConnector<T, U> {
+pub struct RustlsConnector {
     connector: Arc<ClientConfig>,
-    _t: PhantomData<(T, U)>,
 }
 
-impl<T, U> RustlsConnector<T, U> {
+impl RustlsConnector {
     pub fn new(connector: Arc<ClientConfig>) -> Self {
-        RustlsConnector {
-            connector,
-            _t: PhantomData,
-        }
+        RustlsConnector { connector }
     }
 }
 
-impl<T, U> RustlsConnector<T, U>
-where
-    T: Address,
-    U: AsyncRead + AsyncWrite + Unpin + fmt::Debug,
-{
-    pub fn service(connector: Arc<ClientConfig>) -> RustlsConnectorService<T, U> {
-        RustlsConnectorService {
-            connector,
-            _t: PhantomData,
-        }
+impl RustlsConnector {
+    pub fn service(connector: Arc<ClientConfig>) -> RustlsConnectorService {
+        RustlsConnectorService { connector }
     }
 }
 
-impl<T, U> Clone for RustlsConnector<T, U> {
+impl Clone for RustlsConnector {
     fn clone(&self) -> Self {
         Self {
             connector: self.connector.clone(),
-            _t: PhantomData,
         }
     }
 }
 
-impl<T: Address, U> ServiceFactory<Connection<T, U>> for RustlsConnector<T, U>
+impl<T: Address, U> ServiceFactory<Connection<T, U>> for RustlsConnector
 where
     U: AsyncRead + AsyncWrite + Unpin + fmt::Debug,
 {
     type Response = Connection<T, TlsStream<U>>;
     type Error = std::io::Error;
     type Config = ();
-    type Service = RustlsConnectorService<T, U>;
+    type Service = RustlsConnectorService;
     type InitError = ();
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(RustlsConnectorService {
+        ready(Ok(RustlsConnectorService {
             connector: self.connector.clone(),
-            _t: PhantomData,
-        })
+        }))
     }
 }
 
-pub struct RustlsConnectorService<T, U> {
+pub struct RustlsConnectorService {
     connector: Arc<ClientConfig>,
-    _t: PhantomData<(T, U)>,
 }
 
-impl<T, U> Clone for RustlsConnectorService<T, U> {
+impl Clone for RustlsConnectorService {
     fn clone(&self) -> Self {
         Self {
             connector: self.connector.clone(),
-            _t: PhantomData,
         }
     }
 }
 
-impl<T: Address, U> Service<Connection<T, U>> for RustlsConnectorService<T, U>
+impl<T, U> Service<Connection<T, U>> for RustlsConnectorService
 where
+    T: Address,
     U: AsyncRead + AsyncWrite + Unpin + fmt::Debug,
 {
     type Response = Connection<T, TlsStream<U>>;
@@ -114,20 +102,18 @@ pub struct ConnectAsyncExt<T, U> {
     stream: Option<Connection<T, ()>>,
 }
 
-impl<T: Address, U> Future for ConnectAsyncExt<T, U>
+impl<T, U> Future for ConnectAsyncExt<T, U>
 where
+    T: Address,
     U: AsyncRead + AsyncWrite + Unpin + fmt::Debug,
 {
     type Output = Result<Connection<T, TlsStream<U>>, std::io::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-        Poll::Ready(
-            futures_util::ready!(Pin::new(&mut this.fut).poll(cx)).map(|stream| {
-                let s = this.stream.take().unwrap();
-                trace!("SSL Handshake success: {:?}", s.host());
-                s.replace(stream).1
-            }),
-        )
+        let stream = ready!(Pin::new(&mut this.fut).poll(cx))?;
+        let s = this.stream.take().unwrap();
+        trace!("SSL Handshake success: {:?}", s.host());
+        Poll::Ready(Ok(s.replace(stream).1))
     }
 }
