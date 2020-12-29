@@ -23,7 +23,7 @@ name = "basic"
 required-features = ["accept", "rustls"]
 
 [features]
-default = ["accept", "connect", "http", "native-tls"]
+default = ["accept", "connect", "http"]
 
 # enable acceptor services
 accept = []
