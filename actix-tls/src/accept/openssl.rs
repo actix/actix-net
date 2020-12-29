@@ -115,7 +115,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> Future for AcceptorServiceResponse<T> {
     type Output = Result<SslStream<T>, SslError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        ready!(Pin::new(self.stream.as_mut().unwrap()).poll_connect(cx))?;
+        ready!(Pin::new(self.stream.as_mut().unwrap()).poll_accept(cx))?;
         Poll::Ready(Ok(self.stream.take().expect("SSL connect has resolved.")))
     }
 }
