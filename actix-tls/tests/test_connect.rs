@@ -3,7 +3,7 @@ use std::io;
 use actix_codec::{BytesCodec, Framed};
 use actix_rt::net::TcpStream;
 use actix_service::{fn_service, Service, ServiceFactory};
-use actix_testing::TestServer;
+use actix_server::TestServer;
 use bytes::Bytes;
 use futures_util::sink::SinkExt;
 
