@@ -84,10 +84,8 @@ where
     }
 
     fn call(&mut self, io: T) -> Self::Future {
-        let acc = self.acceptor.clone();
-        let ssl_ctx = acc.into_context();
-        let ssl = Ssl::new(&ssl_ctx).expect("Provided SSL acceptor was invalid.");
-
+        let ssl_ctx = self.acceptor.context();
+        let ssl = Ssl::new(ssl_ctx).expect("Provided SSL acceptor was invalid.");
         AcceptorServiceResponse {
             _guard: self.conns.get(),
             stream: Some(SslStream::new(ssl, io).unwrap()),

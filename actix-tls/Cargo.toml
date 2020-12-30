@@ -56,8 +56,8 @@ http = { version = "0.2.2", optional = true }
 log = "0.4"
 
 # resolver
-trust-dns-proto = { version = "0.20.0-alpha.3", default-features = false, optional = true }
-trust-dns-resolver = { version = "0.20.0-alpha.3", default-features = false, optional = true }
+trust-dns-proto = { version = "0.20.0", default-features = false, optional = true }
+trust-dns-resolver = { version = "0.20.0", default-features = false, optional = true }
 
 # openssl
 tls-openssl = { package = "openssl", version = "0.10", optional = true }

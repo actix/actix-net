@@ -25,7 +25,3 @@ actix-tracing = { path = "actix-tracing" }
 actix-utils = { path = "actix-utils" }
 actix-router = { path = "router" }
 bytestring = { path = "string" }
-
-# FIXME: remove override
-trust-dns-proto = { git = "https://github.com/bluejekyll/trust-dns.git", branch = "main" }
-trust-dns-resolver = { git = "https://github.com/bluejekyll/trust-dns.git", branch = "main" }
