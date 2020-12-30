@@ -22,7 +22,6 @@
 [#207]: https://github.com/actix/actix-net/pull/207
 [#236]: https://github.com/actix/actix-net/pull/236
 
-
 ## [1.1.1] - 2020-04-30
 
 ### Fixed
