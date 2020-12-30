@@ -18,7 +18,6 @@
 [#223]: https://github.com/actix/actix-net/pull/223
 [#239]: https://github.com/actix/actix-net/pull/239
 
-[#215]: https://github.com/actix/actix-net/pull/215
 
 ## 1.0.4 - 2020-09-12
 * Update actix-codec to 0.3.0.
