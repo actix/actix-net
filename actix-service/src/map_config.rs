@@ -6,7 +6,7 @@ use super::{IntoServiceFactory, ServiceFactory};
 ///
 /// Note that this function consumes the receiving service factory and returns
 /// a wrapped version of it.
-pub fn map_config<I, SF, S, Req, F, Cfg>(factory: I, f: F) -> MapConfig<SF, Req, F, Cfg>
+pub fn map_config<I, SF, Req, F, Cfg>(factory: I, f: F) -> MapConfig<SF, Req, F, Cfg>
 where
     I: IntoServiceFactory<SF, Req>,
     SF: ServiceFactory<Req>,

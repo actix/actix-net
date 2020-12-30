@@ -2,15 +2,18 @@ use std::io;
 
 use actix_codec::{BytesCodec, Framed};
 use actix_rt::net::TcpStream;
+use actix_server::TestServer;
 use actix_service::{fn_service, Service, ServiceFactory};
-use actix_testing::TestServer;
 use bytes::Bytes;
 use futures_util::sink::SinkExt;
 
-use actix_connect::resolver::{ResolverConfig, ResolverOpts};
-use actix_connect::Connect;
+use actix_tls::connect::{
+    self as actix_connect,
+    resolver::{ResolverConfig, ResolverOpts},
+    Connect,
+};
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "connect", feature = "openssl"))]
 #[actix_rt::test]
 async fn test_string() {
     let srv = TestServer::with(|| {

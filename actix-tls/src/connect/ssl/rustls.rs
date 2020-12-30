@@ -4,17 +4,20 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-pub use rust_tls::Session;
+pub use rustls::Session;
 pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::{ready, Ready};
-use futures_util::ready;
+use futures_util::{
+    future::{ready, Ready},
+    ready,
+};
+use log::trace;
 use tokio_rustls::{Connect, TlsConnector};
 use webpki::DNSNameRef;
 
-use crate::{Address, Connection};
+use crate::connect::{Address, Connection};
 
 /// Rustls connector factory
 pub struct RustlsConnector {
@@ -99,8 +102,9 @@ pub struct ConnectAsyncExt<T, U> {
     stream: Option<Connection<T, ()>>,
 }
 
-impl<T: Address, U> Future for ConnectAsyncExt<T, U>
+impl<T, U> Future for ConnectAsyncExt<T, U>
 where
+    T: Address,
     U: AsyncRead + AsyncWrite + Unpin + fmt::Debug,
 {
     type Output = Result<Connection<T, TlsStream<U>>, std::io::Error>;

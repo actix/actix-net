@@ -1,19 +1,9 @@
-//! Various helpers for Actix applications to use during testing.
-
-#![deny(rust_2018_idioms, nonstandard_style)]
-#![allow(clippy::type_complexity, clippy::needless_doctest_main)]
-#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
-#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
-
 use std::sync::mpsc;
 use std::{net, thread};
 
 use actix_rt::{net::TcpStream, System};
-use actix_server::{Server, ServerBuilder, ServiceFactory};
-use socket2::{Domain, Protocol, Socket, Type};
 
-#[cfg(not(test))] // Work around for rust-lang/rust#62127
-pub use actix_macros::test;
+use crate::{Server, ServerBuilder, ServiceFactory};
 
 /// The `TestServer` type.
 ///
@@ -24,7 +14,7 @@ pub use actix_macros::test;
 ///
 /// ```rust
 /// use actix_service::fn_service;
-/// use actix_testing::TestServer;
+/// use actix_server::TestServer;
 ///
 /// #[actix_rt::main]
 /// async fn main() {
@@ -94,9 +84,8 @@ impl TestServer {
                     .workers(1)
                     .disable_signals()
                     .start();
+                tx.send((System::current(), local_addr)).unwrap();
             });
-
-            tx.send((System::current(), local_addr)).unwrap();
             sys.run()
         });
 
@@ -116,11 +105,10 @@ impl TestServer {
     /// Get first available unused local address
     pub fn unused_addr() -> net::SocketAddr {
         let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-        let socket =
-            Socket::new(Domain::ipv4(), Type::stream(), Some(Protocol::tcp())).unwrap();
-        socket.bind(&addr.into()).unwrap();
-        socket.set_reuse_address(true).unwrap();
-        let tcp = socket.into_tcp_listener();
+        let socket = mio::net::TcpSocket::new_v4().unwrap();
+        socket.bind(addr).unwrap();
+        socket.set_reuseaddr(true).unwrap();
+        let tcp = socket.listen(1024).unwrap();
         tcp.local_addr().unwrap()
     }
 }

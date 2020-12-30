@@ -1,7 +1,10 @@
 [package]
 name = "actix-server"
-version = "1.0.4"
-authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
+version = "2.0.0-beta.1"
+authors = [
+    "Nikolay Kim <fafhrd91@gmail.com>",
+    "fakeshadow <24548779@qq.com>",
+]
 description = "General purpose TCP server built for the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
 homepage = "https://actix.rs"
@@ -20,22 +23,20 @@ path = "src/lib.rs"
 default = []
 
 [dependencies]
-actix-service = "1.0.6"
-actix-rt = "1.1.1"
-actix-codec = "0.3.0"
-actix-utils = "2.0.0"
+actix-codec = "0.4.0-beta.1"
+actix-rt = "2.0.0-beta.1"
+actix-service = "2.0.0-beta.1"
+actix-utils = "3.0.0-beta.1"
 
-concurrent-queue = "1.2.2"
 futures-core = { version = "0.3.7", default-features = false }
 log = "0.4"
-mio = { version = "0.7.3", features = [ "os-poll", "tcp", "uds"] }
+mio = { version = "0.7.6", features = ["os-poll", "net"] }
 num_cpus = "1.13"
 slab = "0.4"
 tokio = { version = "1", features = ["sync"] }
 
 [dev-dependencies]
-actix-testing = "1.0.0"
 bytes = "1"
-env_logger = "0.7"
+env_logger = "0.8"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
 tokio = { version = "1", features = ["io-util"] }

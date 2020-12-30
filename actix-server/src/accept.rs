@@ -9,7 +9,7 @@ use slab::Slab;
 
 use crate::server::Server;
 use crate::socket::{MioListener, SocketAddr};
-use crate::waker_queue::{WakerInterest, WakerQueue, WakerQueueError, WAKER_TOKEN};
+use crate::waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN};
 use crate::worker::{Conn, WorkerHandle};
 use crate::Token;
 
@@ -166,26 +166,36 @@ impl Accept {
             for event in events.iter() {
                 let token = event.token();
                 match token {
-                    // This is a loop because interests for command from previous version was a
-                    // loop that would try to drain the command channel. It's yet unknown if it's
-                    // necessary/good practice to actively drain the waker queue.
+                    // This is a loop because interests for command from previous version was
+                    // a loop that would try to drain the command channel. It's yet unknown
+                    // if it's necessary/good practice to actively drain the waker queue.
                     WAKER_TOKEN => 'waker: loop {
-                        match self.waker.pop() {
-                            // worker notify it becomes available. we may want to recover from
-                            // backpressure.
-                            Ok(WakerInterest::WorkerAvailable) => {
+                        // take guard with every iteration so no new interest can be added
+                        // until the current task is done.
+                        let mut guard = self.waker.guard();
+                        match guard.pop_front() {
+                            // worker notify it becomes available. we may want to recover
+                            // from  backpressure.
+                            Some(WakerInterest::WorkerAvailable) => {
+                                drop(guard);
                                 self.maybe_backpressure(&mut sockets, false);
                             }
-                            // a new worker thread is made and it's handle would be added to Accept
-                            Ok(WakerInterest::Worker(handle)) => {
+                            // a new worker thread is made and it's handle would be added
+                            // to Accept
+                            Some(WakerInterest::Worker(handle)) => {
+                                drop(guard);
                                 // maybe we want to recover from a backpressure.
                                 self.maybe_backpressure(&mut sockets, false);
                                 self.handles.push(handle);
                             }
-                            // got timer interest and it's time to try register socket(s) again.
-                            Ok(WakerInterest::Timer) => self.process_timer(&mut sockets),
-                            Err(WakerQueueError::Empty) => break 'waker,
-                            Ok(WakerInterest::Pause) => {
+                            // got timer interest and it's time to try register socket(s)
+                            // again.
+                            Some(WakerInterest::Timer) => {
+                                drop(guard);
+                                self.process_timer(&mut sockets)
+                            }
+                            Some(WakerInterest::Pause) => {
+                                drop(guard);
                                 sockets.iter_mut().for_each(|(_, info)| {
                                     match self.deregister(info) {
                                         Ok(_) => info!(
@@ -198,13 +208,21 @@ impl Accept {
                                     }
                                 });
                             }
-                            Ok(WakerInterest::Resume) => {
+                            Some(WakerInterest::Resume) => {
+                                drop(guard);
                                 sockets.iter_mut().for_each(|(token, info)| {
                                     self.register_logged(token, info);
                                 });
                             }
-                            Ok(WakerInterest::Stop) | Err(WakerQueueError::Closed) => {
+                            Some(WakerInterest::Stop) => {
                                 return self.deregister_all(&mut sockets);
+                            }
+                            // waker queue is drained.
+                            None => {
+                                // Reset the WakerQueue before break so it does not grow
+                                // infinitely.
+                                WakerQueue::reset(&mut guard);
+                                break 'waker;
                             }
                         }
                     },
@@ -278,6 +296,10 @@ impl Accept {
             if !on {
                 self.backpressure = false;
                 for (token, info) in sockets.iter_mut() {
+                    if info.timeout.is_some() {
+                        // socket will attempt to re-register itself when its timeout completes
+                        continue;
+                    }
                     self.register_logged(token, info);
                 }
             }

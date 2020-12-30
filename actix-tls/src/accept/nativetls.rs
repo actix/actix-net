@@ -1,20 +1,18 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
-use futures_util::future::{ready, Ready};
+use futures_util::future::{ready, LocalBoxFuture, Ready};
 
 pub use native_tls::Error;
 pub use tokio_native_tls::{TlsAcceptor, TlsStream};
 
-use crate::MAX_CONN_COUNTER;
+use super::MAX_CONN_COUNTER;
 
 /// Accept TLS connections via `native-tls` package.
 ///
-/// `nativetls` feature enables this `Acceptor` type.
+/// `native-tls` feature enables this `Acceptor` type.
 pub struct Acceptor {
     acceptor: TlsAcceptor,
 }
@@ -36,11 +34,11 @@ impl Clone for Acceptor {
     }
 }
 
-impl<Req> ServiceFactory<Req> for Acceptor
+impl<T> ServiceFactory<T> for Acceptor
 where
-    Req: AsyncRead + AsyncWrite + Unpin + 'static,
+    T: AsyncRead + AsyncWrite + Unpin + 'static,
 {
-    type Response = TlsStream<Req>;
+    type Response = TlsStream<T>;
     type Error = Error;
     type Config = ();
 
@@ -72,15 +70,13 @@ impl Clone for NativeTlsAcceptorService {
     }
 }
 
-type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
-
-impl<Req> Service<Req> for NativeTlsAcceptorService
+impl<T> Service<T> for NativeTlsAcceptorService
 where
-    Req: AsyncRead + AsyncWrite + Unpin + 'static,
+    T: AsyncRead + AsyncWrite + Unpin + 'static,
 {
-    type Response = TlsStream<Req>;
+    type Response = TlsStream<T>;
     type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<TlsStream<Req>, Error>>;
+    type Future = LocalBoxFuture<'static, Result<TlsStream<T>, Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(cx) {
@@ -90,13 +86,13 @@ where
         }
     }
 
-    fn call(&mut self, req: Req) -> Self::Future {
+    fn call(&mut self, io: T) -> Self::Future {
         let guard = self.conns.get();
         let this = self.clone();
         Box::pin(async move {
-            let res = this.acceptor.accept(req).await;
+            let io = this.acceptor.accept(io).await;
             drop(guard);
-            res
+            io
         })
     }
 }

@@ -1,10 +1,15 @@
 # Changes
 
-## Unreleased - 2020-xx-xx
-* move from `tokio-tls` to `tokio-native-tls` for native-tls feature.
-* Update `tokio-openssl` to `0.6.0`
-* Update `tokio-rustls` to `0.22.0`
-* Update `rust-tls` to `0.19.0`
+## Unreleased - 2021-xx-xx
+
+
+## 3.0.0-beta.1 - 2020-12-29
+* Move acceptors under `accept` module. [#238]
+* Merge `actix-connect` crate under `connect` module. [#238]
+* Add feature flags to enable acceptors and/or connectors individually. [#238]
+
+[#238]: https://github.com/actix/actix-net/pull/238
+
 
 ## 2.0.0 - 2020-09-03
 * `nativetls::NativeTlsAcceptor` is renamed to `nativetls::Acceptor`.

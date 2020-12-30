@@ -1,7 +1,9 @@
-use std::ops::Deref;
-use std::sync::Arc;
+use std::{
+    collections::VecDeque,
+    ops::Deref,
+    sync::{Arc, Mutex, MutexGuard},
+};
 
-use concurrent_queue::{ConcurrentQueue, PopError};
 use mio::{Registry, Token as MioToken, Waker};
 
 use crate::worker::WorkerHandle;
@@ -11,7 +13,7 @@ pub(crate) const WAKER_TOKEN: MioToken = MioToken(usize::MAX);
 
 /// `mio::Waker` with a queue for waking up the `Accept`'s `Poll` and contains the `WakerInterest`
 /// the `Poll` would want to look into.
-pub(crate) struct WakerQueue(Arc<(Waker, ConcurrentQueue<WakerInterest>)>);
+pub(crate) struct WakerQueue(Arc<(Waker, Mutex<VecDeque<WakerInterest>>)>);
 
 impl Clone for WakerQueue {
     fn clone(&self) -> Self {
@@ -20,7 +22,7 @@ impl Clone for WakerQueue {
 }
 
 impl Deref for WakerQueue {
-    type Target = (Waker, ConcurrentQueue<WakerInterest>);
+    type Target = (Waker, Mutex<VecDeque<WakerInterest>>);
 
     fn deref(&self) -> &Self::Target {
         self.0.deref()
@@ -34,7 +36,7 @@ impl WakerQueue {
     /// event's token for it to properly handle `WakerInterest`.
     pub(crate) fn new(registry: &Registry) -> std::io::Result<Self> {
         let waker = Waker::new(registry, WAKER_TOKEN)?;
-        let queue = ConcurrentQueue::unbounded();
+        let queue = Mutex::new(VecDeque::with_capacity(16));
 
         Ok(Self(Arc::new((waker, queue))))
     }
@@ -44,17 +46,23 @@ impl WakerQueue {
         let (waker, queue) = self.deref();
 
         queue
-            .push(interest)
-            .unwrap_or_else(|e| panic!("WakerQueue closed: {}", e));
+            .lock()
+            .expect("Failed to lock WakerQueue")
+            .push_back(interest);
 
         waker
             .wake()
             .unwrap_or_else(|e| panic!("can not wake up Accept Poll: {}", e));
     }
 
-    /// pop an `WakerInterest` from the back of the queue.
-    pub(crate) fn pop(&self) -> Result<WakerInterest, WakerQueueError> {
-        self.deref().1.pop()
+    /// get a MutexGuard of the waker queue.
+    pub(crate) fn guard(&self) -> MutexGuard<'_, VecDeque<WakerInterest>> {
+        self.deref().1.lock().expect("Failed to lock WakerQueue")
+    }
+
+    /// reset the waker queue so it does not grow infinitely.
+    pub(crate) fn reset(queue: &mut VecDeque<WakerInterest>) {
+        std::mem::swap(&mut VecDeque::<WakerInterest>::with_capacity(16), queue);
     }
 }
 
@@ -74,10 +82,8 @@ pub(crate) enum WakerInterest {
     /// connection `Accept` would deregister socket listener temporary and wake up the poll and
     /// register them again after the delayed future resolve.
     Timer,
-    /// `WorkerNew` is an interest happen after a worker runs into faulted state(This is determined
+    /// `Worker` is an interest happen after a worker runs into faulted state(This is determined
     /// by if work can be sent to it successfully).`Accept` would be waked up and add the new
     /// `WorkerHandle`.
     Worker(WorkerHandle),
 }
-
-pub(crate) type WakerQueueError = PopError;

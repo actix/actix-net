@@ -5,13 +5,13 @@ use std::task::{Context, Poll};
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
 use either::Either;
-use futures_util::future::{ready, Ready};
+use futures_util::future::{ok, Ready};
 use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 
-use crate::connect::{Address, Connect, Connection};
-use crate::connector::{TcpConnector, TcpConnectorFactory};
-use crate::error::ConnectError;
-use crate::resolve::{Resolver, ResolverFactory};
+use super::connect::{Address, Connect, Connection};
+use super::connector::{TcpConnector, TcpConnectorFactory};
+use super::error::ConnectError;
+use super::resolve::{Resolver, ResolverFactory};
 
 pub struct ConnectServiceFactory<T> {
     tcp: TcpConnectorFactory<T>,
@@ -79,7 +79,7 @@ impl<T: Address> ServiceFactory<Connect<T>> for ConnectServiceFactory<T> {
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ready(Ok(self.service()))
+        ok(self.service())
     }
 }
 

@@ -9,6 +9,7 @@ use std::task::{Context, Poll};
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
 use futures_util::future::{ready, Ready};
+use log::{error, trace};
 
 use super::connect::{Address, Connect, Connection};
 use super::error::ConnectError;
@@ -151,18 +152,18 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
                         Poll::Ready(Ok(sock)) => {
                             let req = req.take().unwrap();
                             trace!(
-                                    "TCP connector - successfully connected to connecting to {:?} - {:?}",
-                                    req.host(), sock.peer_addr()
-                                );
+                                "TCP connector - successfully connected to connecting to {:?} - {:?}",
+                                req.host(), sock.peer_addr()
+                            );
                             return Poll::Ready(Ok(Connection::new(sock, req)));
                         }
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(err)) => {
                             trace!(
-                                    "TCP connector - failed to connect to connecting to {:?} port: {}",
-                                    req.as_ref().unwrap().host(),
-                                    port,
-                                );
+                                "TCP connector - failed to connect to connecting to {:?} port: {}",
+                                req.as_ref().unwrap().host(),
+                                port,
+                            );
                             if addrs.is_none() || addrs.as_ref().unwrap().is_empty() {
                                 return Poll::Ready(Err(err.into()));
                             }
