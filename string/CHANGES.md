@@ -3,12 +3,13 @@
 ## Unreleased - 2020-xx-xx
 
 
-## 0.2.0 - 2020-12-31
+## 1.0.0 - 2020-12-31
 * Update `bytes` dependency to `1`.
-* Add array and slice of `u8` impls of TryFrom up to 32 in length.
+* Add array and slice of `u8` impls of `TryFrom` up to 32 in length.
 * Rename `get_ref` to `as_bytes` and rename `into_inner` to `into_bytes`.
 * `ByteString::new` is now a `const fn`.
 * Crate is now `#[no_std]` compatible.
+
 
 ## 0.1.5 - 2020-03-30
 * Serde support
