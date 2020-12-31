@@ -6,7 +6,7 @@ authors = [
     "Rob Ede <robjtede@icloud.com>",
 ]
 description = "An immutable UTF-8 encoded string using Bytes as storage"
-keywords = ["string", "bytes", "utf8", "web-programming", "actix"]
+keywords = ["string", "bytes", "utf8", "web", "actix"]
 categories = ["no-std", "web-programming"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
