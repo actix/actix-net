@@ -290,7 +290,7 @@ mod test {
     }
 
     #[test]
-    fn test_try_from_bytesmut() {
+    fn test_try_from_bytes_mut() {
         let _ = ByteString::try_from(bytes::BytesMut::from(&b"nice bytes"[..])).unwrap();
     }
 
