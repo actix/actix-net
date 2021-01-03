@@ -63,3 +63,8 @@ pub mod time {
     pub use tokio::time::{sleep, sleep_until, Sleep};
     pub use tokio::time::{timeout, Timeout};
 }
+
+/// task management.
+pub mod task {
+    pub use tokio::task::{spawn_blocking, yield_now, JoinHandle};
+}

@@ -1,7 +1,7 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-
+* Add `task` mod with re-export of `tokio::task::{spawn_blocking, yield_nowm JoinHandle}`
 
 ## 2.0.0-beta.1 - 2020-12-28
 ### Added
