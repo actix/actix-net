@@ -224,7 +224,7 @@ mod test {
     use alloc::borrow::ToOwned;
     use core::hash::{Hash, Hasher};
 
-    use siphasher::sip::SipHasher;
+    use ahash::AHasher;
 
     use super::*;
 
@@ -243,10 +243,10 @@ mod test {
 
     #[test]
     fn test_hash() {
-        let mut hasher1 = SipHasher::default();
+        let mut hasher1 = AHasher::default();
         "str".hash(&mut hasher1);
 
-        let mut hasher2 = SipHasher::default();
+        let mut hasher2 = AHasher::default();
         let s = ByteString::from_static("str");
         s.hash(&mut hasher2);
         assert_eq!(hasher1.finish(), hasher2.finish());
