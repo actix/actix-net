@@ -3,6 +3,12 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.0-beta.2 - 2021-xx-xx
+* Depend on stable trust-dns packages. [#204]
+
+[#204]: https://github.com/actix/actix-net/pull/204
+
+
 ## 3.0.0-beta.1 - 2020-12-29
 * Move acceptors under `accept` module. [#238]
 * Merge `actix-connect` crate under `connect` module. [#238]

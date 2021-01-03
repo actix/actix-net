@@ -1,6 +1,6 @@
 [package]
 name = "actix-tls"
-version = "3.0.0-beta.1"
+version = "3.0.0-beta.2"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "TLS acceptor and connector services for Actix ecosystem"
 keywords = ["network", "tls", "ssl", "async", "transport"]
@@ -46,7 +46,7 @@ uri = ["http"]
 [dependencies]
 actix-codec = "0.4.0-beta.1"
 actix-rt = "2.0.0-beta.1"
-actix-service = "2.0.0-beta.1"
+actix-service = "2.0.0-beta.2"
 actix-utils = "3.0.0-beta.1"
 
 derive_more = "0.99.5"
@@ -76,7 +76,7 @@ tls-native-tls = { package = "native-tls", version = "0.2", optional = true }
 tokio-native-tls = { version = "0.3", optional = true }
 
 [dev-dependencies]
-actix-server = "2.0.0-beta.1"
+actix-server = "2.0.0-beta.2"
 bytes = "1"
 env_logger = "0.8"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }

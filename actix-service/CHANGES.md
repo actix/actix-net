@@ -1,6 +1,10 @@
 # Changes
 
-## Unreleased - 2020-xx-xx
+## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.2 - 2021-01-03
+* Remove redundant type parameter from `map_config`.
 
 
 ## 2.0.0-beta.1 - 2020-12-28
