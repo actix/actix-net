@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.3 - 2021-01-09
 * The `forward_ready!` macro converts errors. [#246]
 
 [#246]: https://github.com/actix/actix-net/pull/246
