@@ -36,25 +36,14 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
 
     sig.asyncness = None;
 
-    if cfg!(feature = "actix-reexport") {
-        (quote! {
-            #(#attrs)*
-            #vis #sig {
-                actix::System::new(stringify!(#name))
-                    .block_on(async move { #body })
-            }
-        })
-        .into()
-    } else {
-        (quote! {
-            #(#attrs)*
-            #vis #sig {
-                actix_rt::System::new(stringify!(#name))
-                    .block_on(async move { #body })
-            }
-        })
-        .into()
-    }
+    (quote! {
+        #(#attrs)*
+        #vis #sig {
+            actix_rt::System::new(stringify!(#name))
+                .block_on(async move { #body })
+        }
+    })
+    .into()
 }
 
 /// Marks async test function to be executed by actix runtime.
