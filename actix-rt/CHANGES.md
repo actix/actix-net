@@ -1,9 +1,13 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.2 - 2021-01-09
 * Add `task` mod with re-export of `tokio::task::{spawn_blocking, yield_now, JoinHandle}` [#245]
 
 [#245]: https://github.com/actix/actix-net/pull/245
+
 
 ## 2.0.0-beta.1 - 2020-12-28
 ### Added

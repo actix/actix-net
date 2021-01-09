@@ -7,7 +7,9 @@
 
 use std::future::Future;
 
-#[cfg(not(test))] // Work around for rust-lang/rust#62127
+// Cannot define a main macro when compiled into test harness.
+// Workaround for https://github.com/rust-lang/rust/issues/62127.
+#[cfg(all(feature = "macros", not(test)))]
 pub use actix_macros::{main, test};
 
 mod arbiter;
@@ -64,7 +66,7 @@ pub mod time {
     pub use tokio::time::{timeout, Timeout};
 }
 
-/// task management.
+/// Blocking task management.
 pub mod task {
     pub use tokio::task::{spawn_blocking, yield_now, JoinHandle};
 }

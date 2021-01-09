@@ -1,6 +1,6 @@
 [package]
 name = "actix-rt"
-version = "2.0.0-beta.1"
+version = "2.0.0-beta.2"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Tokio-based single-thread async runtime for the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
@@ -15,7 +15,11 @@ edition = "2018"
 name = "actix_rt"
 path = "src/lib.rs"
 
+[features]
+default = ["macros"]
+macros = ["actix-macros"]
+
 [dependencies]
-actix-macros = "0.2.0-beta.1"
+actix-macros = { version = "0.2.0-beta.1", optional = true }
 
 tokio = { version = "1", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }
