@@ -17,7 +17,7 @@ where
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use std::io;
 /// use actix_service::{fn_factory, fn_service, Service, ServiceFactory};
 /// use futures_util::future::ok;
@@ -67,7 +67,7 @@ where
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use std::io;
 /// use actix_service::{fn_factory_with_config, fn_service, Service, ServiceFactory};
 /// use futures_util::future::ok;

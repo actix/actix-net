@@ -94,7 +94,7 @@ where
 /// is passed in a reference to the request being handled by the service.
 ///
 /// For example:
-/// ```rust,ignore
+/// ```ignore
 /// let traced_service = trace(
 ///     web_service,
 ///     |req: &Request| Some(span!(Level::INFO, "request", req.id))

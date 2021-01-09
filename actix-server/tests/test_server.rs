@@ -28,7 +28,7 @@ fn test_bind() {
                 .disable_signals()
                 .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
-                .start()
+                .run()
         }));
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
@@ -55,7 +55,7 @@ fn test_listen() {
                 .workers(1)
                 .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
-                .start();
+                .run();
             let _ = tx.send(actix_rt::System::current());
         });
         let _ = sys.run();
@@ -94,7 +94,7 @@ fn test_start() {
                     })
                 })
                 .unwrap()
-                .start()
+                .run()
         }));
 
         let _ = tx.send((srv, actix_rt::System::current()));
@@ -173,7 +173,7 @@ fn test_configure() {
                 })
                 .unwrap()
                 .workers(1)
-                .start()
+                .run()
         }));
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();

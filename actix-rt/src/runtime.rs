@@ -41,7 +41,7 @@ impl Runtime {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// # use futures::{future, Future, Stream};
     /// use actix_rt::Runtime;
     ///

@@ -70,7 +70,7 @@ impl System {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// use tokio::{runtime::Runtime, task::LocalSet};
     /// use actix_rt::System;
     /// use futures_util::future::try_join_all;
@@ -139,7 +139,7 @@ impl System {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// use tokio::runtime::Runtime;
     /// use actix_rt::System;
     /// use futures_util::future::try_join_all;
