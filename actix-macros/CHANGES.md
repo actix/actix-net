@@ -1,13 +1,19 @@
-# CHANGES
+# Changes
 
-## 0.1.3 - 2020-12-3
+## Unreleased - 2021-xx-xx
 
-* Add `actix-reexport` feature
+
+## 0.2.0-beta.1 - 2021-01-09
+* Remove `actix-reexport` feature.
+
+
+## 0.1.3 - 2020-12-03
+* Add `actix-reexport` feature. [#218]
+
+[#218]: https://github.com/actix/actix-net/pull/218
+
 
 ## 0.1.2 - 2020-05-18
-
-### Changed
-
 * Forward actix_rt::test arguments to test function [#127]
 
 [#127]: https://github.com/actix/actix-net/pull/127
