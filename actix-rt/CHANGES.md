@@ -5,6 +5,7 @@
 
 ## 2.0.0-beta.2 - 2021-01-09
 * Add `task` mod with re-export of `tokio::task::{spawn_blocking, yield_now, JoinHandle}` [#245]
+* Add default "macros" feature to allow faster compile times when using `default-features=false`.
 
 [#245]: https://github.com/actix/actix-net/pull/245
 
