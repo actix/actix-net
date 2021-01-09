@@ -12,7 +12,7 @@ use crate::{Server, ServerBuilder, ServiceFactory};
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
 /// use actix_service::fn_service;
 /// use actix_server::TestServer;
 ///

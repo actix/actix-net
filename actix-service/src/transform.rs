@@ -30,7 +30,7 @@ where
 ///
 /// For example, timeout transform:
 ///
-/// ```rust,ignore
+/// ```ignore
 /// pub struct Timeout<S> {
 ///     service: S,
 ///     timeout: Duration,
@@ -45,9 +45,7 @@ where
 ///     type Error = TimeoutError<S::Error>;
 ///     type Future = TimeoutServiceResponse<S>;
 ///
-///     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-///         ready!(self.service.poll_ready(cx)).map_err(TimeoutError::Service)
-///     }
+///     actix_service::forward_ready!(service);
 ///
 ///     fn call(&mut self, req: S::Request) -> Self::Future {
 ///         TimeoutServiceResponse {
@@ -69,7 +67,7 @@ where
 ///
 /// Factory for `Timeout` middleware from the above example could look like this:
 ///
-/// ```rust,,ignore
+/// ```ignore
 /// pub struct TimeoutTransform {
 ///     timeout: Duration,
 /// }

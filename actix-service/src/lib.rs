@@ -48,7 +48,7 @@ use self::ready::{err, ok, ready, Ready};
 /// replies. You can think about a service as a function with one argument that returns some result
 /// asynchronously. Conceptually, the operation looks like this:
 ///
-/// ```rust,ignore
+/// ```ignore
 /// async fn(Request) -> Result<Response, Err>
 /// ```
 ///
@@ -60,7 +60,7 @@ use self::ready::{err, ok, ready, Ready};
 /// simple API surfaces. This leads to simpler design of each service, improves test-ability and
 /// makes composition easier.
 ///
-/// ```rust,ignore
+/// ```ignore
 /// struct MyService;
 ///
 /// impl Service for MyService {
@@ -78,7 +78,7 @@ use self::ready::{err, ok, ready, Ready};
 /// Sometimes it is not necessary to implement the Service trait. For example, the above service
 /// could be rewritten as a simple function and passed to [fn_service](fn_service()).
 ///
-/// ```rust,ignore
+/// ```ignore
 /// async fn my_service(req: u8) -> Result<u64, MyError>;
 /// ```
 pub trait Service<Req> {

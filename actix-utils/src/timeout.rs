@@ -149,9 +149,7 @@ where
     type Error = TimeoutError<S::Error>;
     type Future = TimeoutServiceResponse<S, Req>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.service.poll_ready(cx).map_err(TimeoutError::Service)
-    }
+    actix_service::forward_ready!(service);
 
     fn call(&mut self, request: Req) -> Self::Future {
         TimeoutServiceResponse {
