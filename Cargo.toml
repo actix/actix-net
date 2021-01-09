@@ -6,7 +6,6 @@ members = [
   "actix-rt",
   "actix-server",
   "actix-service",
-  "actix-threadpool",
   "actix-tls",
   "actix-tracing",
   "actix-utils",
@@ -20,7 +19,6 @@ actix-router = { path = "actix-router" }
 actix-rt = { path = "actix-rt" }
 actix-server = { path = "actix-server" }
 actix-service = { path = "actix-service" }
-actix-threadpool = { path = "actix-threadpool" }
 actix-tls = { path = "actix-tls" }
 actix-tracing = { path = "actix-tracing" }
 actix-utils = { path = "actix-utils" }
