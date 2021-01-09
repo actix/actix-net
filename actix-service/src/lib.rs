@@ -327,7 +327,9 @@ macro_rules! forward_ready {
             &mut self,
             cx: &mut ::core::task::Context<'_>,
         ) -> ::core::task::Poll<Result<(), Self::Error>> {
-            self.$field.poll_ready(cx)
+            self.$field
+                .poll_ready(cx)
+                .map_err(::core::convert::Into::into)
         }
     };
 }

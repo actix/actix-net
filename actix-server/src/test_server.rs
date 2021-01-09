@@ -49,10 +49,7 @@ impl TestServer {
         // run server in separate thread
         thread::spawn(move || {
             let sys = System::new("actix-test-server");
-            factory(Server::build())
-                .workers(1)
-                .disable_signals()
-                .start();
+            factory(Server::build()).workers(1).disable_signals().run();
 
             tx.send(System::current()).unwrap();
             sys.run()
@@ -83,7 +80,7 @@ impl TestServer {
                     .unwrap()
                     .workers(1)
                     .disable_signals()
-                    .start();
+                    .run();
                 tx.send((System::current(), local_addr)).unwrap();
             });
             sys.run()

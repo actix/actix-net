@@ -252,11 +252,6 @@ impl ServerBuilder {
         Ok(self)
     }
 
-    #[doc(hidden)]
-    pub fn start(self) -> Server {
-        self.run()
-    }
-
     /// Starts processing incoming connections and return server controller.
     pub fn run(mut self) -> Server {
         if self.sockets.is_empty() {
