@@ -20,7 +20,7 @@ syn = { version = "^1", features = ["full"] }
 actix-reexport = []
 
 [dev-dependencies]
-actix-rt = "1.0"
+actix-rt = "2.0.0-beta.2"
 
 futures-util = { version = "0.3", default-features = false }
 trybuild = "1"
