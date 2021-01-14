@@ -46,18 +46,18 @@ impl<T, U> Router<T, U> {
     }
 
     pub fn recognize_mut_checked<R, P, F>(
-        &mut self,
+        &self,
         resource: &mut R,
         check: F,
-    ) -> Option<(&mut T, ResourceId)>
+    ) -> Option<(&T, ResourceId)>
     where
         F: Fn(&R, &Option<U>) -> bool,
         R: Resource<P>,
         P: ResourcePath,
     {
-        for item in self.0.iter_mut() {
+        for item in self.0.iter() {
             if item.0.match_path_checked(resource, &check, &item.2) {
-                return Some((&mut item.1, ResourceId(item.0.id())));
+                return Some((&item.1, ResourceId(item.0.id())));
             }
         }
         None
