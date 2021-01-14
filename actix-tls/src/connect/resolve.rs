@@ -113,7 +113,7 @@ impl<T: Address> Service<Connect<T>> for Resolver<T> {
 
     actix_service::always_ready!();
 
-    fn call(&mut self, mut req: Connect<T>) -> Self::Future {
+    fn call(&self, mut req: Connect<T>) -> Self::Future {
         if req.addr.is_some() {
             Either::Right(ok(req))
         } else if let Ok(ip) = req.host().parse() {

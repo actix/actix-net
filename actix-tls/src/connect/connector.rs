@@ -77,7 +77,7 @@ impl<T: Address> Service<Connect<T>> for TcpConnector<T> {
 
     actix_service::always_ready!();
 
-    fn call(&mut self, req: Connect<T>) -> Self::Future {
+    fn call(&self, req: Connect<T>) -> Self::Future {
         let port = req.port();
         let Connect { req, addr, .. } = req;
 

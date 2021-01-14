@@ -146,12 +146,12 @@ impl<S: Service<Req>, Req> Service<Req> for Pipeline<S, Req> {
     type Future = S::Future;
 
     #[inline]
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
         self.service.poll_ready(ctx)
     }
 
     #[inline]
-    fn call(&mut self, req: Req) -> Self::Future {
+    fn call(&self, req: Req) -> Self::Future {
         self.service.call(req)
     }
 }
@@ -172,13 +172,13 @@ where
         factory: I,
     ) -> PipelineFactory<
         impl ServiceFactory<
-                Req,
-                Response = SF1::Response,
-                Error = SF::Error,
-                Config = SF::Config,
-                InitError = SF::InitError,
-                Service = impl Service<Req, Response = SF1::Response, Error = SF::Error> + Clone,
-            > + Clone,
+            Req,
+            Response = SF1::Response,
+            Error = SF::Error,
+            Config = SF::Config,
+            InitError = SF::InitError,
+            Service = impl Service<Req, Response = SF1::Response, Error = SF::Error> + Clone,
+        > + Clone,
         Req,
     >
     where
@@ -209,13 +209,13 @@ where
         factory: I,
     ) -> PipelineFactory<
         impl ServiceFactory<
-                Req,
-                Response = SF1::Response,
-                Error = SF::Error,
-                Config = SF::Config,
-                InitError = SF::InitError,
-                Service = impl Service<Req, Response = SF1::Response, Error = SF::Error> + Clone,
-            > + Clone,
+            Req,
+            Response = SF1::Response,
+            Error = SF::Error,
+            Config = SF::Config,
+            InitError = SF::InitError,
+            Service = impl Service<Req, Response = SF1::Response, Error = SF::Error> + Clone,
+        > + Clone,
         Req,
     >
     where

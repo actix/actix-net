@@ -37,7 +37,7 @@ where
 
     actix_service::forward_ready!(inner);
 
-    fn call(&mut self, req: Req) -> Self::Future {
+    fn call(&self, req: Req) -> Self::Future {
         let span = (self.make_span)(&req);
         let _enter = span.as_ref().map(|s| s.enter());
 
@@ -229,7 +229,7 @@ mod test {
 
         let span_svc = span!(Level::TRACE, "span_svc");
         let trace_service_factory = trace(service_factory, |_: &&str| Some(span_svc.clone()));
-        let mut service = trace_service_factory.new_service(()).await.unwrap();
+        let service = trace_service_factory.new_service(()).await.unwrap();
         service.call("boo").await.unwrap();
 
         let id = span_svc.id().unwrap().into_u64();

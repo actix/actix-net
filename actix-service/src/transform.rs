@@ -1,4 +1,3 @@
-use alloc::{rc::Rc, sync::Arc};
 use core::{
     future::Future,
     marker::PhantomData,
@@ -6,6 +5,8 @@ use core::{
     task::{Context, Poll},
 };
 
+use alloc::{rc::Rc, sync::Arc};
+use futures_core::ready;
 use pin_project_lite::pin_project;
 
 use crate::transform_err::TransformMapInitErr;
@@ -47,7 +48,7 @@ where
 ///
 ///     actix_service::forward_ready!(service);
 ///
-///     fn call(&mut self, req: S::Request) -> Self::Future {
+///     fn call(&self, req: S::Request) -> Self::Future {
 ///         TimeoutServiceResponse {
 ///             fut: self.service.call(req),
 ///             sleep: Delay::new(clock::now() + self.timeout),
@@ -127,8 +128,8 @@ where
 {
     type Response = T::Response;
     type Error = T::Error;
-    type InitError = T::InitError;
     type Transform = T::Transform;
+    type InitError = T::InitError;
     type Future = T::Future;
 
     fn new_transform(&self, service: S) -> T::Future {
@@ -142,8 +143,8 @@ where
 {
     type Response = T::Response;
     type Error = T::Error;
-    type InitError = T::InitError;
     type Transform = T::Transform;
+    type InitError = T::InitError;
     type Future = T::Future;
 
     fn new_transform(&self, service: S) -> T::Future {
@@ -229,14 +230,12 @@ where
         let mut this = self.as_mut().project();
 
         match this.state.as_mut().project() {
-            ApplyTransformFutureStateProj::A { fut } => match fut.poll(cx)? {
-                Poll::Ready(srv) => {
-                    let fut = this.store.0.new_transform(srv);
-                    this.state.set(ApplyTransformFutureState::B { fut });
-                    self.poll(cx)
-                }
-                Poll::Pending => Poll::Pending,
-            },
+            ApplyTransformFutureStateProj::A { fut } => {
+                let srv = ready!(fut.poll(cx))?;
+                let fut = this.store.0.new_transform(srv);
+                this.state.set(ApplyTransformFutureState::B { fut });
+                self.poll(cx)
+            }
             ApplyTransformFutureStateProj::B { fut } => fut.poll(cx),
         }
     }

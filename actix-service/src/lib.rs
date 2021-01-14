@@ -69,9 +69,9 @@ use self::ready::{err, ok, ready, Ready};
 ///      type Error = MyError;
 ///      type Future = Pin<Box<Future<Output=Result<Self::Response, Self::Error>>>>;
 ///
-///      fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> { ... }
+///      fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> { ... }
 ///
-///      fn call(&mut self, req: Self::Request) -> Self::Future { ... }
+///      fn call(&self, req: Self::Request) -> Self::Future { ... }
 /// }
 /// ```
 ///
@@ -104,7 +104,7 @@ pub trait Service<Req> {
     /// # Notes
     /// 1. `.poll_ready()` might be called on different task from actual service call.
     /// 1. In case of chained services, `.poll_ready()` get called for all services at once.
-    fn poll_ready(&mut self, ctx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>>;
+    fn poll_ready(&self, ctx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>>;
 
     /// Process the request and return the response asynchronously.
     ///
@@ -115,7 +115,7 @@ pub trait Service<Req> {
     ///
     /// Calling `call` without calling `poll_ready` is permitted. The
     /// implementation must be resilient to this fact.
-    fn call(&mut self, req: Req) -> Self::Future;
+    fn call(&self, req: Req) -> Self::Future;
 }
 
 /// Factory for creating `Service`s.
@@ -158,11 +158,11 @@ where
     type Error = S::Error;
     type Future = S::Future;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         (**self).poll_ready(ctx)
     }
 
-    fn call(&mut self, request: Req) -> S::Future {
+    fn call(&self, request: Req) -> S::Future {
         (**self).call(request)
     }
 }
@@ -175,11 +175,11 @@ where
     type Error = S::Error;
     type Future = S::Future;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
         (**self).poll_ready(ctx)
     }
 
-    fn call(&mut self, request: Req) -> S::Future {
+    fn call(&self, request: Req) -> S::Future {
         (**self).call(request)
     }
 }
@@ -192,11 +192,11 @@ where
     type Error = S::Error;
     type Future = S::Future;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.borrow_mut().poll_ready(ctx)
     }
 
-    fn call(&mut self, request: Req) -> S::Future {
+    fn call(&self, request: Req) -> S::Future {
         self.borrow_mut().call(request)
     }
 }
@@ -209,11 +209,11 @@ where
     type Error = S::Error;
     type Future = S::Future;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.borrow_mut().poll_ready(ctx)
     }
 
-    fn call(&mut self, request: Req) -> S::Future {
+    fn call(&self, request: Req) -> S::Future {
         (&mut (**self).borrow_mut()).call(request)
     }
 }
@@ -311,8 +311,9 @@ pub mod dev {
 #[macro_export]
 macro_rules! always_ready {
     () => {
+        #[inline]
         fn poll_ready(
-            &mut self,
+            &self,
             _: &mut ::core::task::Context<'_>,
         ) -> ::core::task::Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
@@ -323,8 +324,9 @@ macro_rules! always_ready {
 #[macro_export]
 macro_rules! forward_ready {
     ($field:ident) => {
+        #[inline]
         fn poll_ready(
-            &mut self,
+            &self,
             cx: &mut ::core::task::Context<'_>,
         ) -> ::core::task::Poll<Result<(), Self::Error>> {
             self.$field

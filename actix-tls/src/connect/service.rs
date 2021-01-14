@@ -96,7 +96,7 @@ impl<T: Address> Service<Connect<T>> for ConnectService<T> {
 
     actix_service::always_ready!();
 
-    fn call(&mut self, req: Connect<T>) -> Self::Future {
+    fn call(&self, req: Connect<T>) -> Self::Future {
         ConnectServiceResponse {
             state: ConnectState::Resolve(self.resolver.call(req)),
             tcp: self.tcp.clone(),
@@ -163,7 +163,7 @@ impl<T: Address + 'static> Service<Connect<T>> for TcpConnectService<T> {
 
     actix_service::always_ready!();
 
-    fn call(&mut self, req: Connect<T>) -> Self::Future {
+    fn call(&self, req: Connect<T>) -> Self::Future {
         TcpConnectServiceResponse {
             state: TcpConnectState::Resolve(self.resolver.call(req)),
             tcp: self.tcp.clone(),

@@ -88,7 +88,7 @@ where
 
     actix_service::always_ready!();
 
-    fn call(&mut self, stream: Connection<T, U>) -> Self::Future {
+    fn call(&self, stream: Connection<T, U>) -> Self::Future {
         trace!("SSL Handshake start for: {:?}", stream.host());
         let (io, stream) = stream.replace(());
         let host = stream.host().to_string();
@@ -207,7 +207,7 @@ impl<T: Address + 'static> Service<Connect<T>> for OpensslConnectService<T> {
 
     actix_service::always_ready!();
 
-    fn call(&mut self, req: Connect<T>) -> Self::Future {
+    fn call(&self, req: Connect<T>) -> Self::Future {
         OpensslConnectServiceResponse {
             fut1: Some(self.tcp.call(req)),
             fut2: None,
