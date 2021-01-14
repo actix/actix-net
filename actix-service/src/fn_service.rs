@@ -103,7 +103,7 @@ where
 
 pub struct FnService<F, Fut, Req, Res, Err>
 where
-    F: Fn(Req) -> Fut,
+    F: FnMut(Req) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     f: F,
@@ -112,7 +112,7 @@ where
 
 impl<F, Fut, Req, Res, Err> FnService<F, Fut, Req, Res, Err>
 where
-    F: Fn(Req) -> Fut,
+    F: FnMut(Req) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     pub(crate) fn new(f: F) -> Self {
@@ -122,7 +122,7 @@ where
 
 impl<F, Fut, Req, Res, Err> Clone for FnService<F, Fut, Req, Res, Err>
 where
-    F: Fn(Req) -> Fut + Clone,
+    F: FnMut(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn clone(&self) -> Self {

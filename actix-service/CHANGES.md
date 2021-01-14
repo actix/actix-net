@@ -1,6 +1,12 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* `Service::poll_ready` and `Service::call` take `&self`. [#247]
+* `apply_fn` and `apply_fn_factory` would take `Fn(Req, &Service)` function type [#247]
+* `apply_cfg` and `apply_cfg_factory` would take `Fn(Req, &Service)` function type [#247]
+* `fn_service` module would take `Fn(Req)` function type. [#247]
+
+[#247]: https://github.com/actix/actix-net/pull/247
 
 
 ## 2.0.0-beta.3 - 2021-01-09
