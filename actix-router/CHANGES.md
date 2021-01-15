@@ -1,7 +1,7 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* `Router::recognize_mut_checked` take `&self` and return `Option<(&T, ResourceId)>` [#247]
+* Add `Router::recognize_checked` [#247]
 
 [#247]: https://github.com/actix/actix-net/pull/247
 
