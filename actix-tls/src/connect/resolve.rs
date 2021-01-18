@@ -1,184 +1,123 @@
-use std::future::Future;
-use std::marker::PhantomData;
-use std::net::SocketAddr;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    net::{SocketAddr, ToSocketAddrs},
+    rc::Rc,
+    task::Poll,
+};
 
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::{ok, Either, Ready};
+use futures_core::future::LocalBoxFuture;
 use log::trace;
-use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
-use trust_dns_resolver::{error::ResolveError, lookup_ip::LookupIp};
 
 use super::connect::{Address, Connect};
 use super::error::ConnectError;
-use super::get_default_resolver;
 
 /// DNS Resolver Service factory
-pub struct ResolverFactory<T> {
-    resolver: Option<AsyncResolver>,
-    _t: PhantomData<T>,
+#[derive(Clone)]
+pub struct ResolverFactory {
+    resolver: Resolver,
 }
 
-impl<T> ResolverFactory<T> {
-    /// Create new resolver instance with custom configuration and options.
-    pub fn new(resolver: AsyncResolver) -> Self {
-        ResolverFactory {
-            resolver: Some(resolver),
-            _t: PhantomData,
-        }
+impl ResolverFactory {
+    pub fn new(resolver: Resolver) -> Self {
+        Self { resolver }
     }
 
-    pub fn service(&self) -> Resolver<T> {
-        Resolver {
-            resolver: self.resolver.clone(),
-            _t: PhantomData,
-        }
+    pub fn service(&self) -> Resolver {
+        self.resolver.clone()
     }
 }
 
-impl<T> Default for ResolverFactory<T> {
-    fn default() -> Self {
-        ResolverFactory {
-            resolver: None,
-            _t: PhantomData,
-        }
-    }
-}
-
-impl<T> Clone for ResolverFactory<T> {
-    fn clone(&self) -> Self {
-        ResolverFactory {
-            resolver: self.resolver.clone(),
-            _t: PhantomData,
-        }
-    }
-}
-
-impl<T: Address> ServiceFactory<Connect<T>> for ResolverFactory<T> {
+impl<T: Address> ServiceFactory<Connect<T>> for ResolverFactory {
     type Response = Connect<T>;
     type Error = ConnectError;
     type Config = ();
-    type Service = Resolver<T>;
+    type Service = Resolver;
     type InitError = ();
-    type Future = Ready<Result<Self::Service, Self::InitError>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(self.service())
+        let service = self.resolver.clone();
+        Box::pin(async { Ok(service) })
     }
 }
 
 /// DNS Resolver Service
-pub struct Resolver<T> {
-    resolver: Option<AsyncResolver>,
-    _t: PhantomData<T>,
+#[derive(Clone)]
+pub enum Resolver {
+    Default,
+    Custom(Rc<dyn Resolve>),
 }
 
-impl<T> Resolver<T> {
-    /// Create new resolver instance with custom configuration and options.
-    pub fn new(resolver: AsyncResolver) -> Self {
-        Resolver {
-            resolver: Some(resolver),
-            _t: PhantomData,
+/// trait for custom lookup with self defined resolver.
+pub trait Resolve {
+    fn lookup(
+        &self,
+        addrs: Vec<SocketAddr>,
+    ) -> LocalBoxFuture<'_, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>>;
+}
+
+impl Resolver {
+    /// Constructor for custom Resolve trait object and use it as resolver.
+    pub fn new_custom(resolver: impl Resolve + 'static) -> Self {
+        Self::Custom(Rc::new(resolver))
+    }
+
+    async fn lookup<T: Address>(
+        &self,
+        req: &Connect<T>,
+        host: String,
+    ) -> Result<Vec<SocketAddr>, ConnectError> {
+        match self {
+            Self::Default => {
+                let res = tokio::net::lookup_host(host).await.map_err(|e| {
+                    trace!(
+                        "DNS resolver: failed to resolve host {:?} err: {}",
+                        req.host(),
+                        e
+                    );
+                    ConnectError::Resolver(Box::new(e))
+                })?;
+
+                Ok(res.collect())
+            }
+            Self::Custom(resolver) => {
+                let host = host
+                    .to_socket_addrs()
+                    .map_err(|e| ConnectError::Resolver(Box::new(e)))?
+                    .collect();
+                resolver.lookup(host).await.map_err(ConnectError::Resolver)
+            }
         }
     }
 }
 
-impl<T> Default for Resolver<T> {
-    fn default() -> Self {
-        Resolver {
-            resolver: None,
-            _t: PhantomData,
-        }
-    }
-}
-
-impl<T> Clone for Resolver<T> {
-    fn clone(&self) -> Self {
-        Resolver {
-            resolver: self.resolver.clone(),
-            _t: PhantomData,
-        }
-    }
-}
-
-impl<T: Address> Service<Connect<T>> for Resolver<T> {
+impl<T: Address> Service<Connect<T>> for Resolver {
     type Response = Connect<T>;
     type Error = ConnectError;
-    #[allow(clippy::type_complexity)]
-    type Future = Either<
-        Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>,
-        Ready<Result<Connect<T>, Self::Error>>,
-    >;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     actix_service::always_ready!();
 
     fn call(&mut self, mut req: Connect<T>) -> Self::Future {
-        if req.addr.is_some() {
-            Either::Right(ok(req))
-        } else if let Ok(ip) = req.host().parse() {
-            req.addr = Some(either::Either::Left(SocketAddr::new(ip, req.port())));
-            Either::Right(ok(req))
-        } else {
-            let resolver = self.resolver.as_ref().map(AsyncResolver::clone);
-            Either::Left(Box::pin(async move {
+        let resolver = self.clone();
+        Box::pin(async move {
+            if req.addr.is_some() {
+                Ok(req)
+            } else if let Ok(ip) = req.host().parse() {
+                req.addr = Some(either::Either::Left(SocketAddr::new(ip, req.port())));
+                Ok(req)
+            } else {
                 trace!("DNS resolver: resolving host {:?}", req.host());
-                let resolver = if let Some(resolver) = resolver {
-                    resolver
+
+                let host = if req.host().contains(':') {
+                    req.host().to_string()
                 } else {
-                    get_default_resolver()
-                        .await
-                        .expect("Failed to get default resolver")
+                    format!("{}:{}", req.host(), req.port())
                 };
-                ResolverFuture::new(req, &resolver).await
-            }))
-        }
-    }
-}
 
-type LookupIpFuture = Pin<Box<dyn Future<Output = Result<LookupIp, ResolveError>>>>;
+                let addrs = resolver.lookup(&req, host).await?;
 
-#[doc(hidden)]
-/// Resolver future
-pub struct ResolverFuture<T: Address> {
-    req: Option<Connect<T>>,
-    lookup: LookupIpFuture,
-}
-
-impl<T: Address> ResolverFuture<T> {
-    pub fn new(req: Connect<T>, resolver: &AsyncResolver) -> Self {
-        let host = if let Some(host) = req.host().splitn(2, ':').next() {
-            host
-        } else {
-            req.host()
-        };
-
-        // Clone data to be moved to the lookup future
-        let host_clone = host.to_owned();
-        let resolver_clone = resolver.clone();
-
-        ResolverFuture {
-            lookup: Box::pin(async move {
-                let resolver = resolver_clone;
-                resolver.lookup_ip(host_clone).await
-            }),
-            req: Some(req),
-        }
-    }
-}
-
-impl<T: Address> Future for ResolverFuture<T> {
-    type Output = Result<Connect<T>, ConnectError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-
-        match Pin::new(&mut this.lookup).poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Ok(ips)) => {
-                let req = this.req.take().unwrap();
-                let port = req.port();
-                let req = req.set_addrs(ips.iter().map(|ip| SocketAddr::new(ip, port)));
+                let req = req.set_addrs(addrs);
 
                 trace!(
                     "DNS resolver: host {:?} resolved to {:?}",
@@ -187,19 +126,11 @@ impl<T: Address> Future for ResolverFuture<T> {
                 );
 
                 if req.addr.is_none() {
-                    Poll::Ready(Err(ConnectError::NoRecords))
+                    Err(ConnectError::NoRecords)
                 } else {
-                    Poll::Ready(Ok(req))
+                    Ok(req)
                 }
             }
-            Poll::Ready(Err(e)) => {
-                trace!(
-                    "DNS resolver: failed to resolve host {:?} err: {}",
-                    this.req.as_ref().unwrap().host(),
-                    e
-                );
-                Poll::Ready(Err(e.into()))
-            }
-        }
+        })
     }
 }

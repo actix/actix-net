@@ -29,7 +29,7 @@ default = ["accept", "connect", "uri"]
 accept = []
 
 # enable connector services
-connect = ["trust-dns-proto/tokio-runtime", "trust-dns-resolver/tokio-runtime", "trust-dns-resolver/system-config"]
+connect = ["tokio/net"]
 
 # use openssl impls
 openssl = ["tls-openssl", "tokio-openssl"]
@@ -45,19 +45,17 @@ uri = ["http"]
 
 [dependencies]
 actix-codec = "0.4.0-beta.1"
-actix-rt = "2.0.0-beta.2"
+actix-rt = { version = "2.0.0-beta.2", default-features = false }
 actix-service = "2.0.0-beta.3"
 actix-utils = "3.0.0-beta.1"
 
 derive_more = "0.99.5"
 either = "1.6"
+futures-core = { version = "0.3.7", default-features = false }
 futures-util = { version = "0.3.7", default-features = false }
-http = { version = "0.2.2", optional = true }
+http = { version = "0.2.3", optional = true }
 log = "0.4"
-
-# resolver
-trust-dns-proto = { version = "0.20.0", default-features = false, optional = true }
-trust-dns-resolver = { version = "0.20.0", default-features = false, optional = true }
+tokio = { version = "1", optional = true }
 
 # openssl
 tls-openssl = { package = "openssl", version = "0.10", optional = true }
@@ -76,6 +74,7 @@ tls-native-tls = { package = "native-tls", version = "0.2", optional = true }
 tokio-native-tls = { version = "0.3", optional = true }
 
 [dev-dependencies]
+actix-rt = "2.0.0-beta.2"
 actix-server = "2.0.0-beta.2"
 bytes = "1"
 env_logger = "0.8"

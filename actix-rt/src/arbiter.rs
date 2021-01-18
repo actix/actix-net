@@ -9,9 +9,6 @@ use std::{fmt, thread};
 
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot::{channel, error::RecvError as Canceled, Sender};
-// use futures_util::stream::FuturesUnordered;
-// use tokio::task::JoinHandle;
-// use tokio::stream::StreamExt;
 use tokio::task::LocalSet;
 
 use crate::runtime::Runtime;
@@ -19,12 +16,6 @@ use crate::system::System;
 
 thread_local!(
     static ADDR: RefCell<Option<Arbiter>> = RefCell::new(None);
-    // TODO: Commented out code are for Arbiter::local_join function.
-    // It can be safely removed if this function is not used in actix-*.
-    //
-    // /// stores join handle for spawned async tasks.
-    // static HANDLE: RefCell<FuturesUnordered<JoinHandle<()>>> =
-    //     RefCell::new(FuturesUnordered::new());
     static STORAGE: RefCell<HashMap<TypeId, Box<dyn Any>>> = RefCell::new(HashMap::new());
 );
 
@@ -154,11 +145,6 @@ impl Arbiter {
     where
         F: Future<Output = ()> + 'static,
     {
-        // HANDLE.with(|handle| {
-        //     let handle = handle.borrow();
-        //     handle.push(tokio::task::spawn_local(future));
-        // });
-        // let _ = tokio::task::spawn_local(CleanupPending);
         let _ = tokio::task::spawn_local(future);
     }
 
@@ -277,31 +263,11 @@ impl Arbiter {
 
     /// Returns a future that will be completed once all currently spawned futures
     /// have completed.
-    #[deprecated(since = "1.2.0", note = "Arbiter::local_join function is removed.")]
+    #[deprecated(since = "2.0.0", note = "Arbiter::local_join function is removed.")]
     pub async fn local_join() {
-        // let handle = HANDLE.with(|fut| std::mem::take(&mut *fut.borrow_mut()));
-        // async move {
-        //     handle.collect::<Vec<_>>().await;
-        // }
         unimplemented!("Arbiter::local_join function is removed.")
     }
 }
-
-// /// Future used for cleaning-up already finished `JoinHandle`s
-// /// from the `PENDING` list so the vector doesn't grow indefinitely
-// struct CleanupPending;
-//
-// impl Future for CleanupPending {
-//     type Output = ();
-//
-//     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-//         HANDLE.with(move |handle| {
-//             recycle_join_handle(&mut *handle.borrow_mut(), cx);
-//         });
-//
-//         Poll::Ready(())
-//     }
-// }
 
 struct ArbiterController {
     rx: UnboundedReceiver<ArbiterCommand>,
@@ -330,11 +296,6 @@ impl Future for ArbiterController {
                 Poll::Ready(Some(item)) => match item {
                     ArbiterCommand::Stop => return Poll::Ready(()),
                     ArbiterCommand::Execute(fut) => {
-                        // HANDLE.with(|handle| {
-                        //     let mut handle = handle.borrow_mut();
-                        //     handle.push(tokio::task::spawn_local(fut));
-                        //     recycle_join_handle(&mut *handle, cx);
-                        // });
                         tokio::task::spawn_local(fut);
                     }
                     ArbiterCommand::ExecuteFn(f) => {
@@ -346,20 +307,6 @@ impl Future for ArbiterController {
         }
     }
 }
-
-// fn recycle_join_handle(handle: &mut FuturesUnordered<JoinHandle<()>>, cx: &mut Context<'_>) {
-//     let _ = Pin::new(&mut *handle).poll_next(cx);
-//
-//     // Try to recycle more join handles and free up memory.
-//     //
-//     // this is a guess. The yield limit for FuturesUnordered is 32.
-//     // So poll an extra 3 times would make the total poll below 128.
-//     if handle.len() > 64 {
-//         (0..3).for_each(|_| {
-//             let _ = Pin::new(&mut *handle).poll_next(cx);
-//         })
-//     }
-// }
 
 #[derive(Debug)]
 pub(crate) enum SystemCommand {

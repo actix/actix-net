@@ -1,76 +1,48 @@
 use std::collections::VecDeque;
 use std::future::Future;
 use std::io;
-use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::{ready, Ready};
+use futures_core::future::LocalBoxFuture;
 use log::{error, trace};
 
 use super::connect::{Address, Connect, Connection};
 use super::error::ConnectError;
 
 /// TCP connector service factory
-#[derive(Debug)]
-pub struct TcpConnectorFactory<T>(PhantomData<T>);
+#[derive(Copy, Clone, Debug)]
+pub struct TcpConnectorFactory;
 
-impl<T> TcpConnectorFactory<T> {
-    pub fn new() -> Self {
-        TcpConnectorFactory(PhantomData)
-    }
-
+impl TcpConnectorFactory {
     /// Create TCP connector service
-    pub fn service(&self) -> TcpConnector<T> {
-        TcpConnector(PhantomData)
+    pub fn service(&self) -> TcpConnector {
+        TcpConnector
     }
 }
 
-impl<T> Default for TcpConnectorFactory<T> {
-    fn default() -> Self {
-        TcpConnectorFactory(PhantomData)
-    }
-}
-
-impl<T> Clone for TcpConnectorFactory<T> {
-    fn clone(&self) -> Self {
-        TcpConnectorFactory(PhantomData)
-    }
-}
-
-impl<T: Address> ServiceFactory<Connect<T>> for TcpConnectorFactory<T> {
+impl<T: Address> ServiceFactory<Connect<T>> for TcpConnectorFactory {
     type Response = Connection<T, TcpStream>;
     type Error = ConnectError;
     type Config = ();
-    type Service = TcpConnector<T>;
+    type Service = TcpConnector;
     type InitError = ();
-    type Future = Ready<Result<Self::Service, Self::InitError>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ready(Ok(self.service()))
+        let service = self.service();
+        Box::pin(async move { Ok(service) })
     }
 }
 
 /// TCP connector service
-#[derive(Default, Debug)]
-pub struct TcpConnector<T>(PhantomData<T>);
+#[derive(Copy, Clone, Debug)]
+pub struct TcpConnector;
 
-impl<T> TcpConnector<T> {
-    pub fn new() -> Self {
-        TcpConnector(PhantomData)
-    }
-}
-
-impl<T> Clone for TcpConnector<T> {
-    fn clone(&self) -> Self {
-        TcpConnector(PhantomData)
-    }
-}
-
-impl<T: Address> Service<Connect<T>> for TcpConnector<T> {
+impl<T: Address> Service<Connect<T>> for TcpConnector {
     type Response = Connection<T, TcpStream>;
     type Error = ConnectError;
     type Future = TcpConnectorResponse<T>;
@@ -89,8 +61,6 @@ impl<T: Address> Service<Connect<T>> for TcpConnector<T> {
         }
     }
 }
-
-type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
 #[doc(hidden)]
 /// TCP stream connector response future
@@ -165,7 +135,7 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
                                 port,
                             );
                             if addrs.is_none() || addrs.as_ref().unwrap().is_empty() {
-                                return Poll::Ready(Err(err.into()));
+                                return Poll::Ready(Err(ConnectError::Io(err)));
                             }
                         }
                     }

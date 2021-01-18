@@ -66,7 +66,7 @@ pub mod time {
     pub use tokio::time::{timeout, Timeout};
 }
 
-/// Blocking task management.
+/// Task management.
 pub mod task {
     pub use tokio::task::{spawn_blocking, yield_now, JoinHandle};
 }

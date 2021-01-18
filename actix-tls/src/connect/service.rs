@@ -5,38 +5,29 @@ use std::task::{Context, Poll};
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
 use either::Either;
-use futures_util::future::{ok, Ready};
-use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
+use futures_core::future::LocalBoxFuture;
 
 use super::connect::{Address, Connect, Connection};
 use super::connector::{TcpConnector, TcpConnectorFactory};
 use super::error::ConnectError;
 use super::resolve::{Resolver, ResolverFactory};
 
-pub struct ConnectServiceFactory<T> {
-    tcp: TcpConnectorFactory<T>,
-    resolver: ResolverFactory<T>,
+pub struct ConnectServiceFactory {
+    tcp: TcpConnectorFactory,
+    resolver: ResolverFactory,
 }
 
-impl<T> ConnectServiceFactory<T> {
+impl ConnectServiceFactory {
     /// Construct new ConnectService factory
-    pub fn new() -> Self {
+    pub fn new(resolver: Resolver) -> Self {
         ConnectServiceFactory {
-            tcp: TcpConnectorFactory::default(),
-            resolver: ResolverFactory::default(),
-        }
-    }
-
-    /// Construct new connect service with custom dns resolver
-    pub fn with_resolver(resolver: AsyncResolver) -> Self {
-        ConnectServiceFactory {
-            tcp: TcpConnectorFactory::default(),
+            tcp: TcpConnectorFactory,
             resolver: ResolverFactory::new(resolver),
         }
     }
 
     /// Construct new service
-    pub fn service(&self) -> ConnectService<T> {
+    pub fn service(&self) -> ConnectService {
         ConnectService {
             tcp: self.tcp.service(),
             resolver: self.resolver.service(),
@@ -44,7 +35,7 @@ impl<T> ConnectServiceFactory<T> {
     }
 
     /// Construct new tcp stream service
-    pub fn tcp_service(&self) -> TcpConnectService<T> {
+    pub fn tcp_service(&self) -> TcpConnectService {
         TcpConnectService {
             tcp: self.tcp.service(),
             resolver: self.resolver.service(),
@@ -52,44 +43,36 @@ impl<T> ConnectServiceFactory<T> {
     }
 }
 
-impl<T> Default for ConnectServiceFactory<T> {
-    fn default() -> Self {
-        ConnectServiceFactory {
-            tcp: TcpConnectorFactory::default(),
-            resolver: ResolverFactory::default(),
-        }
-    }
-}
-
-impl<T> Clone for ConnectServiceFactory<T> {
+impl Clone for ConnectServiceFactory {
     fn clone(&self) -> Self {
         ConnectServiceFactory {
-            tcp: self.tcp.clone(),
+            tcp: self.tcp,
             resolver: self.resolver.clone(),
         }
     }
 }
 
-impl<T: Address> ServiceFactory<Connect<T>> for ConnectServiceFactory<T> {
+impl<T: Address> ServiceFactory<Connect<T>> for ConnectServiceFactory {
     type Response = Connection<T, TcpStream>;
     type Error = ConnectError;
     type Config = ();
-    type Service = ConnectService<T>;
+    type Service = ConnectService;
     type InitError = ();
-    type Future = Ready<Result<Self::Service, Self::InitError>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(self.service())
+        let service = self.service();
+        Box::pin(async move { Ok(service) })
     }
 }
 
 #[derive(Clone)]
-pub struct ConnectService<T> {
-    tcp: TcpConnector<T>,
-    resolver: Resolver<T>,
+pub struct ConnectService {
+    tcp: TcpConnector,
+    resolver: Resolver,
 }
 
-impl<T: Address> Service<Connect<T>> for ConnectService<T> {
+impl<T: Address> Service<Connect<T>> for ConnectService {
     type Response = Connection<T, TcpStream>;
     type Error = ConnectError;
     type Future = ConnectServiceResponse<T>;
@@ -99,14 +82,14 @@ impl<T: Address> Service<Connect<T>> for ConnectService<T> {
     fn call(&mut self, req: Connect<T>) -> Self::Future {
         ConnectServiceResponse {
             state: ConnectState::Resolve(self.resolver.call(req)),
-            tcp: self.tcp.clone(),
+            tcp: self.tcp,
         }
     }
 }
 
 enum ConnectState<T: Address> {
-    Resolve(<Resolver<T> as Service<Connect<T>>>::Future),
-    Connect(<TcpConnector<T> as Service<Connect<T>>>::Future),
+    Resolve(<Resolver as Service<Connect<T>>>::Future),
+    Connect(<TcpConnector as Service<Connect<T>>>::Future),
 }
 
 impl<T: Address> ConnectState<T> {
@@ -128,7 +111,7 @@ impl<T: Address> ConnectState<T> {
 
 pub struct ConnectServiceResponse<T: Address> {
     state: ConnectState<T>,
-    tcp: TcpConnector<T>,
+    tcp: TcpConnector,
 }
 
 impl<T: Address> Future for ConnectServiceResponse<T> {
@@ -151,12 +134,12 @@ impl<T: Address> Future for ConnectServiceResponse<T> {
 }
 
 #[derive(Clone)]
-pub struct TcpConnectService<T> {
-    tcp: TcpConnector<T>,
-    resolver: Resolver<T>,
+pub struct TcpConnectService {
+    tcp: TcpConnector,
+    resolver: Resolver,
 }
 
-impl<T: Address + 'static> Service<Connect<T>> for TcpConnectService<T> {
+impl<T: Address + 'static> Service<Connect<T>> for TcpConnectService {
     type Response = TcpStream;
     type Error = ConnectError;
     type Future = TcpConnectServiceResponse<T>;
@@ -166,14 +149,14 @@ impl<T: Address + 'static> Service<Connect<T>> for TcpConnectService<T> {
     fn call(&mut self, req: Connect<T>) -> Self::Future {
         TcpConnectServiceResponse {
             state: TcpConnectState::Resolve(self.resolver.call(req)),
-            tcp: self.tcp.clone(),
+            tcp: self.tcp,
         }
     }
 }
 
 enum TcpConnectState<T: Address> {
-    Resolve(<Resolver<T> as Service<Connect<T>>>::Future),
-    Connect(<TcpConnector<T> as Service<Connect<T>>>::Future),
+    Resolve(<Resolver as Service<Connect<T>>>::Future),
+    Connect(<TcpConnector as Service<Connect<T>>>::Future),
 }
 
 impl<T: Address> TcpConnectState<T> {
@@ -202,7 +185,7 @@ impl<T: Address> TcpConnectState<T> {
 
 pub struct TcpConnectServiceResponse<T: Address> {
     state: TcpConnectState<T>,
-    tcp: TcpConnector<T>,
+    tcp: TcpConnector,
 }
 
 impl<T: Address> Future for TcpConnectServiceResponse<T> {
