@@ -1,8 +1,4 @@
-use std::{
-    net::{SocketAddr, ToSocketAddrs},
-    rc::Rc,
-    task::Poll,
-};
+use std::{net::SocketAddr, rc::Rc, task::Poll};
 
 use actix_service::{Service, ServiceFactory};
 use futures_core::future::LocalBoxFuture;
@@ -52,7 +48,7 @@ pub enum Resolver {
 pub trait Resolve {
     fn lookup(
         &self,
-        addrs: Vec<SocketAddr>,
+        addrs: String,
     ) -> LocalBoxFuture<'_, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>>;
 }
 
@@ -81,10 +77,6 @@ impl Resolver {
                 Ok(res.collect())
             }
             Self::Custom(resolver) => {
-                let host = host
-                    .to_socket_addrs()
-                    .map_err(|e| ConnectError::Resolver(Box::new(e)))?
-                    .collect();
                 resolver.lookup(host).await.map_err(ConnectError::Resolver)
             }
         }
