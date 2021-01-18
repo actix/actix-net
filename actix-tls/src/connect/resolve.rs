@@ -45,11 +45,62 @@ pub enum Resolver {
 }
 
 /// trait for custom lookup with self defined resolver.
+///
+/// # Example:
+/// ```rust
+/// use std::net::SocketAddr;
+///
+/// use actix_tls::connect::{Resolve, Resolver};
+/// use futures_util::future::LocalBoxFuture;
+///
+/// // use trust_dns_resolver as custom resolver.
+/// use trust_dns_resolver::TokioAsyncResolver;
+///
+/// struct MyResolver {
+///     trust_dns: TokioAsyncResolver,
+/// };
+///
+/// // impl Resolve trait and convert given host address str and port to SocketAddr.
+/// impl Resolve for MyResolver {
+///     fn lookup<'a>(
+///         &'a self,
+///         host: &'a str,
+///         port: u16,
+///     ) -> LocalBoxFuture<'a, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>> {
+///         Box::pin(async move {
+///             let res = self
+///                 .trust_dns
+///                 .lookup_ip(host)
+///                 .await?
+///                 .iter()
+///                 .map(|ip| SocketAddr::new(ip, port))
+///                 .collect();
+///             Ok(res)
+///         })
+///     }
+/// }
+///
+/// let resolver = MyResolver {
+///     trust_dns: TokioAsyncResolver::tokio_from_system_conf().unwrap(),
+/// };
+///
+/// // construct custom resolver
+/// let resolver = Resolver::new_custom(resolver);
+///
+/// // pass custom resolver to connector builder.
+/// // connector would then be usable as a service or awc's connector.
+/// let connector = actix_tls::connect::new_connector(resolver.clone());
+///
+/// // resolver can be passed to connector factory where returned service factory
+/// // can be used to construct new connector services.
+/// let factory = actix_tls::connect::new_connector_factory(resolver);
+///```
 pub trait Resolve {
-    fn lookup(
-        &self,
-        addrs: String,
-    ) -> LocalBoxFuture<'_, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>>;
+    fn lookup<'a>(
+        &'a self,
+        host: &'a str,
+        port: u16,
+    ) -> LocalBoxFuture<'a, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>>;
 }
 
 impl Resolver {
@@ -61,10 +112,15 @@ impl Resolver {
     async fn lookup<T: Address>(
         &self,
         req: &Connect<T>,
-        host: String,
     ) -> Result<Vec<SocketAddr>, ConnectError> {
         match self {
             Self::Default => {
+                let host = if req.host().contains(':') {
+                    req.host().to_string()
+                } else {
+                    format!("{}:{}", req.host(), req.port())
+                };
+
                 let res = tokio::net::lookup_host(host).await.map_err(|e| {
                     trace!(
                         "DNS resolver: failed to resolve host {:?} err: {}",
@@ -76,9 +132,10 @@ impl Resolver {
 
                 Ok(res.collect())
             }
-            Self::Custom(resolver) => {
-                resolver.lookup(host).await.map_err(ConnectError::Resolver)
-            }
+            Self::Custom(resolver) => resolver
+                .lookup(req.host(), req.port())
+                .await
+                .map_err(ConnectError::Resolver),
         }
     }
 }
@@ -101,13 +158,7 @@ impl<T: Address> Service<Connect<T>> for Resolver {
             } else {
                 trace!("DNS resolver: resolving host {:?}", req.host());
 
-                let host = if req.host().contains(':') {
-                    req.host().to_string()
-                } else {
-                    format!("{}:{}", req.host(), req.port())
-                };
-
-                let addrs = resolver.lookup(&req, host).await?;
+                let addrs = resolver.lookup(&req).await?;
 
                 let req = req.set_addrs(addrs);
 

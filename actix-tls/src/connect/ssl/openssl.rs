@@ -31,9 +31,7 @@ impl OpensslConnector {
     pub fn new(connector: SslConnector) -> Self {
         OpensslConnector { connector }
     }
-}
 
-impl OpensslConnector {
     pub fn service(connector: SslConnector) -> OpensslConnectorService {
         OpensslConnectorService { connector }
     }

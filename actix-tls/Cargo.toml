@@ -80,3 +80,4 @@ bytes = "1"
 env_logger = "0.8"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
 log = "0.4"
+trust-dns-resolver = "0.20.0"
