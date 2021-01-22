@@ -15,7 +15,7 @@ mod test_server;
 mod waker_queue;
 mod worker;
 
-pub use self::builder::ServerBuilder;
+pub use self::builder::{create_tcp_listener, ServerBuilder};
 pub use self::config::{ServiceConfig, ServiceRuntime};
 pub use self::server::Server;
 pub use self::service::ServiceFactory;

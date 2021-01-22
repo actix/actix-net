@@ -472,13 +472,18 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
     }
 }
 
-fn create_tcp_listener(addr: StdSocketAddr, backlog: u32) -> io::Result<MioTcpListener> {
+pub fn create_tcp_listener(addr: StdSocketAddr, backlog: u32) -> io::Result<MioTcpListener> {
     let socket = match addr {
         StdSocketAddr::V4(_) => MioTcpSocket::new_v4()?,
         StdSocketAddr::V6(_) => MioTcpSocket::new_v6()?,
     };
 
-    socket.set_reuseaddr(true)?;
+    // https://github.com/actix/actix-web/issues/1913
+    #[cfg(not(windows))]
+    {
+        socket.set_reuseaddr(true)?;
+    }
+
     socket.bind(addr)?;
     socket.listen(backlog)
 }
