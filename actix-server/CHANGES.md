@@ -2,8 +2,10 @@
 
 ## Unreleased - 2021-xx-xx
 * Hidden `ServerBuilder::start` method has been removed. Use `ServerBuilder::run`. [#246]
+* Expose `builder::create_tcp_listener`. Don't set reuseaddr on windows. [#249]
 
 [#246]: https://github.com/actix/actix-net/pull/246
+[#249]: https://github.com/actix/actix-net/pull/249
 
 
 ## 2.0.0-beta.2 - 2021-01-03
