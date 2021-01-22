@@ -14,7 +14,6 @@ use tokio_rustls::{Accept, TlsAcceptor};
 
 pub use rustls::{ServerConfig, Session};
 pub use tokio_rustls::server::TlsStream;
-pub use webpki_roots::TLS_SERVER_ROOTS;
 
 use super::MAX_CONN_COUNTER;
 

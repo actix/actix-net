@@ -2,7 +2,6 @@ use std::{
     fmt,
     future::Future,
     io,
-    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -11,7 +10,6 @@ use actix_codec::{AsyncRead, AsyncWrite};
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
-use futures_util::future::{ready, Either, Ready};
 use log::trace;
 
 pub use openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
@@ -82,29 +80,27 @@ where
 {
     type Response = Connection<T, SslStream<U>>;
     type Error = io::Error;
-    #[allow(clippy::type_complexity)]
-    type Future = Either<ConnectAsyncExt<T, U>, Ready<Result<Self::Response, Self::Error>>>;
+    type Future = ConnectAsyncExt<T, U>;
 
     actix_service::always_ready!();
 
     fn call(&mut self, stream: Connection<T, U>) -> Self::Future {
         trace!("SSL Handshake start for: {:?}", stream.host());
         let (io, stream) = stream.replace(());
-        let host = stream.host().to_string();
+        let host = stream.host();
 
-        match self.connector.configure() {
-            Err(e) => Either::Right(ready(Err(io::Error::new(io::ErrorKind::Other, e)))),
-            Ok(config) => {
-                let ssl = config
-                    .into_ssl(&host)
-                    .expect("SSL connect configuration was invalid.");
+        let config = self
+            .connector
+            .configure()
+            .expect("SSL connect configuration was invalid.");
 
-                Either::Left(ConnectAsyncExt {
-                    io: Some(SslStream::new(ssl, io).unwrap()),
-                    stream: Some(stream),
-                    _t: PhantomData,
-                })
-            }
+        let ssl = config
+            .into_ssl(host)
+            .expect("SSL connect configuration was invalid.");
+
+        ConnectAsyncExt {
+            io: Some(SslStream::new(ssl, io).unwrap()),
+            stream: Some(stream),
         }
     }
 }
@@ -112,7 +108,6 @@ where
 pub struct ConnectAsyncExt<T, U> {
     io: Option<SslStream<U>>,
     stream: Option<Connection<T, ()>>,
-    _t: PhantomData<U>,
 }
 
 impl<T: Address, U> Future for ConnectAsyncExt<T, U>

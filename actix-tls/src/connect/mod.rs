@@ -4,6 +4,17 @@
 //!
 //! * `openssl` - enables TLS support via `openssl` crate
 //! * `rustls` - enables TLS support via `rustls` crate
+//!
+//! ## Workflow of connector service:
+//! - resolve [`Address`](self::connect::Address) with given [`Resolver`](self::resolve::Resolver)
+//!   and collect [`SocketAddrs`](std::net::SocketAddr).
+//! - establish Tcp connection and return [`TcpStream`](tokio::net::TcpStream).
+//!
+//! ## Workflow of tls connector services:
+//! - Establish [`TcpStream`](tokio::net::TcpStream) with connector service.
+//! - Wrap around the stream and do connect handshake with remote address.
+//! - Return certain stream type impl [`AsyncRead`](tokio::io::AsyncRead) and
+//!   [`AsyncWrite`](tokio::io::AsyncWrite)
 
 mod connect;
 mod connector;

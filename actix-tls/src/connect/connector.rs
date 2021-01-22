@@ -1,16 +1,18 @@
-use std::collections::VecDeque;
-use std::future::Future;
-use std::io;
-use std::net::SocketAddr;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    collections::VecDeque,
+    future::Future,
+    io,
+    net::SocketAddr,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
 use futures_core::future::LocalBoxFuture;
 use log::{error, trace};
 
-use super::connect::{Address, Connect, Connection};
+use super::connect::{Address, Connect, ConnectAddrs, Connection};
 use super::error::ConnectError;
 
 /// TCP connector service factory
@@ -53,12 +55,7 @@ impl<T: Address> Service<Connect<T>> for TcpConnector {
         let port = req.port();
         let Connect { req, addr, .. } = req;
 
-        if let Some(addr) = addr {
-            TcpConnectorResponse::new(req, port, addr)
-        } else {
-            error!("TCP connector: got unresolved address");
-            TcpConnectorResponse::Error(Some(ConnectError::Unresolved))
-        }
+        TcpConnectorResponse::new(req, port, addr)
     }
 }
 
@@ -75,11 +72,7 @@ pub enum TcpConnectorResponse<T> {
 }
 
 impl<T: Address> TcpConnectorResponse<T> {
-    pub fn new(
-        req: T,
-        port: u16,
-        addr: either::Either<SocketAddr, VecDeque<SocketAddr>>,
-    ) -> TcpConnectorResponse<T> {
+    pub(crate) fn new(req: T, port: u16, addr: ConnectAddrs) -> TcpConnectorResponse<T> {
         trace!(
             "TCP connector - connecting to {:?} port:{}",
             req.host(),
@@ -87,13 +80,19 @@ impl<T: Address> TcpConnectorResponse<T> {
         );
 
         match addr {
-            either::Either::Left(addr) => TcpConnectorResponse::Response {
+            ConnectAddrs::One(None) => {
+                error!("TCP connector: got unresolved address");
+                TcpConnectorResponse::Error(Some(ConnectError::Unresolved))
+            }
+            ConnectAddrs::One(Some(addr)) => TcpConnectorResponse::Response {
                 req: Some(req),
                 port,
                 addrs: None,
                 stream: Some(Box::pin(TcpStream::connect(addr))),
             },
-            either::Either::Right(addrs) => TcpConnectorResponse::Response {
+            // when resolver returns multiple socket addr for request they would be popped from
+            // front end of queue and returns with the first successful tcp connection.
+            ConnectAddrs::Multi(addrs) => TcpConnectorResponse::Response {
                 req: Some(req),
                 port,
                 addrs: Some(addrs),

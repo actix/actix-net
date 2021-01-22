@@ -8,6 +8,7 @@ use std::{
 
 pub use rustls::Session;
 pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
+pub use webpki_roots::TLS_SERVER_ROOTS;
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};

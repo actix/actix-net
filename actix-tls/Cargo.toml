@@ -50,9 +50,7 @@ actix-service = "2.0.0-beta.3"
 actix-utils = "3.0.0-beta.1"
 
 derive_more = "0.99.5"
-either = "1.6"
-futures-core = { version = "0.3.7", default-features = false }
-futures-util = { version = "0.3.7", default-features = false }
+futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 http = { version = "0.2.3", optional = true }
 log = "0.4"
 tokio = { version = "1", optional = true }

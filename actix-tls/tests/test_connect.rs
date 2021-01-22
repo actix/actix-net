@@ -97,7 +97,7 @@ async fn test_custom_resolver() {
 
     struct MyResolver {
         trust_dns: TokioAsyncResolver,
-    };
+    }
 
     impl Resolve for MyResolver {
         fn lookup<'a>(

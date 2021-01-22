@@ -1,9 +1,9 @@
-use std::collections::{vec_deque, VecDeque};
-use std::fmt;
-use std::iter::{FromIterator, FusedIterator};
-use std::net::SocketAddr;
-
-use either::Either;
+use std::{
+    collections::{vec_deque, VecDeque},
+    fmt,
+    iter::{FromIterator, FusedIterator},
+    net::SocketAddr,
+};
 
 /// Connect request
 pub trait Address: Unpin + 'static {
@@ -39,7 +39,25 @@ impl Address for &'static str {
 pub struct Connect<T> {
     pub(crate) req: T,
     pub(crate) port: u16,
-    pub(crate) addr: Option<Either<SocketAddr, VecDeque<SocketAddr>>>,
+    pub(crate) addr: ConnectAddrs,
+}
+
+#[derive(Eq, PartialEq, Debug, Hash)]
+pub(crate) enum ConnectAddrs {
+    One(Option<SocketAddr>),
+    Multi(VecDeque<SocketAddr>),
+}
+
+impl ConnectAddrs {
+    pub(crate) fn is_none(&self) -> bool {
+        matches!(*self, Self::One(None))
+    }
+}
+
+impl Default for ConnectAddrs {
+    fn default() -> Self {
+        Self::One(None)
+    }
 }
 
 impl<T: Address> Connect<T> {
@@ -49,7 +67,7 @@ impl<T: Address> Connect<T> {
         Connect {
             req,
             port: port.unwrap_or(0),
-            addr: None,
+            addr: ConnectAddrs::One(None),
         }
     }
 
@@ -59,7 +77,7 @@ impl<T: Address> Connect<T> {
         Connect {
             req,
             port: 0,
-            addr: Some(Either::Left(addr)),
+            addr: ConnectAddrs::One(Some(addr)),
         }
     }
 
@@ -73,9 +91,7 @@ impl<T: Address> Connect<T> {
 
     /// Use address.
     pub fn set_addr(mut self, addr: Option<SocketAddr>) -> Self {
-        if let Some(addr) = addr {
-            self.addr = Some(Either::Left(addr));
-        }
+        self.addr = ConnectAddrs::One(addr);
         self
     }
 
@@ -86,9 +102,9 @@ impl<T: Address> Connect<T> {
     {
         let mut addrs = VecDeque::from_iter(addrs);
         self.addr = if addrs.len() < 2 {
-            addrs.pop_front().map(Either::Left)
+            ConnectAddrs::One(addrs.pop_front())
         } else {
-            Some(Either::Right(addrs))
+            ConnectAddrs::Multi(addrs)
         };
         self
     }
@@ -105,24 +121,18 @@ impl<T: Address> Connect<T> {
 
     /// Pre-resolved addresses of the request.
     pub fn addrs(&self) -> ConnectAddrsIter<'_> {
-        let inner = match self.addr {
-            None => Either::Left(None),
-            Some(Either::Left(addr)) => Either::Left(Some(addr)),
-            Some(Either::Right(ref addrs)) => Either::Right(addrs.iter()),
-        };
-
-        ConnectAddrsIter { inner }
+        match self.addr {
+            ConnectAddrs::One(addr) => ConnectAddrsIter::One(addr),
+            ConnectAddrs::Multi(ref addrs) => ConnectAddrsIter::Multi(addrs.iter()),
+        }
     }
 
     /// Takes pre-resolved addresses of the request.
-    pub fn take_addrs(&mut self) -> ConnectTakeAddrsIter {
-        let inner = match self.addr.take() {
-            None => Either::Left(None),
-            Some(Either::Left(addr)) => Either::Left(Some(addr)),
-            Some(Either::Right(addrs)) => Either::Right(addrs.into_iter()),
-        };
-
-        ConnectTakeAddrsIter { inner }
+    pub fn take_addrs(&mut self) -> ConnectAddrsIter<'static> {
+        match std::mem::take(&mut self.addr) {
+            ConnectAddrs::One(addr) => ConnectAddrsIter::One(addr),
+            ConnectAddrs::Multi(addrs) => ConnectAddrsIter::MultiOwned(addrs.into_iter()),
+        }
     }
 }
 
@@ -140,25 +150,29 @@ impl<T: Address> fmt::Display for Connect<T> {
 
 /// Iterator over addresses in a [`Connect`] request.
 #[derive(Clone)]
-pub struct ConnectAddrsIter<'a> {
-    inner: Either<Option<SocketAddr>, vec_deque::Iter<'a, SocketAddr>>,
+pub enum ConnectAddrsIter<'a> {
+    One(Option<SocketAddr>),
+    Multi(vec_deque::Iter<'a, SocketAddr>),
+    MultiOwned(vec_deque::IntoIter<SocketAddr>),
 }
 
 impl Iterator for ConnectAddrsIter<'_> {
     type Item = SocketAddr;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.inner {
-            Either::Left(ref mut opt) => opt.take(),
-            Either::Right(ref mut iter) => iter.next().copied(),
+        match *self {
+            Self::One(ref mut addr) => addr.take(),
+            Self::Multi(ref mut iter) => iter.next().copied(),
+            Self::MultiOwned(ref mut iter) => iter.next(),
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        match self.inner {
-            Either::Left(Some(_)) => (1, Some(1)),
-            Either::Left(None) => (0, Some(0)),
-            Either::Right(ref iter) => iter.size_hint(),
+        match *self {
+            Self::One(None) => (0, Some(0)),
+            Self::One(Some(_)) => (1, Some(1)),
+            Self::Multi(ref iter) => iter.size_hint(),
+            Self::MultiOwned(ref iter) => iter.size_hint(),
         }
     }
 }
@@ -172,35 +186,6 @@ impl fmt::Debug for ConnectAddrsIter<'_> {
 impl ExactSizeIterator for ConnectAddrsIter<'_> {}
 
 impl FusedIterator for ConnectAddrsIter<'_> {}
-
-/// Owned iterator over addresses in a [`Connect`] request.
-#[derive(Debug)]
-pub struct ConnectTakeAddrsIter {
-    inner: Either<Option<SocketAddr>, vec_deque::IntoIter<SocketAddr>>,
-}
-
-impl Iterator for ConnectTakeAddrsIter {
-    type Item = SocketAddr;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.inner {
-            Either::Left(ref mut opt) => opt.take(),
-            Either::Right(ref mut iter) => iter.next(),
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match self.inner {
-            Either::Left(Some(_)) => (1, Some(1)),
-            Either::Left(None) => (0, Some(0)),
-            Either::Right(ref iter) => iter.size_hint(),
-        }
-    }
-}
-
-impl ExactSizeIterator for ConnectTakeAddrsIter {}
-
-impl FusedIterator for ConnectTakeAddrsIter {}
 
 fn parse(host: &str) -> (&str, Option<u16>) {
     let mut parts_iter = host.splitn(2, ':');
