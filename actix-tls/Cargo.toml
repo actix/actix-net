@@ -29,7 +29,7 @@ default = ["accept", "connect", "uri"]
 accept = []
 
 # enable connector services
-connect = ["tokio/net"]
+connect = []
 
 # use openssl impls
 openssl = ["tls-openssl", "tokio-openssl"]
@@ -53,7 +53,6 @@ derive_more = "0.99.5"
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 http = { version = "0.2.3", optional = true }
 log = "0.4"
-tokio = { version = "1", optional = true }
 
 # openssl
 tls-openssl = { package = "openssl", version = "0.10", optional = true }
