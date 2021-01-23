@@ -1,14 +1,13 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
-use futures_util::{
-    future::{ready, Ready},
-    ready,
-};
+use futures_core::{future::LocalBoxFuture, ready};
 
 pub use openssl::ssl::{
     AlpnError, Error as SslError, HandshakeError, Ssl, SslAcceptor, SslAcceptorBuilder,
@@ -50,15 +49,16 @@ where
     type Config = ();
     type Service = AcceptorService;
     type InitError = ();
-    type Future = Ready<Result<Self::Service, Self::InitError>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        MAX_CONN_COUNTER.with(|conns| {
-            ready(Ok(AcceptorService {
+        let res = MAX_CONN_COUNTER.with(|conns| {
+            Ok(AcceptorService {
                 acceptor: self.acceptor.clone(),
                 conns: conns.clone(),
-            }))
-        })
+            })
+        });
+        Box::pin(async { res })
     }
 }
 
