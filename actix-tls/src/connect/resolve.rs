@@ -135,6 +135,7 @@ impl Resolver {
             format!("{}:{}", host, req.port())
         };
 
+        // spawn blocking dns lookup in thread pool.
         spawn_blocking(move || std::net::ToSocketAddrs::to_socket_addrs(&host))
     }
 }

@@ -2,7 +2,7 @@
 
 ## Unreleased - 2021-xx-xx
 * Remove `trust-dns-proto` and `trust-dns-resolver` [#248]
-* Use `tokio::net::lookup_host` as simple and basic default resolver [#248]
+* Use `std::net::ToSocketAddrs::to_socket_addrs` as simple and basic default resolver [#248]
 * Add `Resolve` trait for custom dns resolver. [#248]
 * Add `Resolver::new_custom` function to construct custom resolvers. [#248]
 * Export `webpki_roots::TLS_SERVER_ROOTS` in `actix_tls::connect` mod and remove
