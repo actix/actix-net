@@ -1,18 +1,18 @@
-use std::fmt;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    fmt,
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 pub use rustls::Session;
 pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
+pub use webpki_roots::TLS_SERVER_ROOTS;
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
-use futures_util::{
-    future::{ready, Ready},
-    ready,
-};
+use futures_core::{future::LocalBoxFuture, ready};
 use log::trace;
 use tokio_rustls::{Connect, TlsConnector};
 use webpki::DNSNameRef;
@@ -53,12 +53,11 @@ where
     type Config = ();
     type Service = RustlsConnectorService;
     type InitError = ();
-    type Future = Ready<Result<Self::Service, Self::InitError>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ready(Ok(RustlsConnectorService {
-            connector: self.connector.clone(),
-        }))
+        let connector = self.connector.clone();
+        Box::pin(async { Ok(RustlsConnectorService { connector }) })
     }
 }
 

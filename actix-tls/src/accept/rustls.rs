@@ -1,18 +1,19 @@
-use std::future::Future;
-use std::io;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    future::Future,
+    io,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
-use futures_util::future::{ready, Ready};
+use futures_core::future::LocalBoxFuture;
 use tokio_rustls::{Accept, TlsAcceptor};
 
 pub use rustls::{ServerConfig, Session};
 pub use tokio_rustls::server::TlsStream;
-pub use webpki_roots::TLS_SERVER_ROOTS;
 
 use super::MAX_CONN_COUNTER;
 
@@ -52,15 +53,16 @@ where
 
     type Service = AcceptorService;
     type InitError = ();
-    type Future = Ready<Result<Self::Service, Self::InitError>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        MAX_CONN_COUNTER.with(|conns| {
-            ready(Ok(AcceptorService {
+        let res = MAX_CONN_COUNTER.with(|conns| {
+            Ok(AcceptorService {
                 acceptor: self.config.clone().into(),
                 conns: conns.clone(),
-            }))
-        })
+            })
+        });
+        Box::pin(async { res })
     }
 }
 

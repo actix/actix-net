@@ -3,7 +3,7 @@ use std::task::{Context, Poll};
 use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
-use futures_util::future::{ready, LocalBoxFuture, Ready};
+use futures_core::future::LocalBoxFuture;
 
 pub use native_tls::Error;
 pub use tokio_native_tls::{TlsAcceptor, TlsStream};
@@ -44,15 +44,16 @@ where
 
     type Service = NativeTlsAcceptorService;
     type InitError = ();
-    type Future = Ready<Result<Self::Service, Self::InitError>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        MAX_CONN_COUNTER.with(|conns| {
-            ready(Ok(NativeTlsAcceptorService {
+        let res = MAX_CONN_COUNTER.with(|conns| {
+            Ok(NativeTlsAcceptorService {
                 acceptor: self.acceptor.clone(),
                 conns: conns.clone(),
-            }))
-        })
+            })
+        });
+        Box::pin(async { res })
     }
 }
 

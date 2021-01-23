@@ -1,13 +1,12 @@
 use std::io;
 
-use derive_more::{Display, From};
-use trust_dns_resolver::error::ResolveError;
+use derive_more::Display;
 
-#[derive(Debug, From, Display)]
+#[derive(Debug, Display)]
 pub enum ConnectError {
     /// Failed to resolve the hostname
     #[display(fmt = "Failed resolving hostname: {}", _0)]
-    Resolver(ResolveError),
+    Resolver(Box<dyn std::error::Error>),
 
     /// No dns records
     #[display(fmt = "No dns records found for the input")]
