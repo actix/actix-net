@@ -75,7 +75,7 @@ where
     type Error = SslError;
     type Future = AcceptorServiceResponse<T>;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(ctx) {
             Poll::Ready(Ok(()))
         } else {
@@ -83,7 +83,7 @@ where
         }
     }
 
-    fn call(&mut self, io: T) -> Self::Future {
+    fn call(&self, io: T) -> Self::Future {
         let ssl_ctx = self.acceptor.context();
         let ssl = Ssl::new(ssl_ctx).expect("Provided SSL acceptor was invalid.");
         AcceptorServiceResponse {

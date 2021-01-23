@@ -79,7 +79,7 @@ where
     type Error = Error;
     type Future = LocalBoxFuture<'static, Result<TlsStream<T>, Error>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(cx) {
             Poll::Ready(Ok(()))
         } else {
@@ -87,7 +87,7 @@ where
         }
     }
 
-    fn call(&mut self, io: T) -> Self::Future {
+    fn call(&self, io: T) -> Self::Future {
         let guard = self.conns.get();
         let this = self.clone();
         Box::pin(async move {

@@ -20,7 +20,7 @@ pub fn apply_fn<I, S, F, Fut, Req, In, Res, Err>(
 where
     I: IntoService<S, In>,
     S: Service<In, Error = Err>,
-    F: FnMut(Req, &mut S) -> Fut,
+    F: Fn(Req, &S) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     Apply::new(service.into_service(), wrap_fn)
@@ -36,7 +36,7 @@ pub fn apply_fn_factory<I, SF, F, Fut, Req, In, Res, Err>(
 where
     I: IntoServiceFactory<SF, In>,
     SF: ServiceFactory<In, Error = Err>,
-    F: FnMut(Req, &mut SF::Service) -> Fut + Clone,
+    F: Fn(Req, &SF::Service) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     ApplyFactory::new(service.into_factory(), f)
@@ -57,7 +57,7 @@ where
 impl<S, F, Fut, Req, In, Res, Err> Apply<S, F, Req, In, Res, Err>
 where
     S: Service<In, Error = Err>,
-    F: FnMut(Req, &mut S) -> Fut,
+    F: Fn(Req, &S) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     /// Create new `Apply` combinator
@@ -73,7 +73,7 @@ where
 impl<S, F, Fut, Req, In, Res, Err> Clone for Apply<S, F, Req, In, Res, Err>
 where
     S: Service<In, Error = Err> + Clone,
-    F: FnMut(Req, &mut S) -> Fut + Clone,
+    F: Fn(Req, &S) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn clone(&self) -> Self {
@@ -88,7 +88,7 @@ where
 impl<S, F, Fut, Req, In, Res, Err> Service<Req> for Apply<S, F, Req, In, Res, Err>
 where
     S: Service<In, Error = Err>,
-    F: FnMut(Req, &mut S) -> Fut,
+    F: Fn(Req, &S) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     type Response = Res;
@@ -97,8 +97,8 @@ where
 
     crate::forward_ready!(service);
 
-    fn call(&mut self, req: Req) -> Self::Future {
-        (self.wrap_fn)(req, &mut self.service)
+    fn call(&self, req: Req) -> Self::Future {
+        (self.wrap_fn)(req, &self.service)
     }
 }
 
@@ -112,7 +112,7 @@ pub struct ApplyFactory<SF, F, Req, In, Res, Err> {
 impl<SF, F, Fut, Req, In, Res, Err> ApplyFactory<SF, F, Req, In, Res, Err>
 where
     SF: ServiceFactory<In, Error = Err>,
-    F: FnMut(Req, &mut SF::Service) -> Fut + Clone,
+    F: Fn(Req, &SF::Service) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     /// Create new `ApplyFactory` new service instance
@@ -128,7 +128,7 @@ where
 impl<SF, F, Fut, Req, In, Res, Err> Clone for ApplyFactory<SF, F, Req, In, Res, Err>
 where
     SF: ServiceFactory<In, Error = Err> + Clone,
-    F: FnMut(Req, &mut SF::Service) -> Fut + Clone,
+    F: Fn(Req, &SF::Service) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn clone(&self) -> Self {
@@ -144,7 +144,7 @@ impl<SF, F, Fut, Req, In, Res, Err> ServiceFactory<Req>
     for ApplyFactory<SF, F, Req, In, Res, Err>
 where
     SF: ServiceFactory<In, Error = Err>,
-    F: FnMut(Req, &mut SF::Service) -> Fut + Clone,
+    F: Fn(Req, &SF::Service) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     type Response = Res;
@@ -165,7 +165,7 @@ pin_project! {
     pub struct ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
     where
         SF: ServiceFactory<In, Error = Err>,
-        F: FnMut(Req, &mut SF::Service) -> Fut,
+        F: Fn(Req, &SF::Service) -> Fut,
         Fut: Future<Output = Result<Res, Err>>,
     {
         #[pin]
@@ -178,7 +178,7 @@ pin_project! {
 impl<SF, F, Fut, Req, In, Res, Err> ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
 where
     SF: ServiceFactory<In, Error = Err>,
-    F: FnMut(Req, &mut SF::Service) -> Fut,
+    F: Fn(Req, &SF::Service) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn new(fut: SF::Future, wrap_fn: F) -> Self {
@@ -194,7 +194,7 @@ impl<SF, F, Fut, Req, In, Res, Err> Future
     for ApplyServiceFactoryResponse<SF, F, Fut, Req, In, Res, Err>
 where
     SF: ServiceFactory<In, Error = Err>,
-    F: FnMut(Req, &mut SF::Service) -> Fut,
+    F: Fn(Req, &SF::Service) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     type Output = Result<Apply<SF::Service, F, Req, In, Res, Err>, SF::InitError>;
@@ -226,14 +226,14 @@ mod tests {
 
         crate::always_ready!();
 
-        fn call(&mut self, _: ()) -> Self::Future {
+        fn call(&self, _: ()) -> Self::Future {
             ok(())
         }
     }
 
     #[actix_rt::test]
     async fn test_call() {
-        let mut srv = pipeline(apply_fn(Srv, |req: &'static str, srv| {
+        let srv = pipeline(apply_fn(Srv, |req: &'static str, srv| {
             let fut = srv.call(());
             async move {
                 fut.await.unwrap();
@@ -261,7 +261,7 @@ mod tests {
             },
         ));
 
-        let mut srv = new_srv.new_service(()).await.unwrap();
+        let srv = new_srv.new_service(()).await.unwrap();
 
         assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
 

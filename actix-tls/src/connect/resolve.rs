@@ -146,7 +146,7 @@ impl<T: Address> Service<Connect<T>> for Resolver {
 
     actix_service::always_ready!();
 
-    fn call(&mut self, req: Connect<T>) -> Self::Future {
+    fn call(&self, req: Connect<T>) -> Self::Future {
         if !req.addr.is_none() {
             ResolverFuture::Connected(Some(req))
         } else if let Ok(ip) = req.host().parse() {

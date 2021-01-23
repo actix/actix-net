@@ -84,7 +84,7 @@ where
 
     actix_service::always_ready!();
 
-    fn call(&mut self, stream: Connection<T, U>) -> Self::Future {
+    fn call(&self, stream: Connection<T, U>) -> Self::Future {
         trace!("SSL Handshake start for: {:?}", stream.host());
         let (io, stream) = stream.replace(());
         let host = DNSNameRef::try_from_ascii_str(stream.host())

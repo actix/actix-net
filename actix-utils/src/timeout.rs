@@ -151,7 +151,7 @@ where
 
     actix_service::forward_ready!(service);
 
-    fn call(&mut self, request: Req) -> Self::Future {
+    fn call(&self, request: Req) -> Self::Future {
         TimeoutServiceResponse {
             fut: self.service.call(request),
             sleep: sleep(self.timeout),
@@ -213,7 +213,7 @@ mod tests {
 
         actix_service::always_ready!();
 
-        fn call(&mut self, _: ()) -> Self::Future {
+        fn call(&self, _: ()) -> Self::Future {
             let sleep = actix_rt::time::sleep(self.0);
             Box::pin(async move {
                 sleep.await;
@@ -227,7 +227,7 @@ mod tests {
         let resolution = Duration::from_millis(100);
         let wait_time = Duration::from_millis(50);
 
-        let mut timeout = TimeoutService::new(resolution, SleepService(wait_time));
+        let timeout = TimeoutService::new(resolution, SleepService(wait_time));
         assert_eq!(timeout.call(()).await, Ok(()));
     }
 
@@ -236,7 +236,7 @@ mod tests {
         let resolution = Duration::from_millis(100);
         let wait_time = Duration::from_millis(500);
 
-        let mut timeout = TimeoutService::new(resolution, SleepService(wait_time));
+        let timeout = TimeoutService::new(resolution, SleepService(wait_time));
         assert_eq!(timeout.call(()).await, Err(TimeoutError::Timeout));
     }
 
@@ -249,7 +249,7 @@ mod tests {
             Timeout::new(resolution),
             fn_factory(|| async { Ok::<_, ()>(SleepService(wait_time)) }),
         );
-        let mut srv = timeout.new_service(&()).await.unwrap();
+        let srv = timeout.new_service(&()).await.unwrap();
 
         assert_eq!(srv.call(()).await, Err(TimeoutError::Timeout));
     }

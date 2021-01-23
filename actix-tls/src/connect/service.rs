@@ -80,7 +80,7 @@ impl<T: Address> Service<Connect<T>> for ConnectService {
 
     actix_service::always_ready!();
 
-    fn call(&mut self, req: Connect<T>) -> Self::Future {
+    fn call(&self, req: Connect<T>) -> Self::Future {
         ConnectServiceResponse {
             fut: ConnectFuture::Resolve(self.resolver.call(req)),
             tcp: self.tcp,
@@ -149,7 +149,7 @@ impl<T: Address> Service<Connect<T>> for TcpConnectService {
 
     actix_service::always_ready!();
 
-    fn call(&mut self, req: Connect<T>) -> Self::Future {
+    fn call(&self, req: Connect<T>) -> Self::Future {
         TcpConnectServiceResponse {
             fut: ConnectFuture::Resolve(self.resolver.call(req)),
             tcp: self.tcp,

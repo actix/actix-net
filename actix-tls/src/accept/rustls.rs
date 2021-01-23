@@ -80,7 +80,7 @@ where
     type Error = io::Error;
     type Future = AcceptorServiceFut<T>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(cx) {
             Poll::Ready(Ok(()))
         } else {
@@ -88,7 +88,7 @@ where
         }
     }
 
-    fn call(&mut self, req: T) -> Self::Future {
+    fn call(&self, req: T) -> Self::Future {
         AcceptorServiceFut {
             _guard: self.conns.get(),
             fut: self.acceptor.accept(req),

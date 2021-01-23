@@ -7,7 +7,7 @@ pub fn fn_service<F, Fut, Req, Res, Err, Cfg>(
     f: F,
 ) -> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     FnServiceFactory::new(f)
@@ -39,7 +39,7 @@ where
 ///     });
 ///
 ///     // construct new service
-///     let mut srv = factory.new_service(()).await?;
+///     let srv = factory.new_service(()).await?;
 ///
 ///     // now we can use `div` service
 ///     let result = srv.call((10, 20)).await?;
@@ -81,7 +81,7 @@ where
 ///     });
 ///
 ///     // construct new service with config argument
-///     let mut srv = factory.new_service(10).await?;
+///     let srv = factory.new_service(10).await?;
 ///
 ///     let result = srv.call(10).await?;
 ///     assert_eq!(result, 100);
@@ -132,7 +132,7 @@ where
 
 impl<F, Fut, Req, Res, Err> Service<Req> for FnService<F, Fut, Req, Res, Err>
 where
-    F: FnMut(Req) -> Fut,
+    F: Fn(Req) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     type Response = Res;
@@ -141,14 +141,14 @@ where
 
     crate::always_ready!();
 
-    fn call(&mut self, req: Req) -> Self::Future {
+    fn call(&self, req: Req) -> Self::Future {
         (self.f)(req)
     }
 }
 
 impl<F, Fut, Req, Res, Err> IntoService<FnService<F, Fut, Req, Res, Err>, Req> for F
 where
-    F: FnMut(Req) -> Fut,
+    F: Fn(Req) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn into_service(self) -> FnService<F, Fut, Req, Res, Err> {
@@ -158,7 +158,7 @@ where
 
 pub struct FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
-    F: FnMut(Req) -> Fut,
+    F: Fn(Req) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     f: F,
@@ -167,7 +167,7 @@ where
 
 impl<F, Fut, Req, Res, Err, Cfg> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn new(f: F) -> Self {
@@ -177,7 +177,7 @@ where
 
 impl<F, Fut, Req, Res, Err, Cfg> Clone for FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn clone(&self) -> Self {
@@ -187,7 +187,7 @@ where
 
 impl<F, Fut, Req, Res, Err> Service<Req> for FnServiceFactory<F, Fut, Req, Res, Err, ()>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     type Response = Res;
@@ -196,7 +196,7 @@ where
 
     crate::always_ready!();
 
-    fn call(&mut self, req: Req) -> Self::Future {
+    fn call(&self, req: Req) -> Self::Future {
         (self.f)(req)
     }
 }
@@ -204,7 +204,7 @@ where
 impl<F, Fut, Req, Res, Err, Cfg> ServiceFactory<Req>
     for FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     type Response = Res;
@@ -318,8 +318,8 @@ where
 {
     type Response = Srv::Response;
     type Error = Srv::Error;
-    type Service = Srv;
     type Config = Cfg;
+    type Service = Srv;
     type InitError = Err;
     type Future = Fut;
 
@@ -364,7 +364,7 @@ mod tests {
     async fn test_fn_service() {
         let new_srv = fn_service(|()| ok::<_, ()>("srv"));
 
-        let mut srv = new_srv.new_service(()).await.unwrap();
+        let srv = new_srv.new_service(()).await.unwrap();
         let res = srv.call(()).await;
         assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
         assert!(res.is_ok());
@@ -373,7 +373,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_fn_service_service() {
-        let mut srv = fn_service(|()| ok::<_, ()>("srv"));
+        let srv = fn_service(|()| ok::<_, ()>("srv"));
 
         let res = srv.call(()).await;
         assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
@@ -387,7 +387,7 @@ mod tests {
             ok::<_, ()>(fn_service(move |()| ok::<_, ()>(("srv", cfg))))
         });
 
-        let mut srv = new_srv.new_service(1).await.unwrap();
+        let srv = new_srv.new_service(1).await.unwrap();
         let res = srv.call(()).await;
         assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
         assert!(res.is_ok());

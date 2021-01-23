@@ -57,11 +57,11 @@ where
     type Error = E;
     type Future = MapErrFuture<A, Req, F, E>;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(ctx).map_err(&self.f)
     }
 
-    fn call(&mut self, req: Req) -> Self::Future {
+    fn call(&self, req: Req) -> Self::Future {
         MapErrFuture::new(self.service.call(req), self.f.clone())
     }
 }
@@ -218,25 +218,25 @@ mod tests {
         type Error = ();
         type Future = Ready<Result<(), ()>>;
 
-        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Err(()))
         }
 
-        fn call(&mut self, _: ()) -> Self::Future {
+        fn call(&self, _: ()) -> Self::Future {
             err(())
         }
     }
 
     #[actix_rt::test]
     async fn test_poll_ready() {
-        let mut srv = Srv.map_err(|_| "error");
+        let srv = Srv.map_err(|_| "error");
         let res = lazy(|cx| srv.poll_ready(cx)).await;
         assert_eq!(res, Poll::Ready(Err("error")));
     }
 
     #[actix_rt::test]
     async fn test_call() {
-        let mut srv = Srv.map_err(|_| "error");
+        let srv = Srv.map_err(|_| "error");
         let res = srv.call(()).await;
         assert!(res.is_err());
         assert_eq!(res.err().unwrap(), "error");
@@ -245,7 +245,7 @@ mod tests {
     #[actix_rt::test]
     async fn test_new_service() {
         let new_srv = (|| ok::<_, ()>(Srv)).into_factory().map_err(|_| "error");
-        let mut srv = new_srv.new_service(&()).await.unwrap();
+        let srv = new_srv.new_service(&()).await.unwrap();
         let res = srv.call(()).await;
         assert!(res.is_err());
         assert_eq!(res.err().unwrap(), "error");
