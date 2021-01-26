@@ -1,22 +1,25 @@
-use std::borrow::Cow;
-use std::future::Future;
-use std::io;
+use std::{borrow::Cow, future::Future, io};
 
-use tokio::sync::mpsc::unbounded_channel;
-use tokio::sync::oneshot::{channel, Receiver};
-use tokio::task::LocalSet;
+use tokio::{
+    sync::{
+        mpsc::unbounded_channel,
+        oneshot::{channel, Receiver},
+    },
+    task::LocalSet,
+};
 
-use crate::arbiter::{Arbiter, SystemArbiter};
-use crate::runtime::Runtime;
-use crate::system::System;
+use crate::{
+    arbiter::{Arbiter, SystemArbiter},
+    runtime::Runtime,
+    system::System,
+};
 
-/// Builder struct for a actix runtime.
+/// Builder an actix runtime.
 ///
-/// Either use `Builder::build` to create a system and start actors.
-/// Alternatively, use `Builder::run` to start the tokio runtime and
-/// run a function in its context.
+/// Either use `Builder::build` to create a system and start actors. Alternatively, use
+/// `Builder::run` to start the Tokio runtime and run a function in its context.
 pub struct Builder {
-    /// Name of the System. Defaults to "actix" if unset.
+    /// Name of the System. Defaults to "actix-rt" if unset.
     name: Cow<'static, str>,
 
     /// Whether the Arbiter will stop the whole System on uncaught panic. Defaults to false.
@@ -26,13 +29,13 @@ pub struct Builder {
 impl Builder {
     pub(crate) fn new() -> Self {
         Builder {
-            name: Cow::Borrowed("actix"),
+            name: Cow::Borrowed("actix-rt"),
             stop_on_panic: false,
         }
     }
 
     /// Sets the name of the System.
-    pub fn name<T: Into<String>>(mut self, name: T) -> Self {
+    pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Cow::Owned(name.into());
         self
     }
@@ -48,7 +51,7 @@ impl Builder {
 
     /// Create new System.
     ///
-    /// This method panics if it can not create tokio runtime
+    /// This method panics if it can not create Tokio runtime
     pub fn build(self) -> SystemRunner {
         self.create_runtime(|| {})
     }
@@ -60,9 +63,8 @@ impl Builder {
         self.create_async_runtime(local)
     }
 
-    /// This function will start tokio runtime and will finish once the
-    /// `System::stop()` message get called.
-    /// Function `f` get called within tokio runtime context.
+    /// This function will start Tokio runtime and will finish once the `System::stop()` message
+    /// is called. Function `f` is called within Tokio runtime context.
     pub fn run<F>(self, f: F) -> io::Result<()>
     where
         F: FnOnce(),
@@ -71,7 +73,7 @@ impl Builder {
     }
 
     fn create_async_runtime(self, local: &LocalSet) -> AsyncSystemRunner {
-        let (stop_tx, stop) = channel();
+        let (stop_tx, stop_rx) = channel();
         let (sys_sender, sys_receiver) = unbounded_channel();
 
         let system =
@@ -83,7 +85,7 @@ impl Builder {
         // start the system arbiter
         let _ = local.spawn_local(arb);
 
-        AsyncSystemRunner { stop, system }
+        AsyncSystemRunner { system, stop_rx }
     }
 
     fn create_runtime<F>(self, f: F) -> SystemRunner
@@ -115,31 +117,29 @@ impl Builder {
 
 #[derive(Debug)]
 pub(crate) struct AsyncSystemRunner {
-    stop: Receiver<i32>,
     system: System,
+    stop_rx: Receiver<i32>,
 }
 
 impl AsyncSystemRunner {
-    /// This function will start event loop and returns a future that
-    /// resolves once the `System::stop()` function is called.
-    pub(crate) fn run_nonblocking(self) -> impl Future<Output = Result<(), io::Error>> + Send {
-        let AsyncSystemRunner { stop, .. } = self;
+    /// This function will start event loop and returns a future that resolves once the
+    /// `System::stop()` function is called.
+    pub(crate) async fn run(self) -> Result<(), io::Error> {
+        let AsyncSystemRunner { stop_rx: stop, .. } = self;
 
         // run loop
-        async {
-            match stop.await {
-                Ok(code) => {
-                    if code != 0 {
-                        Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            format!("Non-zero exit code: {}", code),
-                        ))
-                    } else {
-                        Ok(())
-                    }
+        match stop.await {
+            Ok(code) => {
+                if code != 0 {
+                    Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("Non-zero exit code: {}", code),
+                    ))
+                } else {
+                    Ok(())
                 }
-                Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
             }
+            Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
         }
     }
 }

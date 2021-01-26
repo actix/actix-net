@@ -1,13 +1,16 @@
-use std::cell::RefCell;
-use std::future::Future;
-use std::io;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    cell::RefCell,
+    future::Future,
+    io,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
-use tokio::sync::mpsc::UnboundedSender;
-use tokio::task::LocalSet;
+use tokio::{sync::mpsc::UnboundedSender, task::LocalSet};
 
-use crate::arbiter::{Arbiter, SystemCommand};
-use crate::builder::{Builder, SystemRunner};
+use crate::{
+    arbiter::{Arbiter, SystemCommand},
+    builder::{Builder, SystemRunner},
+};
 
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -43,16 +46,15 @@ impl System {
 
     /// Build a new system with a customized tokio runtime.
     ///
-    /// This allows to customize the runtime. See struct level docs on
-    /// `Builder` for more information.
+    /// This allows to customize the runtime. See [`Builder`] for more information.
     pub fn builder() -> Builder {
         Builder::new()
     }
 
-    #[allow(clippy::new_ret_no_self)]
     /// Create new system.
     ///
     /// This method panics if it can not create tokio runtime
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<T: Into<String>>(name: T) -> SystemRunner {
         Self::builder().name(name).build()
     }
@@ -64,13 +66,10 @@ impl System {
     /// Note: This method uses provided `LocalSet` to create a `System` future only.
     /// All the [`Arbiter`]s will be started in separate threads using their own tokio `Runtime`s.
     /// It means that using this method currently it is impossible to make `actix-rt` work in the
-    /// alternative `tokio` `Runtime`s (e.g. provided by [`tokio_compat`]).
-    ///
-    /// [`tokio_compat`]: https://crates.io/crates/tokio-compat
+    /// alternative Tokio runtimes such as those provided by `tokio_compat`.
     ///
     /// # Examples
-    ///
-    /// ```ignore
+    /// ```
     /// use tokio::{runtime::Runtime, task::LocalSet};
     /// use actix_rt::System;
     /// use futures_util::future::try_join_all;
@@ -78,14 +77,14 @@ impl System {
     /// async fn run_application() {
     ///     let first_task = tokio::spawn(async {
     ///         // ...
-    /// #        println!("One task");
-    /// #        Ok::<(),()>(())
+    ///         # println!("One task");
+    ///         # Ok::<(),()>(())
     ///     });
     ///
     ///     let second_task = tokio::spawn(async {
     ///         // ...
-    /// #       println!("Another task");
-    /// #       Ok::<(),()>(())
+    ///         # println!("Another task");
+    ///         # Ok::<(),()>(())
     ///     });
     ///
     ///     try_join_all(vec![first_task, second_task])
@@ -93,13 +92,11 @@ impl System {
     ///         .expect("Some of the futures finished unexpectedly");
     /// }
     ///
-    ///
     /// let runtime = tokio::runtime::Builder::new_multi_thread()
     ///     .worker_threads(2)
     ///     .enable_all()
     ///     .build()
     ///     .unwrap();
-    ///
     ///
     /// let actix_system_task = LocalSet::new();
     /// let sys = System::run_in_tokio("actix-main-system", &actix_system_task);
@@ -112,34 +109,28 @@ impl System {
         name: T,
         local: &LocalSet,
     ) -> impl Future<Output = io::Result<()>> {
-        Self::builder()
-            .name(name)
-            .build_async(local)
-            .run_nonblocking()
+        Self::builder().name(name).build_async(local).run()
     }
 
-    /// Consume the provided tokio Runtime and start the `System` in it.
+    /// Consume the provided Tokio Runtime and start the `System` in it.
     /// This method will create a `LocalSet` object and occupy the current thread
     /// for the created `System` exclusively. All the other asynchronous tasks that
     /// should be executed as well must be aggregated into one future, provided as the last
     /// argument to this method.
     ///
     /// Note: This method uses provided `Runtime` to create a `System` future only.
-    /// All the [`Arbiter`]s will be started in separate threads using their own tokio `Runtime`s.
+    /// All the [`Arbiter`]s will be started in separate threads using their own Tokio `Runtime`s.
     /// It means that using this method currently it is impossible to make `actix-rt` work in the
-    /// alternative `tokio` `Runtime`s (e.g. provided by `tokio_compat`).
-    ///
-    /// [`tokio_compat`]: https://crates.io/crates/tokio-compat
+    /// alternative Tokio runtimes such as those provided by `tokio_compat`.
     ///
     /// # Arguments
     ///
     /// - `name`: Name of the System
-    /// - `runtime`: A tokio Runtime to run the system in.
+    /// - `runtime`: A Tokio Runtime to run the system in.
     /// - `rest_operations`: A future to be executed in the runtime along with the System.
     ///
     /// # Examples
-    ///
-    /// ```ignore
+    /// ```
     /// use tokio::runtime::Runtime;
     /// use actix_rt::System;
     /// use futures_util::future::try_join_all;
@@ -172,14 +163,11 @@ impl System {
     /// let rest_operations = run_application();
     /// System::attach_to_tokio("actix-main-system", runtime, rest_operations);
     /// ```
-    pub fn attach_to_tokio<Fut, R>(
+    pub fn attach_to_tokio<Fut: Future>(
         name: impl Into<String>,
         runtime: tokio::runtime::Runtime,
         rest_operations: Fut,
-    ) -> R
-    where
-        Fut: std::future::Future<Output = R>,
-    {
+    ) -> Fut::Output {
         let actix_system_task = LocalSet::new();
         let sys = System::run_in_tokio(name.into(), &actix_system_task);
         actix_system_task.spawn_local(sys);
@@ -195,7 +183,7 @@ impl System {
         })
     }
 
-    /// Check if current system is set, i.e., as already been started.
+    /// Check if current system has started.
     pub fn is_set() -> bool {
         CURRENT.with(|cell| cell.borrow().is_some())
     }
@@ -219,12 +207,12 @@ impl System {
         })
     }
 
-    /// System id
+    /// Numeric system ID.
     pub fn id(&self) -> usize {
         self.id
     }
 
-    /// Stop the system
+    /// Stop the system (with code 0).
     pub fn stop(&self) {
         self.stop_with_code(0)
     }
@@ -240,18 +228,17 @@ impl System {
 
     /// Return status of 'stop_on_panic' option which controls whether the System is stopped when an
     /// uncaught panic is thrown from a worker thread.
-    pub fn stop_on_panic(&self) -> bool {
+    pub(crate) fn stop_on_panic(&self) -> bool {
         self.stop_on_panic
     }
 
-    /// System arbiter
+    /// Get shared reference to system arbiter.
     pub fn arbiter(&self) -> &Arbiter {
         &self.arbiter
     }
 
-    /// This function will start tokio runtime and will finish once the
-    /// `System::stop()` message get called.
-    /// Function `f` get called within tokio runtime context.
+    /// This function will start tokio runtime and will finish once the `System::stop()` message
+    /// is called. Function `f` is called within tokio runtime context.
     pub fn run<F>(f: F) -> io::Result<()>
     where
         F: FnOnce(),

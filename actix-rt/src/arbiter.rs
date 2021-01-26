@@ -1,25 +1,31 @@
-use std::any::{Any, TypeId};
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::task::{Context, Poll};
-use std::{fmt, thread};
+use std::{
+    any::{Any, TypeId},
+    cell::RefCell,
+    collections::HashMap,
+    fmt,
+    future::Future,
+    pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
+    task::{Context, Poll},
+    thread,
+};
 
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tokio::sync::oneshot::{channel, error::RecvError as Canceled, Sender};
-use tokio::task::LocalSet;
+use tokio::{
+    sync::{
+        mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+        oneshot::{channel, error::RecvError as Canceled, Sender},
+    },
+    task::LocalSet,
+};
 
-use crate::runtime::Runtime;
-use crate::system::System;
+use crate::{runtime::Runtime, system::System};
+
+pub(crate) static COUNT: AtomicUsize = AtomicUsize::new(0);
 
 thread_local!(
     static ADDR: RefCell<Option<Arbiter>> = RefCell::new(None);
     static STORAGE: RefCell<HashMap<TypeId, Box<dyn Any>>> = RefCell::new(HashMap::new());
 );
-
-pub(crate) static COUNT: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) enum ArbiterCommand {
     Stop,
@@ -37,10 +43,10 @@ impl fmt::Debug for ArbiterCommand {
     }
 }
 
+/// Arbiters provide an asynchronous execution environment for actors, functions and futures. When
+/// an Arbiter is created, it spawns a new OS thread, and hosts an event loop. Some Arbiter
+/// functions execute on the current thread.
 #[derive(Debug)]
-/// Arbiters provide an asynchronous execution environment for actors, functions
-/// and futures. When an Arbiter is created, it spawns a new OS thread, and
-/// hosts an event loop. Some Arbiter functions execute on the current thread.
 pub struct Arbiter {
     sender: UnboundedSender<ArbiterCommand>,
     thread_handle: Option<thread::JoinHandle<()>>,
@@ -125,7 +131,7 @@ impl Arbiter {
                     // unregister arbiter
                     let _ = System::current()
                         .sys()
-                        .send(SystemCommand::UnregisterArbiter(id));
+                        .send(SystemCommand::DeregisterArbiter(id));
                 }
             })
             .unwrap_or_else(|err| {
@@ -312,7 +318,7 @@ impl Future for ArbiterController {
 pub(crate) enum SystemCommand {
     Exit(i32),
     RegisterArbiter(usize, Arbiter),
-    UnregisterArbiter(usize),
+    DeregisterArbiter(usize),
 }
 
 #[derive(Debug)]
@@ -353,7 +359,7 @@ impl Future for SystemArbiter {
                     SystemCommand::RegisterArbiter(name, hnd) => {
                         self.arbiters.insert(name, hnd);
                     }
-                    SystemCommand::UnregisterArbiter(name) => {
+                    SystemCommand::DeregisterArbiter(name) => {
                         self.arbiters.remove(&name);
                     }
                 },

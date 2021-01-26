@@ -1,24 +1,21 @@
-use std::future::Future;
-use std::io;
-use tokio::{runtime, task::LocalSet};
+use std::{future::Future, io};
 
-/// Single-threaded runtime provides a way to start reactor
-/// and runtime on the current thread.
+use tokio::task::{JoinHandle, LocalSet};
+
+/// Single-threaded runtime provides a way to start reactor and runtime on the current thread.
 ///
-/// See [module level][mod] documentation for more details.
-///
-/// [mod]: crate
+/// See [crate root][crate] documentation for more details.
 #[derive(Debug)]
 pub struct Runtime {
     local: LocalSet,
-    rt: runtime::Runtime,
+    rt: tokio::runtime::Runtime,
 }
 
 impl Runtime {
-    #[allow(clippy::new_ret_no_self)]
     /// Returns a new runtime initialized with default configuration values.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> io::Result<Runtime> {
-        let rt = runtime::Builder::new_current_thread()
+        let rt = tokio::runtime::Builder::new_current_thread()
             .enable_io()
             .enable_time()
             .build()?;
@@ -29,62 +26,53 @@ impl Runtime {
         })
     }
 
-    pub(super) fn local(&self) -> &LocalSet {
+    /// Reference to local task set.
+    pub(crate) fn local(&self) -> &LocalSet {
         &self.local
     }
 
-    /// Spawn a future onto the single-threaded runtime.
+    /// Offload a future onto the single-threaded runtime.
     ///
-    /// See [module level][mod] documentation for more details.
+    /// The returned join handle can be used to await the future's result.
     ///
-    /// [mod]: crate
+    /// See [crate root][crate] documentation for more details.
     ///
     /// # Examples
-    ///
-    /// ```ignore
-    /// # use futures::{future, Future, Stream};
-    /// use actix_rt::Runtime;
-    ///
-    /// # fn dox() {
-    /// // Create the runtime
-    /// let rt = Runtime::new().unwrap();
+    /// ```
+    /// let rt = actix_rt::Runtime::new().unwrap();
     ///
     /// // Spawn a future onto the runtime
-    /// rt.spawn(future::lazy(|_| {
+    /// let handle = rt.spawn(async {
     ///     println!("running on the runtime");
-    /// }));
-    /// # }
-    /// # pub fn main() {}
+    ///     42
+    /// });
+    ///
+    /// assert_eq!(rt.block_on(handle).unwrap(), 42);
     /// ```
     ///
     /// # Panics
-    ///
-    /// This function panics if the spawn fails. Failure occurs if the executor
-    /// is currently at capacity and is unable to spawn a new future.
-    pub fn spawn<F>(&self, future: F) -> &Self
+    /// This function panics if the spawn fails. Failure occurs if the executor is currently at
+    /// capacity and is unable to spawn a new future.
+    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
-        F: Future<Output = ()> + 'static,
+        F: Future + 'static,
     {
-        self.local.spawn_local(future);
-        self
+        self.local.spawn_local(future)
     }
 
-    /// Runs the provided future, blocking the current thread until the future
-    /// completes.
+    /// Runs the provided future, blocking the current thread until the future completes.
     ///
-    /// This function can be used to synchronously block the current thread
-    /// until the provided `future` has resolved either successfully or with an
-    /// error. The result of the future is then returned from this function
-    /// call.
+    /// This function can be used to synchronously block the current thread until the provided
+    /// `future` has resolved either successfully or with an error. The result of the future is
+    /// then returned from this function call.
     ///
-    /// Note that this function will **also** execute any spawned futures on the
-    /// current thread, but will **not** block until these other spawned futures
-    /// have completed. Once the function returns, any uncompleted futures
-    /// remain pending in the `Runtime` instance. These futures will not run
+    /// Note that this function will also execute any spawned futures on the current thread, but
+    /// will not block until these other spawned futures have completed. Once the function returns,
+    /// any uncompleted futures remain pending in the `Runtime` instance. These futures will not run
     /// until `block_on` or `run` is called again.
     ///
-    /// The caller is responsible for ensuring that other spawned futures
-    /// complete execution by calling `block_on` or `run`.
+    /// The caller is responsible for ensuring that other spawned futures complete execution by
+    /// calling `block_on` or `run`.
     pub fn block_on<F>(&self, f: F) -> F::Output
     where
         F: Future,

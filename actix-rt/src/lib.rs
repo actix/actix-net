@@ -2,6 +2,7 @@
 
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![allow(clippy::type_complexity)]
+#![warn(missing_docs)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
@@ -25,7 +26,6 @@ pub use self::system::System;
 /// Spawns a future on the current arbiter.
 ///
 /// # Panics
-///
 /// This function panics if actix system is not running.
 #[inline]
 pub fn spawn<F>(f: F)
@@ -39,13 +39,15 @@ where
 pub mod signal {
     #[cfg(unix)]
     pub mod unix {
+        //! Unix specific signals.
         pub use tokio::signal::unix::*;
     }
     pub use tokio::signal::ctrl_c;
 }
 
-/// TCP/UDP/Unix bindings
 pub mod net {
+    //! TCP/UDP/Unix bindings
+
     pub use tokio::net::UdpSocket;
     pub use tokio::net::{TcpListener, TcpStream};
 
@@ -58,15 +60,17 @@ pub mod net {
     pub use self::unix::*;
 }
 
-/// Utilities for tracking time.
 pub mod time {
+    //! Utilities for tracking time.
+
     pub use tokio::time::Instant;
     pub use tokio::time::{interval, interval_at, Interval};
     pub use tokio::time::{sleep, sleep_until, Sleep};
     pub use tokio::time::{timeout, Timeout};
 }
 
-/// Task management.
 pub mod task {
+    //! Task management.
+
     pub use tokio::task::{spawn_blocking, yield_now, JoinHandle};
 }
