@@ -9,14 +9,14 @@ use std::{
 
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
-use futures_core::future::LocalBoxFuture;
+use futures_core::{future::LocalBoxFuture, ready};
 use log::{error, trace};
 
 use super::connect::{Address, Connect, ConnectAddrs, Connection};
 use super::error::ConnectError;
 
 /// TCP connector service factory
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct TcpConnectorFactory;
 
 impl TcpConnectorFactory {
@@ -41,7 +41,7 @@ impl<T: Address> ServiceFactory<Connect<T>> for TcpConnectorFactory {
 }
 
 /// TCP connector service
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct TcpConnector;
 
 impl<T: Address> Service<Connect<T>> for TcpConnector {
@@ -59,7 +59,6 @@ impl<T: Address> Service<Connect<T>> for TcpConnector {
     }
 }
 
-#[doc(hidden)]
 /// TCP stream connector response future
 pub enum TcpConnectorResponse<T> {
     Response {
@@ -73,23 +72,27 @@ pub enum TcpConnectorResponse<T> {
 
 impl<T: Address> TcpConnectorResponse<T> {
     pub(crate) fn new(req: T, port: u16, addr: ConnectAddrs) -> TcpConnectorResponse<T> {
+        if addr.is_none() {
+            error!("TCP connector: unresolved connection address");
+            return TcpConnectorResponse::Error(Some(ConnectError::Unresolved));
+        }
+
         trace!(
-            "TCP connector - connecting to {:?} port:{}",
-            req.host(),
+            "TCP connector: connecting to {} on port {}",
+            req.hostname(),
             port
         );
 
         match addr {
-            ConnectAddrs::One(None) => {
-                error!("TCP connector: got unresolved address");
-                TcpConnectorResponse::Error(Some(ConnectError::Unresolved))
-            }
-            ConnectAddrs::One(Some(addr)) => TcpConnectorResponse::Response {
+            ConnectAddrs::None => unreachable!("none variant already checked"),
+
+            ConnectAddrs::One(addr) => TcpConnectorResponse::Response {
                 req: Some(req),
                 port,
                 addrs: None,
                 stream: Some(Box::pin(TcpStream::connect(addr))),
             },
+
             // when resolver returns multiple socket addr for request they would be popped from
             // front end of queue and returns with the first successful tcp connection.
             ConnectAddrs::Multi(addrs) => TcpConnectorResponse::Response {
@@ -106,10 +109,9 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
     type Output = Result<Connection<T, TcpStream>, ConnectError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-        match this {
-            TcpConnectorResponse::Error(e) => Poll::Ready(Err(e.take().unwrap())),
-            // connect
+        match self.get_mut() {
+            TcpConnectorResponse::Error(err) => Poll::Ready(Err(err.take().unwrap())),
+
             TcpConnectorResponse::Response {
                 req,
                 port,
@@ -117,22 +119,24 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
                 stream,
             } => loop {
                 if let Some(new) = stream.as_mut() {
-                    match new.as_mut().poll(cx) {
-                        Poll::Ready(Ok(sock)) => {
+                    match ready!(new.as_mut().poll(cx)) {
+                        Ok(sock) => {
                             let req = req.take().unwrap();
                             trace!(
-                                "TCP connector - successfully connected to connecting to {:?} - {:?}",
-                                req.host(), sock.peer_addr()
+                                "TCP connector: successfully connected to {:?} - {:?}",
+                                req.hostname(),
+                                sock.peer_addr()
                             );
                             return Poll::Ready(Ok(Connection::new(sock, req)));
                         }
-                        Poll::Pending => return Poll::Pending,
-                        Poll::Ready(Err(err)) => {
+
+                        Err(err) => {
                             trace!(
-                                "TCP connector - failed to connect to connecting to {:?} port: {}",
-                                req.as_ref().unwrap().host(),
+                                "TCP connector: failed to connect to {:?} port: {}",
+                                req.as_ref().unwrap().hostname(),
                                 port,
                             );
+
                             if addrs.is_none() || addrs.as_ref().unwrap().is_empty() {
                                 return Poll::Ready(Err(ConnectError::Io(err)));
                             }

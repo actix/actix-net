@@ -3,35 +3,41 @@ use http::Uri;
 use super::Address;
 
 impl Address for Uri {
-    fn host(&self) -> &str {
+    fn hostname(&self) -> &str {
         self.host().unwrap_or("")
     }
 
     fn port(&self) -> Option<u16> {
-        if let Some(port) = self.port_u16() {
-            Some(port)
-        } else {
-            port(self.scheme_str())
+        match self.port_u16() {
+            Some(port) => Some(port),
+            None => scheme_to_port(self.scheme_str()),
         }
     }
 }
 
-// TODO: load data from file
-fn port(scheme: Option<&str>) -> Option<u16> {
-    if let Some(scheme) = scheme {
-        match scheme {
-            "http" => Some(80),
-            "https" => Some(443),
-            "ws" => Some(80),
-            "wss" => Some(443),
-            "amqp" => Some(5672),
-            "amqps" => Some(5671),
-            "sb" => Some(5671),
-            "mqtt" => Some(1883),
-            "mqtts" => Some(8883),
-            _ => None,
-        }
-    } else {
-        None
+// Get port from well-known URL schemes.
+fn scheme_to_port(scheme: Option<&str>) -> Option<u16> {
+    match scheme {
+        // HTTP
+        Some("http") => Some(80),
+        Some("https") => Some(443),
+
+        // WebSockets
+        Some("ws") => Some(80),
+        Some("wss") => Some(443),
+
+        // Advanced Message Queuing Protocol (AMQP)
+        Some("amqp") => Some(5672),
+        Some("amqps") => Some(5671),
+
+        // Message Queuing Telemetry Transport (MQTT)
+        Some("mqtt") => Some(1883),
+        Some("mqtts") => Some(8883),
+
+        // File Transfer Protocol (FTP)
+        Some("ftp") => Some(1883),
+        Some("ftps") => Some(990),
+
+        _ => None,
     }
 }

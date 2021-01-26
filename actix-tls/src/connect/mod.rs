@@ -1,21 +1,21 @@
-//! TCP connector service for Actix ecosystem.
+//! TCP connector services for Actix ecosystem.
 //!
-//! ## Package feature
+//! # Stages of the TCP connector service:
+//! - Resolve [`Address`] with given [`Resolver`] and collect list of socket addresses.
+//! - Establish TCP connection and return [`TcpStream`].
 //!
+//! # Stages of TLS connector services:
+//! - Establish [`TcpStream`] with connector service.
+//! - Wrap the stream and perform connect handshake with remote peer.
+//! - Return certain stream type that impls `AsyncRead` and `AsyncWrite`.
+//!
+//! # Package feature
 //! * `openssl` - enables TLS support via `openssl` crate
 //! * `rustls` - enables TLS support via `rustls` crate
 //!
-//! ## Workflow of connector service:
-//! - resolve [`Address`](self::connect::Address) with given [`Resolver`](self::resolve::Resolver)
-//!   and collect [`SocketAddrs`](std::net::SocketAddr).
-//! - establish Tcp connection and return [`TcpStream`](tokio::net::TcpStream).
-//!
-//! ## Workflow of tls connector services:
-//! - Establish [`TcpStream`](tokio::net::TcpStream) with connector service.
-//! - Wrap around the stream and do connect handshake with remote address.
-//! - Return certain stream type impl [`AsyncRead`](tokio::io::AsyncRead) and
-//!   [`AsyncWrite`](tokio::io::AsyncWrite)
+//! [`TcpStream`]: actix_rt::net::TcpStream
 
+#[allow(clippy::module_inception)]
 mod connect;
 mod connector;
 mod error;

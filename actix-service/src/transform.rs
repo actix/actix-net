@@ -1,3 +1,4 @@
+use alloc::{rc::Rc, sync::Arc};
 use core::{
     future::Future,
     marker::PhantomData,
@@ -5,7 +6,6 @@ use core::{
     task::{Context, Poll},
 };
 
-use alloc::{rc::Rc, sync::Arc};
 use futures_core::ready;
 use pin_project_lite::pin_project;
 

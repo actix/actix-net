@@ -18,10 +18,6 @@ features = ["openssl", "rustls", "native-tls", "accept", "connect", "uri"]
 name = "actix_tls"
 path = "src/lib.rs"
 
-[[example]]
-name = "basic"
-required-features = ["accept", "rustls"]
-
 [features]
 default = ["accept", "connect", "uri"]
 
@@ -78,3 +74,7 @@ env_logger = "0.8"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
 log = "0.4"
 trust-dns-resolver = "0.20.0"
+
+[[example]]
+name = "basic"
+required-features = ["accept", "rustls"]

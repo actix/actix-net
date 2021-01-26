@@ -16,7 +16,7 @@ use log::trace;
 use super::connect::{Address, Connect};
 use super::error::ConnectError;
 
-/// DNS Resolver Service factory
+/// DNS Resolver Service Factory
 #[derive(Clone)]
 pub struct ResolverFactory {
     resolver: Resolver,
@@ -53,16 +53,16 @@ pub enum Resolver {
     Custom(Rc<dyn Resolve>),
 }
 
-/// trait for custom lookup with self defined resolver.
+/// An interface for custom async DNS resolvers.
 ///
-/// # Example:
+/// # Usage
 /// ```rust
 /// use std::net::SocketAddr;
 ///
 /// use actix_tls::connect::{Resolve, Resolver};
 /// use futures_util::future::LocalBoxFuture;
 ///
-/// // use trust_dns_resolver as custom resolver.
+/// // use trust-dns async tokio resolver
 /// use trust_dns_resolver::TokioAsyncResolver;
 ///
 /// struct MyResolver {
@@ -103,7 +103,7 @@ pub enum Resolver {
 /// // resolver can be passed to connector factory where returned service factory
 /// // can be used to construct new connector services.
 /// let factory = actix_tls::connect::new_connector_factory::<&str>(resolver);
-///```
+/// ```
 pub trait Resolve {
     fn lookup<'a>(
         &'a self,
@@ -120,10 +120,10 @@ impl Resolver {
 
     // look up with default resolver variant.
     fn look_up<T: Address>(req: &Connect<T>) -> JoinHandle<io::Result<IntoIter<SocketAddr>>> {
-        let host = req.host();
+        let host = req.hostname();
         // TODO: Connect should always return host with port if possible.
         let host = if req
-            .host()
+            .hostname()
             .splitn(2, ':')
             .last()
             .and_then(|p| p.parse::<u16>().ok())
@@ -135,6 +135,7 @@ impl Resolver {
             format!("{}:{}", host, req.port())
         };
 
+        // run blocking DNS lookup in thread pool
         spawn_blocking(move || std::net::ToSocketAddrs::to_socket_addrs(&host))
     }
 }
@@ -147,14 +148,14 @@ impl<T: Address> Service<Connect<T>> for Resolver {
     actix_service::always_ready!();
 
     fn call(&self, req: Connect<T>) -> Self::Future {
-        if !req.addr.is_none() {
+        if req.addr.is_some() {
             ResolverFuture::Connected(Some(req))
-        } else if let Ok(ip) = req.host().parse() {
+        } else if let Ok(ip) = req.hostname().parse() {
             let addr = SocketAddr::new(ip, req.port());
             let req = req.set_addr(Some(addr));
             ResolverFuture::Connected(Some(req))
         } else {
-            trace!("DNS resolver: resolving host {:?}", req.host());
+            trace!("DNS resolver: resolving host {:?}", req.hostname());
 
             match self {
                 Self::Default => {
@@ -166,7 +167,7 @@ impl<T: Address> Service<Connect<T>> for Resolver {
                     let resolver = Rc::clone(&resolver);
                     ResolverFuture::LookupCustom(Box::pin(async move {
                         let addrs = resolver
-                            .lookup(req.host(), req.port())
+                            .lookup(req.hostname(), req.port())
                             .await
                             .map_err(ConnectError::Resolver)?;
 
@@ -201,6 +202,7 @@ impl<T: Address> Future for ResolverFuture<T> {
             Self::Connected(conn) => Poll::Ready(Ok(conn
                 .take()
                 .expect("ResolverFuture polled after finished"))),
+
             Self::LookUp(fut, req) => {
                 let res = match ready!(Pin::new(fut).poll(cx)) {
                     Ok(Ok(res)) => Ok(res),
@@ -210,20 +212,21 @@ impl<T: Address> Future for ResolverFuture<T> {
 
                 let req = req.take().unwrap();
 
-                let addrs = res.map_err(|e| {
+                let addrs = res.map_err(|err| {
                     trace!(
                         "DNS resolver: failed to resolve host {:?} err: {:?}",
-                        req.host(),
-                        e
+                        req.hostname(),
+                        err
                     );
-                    e
+
+                    err
                 })?;
 
                 let req = req.set_addrs(addrs);
 
                 trace!(
                     "DNS resolver: host {:?} resolved to {:?}",
-                    req.host(),
+                    req.hostname(),
                     req.addrs()
                 );
 
@@ -233,6 +236,7 @@ impl<T: Address> Future for ResolverFuture<T> {
                     Poll::Ready(Ok(req))
                 }
             }
+
             Self::LookupCustom(fut) => fut.as_mut().poll(cx),
         }
     }
