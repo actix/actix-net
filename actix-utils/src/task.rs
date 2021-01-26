@@ -40,16 +40,16 @@ impl LocalWaker {
         since = "2.1.0",
         note = "In favor of `wake`. State of the register doesn't matter at `wake` up"
     )]
-    #[inline]
     /// Check if waker has been registered.
+    #[inline]
     pub fn is_registered(&self) -> bool {
         unsafe { (*self.waker.get()).is_some() }
     }
 
-    #[inline]
     /// Registers the waker to be notified on calls to `wake`.
     ///
     /// Returns `true` if waker was registered before.
+    #[inline]
     pub fn register(&self, waker: &Waker) -> bool {
         unsafe {
             let w = self.waker.get();
@@ -58,20 +58,20 @@ impl LocalWaker {
         }
     }
 
-    #[inline]
     /// Calls `wake` on the last `Waker` passed to `register`.
     ///
     /// If `register` has not been called yet, then this does nothing.
+    #[inline]
     pub fn wake(&self) {
         if let Some(waker) = self.take() {
             waker.wake();
         }
     }
 
-    #[inline]
     /// Returns the last `Waker` passed to `register`, so that the user can wake it.
     ///
     /// If a waker has not been registered, this returns `None`.
+    #[inline]
     pub fn take(&self) -> Option<Waker> {
         unsafe { (*self.waker.get()).take() }
     }

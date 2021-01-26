@@ -177,8 +177,8 @@ impl ServerBuilder {
         Ok(self)
     }
 
-    #[cfg(unix)]
     /// Add new unix domain service to the server.
+    #[cfg(unix)]
     pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
         F: ServiceFactory<actix_rt::net::UnixStream>,
@@ -198,10 +198,10 @@ impl ServerBuilder {
         self.listen_uds(name, lst, factory)
     }
 
-    #[cfg(unix)]
     /// Add new unix domain service to the server.
     /// Useful when running as a systemd service and
     /// a socket FD can be acquired using the systemd crate.
+    #[cfg(unix)]
     pub fn listen_uds<F, N: AsRef<str>>(
         mut self,
         name: N,
