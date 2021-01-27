@@ -175,7 +175,10 @@ impl Iterator for ConnectAddrsIter<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         match *self {
             Self::None => None,
-            Self::One(addr) => Some(addr),
+            Self::One(addr) => {
+                *self = Self::None;
+                Some(addr)
+            }
             Self::Multi(ref mut iter) => iter.next().copied(),
             Self::MultiOwned(ref mut iter) => iter.next(),
         }
@@ -282,6 +285,8 @@ fn parse_host(host: &str) -> (&str, Option<u16>) {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr};
+
     use super::*;
 
     #[test]
@@ -291,5 +296,37 @@ mod tests {
         assert_eq!(parse_host("example:8080"), ("example", Some(8080)));
         assert_eq!(parse_host("example.com:false"), ("example.com", None));
         assert_eq!(parse_host("example.com:false:false"), ("example.com", None));
+    }
+
+    #[test]
+    fn test_addr_iter_multi() {
+        let localhost = SocketAddr::from((IpAddr::from(Ipv4Addr::LOCALHOST), 8080));
+        let unspecified = SocketAddr::from((IpAddr::from(Ipv4Addr::UNSPECIFIED), 8080));
+
+        let mut addrs = VecDeque::new();
+        addrs.push_back(localhost);
+        addrs.push_back(unspecified);
+
+        let mut iter = ConnectAddrsIter::Multi(addrs.iter());
+        assert_eq!(iter.next(), Some(localhost));
+        assert_eq!(iter.next(), Some(unspecified));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = ConnectAddrsIter::MultiOwned(addrs.into_iter());
+        assert_eq!(iter.next(), Some(localhost));
+        assert_eq!(iter.next(), Some(unspecified));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_addr_iter_single() {
+        let localhost = SocketAddr::from((IpAddr::from(Ipv4Addr::LOCALHOST), 8080));
+
+        let mut iter = ConnectAddrsIter::One(localhost);
+        assert_eq!(iter.next(), Some(localhost));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = ConnectAddrsIter::None;
+        assert_eq!(iter.next(), None);
     }
 }
