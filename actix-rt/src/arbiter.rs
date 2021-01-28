@@ -10,10 +10,11 @@ use std::{
     thread,
 };
 
+use futures_core::ready;
 use tokio::{
     sync::{
         mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-        oneshot::{channel, error::RecvError as Canceled, Sender},
+        oneshot::Sender,
     },
     task::LocalSet,
 };
@@ -65,7 +66,8 @@ impl Default for Arbiter {
 }
 
 impl Arbiter {
-    pub(crate) fn new_system(local: &LocalSet) -> Self {
+    /// TODO: make pub(crate) again
+    pub fn new_system(local: &LocalSet) -> Self {
         let (tx, rx) = unbounded_channel();
 
         let arb = Arbiter::with_sender(tx);
@@ -128,7 +130,7 @@ impl Arbiter {
                     // run loop
                     rt.block_on(ArbiterController { rx });
 
-                    // unregister arbiter
+                    // deregister arbiter
                     let _ = System::current()
                         .sys()
                         .send(SystemCommand::DeregisterArbiter(id));
@@ -144,67 +146,35 @@ impl Arbiter {
         }
     }
 
-    /// Spawn a future on the current thread. This does not create a new Arbiter
-    /// or Arbiter address, it is simply a helper for spawning futures on the current
-    /// thread.
-    pub fn spawn<F>(future: F)
+    /// Send a future to the Arbiter's thread and spawn it.
+    ///
+    /// If you require a result, include a response channel in the future.
+    ///
+    /// Returns true if function was sent successfully and false if the Arbiter has died.
+    pub fn spawn<Fut>(&self, future: Fut) -> bool
     where
-        F: Future<Output = ()> + 'static,
+        Fut: Future<Output = ()> + Unpin + Send + 'static,
     {
-        let _ = tokio::task::spawn_local(future);
+        match self.sender.send(ArbiterCommand::Execute(Box::new(future))) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
     }
 
-    /// Executes a future on the current thread. This does not create a new Arbiter
-    /// or Arbiter address, it is simply a helper for executing futures on the current
-    /// thread.
-    pub fn spawn_fn<F, R>(f: F)
-    where
-        F: FnOnce() -> R + 'static,
-        R: Future<Output = ()> + 'static,
-    {
-        Arbiter::spawn(async {
-            f();
-        })
-    }
-
-    /// Send a future to the Arbiter's thread, and spawn it.
-    pub fn send<F>(&self, future: F)
-    where
-        F: Future<Output = ()> + Send + Unpin + 'static,
-    {
-        let _ = self.sender.send(ArbiterCommand::Execute(Box::new(future)));
-    }
-
-    /// Send a function to the Arbiter's thread, and execute it. Any result from the function
-    /// is discarded.
-    pub fn exec_fn<F>(&self, f: F)
+    /// Send a function to the Arbiter's thread and execute it.
+    ///
+    /// Any result from the function is discarded. If you require a result, include a response
+    /// channel in the function.
+    ///
+    /// Returns true if function was sent successfully and false if the Arbiter has died.
+    pub fn spawn_fn<F>(&self, f: F) -> bool
     where
         F: FnOnce() + Send + 'static,
     {
-        let _ = self
-            .sender
-            .send(ArbiterCommand::ExecuteFn(Box::new(move || {
-                f();
-            })));
-    }
-
-    /// Send a function to the Arbiter's thread. This function will be executed asynchronously.
-    /// A future is created, and when resolved will contain the result of the function sent
-    /// to the Arbiters thread.
-    pub fn exec<F, R>(&self, f: F) -> impl Future<Output = Result<R, Canceled>>
-    where
-        F: FnOnce() -> R + Send + 'static,
-        R: Send + 'static,
-    {
-        let (tx, rx) = channel();
-        let _ = self
-            .sender
-            .send(ArbiterCommand::ExecuteFn(Box::new(move || {
-                if !tx.is_closed() {
-                    let _ = tx.send(f());
-                }
-            })));
-        rx
+        match self.sender.send(ArbiterCommand::ExecuteFn(Box::new(f))) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
     }
 
     /// Set item to arbiter storage
@@ -266,13 +236,6 @@ impl Arbiter {
             Ok(())
         }
     }
-
-    /// Returns a future that will be completed once all currently spawned futures
-    /// have completed.
-    #[deprecated(since = "2.0.0", note = "Arbiter::local_join function is removed.")]
-    pub async fn local_join() {
-        unimplemented!("Arbiter::local_join function is removed.")
-    }
 }
 
 struct ArbiterController {
@@ -296,10 +259,14 @@ impl Future for ArbiterController {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // process all items currently buffered in channel
         loop {
-            match Pin::new(&mut self.rx).poll_recv(cx) {
-                Poll::Ready(None) => return Poll::Ready(()),
-                Poll::Ready(Some(item)) => match item {
+            match ready!(Pin::new(&mut self.rx).poll_recv(cx)) {
+                // channel closed; no more messages can be received
+                None => return Poll::Ready(()),
+
+                // process arbiter command
+                Some(item) => match item {
                     ArbiterCommand::Stop => return Poll::Ready(()),
                     ArbiterCommand::Execute(fut) => {
                         tokio::task::spawn_local(fut);
@@ -308,7 +275,6 @@ impl Future for ArbiterController {
                         f.call_box();
                     }
                 },
-                Poll::Pending => return Poll::Pending,
             }
         }
     }
@@ -342,10 +308,14 @@ impl Future for SystemArbiter {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // process all items currently buffered in channel
         loop {
-            match Pin::new(&mut self.commands).poll_recv(cx) {
-                Poll::Ready(None) => return Poll::Ready(()),
-                Poll::Ready(Some(cmd)) => match cmd {
+            match ready!(Pin::new(&mut self.commands).poll_recv(cx)) {
+                // channel closed; no more messages can be received
+                None => return Poll::Ready(()),
+
+                // process system command
+                Some(cmd) => match cmd {
                     SystemCommand::Exit(code) => {
                         // stop arbiters
                         for arb in self.arbiters.values() {
@@ -363,7 +333,6 @@ impl Future for SystemArbiter {
                         self.arbiters.remove(&name);
                     }
                 },
-                Poll::Pending => return Poll::Pending,
             }
         }
     }

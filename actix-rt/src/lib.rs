@@ -8,6 +8,8 @@
 
 use std::future::Future;
 
+use tokio::task::JoinHandle;
+
 // Cannot define a main macro when compiled into test harness.
 // Workaround for https://github.com/rust-lang/rust/issues/62127.
 #[cfg(all(feature = "macros", not(test)))]
@@ -26,13 +28,13 @@ pub use self::system::System;
 /// Spawns a future on the current arbiter.
 ///
 /// # Panics
-/// This function panics if actix system is not running.
+/// Panics if Actix system is not running.
 #[inline]
-pub fn spawn<F>(f: F)
+pub fn spawn<Fut>(f: Fut) -> JoinHandle<()>
 where
-    F: Future<Output = ()> + 'static,
+    Fut: Future<Output = ()> + 'static,
 {
-    Arbiter::spawn(f)
+    tokio::task::spawn_local(f)
 }
 
 /// Asynchronous signal handling

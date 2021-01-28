@@ -1,6 +1,8 @@
 use std::time::{Duration, Instant};
 
-use futures_util::future::try_join_all;
+use actix_rt::{Arbiter, System};
+use futures_util::future::lazy;
+use tokio::task::LocalSet;
 
 #[test]
 fn await_for_timer() {
@@ -21,7 +23,7 @@ fn join_another_arbiter() {
     let instant = Instant::now();
     actix_rt::System::new("test_join_another_arbiter").block_on(async move {
         let mut arbiter = actix_rt::Arbiter::new();
-        arbiter.send(Box::pin(async move {
+        arbiter.spawn(Box::pin(async move {
             tokio::time::sleep(time).await;
             actix_rt::Arbiter::current().stop();
         }));
@@ -35,7 +37,7 @@ fn join_another_arbiter() {
     let instant = Instant::now();
     actix_rt::System::new("test_join_another_arbiter").block_on(async move {
         let mut arbiter = actix_rt::Arbiter::new();
-        arbiter.exec_fn(move || {
+        arbiter.spawn_fn(move || {
             actix_rt::spawn(async move {
                 tokio::time::sleep(time).await;
                 actix_rt::Arbiter::current().stop();
@@ -51,7 +53,7 @@ fn join_another_arbiter() {
     let instant = Instant::now();
     actix_rt::System::new("test_join_another_arbiter").block_on(async move {
         let mut arbiter = actix_rt::Arbiter::new();
-        arbiter.send(Box::pin(async move {
+        arbiter.spawn(Box::pin(async move {
             tokio::time::sleep(time).await;
             actix_rt::Arbiter::current().stop();
         }));
@@ -101,74 +103,4 @@ fn wait_for_spawns() {
     });
 
     assert!(rt.block_on(handle).is_err());
-}
-
-#[test]
-fn run_in_existing_tokio() {
-    use actix_rt::System;
-    use futures_util::future::try_join_all;
-    use tokio::task::LocalSet;
-
-    async fn run_application() {
-        let first_task = tokio::spawn(async {
-            println!("One task");
-            Ok::<(), ()>(())
-        });
-
-        let second_task = tokio::spawn(async {
-            println!("Another task");
-            Ok::<(), ()>(())
-        });
-
-        try_join_all(vec![first_task, second_task])
-            .await
-            .expect("Some of the futures finished unexpectedly");
-    }
-
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .unwrap();
-
-    let actix_local_set = LocalSet::new();
-    let sys = System::run_in_tokio("actix-main-system", &actix_local_set);
-    actix_local_set.spawn_local(sys);
-
-    let rest_operations = run_application();
-    runtime.block_on(actix_local_set.run_until(rest_operations));
-}
-
-async fn run_application() -> usize {
-    let first_task = tokio::spawn(async {
-        println!("One task");
-        Ok::<(), ()>(())
-    });
-
-    let second_task = tokio::spawn(async {
-        println!("Another task");
-        Ok::<(), ()>(())
-    });
-
-    let tasks = try_join_all(vec![first_task, second_task])
-        .await
-        .expect("Some of the futures finished unexpectedly");
-
-    tasks.len()
-}
-
-#[test]
-fn attack_to_tokio() {
-    use actix_rt::System;
-
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .unwrap();
-
-    let rest_operations = run_application();
-    let res = System::attach_to_tokio("actix-main-system", runtime, rest_operations);
-
-    assert_eq!(res, 2);
 }

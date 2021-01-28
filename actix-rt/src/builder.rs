@@ -1,11 +1,8 @@
 use std::{borrow::Cow, future::Future, io};
 
-use tokio::{
-    sync::{
-        mpsc::unbounded_channel,
-        oneshot::{channel, Receiver},
-    },
-    task::LocalSet,
+use tokio::sync::{
+    mpsc::unbounded_channel,
+    oneshot::{channel, Receiver},
 };
 
 use crate::{
@@ -56,13 +53,6 @@ impl Builder {
         self.create_runtime(|| {})
     }
 
-    /// Create new System that can run asynchronously.
-    ///
-    /// This method panics if it cannot start the system arbiter
-    pub(crate) fn build_async(self, local: &LocalSet) -> AsyncSystemRunner {
-        self.create_async_runtime(local)
-    }
-
     /// This function will start Tokio runtime and will finish once the `System::stop()` message
     /// is called. Function `f` is called within Tokio runtime context.
     pub fn run<F>(self, f: F) -> io::Result<()>
@@ -70,22 +60,6 @@ impl Builder {
         F: FnOnce(),
     {
         self.create_runtime(f).run()
-    }
-
-    fn create_async_runtime(self, local: &LocalSet) -> AsyncSystemRunner {
-        let (stop_tx, stop_rx) = channel();
-        let (sys_sender, sys_receiver) = unbounded_channel();
-
-        let system =
-            System::construct(sys_sender, Arbiter::new_system(local), self.stop_on_panic);
-
-        // system arbiter
-        let arb = SystemArbiter::new(stop_tx, sys_receiver);
-
-        // start the system arbiter
-        let _ = local.spawn_local(arb);
-
-        AsyncSystemRunner { system, stop_rx }
     }
 
     fn create_runtime<F>(self, f: F) -> SystemRunner
@@ -112,35 +86,6 @@ impl Builder {
         rt.block_on(async { f() });
 
         SystemRunner { rt, stop, system }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct AsyncSystemRunner {
-    system: System,
-    stop_rx: Receiver<i32>,
-}
-
-impl AsyncSystemRunner {
-    /// This function will start event loop and returns a future that resolves once the
-    /// `System::stop()` function is called.
-    pub(crate) async fn run(self) -> Result<(), io::Error> {
-        let AsyncSystemRunner { stop_rx: stop, .. } = self;
-
-        // run loop
-        match stop.await {
-            Ok(code) => {
-                if code != 0 {
-                    Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Non-zero exit code: {}", code),
-                    ))
-                } else {
-                    Ok(())
-                }
-            }
-            Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
-        }
     }
 }
 

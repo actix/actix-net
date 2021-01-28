@@ -1,11 +1,10 @@
 use std::{
     cell::RefCell,
-    future::Future,
     io,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use tokio::{sync::mpsc::UnboundedSender, task::LocalSet};
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     arbiter::{Arbiter, SystemCommand},
@@ -55,124 +54,8 @@ impl System {
     ///
     /// This method panics if it can not create tokio runtime
     #[allow(clippy::new_ret_no_self)]
-    pub fn new<T: Into<String>>(name: T) -> SystemRunner {
+    pub fn new(name: impl Into<String>) -> SystemRunner {
         Self::builder().name(name).build()
-    }
-
-    /// Create new system using provided tokio `LocalSet`.
-    ///
-    /// This method panics if it can not spawn system arbiter
-    ///
-    /// Note: This method uses provided `LocalSet` to create a `System` future only.
-    /// All the [`Arbiter`]s will be started in separate threads using their own tokio `Runtime`s.
-    /// It means that using this method currently it is impossible to make `actix-rt` work in the
-    /// alternative Tokio runtimes such as those provided by `tokio_compat`.
-    ///
-    /// # Examples
-    /// ```
-    /// use tokio::{runtime::Runtime, task::LocalSet};
-    /// use actix_rt::System;
-    /// use futures_util::future::try_join_all;
-    ///
-    /// async fn run_application() {
-    ///     let first_task = tokio::spawn(async {
-    ///         // ...
-    ///         # println!("One task");
-    ///         # Ok::<(),()>(())
-    ///     });
-    ///
-    ///     let second_task = tokio::spawn(async {
-    ///         // ...
-    ///         # println!("Another task");
-    ///         # Ok::<(),()>(())
-    ///     });
-    ///
-    ///     try_join_all(vec![first_task, second_task])
-    ///         .await
-    ///         .expect("Some of the futures finished unexpectedly");
-    /// }
-    ///
-    /// let runtime = tokio::runtime::Builder::new_multi_thread()
-    ///     .worker_threads(2)
-    ///     .enable_all()
-    ///     .build()
-    ///     .unwrap();
-    ///
-    /// let actix_system_task = LocalSet::new();
-    /// let sys = System::run_in_tokio("actix-main-system", &actix_system_task);
-    /// actix_system_task.spawn_local(sys);
-    ///
-    /// let rest_operations = run_application();
-    /// runtime.block_on(actix_system_task.run_until(rest_operations));
-    /// ```
-    pub fn run_in_tokio<T: Into<String>>(
-        name: T,
-        local: &LocalSet,
-    ) -> impl Future<Output = io::Result<()>> {
-        Self::builder().name(name).build_async(local).run()
-    }
-
-    /// Consume the provided Tokio Runtime and start the `System` in it.
-    /// This method will create a `LocalSet` object and occupy the current thread
-    /// for the created `System` exclusively. All the other asynchronous tasks that
-    /// should be executed as well must be aggregated into one future, provided as the last
-    /// argument to this method.
-    ///
-    /// Note: This method uses provided `Runtime` to create a `System` future only.
-    /// All the [`Arbiter`]s will be started in separate threads using their own Tokio `Runtime`s.
-    /// It means that using this method currently it is impossible to make `actix-rt` work in the
-    /// alternative Tokio runtimes such as those provided by `tokio_compat`.
-    ///
-    /// # Arguments
-    ///
-    /// - `name`: Name of the System
-    /// - `runtime`: A Tokio Runtime to run the system in.
-    /// - `rest_operations`: A future to be executed in the runtime along with the System.
-    ///
-    /// # Examples
-    /// ```
-    /// use tokio::runtime::Runtime;
-    /// use actix_rt::System;
-    /// use futures_util::future::try_join_all;
-    ///
-    /// async fn run_application() {
-    ///     let first_task = tokio::spawn(async {
-    ///         // ...
-    /// #        println!("One task");
-    /// #        Ok::<(),()>(())
-    ///     });
-    ///
-    ///     let second_task = tokio::spawn(async {
-    ///         // ...
-    /// #       println!("Another task");
-    /// #       Ok::<(),()>(())
-    ///     });
-    ///
-    ///     try_join_all(vec![first_task, second_task])
-    ///         .await
-    ///         .expect("Some of the futures finished unexpectedly");
-    /// }
-    ///
-    ///
-    /// let runtime = tokio::runtime::Builder::new_multi_thread()
-    ///     .worker_threads(2)
-    ///     .enable_all()
-    ///     .build()
-    ///     .unwrap();
-    ///
-    /// let rest_operations = run_application();
-    /// System::attach_to_tokio("actix-main-system", runtime, rest_operations);
-    /// ```
-    pub fn attach_to_tokio<Fut: Future>(
-        name: impl Into<String>,
-        runtime: tokio::runtime::Runtime,
-        rest_operations: Fut,
-    ) -> Fut::Output {
-        let actix_system_task = LocalSet::new();
-        let sys = System::run_in_tokio(name.into(), &actix_system_task);
-        actix_system_task.spawn_local(sys);
-
-        runtime.block_on(actix_system_task.run_until(rest_operations))
     }
 
     /// Get current running system.
