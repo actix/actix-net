@@ -86,7 +86,7 @@ where
 
     fn call(&self, stream: Connection<T, U>) -> Self::Future {
         trace!("SSL Handshake start for: {:?}", stream.host());
-        let (io, stream) = stream.replace(());
+        let (io, stream) = stream.replace_io(());
         let host = stream.host();
 
         let config = self
@@ -123,7 +123,7 @@ where
             Ok(_) => {
                 let stream = this.stream.take().unwrap();
                 trace!("SSL Handshake success: {:?}", stream.host());
-                Poll::Ready(Ok(stream.replace(this.io.take().unwrap()).1))
+                Poll::Ready(Ok(stream.replace_io(this.io.take().unwrap()).1))
             }
             Err(e) => {
                 trace!("SSL Handshake error: {:?}", e);
