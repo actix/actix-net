@@ -172,17 +172,3 @@ fn attack_to_tokio() {
 
     assert_eq!(res, 2);
 }
-
-#[tokio::test]
-async fn attack_to_tokio_macro() {
-    use actix_rt::System;
-
-    let rest_operations = run_application();
-    let res = System::attach_to_tokio(
-        "actix-main-system",
-        tokio::runtime::Runtime::handle(&self),
-        rest_operations,
-    );
-
-    assert_eq!(res, 2);
-}
