@@ -66,8 +66,7 @@ impl Default for Arbiter {
 }
 
 impl Arbiter {
-    /// TODO: make pub(crate) again
-    pub fn new_system(local: &LocalSet) -> Self {
+    pub(crate) fn new_system(local: &LocalSet) -> Self {
         let (tx, rx) = unbounded_channel();
 
         let arb = Arbiter::with_sender(tx);
