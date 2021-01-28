@@ -172,7 +172,7 @@ impl Worker {
         let avail = availability.clone();
 
         // every worker runs in it's own arbiter.
-        Arbiter::new().send(Box::pin(async move {
+        Arbiter::new().spawn(Box::pin(async move {
             availability.set(false);
             let mut wrk = MAX_CONNS_COUNTER.with(move |conns| Worker {
                 rx,
