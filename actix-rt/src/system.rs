@@ -23,7 +23,7 @@ static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[derive(Clone, Debug)]
 pub struct System {
     id: usize,
-    tx: mpsc::UnboundedSender<SystemCommand>,
+    sys_tx: mpsc::UnboundedSender<SystemCommand>,
     worker: Worker,
 }
 
@@ -32,10 +32,13 @@ thread_local!(
 );
 
 impl System {
-    /// Constructs new system and sets it as current
-    pub(crate) fn construct(sys: mpsc::UnboundedSender<SystemCommand>, worker: Worker) -> Self {
+    /// Constructs new system and sets it as current.
+    pub(crate) fn construct(
+        sys_tx: mpsc::UnboundedSender<SystemCommand>,
+        worker: Worker,
+    ) -> Self {
         let sys = System {
-            tx: sys,
+            sys_tx,
             worker,
             id: SYSTEM_COUNT.fetch_add(1, Ordering::SeqCst),
         };
@@ -103,16 +106,11 @@ impl System {
 
     /// Stop the system with a particular exit code.
     pub fn stop_with_code(&self, code: i32) {
-        let _ = self.tx.send(SystemCommand::Exit(code));
+        let _ = self.sys_tx.send(SystemCommand::Exit(code));
     }
 
     pub(crate) fn tx(&self) -> &mpsc::UnboundedSender<SystemCommand> {
-        &self.tx
-    }
-
-    /// Get shared reference to system arbiter.
-    pub fn arbiter(&self) -> &Worker {
-        &self.worker
+        &self.sys_tx
     }
 
     /// This function will start Tokio runtime and will finish once the `System::stop()` message
@@ -165,18 +163,21 @@ impl Future for SystemWorker {
                 // process system command
                 Some(cmd) => match cmd {
                     SystemCommand::Exit(code) => {
-                        // stop arbiters
-                        for arb in self.workers.values() {
-                            arb.stop();
+                        // stop workers
+                        for wkr in self.workers.values() {
+                            wkr.stop();
                         }
+
                         // stop event loop
                         if let Some(stop) = self.stop.take() {
                             let _ = stop.send(code);
                         }
                     }
+
                     SystemCommand::RegisterArbiter(name, hnd) => {
                         self.workers.insert(name, hnd);
                     }
+
                     SystemCommand::DeregisterArbiter(name) => {
                         self.workers.remove(&name);
                     }

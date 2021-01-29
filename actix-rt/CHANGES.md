@@ -8,6 +8,7 @@
 * Remove old `Worker::spawn`. Implementation is now inlined into `actix_rt::spawn`. [#253]
 * Rename `Worker::{send => spawn}` and `Worker::{exec_fn => spawn_fn}`. [#253]
 * Remove `Worker::exec`. [#253]
+* Remove `System::arbiter`. [#256]
 * Remove deprecated `Worker::local_join` and `Worker::is_running`. [#253]
 * `Worker::spawn` now accepts !Unpin futures. [#256]
 

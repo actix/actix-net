@@ -197,11 +197,6 @@ impl Worker {
 
     /// Call a function with a shared reference to an item in this worker's thread-local storage.
     ///
-    /// # Examples
-    /// ```
-    ///
-    /// ```
-    ///
     /// # Panics
     /// Panics if item is not in worker's thread-local item storage.
     pub fn get_item<T: 'static, F, R>(mut f: F) -> R
@@ -252,7 +247,7 @@ impl Future for WorkerRunner {
                 // channel closed; no more messages can be received
                 None => return Poll::Ready(()),
 
-                // process arbiter command
+                // process worker command
                 Some(item) => match item {
                     WorkerCommand::Stop => return Poll::Ready(()),
                     WorkerCommand::Execute(task_fut) => {
