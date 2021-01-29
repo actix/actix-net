@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cell::RefCell,
     collections::HashMap,
     future::Future,
@@ -24,7 +25,6 @@ pub struct System {
     id: usize,
     tx: mpsc::UnboundedSender<SystemCommand>,
     worker: Worker,
-    stop_on_panic: bool,
 }
 
 thread_local!(
@@ -33,15 +33,10 @@ thread_local!(
 
 impl System {
     /// Constructs new system and sets it as current
-    pub(crate) fn construct(
-        sys: mpsc::UnboundedSender<SystemCommand>,
-        worker: Worker,
-        stop_on_panic: bool,
-    ) -> Self {
+    pub(crate) fn construct(sys: mpsc::UnboundedSender<SystemCommand>, worker: Worker) -> Self {
         let sys = System {
             tx: sys,
             worker,
-            stop_on_panic,
             id: SYSTEM_COUNT.fetch_add(1, Ordering::SeqCst),
         };
         System::set_current(sys.clone());
@@ -57,9 +52,10 @@ impl System {
 
     /// Create new system.
     ///
-    /// This method panics if it can not create Tokio runtime
+    /// # Panics
+    /// Panics if underlying Tokio runtime can not be created.
     #[allow(clippy::new_ret_no_self)]
-    pub fn new(name: impl Into<String>) -> SystemRunner {
+    pub fn new(name: impl Into<Cow<'static, str>>) -> SystemRunner {
         Self::builder().name(name).build()
     }
 
@@ -112,12 +108,6 @@ impl System {
 
     pub(crate) fn tx(&self) -> &mpsc::UnboundedSender<SystemCommand> {
         &self.tx
-    }
-
-    /// Return status of 'stop_on_panic' option which controls whether the System is stopped when an
-    /// uncaught panic is thrown from a worker thread.
-    pub(crate) fn stop_on_panic(&self) -> bool {
-        self.stop_on_panic
     }
 
     /// Get shared reference to system arbiter.

@@ -11,38 +11,25 @@ use crate::{
     worker::Worker,
 };
 
-/// Builder an actix runtime.
+/// System builder.
 ///
 /// Either use `Builder::build` to create a system and start actors. Alternatively, use
 /// `Builder::run` to start the Tokio runtime and run a function in its context.
 pub struct Builder {
     /// Name of the System. Defaults to "actix-rt" if unset.
     name: Cow<'static, str>,
-
-    /// Whether the Arbiter will stop the whole System on uncaught panic. Defaults to false.
-    stop_on_panic: bool,
 }
 
 impl Builder {
     pub(crate) fn new() -> Self {
         Builder {
             name: Cow::Borrowed("actix-rt"),
-            stop_on_panic: false,
         }
     }
 
     /// Sets the name of the System.
-    pub fn name(mut self, name: impl Into<String>) -> Self {
-        self.name = Cow::Owned(name.into());
-        self
-    }
-
-    /// Sets the option 'stop_on_panic' which controls whether the System is stopped when an
-    /// uncaught panic is thrown from a worker thread.
-    ///
-    /// Defaults to false.
-    pub fn stop_on_panic(mut self, stop_on_panic: bool) -> Self {
-        self.stop_on_panic = stop_on_panic;
+    pub fn name(mut self, name: impl Into<Cow<'static, str>>) -> Self {
+        self.name = name.into();
         self
     }
 
@@ -55,14 +42,14 @@ impl Builder {
 
     /// This function will start Tokio runtime and will finish once the `System::stop()` message
     /// is called. Function `f` is called within Tokio runtime context.
-    pub fn run<F>(self, f: F) -> io::Result<()>
+    pub fn run<F>(self, init_fn: F) -> io::Result<()>
     where
         F: FnOnce(),
     {
-        self.create_runtime(f).run()
+        self.create_runtime(init_fn).run()
     }
 
-    fn create_runtime<F>(self, f: F) -> SystemRunner
+    fn create_runtime<F>(self, init_fn: F) -> SystemRunner
     where
         F: FnOnce(),
     {
@@ -71,18 +58,14 @@ impl Builder {
 
         let rt = Runtime::new().unwrap();
 
-        let system = System::construct(
-            sys_sender,
-            Worker::new_system(rt.local()),
-            self.stop_on_panic,
-        );
+        let system = System::construct(sys_sender, Worker::new_system(rt.local()));
 
-        let arb = SystemWorker::new(sys_receiver, stop_tx);
+        // init system worker
+        let sys_worker = SystemWorker::new(sys_receiver, stop_tx);
+        rt.spawn(sys_worker);
 
-        rt.spawn(arb);
-
-        // init system arbiter and run configuration method
-        rt.block_on(async { f() });
+        // run system init method
+        rt.block_on(async { init_fn() });
 
         SystemRunner { rt, stop, system }
     }
