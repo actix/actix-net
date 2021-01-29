@@ -6,9 +6,9 @@ use tokio::sync::{
 };
 
 use crate::{
-    worker::Worker,
     runtime::Runtime,
     system::{System, SystemWorker},
+    worker::Worker,
 };
 
 /// Builder an actix runtime.

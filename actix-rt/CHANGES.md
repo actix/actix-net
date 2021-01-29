@@ -8,8 +8,10 @@
 * Rename `Arbiter::{send => spawn}` and `Arbiter::{exec_fn => spawn_fn}`. [#253]
 * Remove `Arbiter::exec`. [#253]
 * Remove deprecated `Arbiter::local_join` and `Arbiter::is_running`. [#253]
+* Rename `Arbiter => Worker`. [#254]
 
 [#253]: https://github.com/actix/actix-net/pull/253
+[#254]: https://github.com/actix/actix-net/pull/254
 
 
 ## 2.0.0-beta.2 - 2021-01-09
