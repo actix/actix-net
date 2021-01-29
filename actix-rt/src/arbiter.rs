@@ -149,7 +149,7 @@ impl Arbiter {
     ///
     /// If you require a result, include a response channel in the future.
     ///
-    /// Returns true if function was sent successfully and false if the Arbiter has died.
+    /// Returns true if future was sent successfully and false if the Arbiter has died.
     pub fn spawn<Fut>(&self, future: Fut) -> bool
     where
         Fut: Future<Output = ()> + Unpin + Send + 'static,
