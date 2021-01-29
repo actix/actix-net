@@ -192,10 +192,7 @@ fn no_system_worker_new_panic() {
 fn system_worker_spawn() {
     let runner = System::new();
 
-    eprintln!("making channel");
     let (tx, rx) = oneshot::channel();
-
-    eprintln!("getting initial system worker");
     let sys = System::current();
 
     thread::spawn(|| {
@@ -212,10 +209,7 @@ fn system_worker_spawn() {
 
         let wrk = sys.worker();
         wrk.spawn(async move {
-            eprintln!("before send");
             tx.send(42u32).unwrap();
-
-            eprintln!("after send");
             System::current().stop();
         });
     });

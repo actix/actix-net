@@ -29,11 +29,6 @@ pub struct System {
     worker_handle: WorkerHandle,
 }
 
-impl Drop for System {
-    fn drop(&mut self) {
-        eprintln!("dropping System")
-    }
-}
 
 impl System {
     /// Create a new system.
@@ -42,7 +37,6 @@ impl System {
     /// Panics if underlying Tokio runtime can not be created.
     #[allow(clippy::new_ret_no_self)]
     pub fn new() -> SystemRunner {
-        eprintln!("System::new");
         Self::create_runtime(async {})
     }
 
@@ -77,21 +71,16 @@ impl System {
         let (stop_tx, stop_rx) = oneshot::channel();
         let (sys_tx, sys_rx) = mpsc::unbounded_channel();
 
-        eprintln!("creating runtime");
         let rt = Runtime::new().expect("Actix (Tokio) runtime could not be created.");
-        eprintln!("creating worker and system");
         let system = System::construct(sys_tx, Worker::new_current_thread(rt.local_set()));
 
-        eprintln!("creating system controller");
         // init background system worker
         let sys_worker = SystemController::new(sys_rx, stop_tx);
         rt.spawn(sys_worker);
 
-        eprintln!("running init future");
         // run system init future
         rt.block_on(init_fut);
 
-        eprintln!("done; here's your system runner");
         SystemRunner {
             rt,
             stop_rx,
@@ -104,7 +93,6 @@ impl System {
     /// # Panics
     /// Panics if no system is registered on the current thread.
     pub fn current() -> System {
-        eprintln!("gib current system");
         CURRENT.with(|cell| match *cell.borrow() {
             Some(ref sys) => sys.clone(),
             None => panic!("System is not running"),
@@ -163,7 +151,6 @@ pub struct SystemRunner {
 impl SystemRunner {
     /// Starts event loop and will return once [System] is [stopped](System::stop).
     pub fn run(self) -> io::Result<()> {
-        eprintln!("SystemRunner: run");
 
         let SystemRunner { rt, stop_rx, .. } = self;
 
@@ -217,11 +204,6 @@ impl SystemController {
             stop_tx: Some(stop_tx),
             workers: HashMap::with_capacity(4),
         }
-    }
-}
-impl Drop for SystemController {
-    fn drop(&mut self) {
-        eprintln!("dropping SystemController")
     }
 }
 

@@ -45,15 +45,9 @@ pub struct WorkerHandle {
     sender: mpsc::UnboundedSender<WorkerCommand>,
 }
 
-impl Drop for WorkerHandle {
-    fn drop(&mut self) {
-        eprintln!("dropping WorkerHandle")
-    }
-}
 
 impl WorkerHandle {
     pub(crate) fn new(sender: mpsc::UnboundedSender<WorkerCommand>) -> Self {
-        eprintln!("WorkerHandle::new");
         Self { sender }
     }
 
@@ -272,21 +266,14 @@ struct WorkerRunner {
     rx: mpsc::UnboundedReceiver<WorkerCommand>,
 }
 
-impl Drop for WorkerRunner {
-    fn drop(&mut self) {
-        eprintln!("dropping WorkerRunner")
-    }
-}
 
 impl Future for WorkerRunner {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        eprintln!("WorkerRunner: poll");
 
         // process all items currently buffered in channel
         loop {
-            eprintln!("WorkerRunner: loop");
 
             match ready!(Pin::new(&mut self.rx).poll_recv(cx)) {
                 // channel closed; no more messages can be received
@@ -295,11 +282,9 @@ impl Future for WorkerRunner {
                 // process worker command
                 Some(item) => match item {
                     WorkerCommand::Stop => {
-                        eprintln!("WorkerRunner: stopping");
                         return Poll::Ready(());
                     }
                     WorkerCommand::Execute(task_fut) => {
-                        eprintln!("WorkerRunner: executing task");
                         tokio::task::spawn_local(task_fut);
                     }
                 },
