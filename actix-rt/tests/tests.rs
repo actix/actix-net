@@ -136,12 +136,10 @@ fn worker_drop_no_panic_fn() {
 
 #[test]
 fn worker_drop_no_panic_fut() {
-    use futures_util::future::lazy;
-
     let _ = System::new("test-system");
 
     let mut worker = Worker::new();
-    worker.spawn(lazy(|_| panic!("test")));
+    worker.spawn(async { panic!("test") });
 
     worker.stop();
     worker.join().unwrap();

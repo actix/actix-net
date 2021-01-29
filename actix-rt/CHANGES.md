@@ -2,16 +2,18 @@
 
 ## Unreleased - 2021-xx-xx
 
+* Rename `Arbiter => Worker`. [#254]
 * Remove `run_in_tokio`, `attach_to_tokio` and `AsyncSystemRunner`. [#253]
 * Return `JoinHandle` from `actix_rt::spawn`. [#253]
-* Remove old `Arbiter::spawn`. Implementation is now inlined into `actix_rt::spawn`. [#253]
-* Rename `Arbiter::{send => spawn}` and `Arbiter::{exec_fn => spawn_fn}`. [#253]
-* Remove `Arbiter::exec`. [#253]
-* Remove deprecated `Arbiter::local_join` and `Arbiter::is_running`. [#253]
-* Rename `Arbiter => Worker`. [#254]
+* Remove old `Worker::spawn`. Implementation is now inlined into `actix_rt::spawn`. [#253]
+* Rename `Worker::{send => spawn}` and `Worker::{exec_fn => spawn_fn}`. [#253]
+* Remove `Worker::exec`. [#253]
+* Remove deprecated `Worker::local_join` and `Worker::is_running`. [#253]
+* `Worker::spawn` now accepts !Unpin futures. [#256]
 
 [#253]: https://github.com/actix/actix-net/pull/253
 [#254]: https://github.com/actix/actix-net/pull/254
+[#256]: https://github.com/actix/actix-net/pull/256
 
 
 ## 2.0.0-beta.2 - 2021-01-09

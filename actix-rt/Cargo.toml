@@ -27,4 +27,3 @@ tokio = { version = "1", features = ["rt", "net", "parking_lot", "signal", "sync
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
-futures-util = { version = "0.3.7", default-features = true, features = ["alloc"] }
