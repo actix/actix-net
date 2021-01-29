@@ -15,17 +15,17 @@ use tokio::task::JoinHandle;
 #[cfg(all(feature = "macros", not(test)))]
 pub use actix_macros::{main, test};
 
-mod arbiter;
 mod builder;
 mod runtime;
 mod system;
+mod worker;
 
-pub use self::arbiter::Arbiter;
 pub use self::builder::{Builder, SystemRunner};
 pub use self::runtime::Runtime;
 pub use self::system::System;
+pub use self::worker::Worker;
 
-/// Spawns a future on the current arbiter.
+/// Spawns a future on the current [Arbiter].
 ///
 /// # Panics
 /// Panics if Actix system is not running.
@@ -37,33 +37,29 @@ where
     tokio::task::spawn_local(f)
 }
 
-/// Asynchronous signal handling
 pub mod signal {
+    //! Asynchronous signal handling (Tokio re-exports).
+
     #[cfg(unix)]
     pub mod unix {
-        //! Unix specific signals.
+        //! Unix specific signals (Tokio re-exports).
         pub use tokio::signal::unix::*;
     }
     pub use tokio::signal::ctrl_c;
 }
 
 pub mod net {
-    //! TCP/UDP/Unix bindings
+    //! TCP/UDP/Unix bindings (Tokio re-exports).
 
     pub use tokio::net::UdpSocket;
     pub use tokio::net::{TcpListener, TcpStream};
 
     #[cfg(unix)]
-    mod unix {
-        pub use tokio::net::{UnixDatagram, UnixListener, UnixStream};
-    }
-
-    #[cfg(unix)]
-    pub use self::unix::*;
+    pub use tokio::net::{UnixDatagram, UnixListener, UnixStream};
 }
 
 pub mod time {
-    //! Utilities for tracking time.
+    //! Utilities for tracking time (Tokio re-exports).
 
     pub use tokio::time::Instant;
     pub use tokio::time::{interval, interval_at, Interval};
@@ -72,7 +68,7 @@ pub mod time {
 }
 
 pub mod task {
-    //! Task management.
+    //! Task management (Tokio re-exports).
 
     pub use tokio::task::{spawn_blocking, yield_now, JoinHandle};
 }

@@ -6,9 +6,9 @@ use tokio::sync::{
 };
 
 use crate::{
-    arbiter::{Arbiter, SystemArbiter},
     runtime::Runtime,
-    system::System,
+    system::{System, SystemWorker},
+    worker::Worker,
 };
 
 /// Builder an actix runtime.
@@ -73,12 +73,11 @@ impl Builder {
 
         let system = System::construct(
             sys_sender,
-            Arbiter::new_system(rt.local()),
+            Worker::new_system(rt.local()),
             self.stop_on_panic,
         );
 
-        // system arbiter
-        let arb = SystemArbiter::new(stop_tx, sys_receiver);
+        let arb = SystemWorker::new(sys_receiver, stop_tx);
 
         rt.spawn(arb);
 

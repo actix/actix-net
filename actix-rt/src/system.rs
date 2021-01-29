@@ -1,14 +1,19 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
+    future::Future,
     io,
+    pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
+    task::{Context, Poll},
 };
 
-use tokio::sync::mpsc::UnboundedSender;
+use futures_core::ready;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    arbiter::{Arbiter, SystemCommand},
     builder::{Builder, SystemRunner},
+    worker::Worker,
 };
 
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -17,8 +22,8 @@ static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[derive(Clone, Debug)]
 pub struct System {
     id: usize,
-    tx: UnboundedSender<SystemCommand>,
-    arbiter: Arbiter,
+    tx: mpsc::UnboundedSender<SystemCommand>,
+    worker: Worker,
     stop_on_panic: bool,
 }
 
@@ -29,13 +34,13 @@ thread_local!(
 impl System {
     /// Constructs new system and sets it as current
     pub(crate) fn construct(
-        sys: UnboundedSender<SystemCommand>,
-        arbiter: Arbiter,
+        sys: mpsc::UnboundedSender<SystemCommand>,
+        worker: Worker,
         stop_on_panic: bool,
     ) -> Self {
         let sys = System {
             tx: sys,
-            arbiter,
+            worker,
             stop_on_panic,
             id: SYSTEM_COUNT.fetch_add(1, Ordering::SeqCst),
         };
@@ -43,7 +48,7 @@ impl System {
         sys
     }
 
-    /// Build a new system with a customized tokio runtime.
+    /// Build a new system with a customized Tokio runtime.
     ///
     /// This allows to customize the runtime. See [`Builder`] for more information.
     pub fn builder() -> Builder {
@@ -52,7 +57,7 @@ impl System {
 
     /// Create new system.
     ///
-    /// This method panics if it can not create tokio runtime
+    /// This method panics if it can not create Tokio runtime
     #[allow(clippy::new_ret_no_self)]
     pub fn new(name: impl Into<String>) -> SystemRunner {
         Self::builder().name(name).build()
@@ -105,7 +110,7 @@ impl System {
         let _ = self.tx.send(SystemCommand::Exit(code));
     }
 
-    pub(crate) fn tx(&self) -> &UnboundedSender<SystemCommand> {
+    pub(crate) fn tx(&self) -> &mpsc::UnboundedSender<SystemCommand> {
         &self.tx
     }
 
@@ -116,16 +121,77 @@ impl System {
     }
 
     /// Get shared reference to system arbiter.
-    pub fn arbiter(&self) -> &Arbiter {
-        &self.arbiter
+    pub fn arbiter(&self) -> &Worker {
+        &self.worker
     }
 
-    /// This function will start tokio runtime and will finish once the `System::stop()` message
-    /// is called. Function `f` is called within tokio runtime context.
+    /// This function will start Tokio runtime and will finish once the `System::stop()` message
+    /// is called. Function `f` is called within Tokio runtime context.
     pub fn run<F>(f: F) -> io::Result<()>
     where
         F: FnOnce(),
     {
         Self::builder().run(f)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum SystemCommand {
+    Exit(i32),
+    RegisterArbiter(usize, Worker),
+    DeregisterArbiter(usize),
+}
+
+#[derive(Debug)]
+pub(crate) struct SystemWorker {
+    stop: Option<oneshot::Sender<i32>>,
+    commands: mpsc::UnboundedReceiver<SystemCommand>,
+    workers: HashMap<usize, Worker>,
+}
+
+impl SystemWorker {
+    pub(crate) fn new(
+        commands: mpsc::UnboundedReceiver<SystemCommand>,
+        stop: oneshot::Sender<i32>,
+    ) -> Self {
+        SystemWorker {
+            commands,
+            stop: Some(stop),
+            workers: HashMap::new(),
+        }
+    }
+}
+
+impl Future for SystemWorker {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // process all items currently buffered in channel
+        loop {
+            match ready!(Pin::new(&mut self.commands).poll_recv(cx)) {
+                // channel closed; no more messages can be received
+                None => return Poll::Ready(()),
+
+                // process system command
+                Some(cmd) => match cmd {
+                    SystemCommand::Exit(code) => {
+                        // stop arbiters
+                        for arb in self.workers.values() {
+                            arb.stop();
+                        }
+                        // stop event loop
+                        if let Some(stop) = self.stop.take() {
+                            let _ = stop.send(code);
+                        }
+                    }
+                    SystemCommand::RegisterArbiter(name, hnd) => {
+                        self.workers.insert(name, hnd);
+                    }
+                    SystemCommand::DeregisterArbiter(name) => {
+                        self.workers.remove(&name);
+                    }
+                },
+            }
+        }
     }
 }
