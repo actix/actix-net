@@ -17,7 +17,7 @@ static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[derive(Clone, Debug)]
 pub struct System {
     id: usize,
-    sys: UnboundedSender<SystemCommand>,
+    tx: UnboundedSender<SystemCommand>,
     arbiter: Arbiter,
     stop_on_panic: bool,
 }
@@ -34,7 +34,7 @@ impl System {
         stop_on_panic: bool,
     ) -> Self {
         let sys = System {
-            sys,
+            tx: sys,
             arbiter,
             stop_on_panic,
             id: SYSTEM_COUNT.fetch_add(1, Ordering::SeqCst),
@@ -102,11 +102,11 @@ impl System {
 
     /// Stop the system with a particular exit code.
     pub fn stop_with_code(&self, code: i32) {
-        let _ = self.sys.send(SystemCommand::Exit(code));
+        let _ = self.tx.send(SystemCommand::Exit(code));
     }
 
-    pub(crate) fn sys(&self) -> &UnboundedSender<SystemCommand> {
-        &self.sys
+    pub(crate) fn tx(&self) -> &UnboundedSender<SystemCommand> {
+        &self.tx
     }
 
     /// Return status of 'stop_on_panic' option which controls whether the System is stopped when an

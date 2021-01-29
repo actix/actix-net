@@ -1,8 +1,9 @@
-use std::time::{Duration, Instant};
+use std::{
+    thread,
+    time::{Duration, Instant},
+};
 
 use actix_rt::{Arbiter, System};
-use futures_util::future::lazy;
-use tokio::task::LocalSet;
 
 #[test]
 fn await_for_timer() {
@@ -103,4 +104,34 @@ fn wait_for_spawns() {
     });
 
     assert!(rt.block_on(handle).is_err());
+}
+
+#[test]
+#[should_panic]
+fn arbiter_drop_panic_fn() {
+    let _ = System::new("test-system");
+
+    let mut arbiter = Arbiter::new();
+    arbiter.spawn_fn(|| panic!("test"));
+
+    arbiter.join().unwrap();
+}
+
+#[test]
+fn arbiter_drop_no_panic_fut() {
+    use futures_util::future::lazy;
+
+    let _ = System::new("test-system");
+
+    let mut arbiter = Arbiter::new();
+    arbiter.spawn(lazy(|_| panic!("test")));
+
+    let arb = arbiter.clone();
+    let thread = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(200));
+        arb.stop();
+    });
+
+    arbiter.join().unwrap();
+    thread.join().unwrap();
 }

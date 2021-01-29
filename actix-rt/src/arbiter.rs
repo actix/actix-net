@@ -87,12 +87,6 @@ impl Arbiter {
         })
     }
 
-    /// Check if current arbiter is running.
-    #[deprecated(note = "Thread local variables for running state of Arbiter is removed")]
-    pub fn is_running() -> bool {
-        false
-    }
-
     /// Stop arbiter from continuing it's event loop.
     pub fn stop(&self) {
         let _ = self.sender.send(ArbiterCommand::Stop);
@@ -122,7 +116,7 @@ impl Arbiter {
 
                     // register arbiter
                     let _ = System::current()
-                        .sys()
+                        .tx()
                         .send(SystemCommand::RegisterArbiter(id, arb));
 
                     // start arbiter controller
@@ -131,7 +125,7 @@ impl Arbiter {
 
                     // deregister arbiter
                     let _ = System::current()
-                        .sys()
+                        .tx()
                         .send(SystemCommand::DeregisterArbiter(id));
                 }
             })
@@ -243,6 +237,7 @@ struct ArbiterController {
 
 impl Drop for ArbiterController {
     fn drop(&mut self) {
+        // panics can only occur with spawn_fn calls
         if thread::panicking() {
             if System::current().stop_on_panic() {
                 eprintln!("Panic in Arbiter thread, shutting down system.");

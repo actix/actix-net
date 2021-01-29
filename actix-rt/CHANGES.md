@@ -2,13 +2,12 @@
 
 ## Unreleased - 2021-xx-xx
 
-* Remove `run_in_tokio` and `attach_to_tokio`. [#253]
-* Remove `AsyncSystemRunner`. [#253]
+* Remove `run_in_tokio`, `attach_to_tokio` and `AsyncSystemRunner`. [#253]
 * Return `JoinHandle` from `actix_rt::spawn`. [#253]
 * Remove old `Arbiter::spawn`. Implementation is now inlined into `actix_rt::spawn`. [#253]
 * Rename `Arbiter::{send => spawn}` and `Arbiter::{exec_fn => spawn_fn}`. [#253]
 * Remove `Arbiter::exec`. [#253]
-* Remove deprecated `Arbiter::local_join`. [#253]
+* Remove deprecated `Arbiter::local_join` and `Arbiter::is_running`. [#253]
 
 [#253]: https://github.com/actix/actix-net/pull/253
 
