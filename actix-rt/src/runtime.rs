@@ -2,9 +2,10 @@ use std::{future::Future, io};
 
 use tokio::task::{JoinHandle, LocalSet};
 
-/// Single-threaded runtime provides a way to start reactor and runtime on the current thread.
+/// A single-threaded runtime based on Tokio's "current thread" runtime.
 ///
-/// See [crate root][crate] documentation for more details.
+/// All spawned futures will be executed on the current thread. Therefore, there is no `Send` bound
+/// on submitted futures.
 #[derive(Debug)]
 pub struct Runtime {
     local: LocalSet,
@@ -27,7 +28,7 @@ impl Runtime {
     }
 
     /// Reference to local task set.
-    pub(crate) fn local(&self) -> &LocalSet {
+    pub(crate) fn local_set(&self) -> &LocalSet {
         &self.local
     }
 

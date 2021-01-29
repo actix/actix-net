@@ -1,16 +1,17 @@
 use std::{
-    sync::mpsc::sync_channel,
+    sync::mpsc::channel,
     thread,
     time::{Duration, Instant},
 };
 
 use actix_rt::{System, Worker};
+use tokio::sync::oneshot;
 
 #[test]
 fn await_for_timer() {
     let time = Duration::from_secs(1);
     let instant = Instant::now();
-    System::new("test_wait_timer").block_on(async move {
+    System::new().block_on(async move {
         tokio::time::sleep(time).await;
     });
     assert!(
@@ -23,11 +24,11 @@ fn await_for_timer() {
 fn join_another_worker() {
     let time = Duration::from_secs(1);
     let instant = Instant::now();
-    System::new("test_join_another_worker").block_on(async move {
-        let mut worker = Worker::new();
+    System::new().block_on(async move {
+        let worker = Worker::new();
         worker.spawn(Box::pin(async move {
             tokio::time::sleep(time).await;
-            Worker::current().stop();
+            Worker::handle().stop();
         }));
         worker.join().unwrap();
     });
@@ -37,12 +38,12 @@ fn join_another_worker() {
     );
 
     let instant = Instant::now();
-    System::new("test_join_another_worker").block_on(async move {
-        let mut worker = Worker::new();
+    System::new().block_on(async move {
+        let worker = Worker::new();
         worker.spawn_fn(move || {
             actix_rt::spawn(async move {
                 tokio::time::sleep(time).await;
-                Worker::current().stop();
+                Worker::handle().stop();
             });
         });
         worker.join().unwrap();
@@ -53,11 +54,11 @@ fn join_another_worker() {
     );
 
     let instant = Instant::now();
-    System::new("test_join_another_worker").block_on(async move {
-        let mut worker = Worker::new();
+    System::new().block_on(async move {
+        let worker = Worker::new();
         worker.spawn(Box::pin(async move {
             tokio::time::sleep(time).await;
-            Worker::current().stop();
+            Worker::handle().stop();
         }));
         worker.stop();
         worker.join().unwrap();
@@ -73,7 +74,7 @@ fn non_static_block_on() {
     let string = String::from("test_str");
     let str = string.as_str();
 
-    let sys = System::new("borrow some");
+    let sys = System::new();
 
     sys.block_on(async {
         actix_rt::time::sleep(Duration::from_millis(1)).await;
@@ -87,10 +88,11 @@ fn non_static_block_on() {
         assert_eq!("test_str", str);
     });
 
-    System::run(|| {
+    System::with_init(async {
         assert_eq!("test_str", str);
         System::current().stop();
     })
+    .run()
     .unwrap();
 }
 
@@ -109,11 +111,11 @@ fn wait_for_spawns() {
 
 #[test]
 fn worker_spawn_fn_runs() {
-    let _ = System::new("test-system");
+    let _ = System::new();
 
-    let (tx, rx) = sync_channel::<u32>(1);
+    let (tx, rx) = channel::<u32>();
 
-    let mut worker = Worker::new();
+    let worker = Worker::new();
     worker.spawn_fn(move || tx.send(42).unwrap());
 
     let num = rx.recv().unwrap();
@@ -125,9 +127,9 @@ fn worker_spawn_fn_runs() {
 
 #[test]
 fn worker_drop_no_panic_fn() {
-    let _ = System::new("test-system");
+    let _ = System::new();
 
-    let mut worker = Worker::new();
+    let worker = Worker::new();
     worker.spawn_fn(|| panic!("test"));
 
     worker.stop();
@@ -136,9 +138,9 @@ fn worker_drop_no_panic_fn() {
 
 #[test]
 fn worker_drop_no_panic_fut() {
-    let _ = System::new("test-system");
+    let _ = System::new();
 
-    let mut worker = Worker::new();
+    let worker = Worker::new();
     worker.spawn(async { panic!("test") });
 
     worker.stop();
@@ -147,9 +149,9 @@ fn worker_drop_no_panic_fut() {
 
 #[test]
 fn worker_item_storage() {
-    let _ = System::new("test-system");
+    let _ = System::new();
 
-    let mut worker = Worker::new();
+    let worker = Worker::new();
 
     assert!(!Worker::contains_item::<u32>());
     Worker::set_item(42u32);
@@ -175,18 +177,6 @@ fn worker_item_storage() {
 }
 
 #[test]
-fn system_name_cow_str() {
-    let _ = System::new("test-system");
-    System::current().stop();
-}
-
-#[test]
-fn system_name_cow_string() {
-    let _ = System::new("test-system".to_owned());
-    System::current().stop();
-}
-
-#[test]
 #[should_panic]
 fn no_system_current_panic() {
     System::current();
@@ -196,4 +186,40 @@ fn no_system_current_panic() {
 #[should_panic]
 fn no_system_worker_new_panic() {
     Worker::new();
+}
+
+#[test]
+fn system_worker_spawn() {
+    let runner = System::new();
+
+    eprintln!("making channel");
+    let (tx, rx) = oneshot::channel();
+
+    eprintln!("getting initial system worker");
+    let sys = System::current();
+
+    thread::spawn(|| {
+        // this thread will have no worker in it's thread local so call will panic
+        Worker::handle();
+    })
+    .join()
+    .unwrap_err();
+
+    let thread = thread::spawn(|| {
+        // this thread will have no worker in it's thread local so use the system handle instead
+        System::set_current(sys);
+        let sys = System::current();
+
+        let wrk = sys.worker();
+        wrk.spawn(async move {
+            eprintln!("before send");
+            tx.send(42u32).unwrap();
+
+            eprintln!("after send");
+            System::current().stop();
+        });
+    });
+
+    assert_eq!(runner.block_on(rx).unwrap(), 42);
+    thread.join().unwrap();
 }

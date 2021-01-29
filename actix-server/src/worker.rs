@@ -215,7 +215,7 @@ impl ServerWorker {
                     }
                     Err(e) => {
                         error!("Can not start worker: {:?}", e);
-                        Arbiter::current().stop();
+                        Arbiter::handle().stop();
                     }
                 }
                 wrk.await
@@ -386,7 +386,7 @@ impl Future for ServerWorker {
                 let num = num_connections();
                 if num == 0 {
                     let _ = tx.take().unwrap().send(true);
-                    Arbiter::current().stop();
+                    Arbiter::handle().stop();
                     return Poll::Ready(());
                 }
 
@@ -394,7 +394,7 @@ impl Future for ServerWorker {
                 if Pin::new(t2).poll(cx).is_ready() {
                     let _ = tx.take().unwrap().send(false);
                     self.shutdown(true);
-                    Arbiter::current().stop();
+                    Arbiter::handle().stop();
                     return Poll::Ready(());
                 }
 

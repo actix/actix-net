@@ -7,7 +7,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
-/// Marks async function to be executed by actix system.
+/// Marks async function to be executed by Actix system.
 ///
 /// ## Usage
 ///
@@ -26,7 +26,6 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
     let vis = &input.vis;
     let sig = &mut input.sig;
     let body = &input.block;
-    let name = &sig.ident;
 
     if sig.asyncness.is_none() {
         return syn::Error::new_spanned(sig.fn_token, "only async fn is supported")
@@ -39,14 +38,14 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
     (quote! {
         #(#attrs)*
         #vis #sig {
-            actix_rt::System::new(stringify!(#name))
+            actix_rt::System::new()
                 .block_on(async move { #body })
         }
     })
     .into()
 }
 
-/// Marks async test function to be executed by actix runtime.
+/// Marks async test function to be executed by Actix system.
 ///
 /// ## Usage
 ///
@@ -86,7 +85,7 @@ pub fn test(_: TokenStream, item: TokenStream) -> TokenStream {
         quote! {
             #(#attrs)*
             #vis #sig {
-                actix_rt::System::new("test")
+                actix_rt::System::new()
                     .block_on(async { #body })
             }
         }
@@ -95,7 +94,7 @@ pub fn test(_: TokenStream, item: TokenStream) -> TokenStream {
             #[test]
             #(#attrs)*
             #vis #sig {
-                actix_rt::System::new("test")
+                actix_rt::System::new()
                     .block_on(async { #body })
             }
         }
