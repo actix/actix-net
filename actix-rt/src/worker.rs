@@ -45,7 +45,6 @@ pub struct WorkerHandle {
     sender: mpsc::UnboundedSender<WorkerCommand>,
 }
 
-
 impl WorkerHandle {
     pub(crate) fn new(sender: mpsc::UnboundedSender<WorkerCommand>) -> Self {
         Self { sender }
@@ -103,6 +102,7 @@ impl Worker {
     ///
     /// # Panics
     /// Panics if a [System] is not registered on the current thread.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Worker {
         let id = COUNT.fetch_add(1, Ordering::Relaxed);
         let name = format!("actix-rt:worker:{}", id);
@@ -266,15 +266,12 @@ struct WorkerRunner {
     rx: mpsc::UnboundedReceiver<WorkerCommand>,
 }
 
-
 impl Future for WorkerRunner {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-
         // process all items currently buffered in channel
         loop {
-
             match ready!(Pin::new(&mut self.rx).poll_recv(cx)) {
                 // channel closed; no more messages can be received
                 None => return Poll::Ready(()),

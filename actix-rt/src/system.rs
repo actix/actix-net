@@ -29,7 +29,6 @@ pub struct System {
     worker_handle: WorkerHandle,
 }
 
-
 impl System {
     /// Create a new system.
     ///
@@ -151,7 +150,6 @@ pub struct SystemRunner {
 impl SystemRunner {
     /// Starts event loop and will return once [System] is [stopped](System::stop).
     pub fn run(self) -> io::Result<()> {
-
         let SystemRunner { rt, stop_rx, .. } = self;
 
         // run loop
