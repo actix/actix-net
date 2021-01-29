@@ -1,4 +1,5 @@
 use std::{
+    sync::mpsc::sync_channel,
     thread,
     time::{Duration, Instant},
 };
@@ -107,13 +108,29 @@ fn wait_for_spawns() {
 }
 
 #[test]
-#[should_panic]
-fn worker_drop_panic_fn() {
+fn worker_spawn_fn_runs() {
+    let _ = System::new("test-system");
+
+    let (tx, rx) = sync_channel::<u32>(1);
+
+    let mut worker = Worker::new();
+    worker.spawn_fn(move || tx.send(42).unwrap());
+
+    let num = rx.recv().unwrap();
+    assert_eq!(num, 42);
+
+    worker.stop();
+    worker.join().unwrap();
+}
+
+#[test]
+fn worker_drop_no_panic_fn() {
     let _ = System::new("test-system");
 
     let mut worker = Worker::new();
     worker.spawn_fn(|| panic!("test"));
 
+    worker.stop();
     worker.join().unwrap();
 }
 
@@ -157,4 +174,16 @@ fn worker_item_storage() {
 
     worker.stop();
     worker.join().unwrap();
+}
+
+#[test]
+fn system_name_cow_str() {
+    let _ = System::new("test-system");
+    System::current().stop();
+}
+
+#[test]
+fn system_name_cow_string() {
+    let _ = System::new("test-system".to_owned());
+    System::current().stop();
 }

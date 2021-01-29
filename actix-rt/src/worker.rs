@@ -246,20 +246,6 @@ struct WorkerRunner {
     rx: mpsc::UnboundedReceiver<WorkerCommand>,
 }
 
-impl Drop for WorkerRunner {
-    fn drop(&mut self) {
-        // panics can only occur with spawn_fn calls
-        if thread::panicking() {
-            if System::current().stop_on_panic() {
-                eprintln!("Panic in Worker thread, shutting down system.");
-                System::current().stop_with_code(1)
-            } else {
-                eprintln!("Panic in Worker thread.");
-            }
-        }
-    }
-}
-
 impl Future for WorkerRunner {
     type Output = ();
 
@@ -277,7 +263,9 @@ impl Future for WorkerRunner {
                         tokio::task::spawn_local(task_fut);
                     }
                     WorkerCommand::ExecuteFn(task_fn) => {
-                        task_fn();
+                        tokio::task::spawn_local(async {
+                            task_fn();
+                        });
                     }
                 },
             }
