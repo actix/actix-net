@@ -11,10 +11,20 @@
 * Remove `System::arbiter`. [#256]
 * Remove deprecated `Worker::local_join` and `Worker::is_running`. [#253]
 * `Worker::spawn` now accepts !Unpin futures. [#256]
+* `System::new` no longer takes arguments. [#257]
+* Remove `System::with_current`. [#257]
+* Remove `Builder`. [#257]
+* Add `System::with_init` as replacement for `Builder::run`. [#257]
+* Rename `System::{is_set => is_registered}`. [#257]
+* Add `WorkerHandle` for sending messages to non-current-thread workers. [#257].
+* `System::worker` now returns a `&WorkerHandle`. [#257]
+* Rename `Worker::{current => handle}` and return a `WorkerHandle` instead. [#257]
+* `Worker::join` now takes self by value. [#257]
 
 [#253]: https://github.com/actix/actix-net/pull/253
 [#254]: https://github.com/actix/actix-net/pull/254
 [#256]: https://github.com/actix/actix-net/pull/256
+[#257]: https://github.com/actix/actix-net/pull/257
 
 
 ## 2.0.0-beta.2 - 2021-01-09
