@@ -137,11 +137,11 @@ fn worker_item_storage() {
     let mut worker = Worker::new();
 
     assert!(!Worker::contains_item::<u32>());
-    Worker::insert_item(42u32);
+    Worker::set_item(42u32);
     assert!(Worker::contains_item::<u32>());
 
     Worker::get_item(|&item: &u32| assert_eq!(item, 42));
-    Worker::get_item_mut(|&mut item: &mut u32| assert_eq!(item, 42));
+    Worker::get_mut_item(|&mut item: &mut u32| assert_eq!(item, 42));
 
     let thread = thread::spawn(move || {
         Worker::get_item(|&_item: &u32| unreachable!("u32 not in this thread"));
@@ -150,7 +150,7 @@ fn worker_item_storage() {
     assert!(thread.is_err());
 
     let thread = thread::spawn(move || {
-        Worker::get_item_mut(|&mut _item: &mut i8| unreachable!("i8 not in this thread"));
+        Worker::get_mut_item(|&mut _item: &mut i8| unreachable!("i8 not in this thread"));
     })
     .join();
     assert!(thread.is_err());
