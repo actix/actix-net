@@ -19,7 +19,7 @@ use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{self, Worker, WorkerAvailability, WorkerHandle};
+use crate::worker::{self, ServerWorker, WorkerAvailability, WorkerHandle};
 use crate::{join_all, Token};
 
 /// Server builder
@@ -297,7 +297,7 @@ impl ServerBuilder {
         let avail = WorkerAvailability::new(waker);
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
 
-        Worker::start(idx, services, avail, self.shutdown_timeout)
+        ServerWorker::start(idx, services, avail, self.shutdown_timeout)
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) {

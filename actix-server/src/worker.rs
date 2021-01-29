@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use actix_rt::time::{sleep_until, Instant, Sleep};
-use actix_rt::{spawn, Arbiter};
+use actix_rt::{spawn, Worker as Arbiter};
 use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
 use log::{error, info, trace};
@@ -122,11 +122,10 @@ impl WorkerAvailability {
     }
 }
 
-/// Service worker
+/// Service worker.
 ///
-/// Worker accepts Socket objects via unbounded channel and starts stream
-/// processing.
-pub(crate) struct Worker {
+/// Worker accepts Socket objects via unbounded channel and starts stream processing.
+pub(crate) struct ServerWorker {
     rx: UnboundedReceiver<WorkerCommand>,
     rx2: UnboundedReceiver<StopCommand>,
     services: Vec<WorkerService>,
@@ -160,7 +159,7 @@ enum WorkerServiceStatus {
     Stopped,
 }
 
-impl Worker {
+impl ServerWorker {
     pub(crate) fn start(
         idx: usize,
         factories: Vec<Box<dyn InternalServiceFactory>>,
@@ -174,7 +173,7 @@ impl Worker {
         // every worker runs in it's own arbiter.
         Arbiter::new().spawn(Box::pin(async move {
             availability.set(false);
-            let mut wrk = MAX_CONNS_COUNTER.with(move |conns| Worker {
+            let mut wrk = MAX_CONNS_COUNTER.with(move |conns| ServerWorker {
                 rx,
                 rx2,
                 availability,
@@ -304,7 +303,7 @@ enum WorkerState {
     ),
 }
 
-impl Future for Worker {
+impl Future for ServerWorker {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
