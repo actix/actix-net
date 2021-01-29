@@ -401,7 +401,7 @@ impl Accept {
 
                         // after the sleep a Timer interest is sent to Accept Poll
                         let waker = self.waker.clone();
-                        System::current().arbiter().send(Box::pin(async move {
+                        System::current().arbiter().spawn(Box::pin(async move {
                             sleep_until(Instant::now() + Duration::from_millis(510)).await;
                             waker.wake(WakerInterest::Timer);
                         }));

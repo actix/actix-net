@@ -6,7 +6,7 @@ use std::{io, mem};
 
 use actix_rt::net::TcpStream;
 use actix_rt::time::{sleep_until, Instant};
-use actix_rt::{spawn, System};
+use actix_rt::{self as rt, System};
 use log::{error, info};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use tokio::sync::oneshot;
@@ -288,7 +288,7 @@ impl ServerBuilder {
 
             // start http server actor
             let server = self.server.clone();
-            spawn(self);
+            rt::spawn(self);
             server
         }
     }
@@ -364,7 +364,7 @@ impl ServerBuilder {
 
                     let fut = join_all(iter);
 
-                    spawn(async move {
+                    rt::spawn(async move {
                         let _ = fut.await;
                         if let Some(tx) = completion {
                             let _ = tx.send(());
@@ -373,16 +373,16 @@ impl ServerBuilder {
                             let _ = tx.send(());
                         }
                         if exit {
-                            spawn(async {
+                            rt::spawn(async {
                                 sleep_until(Instant::now() + Duration::from_millis(300)).await;
                                 System::current().stop();
                             });
                         }
-                    })
+                    });
                 } else {
                     // we need to stop system if server was spawned
                     if self.exit {
-                        spawn(async {
+                        rt::spawn(async {
                             sleep_until(Instant::now() + Duration::from_millis(300)).await;
                             System::current().stop();
                         });
