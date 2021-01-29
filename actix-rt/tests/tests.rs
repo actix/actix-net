@@ -185,3 +185,15 @@ fn system_name_cow_string() {
     let _ = System::new("test-system".to_owned());
     System::current().stop();
 }
+
+#[test]
+#[should_panic]
+fn no_system_current_panic() {
+    System::current();
+}
+
+#[test]
+#[should_panic]
+fn no_system_worker_new_panic() {
+    Worker::new();
+}

@@ -2,7 +2,6 @@ use std::time::Duration;
 use std::{io, thread};
 
 use actix_rt::{
-    self as rt,
     time::{sleep_until, Instant},
     System,
 };
@@ -404,7 +403,7 @@ impl Accept {
 
                         // after the sleep a Timer interest is sent to Accept Poll
                         let waker = self.waker.clone();
-                        rt::spawn(async move {
+                        System::current().worker().spawn(async move {
                             sleep_until(Instant::now() + Duration::from_millis(510)).await;
                             waker.wake(WakerInterest::Timer);
                         });

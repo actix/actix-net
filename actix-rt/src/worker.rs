@@ -66,6 +66,9 @@ impl Worker {
     /// Spawn new thread and run event loop in spawned thread.
     ///
     /// Returns handle of newly created worker.
+    ///
+    /// # Panics
+    /// Panics if a [System] not registered on the current thread.
     pub fn new() -> Worker {
         let id = COUNT.fetch_add(1, Ordering::Relaxed);
         let name = format!("actix-rt:worker:{}", id);

@@ -24,6 +24,7 @@ static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub struct System {
     id: usize,
     sys_tx: mpsc::UnboundedSender<SystemCommand>,
+    // TODO: which worker is this exactly
     worker: Worker,
 }
 
@@ -63,6 +64,9 @@ impl System {
     }
 
     /// Get current running system.
+    ///
+    /// # Panics
+    /// Panics if no system is registered on the current thread.
     pub fn current() -> System {
         CURRENT.with(|cell| match *cell.borrow() {
             Some(ref sys) => sys.clone(),
@@ -111,6 +115,12 @@ impl System {
 
     pub(crate) fn tx(&self) -> &mpsc::UnboundedSender<SystemCommand> {
         &self.sys_tx
+    }
+
+    // TODO: give clarity on which worker this is; previous documented as returning "system worker"
+    /// Get shared reference to a worker.
+    pub fn worker(&self) -> &Worker {
+        &self.worker
     }
 
     /// This function will start Tokio runtime and will finish once the `System::stop()` message
