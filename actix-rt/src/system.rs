@@ -23,7 +23,8 @@ static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 #[derive(Clone, Debug)]
 pub struct System {
     id: usize,
-    tx: mpsc::UnboundedSender<SystemCommand>,
+    sys_tx: mpsc::UnboundedSender<SystemCommand>,
+    // TODO: which worker is this exactly
     worker: Worker,
 }
 
@@ -32,10 +33,13 @@ thread_local!(
 );
 
 impl System {
-    /// Constructs new system and sets it as current
-    pub(crate) fn construct(sys: mpsc::UnboundedSender<SystemCommand>, worker: Worker) -> Self {
+    /// Constructs new system and sets it as current.
+    pub(crate) fn construct(
+        sys_tx: mpsc::UnboundedSender<SystemCommand>,
+        worker: Worker,
+    ) -> Self {
         let sys = System {
-            tx: sys,
+            sys_tx,
             worker,
             id: SYSTEM_COUNT.fetch_add(1, Ordering::SeqCst),
         };
@@ -60,6 +64,9 @@ impl System {
     }
 
     /// Get current running system.
+    ///
+    /// # Panics
+    /// Panics if no system is registered on the current thread.
     pub fn current() -> System {
         CURRENT.with(|cell| match *cell.borrow() {
             Some(ref sys) => sys.clone(),
@@ -103,15 +110,16 @@ impl System {
 
     /// Stop the system with a particular exit code.
     pub fn stop_with_code(&self, code: i32) {
-        let _ = self.tx.send(SystemCommand::Exit(code));
+        let _ = self.sys_tx.send(SystemCommand::Exit(code));
     }
 
     pub(crate) fn tx(&self) -> &mpsc::UnboundedSender<SystemCommand> {
-        &self.tx
+        &self.sys_tx
     }
 
-    /// Get shared reference to system arbiter.
-    pub fn arbiter(&self) -> &Worker {
+    // TODO: give clarity on which worker this is; previous documented as returning "system worker"
+    /// Get shared reference to a worker.
+    pub fn worker(&self) -> &Worker {
         &self.worker
     }
 
@@ -165,18 +173,21 @@ impl Future for SystemWorker {
                 // process system command
                 Some(cmd) => match cmd {
                     SystemCommand::Exit(code) => {
-                        // stop arbiters
-                        for arb in self.workers.values() {
-                            arb.stop();
+                        // stop workers
+                        for wkr in self.workers.values() {
+                            wkr.stop();
                         }
+
                         // stop event loop
                         if let Some(stop) = self.stop.take() {
                             let _ = stop.send(code);
                         }
                     }
+
                     SystemCommand::RegisterArbiter(name, hnd) => {
                         self.workers.insert(name, hnd);
                     }
+
                     SystemCommand::DeregisterArbiter(name) => {
                         self.workers.remove(&name);
                     }

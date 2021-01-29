@@ -25,18 +25,6 @@ pub use self::runtime::Runtime;
 pub use self::system::System;
 pub use self::worker::Worker;
 
-/// Spawns a future on the current [Arbiter].
-///
-/// # Panics
-/// Panics if Actix system is not running.
-#[inline]
-pub fn spawn<Fut>(f: Fut) -> JoinHandle<()>
-where
-    Fut: Future<Output = ()> + 'static,
-{
-    tokio::task::spawn_local(f)
-}
-
 pub mod signal {
     //! Asynchronous signal handling (Tokio re-exports).
 
@@ -71,4 +59,16 @@ pub mod task {
     //! Task management (Tokio re-exports).
 
     pub use tokio::task::{spawn_blocking, yield_now, JoinHandle};
+}
+
+/// Spawns a future on the current [Worker].
+///
+/// # Panics
+/// Panics if Actix system is not running.
+#[inline]
+pub fn spawn<Fut>(f: Fut) -> JoinHandle<()>
+where
+    Fut: Future<Output = ()> + 'static,
+{
+    tokio::task::spawn_local(f)
 }

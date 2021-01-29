@@ -136,12 +136,10 @@ fn worker_drop_no_panic_fn() {
 
 #[test]
 fn worker_drop_no_panic_fut() {
-    use futures_util::future::lazy;
-
     let _ = System::new("test-system");
 
     let mut worker = Worker::new();
-    worker.spawn(lazy(|_| panic!("test")));
+    worker.spawn(async { panic!("test") });
 
     worker.stop();
     worker.join().unwrap();
@@ -186,4 +184,16 @@ fn system_name_cow_str() {
 fn system_name_cow_string() {
     let _ = System::new("test-system".to_owned());
     System::current().stop();
+}
+
+#[test]
+#[should_panic]
+fn no_system_current_panic() {
+    System::current();
+}
+
+#[test]
+#[should_panic]
+fn no_system_worker_new_panic() {
+    Worker::new();
 }

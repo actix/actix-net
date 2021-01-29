@@ -53,7 +53,7 @@ impl Builder {
     where
         F: FnOnce(),
     {
-        let (stop_tx, stop) = channel();
+        let (stop_tx, stop_rx) = channel();
         let (sys_sender, sys_receiver) = unbounded_channel();
 
         let rt = Runtime::new().unwrap();
@@ -67,27 +67,30 @@ impl Builder {
         // run system init method
         rt.block_on(async { init_fn() });
 
-        SystemRunner { rt, stop, system }
+        SystemRunner {
+            rt,
+            stop_rx,
+            system,
+        }
     }
 }
 
-/// Helper object that runs System's event loop
-#[must_use = "SystemRunner must be run"]
+/// System runner object that keeps event loop alive and running until stop message is received.
+#[must_use = "A SystemRunner does nothing unless `run` is called."]
 #[derive(Debug)]
 pub struct SystemRunner {
     rt: Runtime,
-    stop: Receiver<i32>,
+    stop_rx: Receiver<i32>,
     system: System,
 }
 
 impl SystemRunner {
-    /// This function will start event loop and will finish once the
-    /// `System::stop()` function is called.
+    /// Starts event loop and will finish once [`System::stop()`] is called.
     pub fn run(self) -> io::Result<()> {
-        let SystemRunner { rt, stop, .. } = self;
+        let SystemRunner { rt, stop_rx, .. } = self;
 
         // run loop
-        match rt.block_on(stop) {
+        match rt.block_on(stop_rx) {
             Ok(code) => {
                 if code != 0 {
                     Err(io::Error::new(
@@ -98,11 +101,12 @@ impl SystemRunner {
                     Ok(())
                 }
             }
+
             Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
         }
     }
 
-    /// Execute a future and wait for result.
+    /// Runs the provided future, blocking the current thread until the future completes.
     #[inline]
     pub fn block_on<F: Future>(&self, fut: F) -> F::Output {
         self.rt.block_on(fut)
