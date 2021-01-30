@@ -6,7 +6,6 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use actix_rt::time::{sleep_until, Instant, Sleep};
-use actix_rt::{spawn, Worker as Arbiter};
 use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
 use log::{error, info, trace};
@@ -122,10 +121,8 @@ impl WorkerAvailability {
     }
 }
 
-/// Service worker.
-///
 /// Worker accepts Socket objects via unbounded channel and starts stream processing.
-pub(crate) struct ServerWorker {
+pub(crate) struct Worker {
     rx: UnboundedReceiver<WorkerCommand>,
     rx2: UnboundedReceiver<StopCommand>,
     services: Vec<WorkerService>,
@@ -159,7 +156,7 @@ enum WorkerServiceStatus {
     Stopped,
 }
 
-impl ServerWorker {
+impl Worker {
     pub(crate) fn start(
         idx: usize,
         factories: Vec<Box<dyn InternalServiceFactory>>,
@@ -170,10 +167,9 @@ impl ServerWorker {
         let (tx2, rx2) = unbounded_channel();
         let avail = availability.clone();
 
-        // every worker runs in it's own arbiter.
-        Arbiter::new().spawn(Box::pin(async move {
-            availability.set(false);
-            let mut wrk = MAX_CONNS_COUNTER.with(move |conns| ServerWorker {
+        // every worker runs in it's own thread.
+        std::thread::spawn(move || {
+            let mut wrk = MAX_CONNS_COUNTER.with(move |conns| Worker {
                 rx,
                 rx2,
                 availability,
@@ -184,23 +180,26 @@ impl ServerWorker {
                 state: WorkerState::Unavailable,
             });
 
-            let fut = wrk
-                .factories
-                .iter()
-                .enumerate()
-                .map(|(idx, factory)| {
-                    let fut = factory.create();
-                    async move {
-                        fut.await.map(|r| {
-                            r.into_iter().map(|(t, s)| (idx, t, s)).collect::<Vec<_>>()
-                        })
-                    }
-                })
-                .collect::<Vec<_>>();
+            actix_rt::Runtime::new().unwrap().block_on(async move {
+                let fut = wrk
+                    .factories
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, factory)| {
+                        let fut = factory.create();
+                        async move {
+                            fut.await.map(|r| {
+                                r.into_iter().map(|(t, s)| (idx, t, s)).collect::<Vec<_>>()
+                            })
+                        }
+                    })
+                    .collect::<Vec<_>>();
 
-            spawn(async move {
-                let res: Result<Vec<_>, _> = join_all(fut).await.into_iter().collect();
-                match res {
+                match join_all(fut)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()
+                {
                     Ok(services) => {
                         for item in services {
                             for (factory, token, service) in item {
@@ -215,12 +214,12 @@ impl ServerWorker {
                     }
                     Err(e) => {
                         error!("Can not start worker: {:?}", e);
-                        Arbiter::handle().stop();
                     }
                 }
+
                 wrk.await
-            });
-        }));
+            })
+        });
 
         WorkerHandle::new(idx, tx1, tx2, avail)
     }
@@ -303,7 +302,7 @@ enum WorkerState {
     ),
 }
 
-impl Future for ServerWorker {
+impl Future for Worker {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -386,7 +385,6 @@ impl Future for ServerWorker {
                 let num = num_connections();
                 if num == 0 {
                     let _ = tx.take().unwrap().send(true);
-                    Arbiter::handle().stop();
                     return Poll::Ready(());
                 }
 
@@ -394,7 +392,6 @@ impl Future for ServerWorker {
                 if Pin::new(t2).poll(cx).is_ready() {
                     let _ = tx.take().unwrap().send(false);
                     self.shutdown(true);
-                    Arbiter::handle().stop();
                     return Poll::Ready(());
                 }
 
