@@ -180,7 +180,7 @@ impl Worker {
                 state: WorkerState::Unavailable,
             });
 
-            actix_rt::Runtime::new().unwrap().block_on(async move {
+            actix_rt::ActixRuntime::new().unwrap().block_on(async move {
                 let fut = wrk
                     .factories
                     .iter()

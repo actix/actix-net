@@ -2,29 +2,40 @@ use std::{future::Future, io};
 
 use tokio::task::{JoinHandle, LocalSet};
 
-/// A single-threaded runtime based on Tokio's "current thread" runtime.
+/// A runtime based on Tokio runtime.
 ///
 /// All spawned futures will be executed on the current thread. Therefore, there is no `Send` bound
 /// on submitted futures.
 #[derive(Debug)]
-pub struct Runtime {
+pub struct ActixRuntime {
     local: LocalSet,
     rt: tokio::runtime::Runtime,
 }
 
-impl Runtime {
-    /// Returns a new runtime initialized with default configuration values.
+impl From<tokio::runtime::Runtime> for ActixRuntime {
+    fn from(rt: tokio::runtime::Runtime) -> Self {
+        Self {
+            local: LocalSet::new(),
+            rt,
+        }
+    }
+}
+
+impl ActixRuntime {
+    /// Returns a new ActixRuntime instance.
     #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> io::Result<Runtime> {
-        let rt = tokio::runtime::Builder::new_current_thread()
+    pub fn new() -> io::Result<Self> {
+        let rt = Self::new_tokio_rt()?;
+        Ok(ActixRuntime::from(rt))
+    }
+
+    /// Returns a new tokio current thread runtime initialized with default configuration values.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new_tokio_rt() -> io::Result<tokio::runtime::Runtime> {
+        tokio::runtime::Builder::new_current_thread()
             .enable_io()
             .enable_time()
-            .build()?;
-
-        Ok(Runtime {
-            rt,
-            local: LocalSet::new(),
-        })
+            .build()
     }
 
     /// Reference to local task set.
@@ -40,7 +51,7 @@ impl Runtime {
     ///
     /// # Examples
     /// ```
-    /// let rt = actix_rt::Runtime::new().unwrap();
+    /// let rt = actix_rt::ActixRuntime::new().unwrap();
     ///
     /// // Spawn a future onto the runtime
     /// let handle = rt.spawn(async {

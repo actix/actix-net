@@ -2,24 +2,40 @@
 
 ## Unreleased - 2021-xx-xx
 
-* Rename `Arbiter => Worker`. [#254]
+
+## 2.0.0-beta.3 - 2021-01-31
 * Remove `run_in_tokio`, `attach_to_tokio` and `AsyncSystemRunner`. [#253]
 * Return `JoinHandle` from `actix_rt::spawn`. [#253]
+<<<<<<< HEAD
 * Remove old `Worker::spawn`. Implementation is now inlined into `actix_rt::spawn`. [#253]
 * Rename `Worker::{send => spawn}` and `Worker::{exec_fn => spawn_fn}`. [#253]
 * Remove `Worker::exec`. [#253]
 * Remove `System::arbiter`. [#256]
 * Remove deprecated `Worker::local_join` and `Worker::is_running`. [#253]
 * `Worker::spawn` now accepts !Unpin futures. [#256]
+=======
+* Remove old `Arbiter::spawn`. Implementation is now inlined into `actix_rt::spawn`. [#253]
+* Rename `Arbiter::{send => spawn}` and `Arbiter::{exec_fn => spawn_fn}`. [#253]
+* Remove `Arbiter::exec`. [#253]
+* Remove deprecated `Arbiter::local_join` and `Arbiter::is_running`. [#253]
+* `Arbiter::spawn` now accepts !Unpin futures. [#256]
+>>>>>>> master
 * `System::new` no longer takes arguments. [#257]
 * Remove `System::with_current`. [#257]
 * Remove `Builder`. [#257]
 * Add `System::with_init` as replacement for `Builder::run`. [#257]
 * Rename `System::{is_set => is_registered}`. [#257]
+<<<<<<< HEAD
 * Add `WorkerHandle` for sending messages to non-current-thread workers. [#257].
 * `System::worker` now returns a `&WorkerHandle`. [#257]
 * Rename `Worker::{current => handle}` and return a `WorkerHandle` instead. [#257]
 * `Worker::join` now takes self by value. [#257]
+=======
+* Add `ArbiterHandle` for sending messages to non-current-thread arbiters. [#257].
+* `System::arbiter` now returns an `&ArbiterHandle`. [#257]
+* `Arbiter::current` now returns an `ArbiterHandle` instead. [#257]
+* `Arbiter::join` now takes self by value. [#257]
+>>>>>>> master
 
 [#253]: https://github.com/actix/actix-net/pull/253
 [#254]: https://github.com/actix/actix-net/pull/254

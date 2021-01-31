@@ -11,7 +11,7 @@ use std::{
 use futures_core::ready;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{worker::WorkerHandle, Runtime, Worker};
+use crate::{arbiter::ArbiterHandle, ActixRuntime, Arbiter};
 
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -25,8 +25,8 @@ pub struct System {
     id: usize,
     sys_tx: mpsc::UnboundedSender<SystemCommand>,
 
-    /// First worker that is created as part of the System.
-    worker_handle: WorkerHandle,
+    /// Handle to the first [Arbiter] that is created with the System.
+    arbiter_handle: ArbiterHandle,
 }
 
 impl System {
@@ -36,55 +36,56 @@ impl System {
     /// Panics if underlying Tokio runtime can not be created.
     #[allow(clippy::new_ret_no_self)]
     pub fn new() -> SystemRunner {
-        Self::create_runtime(async {})
+        Self::with_tokio_rt(|| {
+            ActixRuntime::new_tokio_rt().expect("Cannot create new System's Runtime.")
+        })
     }
 
-    /// Create a new system with given initialization future.
-    ///
-    /// The initialization future be run to completion (blocking current thread) before the system
-    /// runner is returned.
-    ///
-    /// # Panics
-    /// Panics if underlying Tokio runtime can not be created.
-    pub fn with_init(init_fut: impl Future) -> SystemRunner {
-        Self::create_runtime(init_fut)
-    }
-
-    /// Constructs new system and registers it on the current thread.
-    pub(crate) fn construct(
-        sys_tx: mpsc::UnboundedSender<SystemCommand>,
-        worker: WorkerHandle,
-    ) -> Self {
-        let sys = System {
-            sys_tx,
-            worker_handle: worker,
-            id: SYSTEM_COUNT.fetch_add(1, Ordering::SeqCst),
-        };
-
-        System::set_current(sys.clone());
-
-        sys
-    }
-
-    fn create_runtime(init_fut: impl Future) -> SystemRunner {
+    /// Create a new system with a closure that return a tokio Runtime instance
+    pub fn with_tokio_rt<F>(f: F) -> SystemRunner
+    where
+        F: Fn() -> tokio::runtime::Runtime,
+    {
         let (stop_tx, stop_rx) = oneshot::channel();
         let (sys_tx, sys_rx) = mpsc::unbounded_channel();
 
-        let rt = Runtime::new().expect("Actix (Tokio) runtime could not be created.");
-        let system = System::construct(sys_tx, Worker::new_current_thread(rt.local_set()));
+        let tokio_rt = f();
+        let rt = ActixRuntime::from(tokio_rt);
 
-        // init background system worker
-        let sys_worker = SystemController::new(sys_rx, stop_tx);
-        rt.spawn(sys_worker);
+        let sys_arbiter = Arbiter::in_new_system(rt.local_set());
+        let system = System::construct(sys_tx, sys_arbiter.clone());
 
-        // run system init future
-        rt.block_on(init_fut);
+        system
+            .tx()
+            .send(SystemCommand::RegisterArbiter(usize::MAX, sys_arbiter))
+            .unwrap();
+
+        // init background system arbiter
+        let sys_ctrl = SystemController::new(sys_rx, stop_tx);
+
+        rt.spawn(sys_ctrl);
 
         SystemRunner {
             rt,
             stop_rx,
             system,
         }
+    }
+
+    /// Constructs new system and registers it on the current thread.
+    pub(crate) fn construct(
+        sys_tx: mpsc::UnboundedSender<SystemCommand>,
+        arbiter_handle: ArbiterHandle,
+    ) -> Self {
+        let sys = System {
+            sys_tx,
+            arbiter_handle,
+            id: SYSTEM_COUNT.fetch_add(1, Ordering::SeqCst),
+        };
+
+        System::set_current(sys.clone());
+
+        sys
     }
 
     /// Get current running system.
@@ -98,9 +99,9 @@ impl System {
         })
     }
 
-    /// Get handle to a the System's initial [Worker].
-    pub fn worker(&self) -> &WorkerHandle {
-        &self.worker_handle
+    /// Get handle to a the System's initial [Arbiter].
+    pub fn arbiter(&self) -> &ArbiterHandle {
+        &self.arbiter_handle
     }
 
     /// Check if there is a System registered on the current thread.
@@ -142,7 +143,7 @@ impl System {
 #[must_use = "A SystemRunner does nothing unless `run` is called."]
 #[derive(Debug)]
 pub struct SystemRunner {
-    rt: Runtime,
+    rt: ActixRuntime,
     stop_rx: oneshot::Receiver<i32>,
     system: System,
 }
@@ -179,17 +180,17 @@ impl SystemRunner {
 #[derive(Debug)]
 pub(crate) enum SystemCommand {
     Exit(i32),
-    RegisterWorker(usize, WorkerHandle),
-    DeregisterWorker(usize),
+    RegisterArbiter(usize, ArbiterHandle),
+    DeregisterArbiter(usize),
 }
 
 /// There is one `SystemController` per [System]. It runs in the background, keeping track of
-/// [Worker]s and is able to distribute a system-wide stop command.
+/// [Arbiter]s and is able to distribute a system-wide stop command.
 #[derive(Debug)]
 pub(crate) struct SystemController {
     stop_tx: Option<oneshot::Sender<i32>>,
     cmd_rx: mpsc::UnboundedReceiver<SystemCommand>,
-    workers: HashMap<usize, WorkerHandle>,
+    arbiters: HashMap<usize, ArbiterHandle>,
 }
 
 impl SystemController {
@@ -200,7 +201,7 @@ impl SystemController {
         SystemController {
             cmd_rx,
             stop_tx: Some(stop_tx),
-            workers: HashMap::with_capacity(4),
+            arbiters: HashMap::with_capacity(4),
         }
     }
 }
@@ -218,9 +219,9 @@ impl Future for SystemController {
                 // process system command
                 Some(cmd) => match cmd {
                     SystemCommand::Exit(code) => {
-                        // stop workers
-                        for wkr in self.workers.values() {
-                            wkr.stop();
+                        // stop all arbiters
+                        for arb in self.arbiters.values() {
+                            arb.stop();
                         }
 
                         // stop event loop
@@ -230,12 +231,12 @@ impl Future for SystemController {
                         }
                     }
 
-                    SystemCommand::RegisterWorker(name, hnd) => {
-                        self.workers.insert(name, hnd);
+                    SystemCommand::RegisterArbiter(id, arb) => {
+                        self.arbiters.insert(id, arb);
                     }
 
-                    SystemCommand::DeregisterWorker(name) => {
-                        self.workers.remove(&name);
+                    SystemCommand::DeregisterArbiter(id) => {
+                        self.arbiters.remove(&id);
                     }
                 },
             }
