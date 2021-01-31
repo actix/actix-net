@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use actix_rt::{System, Worker};
+use actix_rt::{System, Arbiter};
 use tokio::sync::oneshot;
 
 #[test]
@@ -21,51 +21,51 @@ fn await_for_timer() {
 }
 
 #[test]
-fn join_another_worker() {
+fn join_another_arbiter() {
     let time = Duration::from_secs(1);
     let instant = Instant::now();
     System::new().block_on(async move {
-        let worker = Worker::new();
-        worker.spawn(Box::pin(async move {
+        let arbiter = Arbiter::new();
+        arbiter.spawn(Box::pin(async move {
             tokio::time::sleep(time).await;
-            Worker::handle().stop();
+            Arbiter::handle().stop();
         }));
-        worker.join().unwrap();
+        arbiter.join().unwrap();
     });
     assert!(
         instant.elapsed() >= time,
-        "Join on another worker should complete only when it calls stop"
+        "Join on another arbiter should complete only when it calls stop"
     );
 
     let instant = Instant::now();
     System::new().block_on(async move {
-        let worker = Worker::new();
-        worker.spawn_fn(move || {
+        let arbiter = Arbiter::new();
+        arbiter.spawn_fn(move || {
             actix_rt::spawn(async move {
                 tokio::time::sleep(time).await;
-                Worker::handle().stop();
+                Arbiter::handle().stop();
             });
         });
-        worker.join().unwrap();
+        arbiter.join().unwrap();
     });
     assert!(
         instant.elapsed() >= time,
-        "Join on a worker that has used actix_rt::spawn should wait for said future"
+        "Join on a arbiter that has used actix_rt::spawn should wait for said future"
     );
 
     let instant = Instant::now();
     System::new().block_on(async move {
-        let worker = Worker::new();
-        worker.spawn(Box::pin(async move {
+        let arbiter = Arbiter::new();
+        arbiter.spawn(Box::pin(async move {
             tokio::time::sleep(time).await;
-            Worker::handle().stop();
+            Arbiter::handle().stop();
         }));
-        worker.stop();
-        worker.join().unwrap();
+        arbiter.stop();
+        arbiter.join().unwrap();
     });
     assert!(
         instant.elapsed() < time,
-        "Premature stop of worker should conclude regardless of it's current state"
+        "Premature stop of arbiter should conclude regardless of it's current state"
     );
 }
 
@@ -110,70 +110,70 @@ fn wait_for_spawns() {
 }
 
 #[test]
-fn worker_spawn_fn_runs() {
+fn arbiter_spawn_fn_runs() {
     let _ = System::new();
 
     let (tx, rx) = channel::<u32>();
 
-    let worker = Worker::new();
-    worker.spawn_fn(move || tx.send(42).unwrap());
+    let arbiter = Arbiter::new();
+    arbiter.spawn_fn(move || tx.send(42).unwrap());
 
     let num = rx.recv().unwrap();
     assert_eq!(num, 42);
 
-    worker.stop();
-    worker.join().unwrap();
+    arbiter.stop();
+    arbiter.join().unwrap();
 }
 
 #[test]
-fn worker_drop_no_panic_fn() {
+fn arbiter_drop_no_panic_fn() {
     let _ = System::new();
 
-    let worker = Worker::new();
-    worker.spawn_fn(|| panic!("test"));
+    let arbiter = Arbiter::new();
+    arbiter.spawn_fn(|| panic!("test"));
 
-    worker.stop();
-    worker.join().unwrap();
+    arbiter.stop();
+    arbiter.join().unwrap();
 }
 
 #[test]
-fn worker_drop_no_panic_fut() {
+fn arbiter_drop_no_panic_fut() {
     let _ = System::new();
 
-    let worker = Worker::new();
-    worker.spawn(async { panic!("test") });
+    let arbiter = Arbiter::new();
+    arbiter.spawn(async { panic!("test") });
 
-    worker.stop();
-    worker.join().unwrap();
+    arbiter.stop();
+    arbiter.join().unwrap();
 }
 
 #[test]
-fn worker_item_storage() {
+fn arbiter_item_storage() {
     let _ = System::new();
 
-    let worker = Worker::new();
+    let arbiter = Arbiter::new();
 
-    assert!(!Worker::contains_item::<u32>());
-    Worker::set_item(42u32);
-    assert!(Worker::contains_item::<u32>());
+    assert!(!Arbiter::contains_item::<u32>());
+    Arbiter::set_item(42u32);
+    assert!(Arbiter::contains_item::<u32>());
 
-    Worker::get_item(|&item: &u32| assert_eq!(item, 42));
-    Worker::get_mut_item(|&mut item: &mut u32| assert_eq!(item, 42));
+    Arbiter::get_item(|&item: &u32| assert_eq!(item, 42));
+    Arbiter::get_mut_item(|&mut item: &mut u32| assert_eq!(item, 42));
 
     let thread = thread::spawn(move || {
-        Worker::get_item(|&_item: &u32| unreachable!("u32 not in this thread"));
+        Arbiter::get_item(|&_item: &u32| unreachable!("u32 not in this thread"));
     })
     .join();
     assert!(thread.is_err());
 
     let thread = thread::spawn(move || {
-        Worker::get_mut_item(|&mut _item: &mut i8| unreachable!("i8 not in this thread"));
+        Arbiter::get_mut_item(|&mut _item: &mut i8| unreachable!("i8 not in this thread"));
     })
     .join();
     assert!(thread.is_err());
 
-    worker.stop();
-    worker.join().unwrap();
+    arbiter.stop();
+    arbiter.join().unwrap();
 }
 
 #[test]
@@ -184,30 +184,30 @@ fn no_system_current_panic() {
 
 #[test]
 #[should_panic]
-fn no_system_worker_new_panic() {
-    Worker::new();
+fn no_system_arbiter_new_panic() {
+    Arbiter::new();
 }
 
 #[test]
-fn system_worker_spawn() {
+fn system_arbiter_spawn() {
     let runner = System::new();
 
     let (tx, rx) = oneshot::channel();
     let sys = System::current();
 
     thread::spawn(|| {
-        // this thread will have no worker in it's thread local so call will panic
-        Worker::handle();
+        // this thread will have no arbiter in it's thread local so call will panic
+        Arbiter::handle();
     })
     .join()
     .unwrap_err();
 
     let thread = thread::spawn(|| {
-        // this thread will have no worker in it's thread local so use the system handle instead
+        // this thread will have no arbiter in it's thread local so use the system handle instead
         System::set_current(sys);
         let sys = System::current();
 
-        let wrk = sys.worker();
+        let wrk = sys.arbiter();
         wrk.spawn(async move {
             tx.send(42u32).unwrap();
             System::current().stop();

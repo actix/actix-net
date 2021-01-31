@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use actix_rt::time::{sleep_until, Instant, Sleep};
-use actix_rt::{spawn, Worker as Arbiter};
+use actix_rt::{spawn, Arbiter as Arbiter};
 use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
 use log::{error, info, trace};
