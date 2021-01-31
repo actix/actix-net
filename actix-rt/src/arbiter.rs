@@ -1,5 +1,7 @@
 use std::{
+    any::{Any, TypeId},
     cell::RefCell,
+    collections::HashMap,
     fmt,
     future::Future,
     pin::Pin,
@@ -20,6 +22,7 @@ pub(crate) static COUNT: AtomicUsize = AtomicUsize::new(0);
 
 thread_local!(
     static HANDLE: RefCell<Option<ArbiterHandle>> = RefCell::new(None);
+    static STORAGE: RefCell<HashMap<TypeId, Box<dyn Any>>> = RefCell::new(HashMap::new());
 );
 
 pub(crate) enum ArbiterCommand {
@@ -118,6 +121,7 @@ impl Arbiter {
 
                     System::set_current(sys);
 
+                    STORAGE.with(|cell| cell.borrow_mut().clear());
                     HANDLE.with(|cell| *cell.borrow_mut() = Some(hnd.clone()));
 
                     // register arbiter
@@ -152,6 +156,7 @@ impl Arbiter {
         let hnd = ArbiterHandle::new(tx);
 
         HANDLE.with(|cell| *cell.borrow_mut() = Some(hnd.clone()));
+        STORAGE.with(|cell| cell.borrow_mut().clear());
 
         local.spawn_local(ArbiterRunner { rx });
 
@@ -209,6 +214,54 @@ impl Arbiter {
     pub fn join(self) -> thread::Result<()> {
         self.thread_handle.join()
     }
+
+    /// Insert item into Arbiter's thread-local storage.
+    ///
+    /// Overwrites any item of the same type previously inserted.
+    pub fn set_item<T: 'static>(item: T) {
+        STORAGE.with(move |cell| cell.borrow_mut().insert(TypeId::of::<T>(), Box::new(item)));
+    }
+
+    /// Check if Arbiter's thread-local storage contains an item type.
+    pub fn contains_item<T: 'static>() -> bool {
+        STORAGE.with(move |cell| cell.borrow().contains_key(&TypeId::of::<T>()))
+    }
+
+    /// Call a function with a shared reference to an item in this Arbiter's thread-local storage.
+    ///
+    /// # Panics
+    /// Panics if item is not in Arbiter's thread-local item storage.
+    pub fn get_item<T: 'static, F, R>(mut f: F) -> R
+    where
+        F: FnMut(&T) -> R,
+    {
+        STORAGE.with(move |cell| {
+            let st = cell.borrow();
+
+            let type_id = TypeId::of::<T>();
+            let item = st.get(&type_id).and_then(downcast_ref).unwrap();
+
+            f(item)
+        })
+    }
+
+    /// Call a function with a mutable reference to an item in this Arbiter's thread-local storage.
+    ///
+    /// # Panics
+    /// Panics if item is not in Arbiter's thread-local item storage.
+    pub fn get_mut_item<T: 'static, F, R>(mut f: F) -> R
+    where
+        F: FnMut(&mut T) -> R,
+    {
+        STORAGE.with(move |cell| {
+            let mut st = cell.borrow_mut();
+
+            let type_id = TypeId::of::<T>();
+            let item = st.get_mut(&type_id).and_then(downcast_mut).unwrap();
+
+            f(item)
+        })
+    }
 }
 
 /// A persistent future that processes [Arbiter] commands.
@@ -238,4 +291,12 @@ impl Future for ArbiterRunner {
             }
         }
     }
+}
+
+fn downcast_ref<T: 'static>(boxed: &Box<dyn Any>) -> Option<&T> {
+    boxed.downcast_ref()
+}
+
+fn downcast_mut<T: 'static>(boxed: &mut Box<dyn Any>) -> Option<&mut T> {
+    boxed.downcast_mut()
 }
