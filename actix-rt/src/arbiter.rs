@@ -147,7 +147,7 @@ impl Arbiter {
     }
 
     /// Sets up an Arbiter runner on the current thread using the provided runtime local task set.
-    pub(crate) fn new_current_thread(local: &LocalSet) -> ArbiterHandle {
+    pub(crate) fn in_new_system(local: &LocalSet) -> ArbiterHandle {
         let (tx, rx) = mpsc::unbounded_channel();
 
         let hnd = ArbiterHandle::new(tx);

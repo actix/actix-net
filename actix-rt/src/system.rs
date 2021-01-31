@@ -36,15 +36,11 @@ impl System {
     /// Panics if underlying Tokio runtime can not be created.
     #[allow(clippy::new_ret_no_self)]
     pub fn new() -> SystemRunner {
-        Self::create_runtime()
-    }
-
-    fn create_runtime() -> SystemRunner {
         let (stop_tx, stop_rx) = oneshot::channel();
         let (sys_tx, sys_rx) = mpsc::unbounded_channel();
 
         let rt = Runtime::new().expect("Actix (Tokio) runtime could not be created.");
-        let system = System::construct(sys_tx, Arbiter::new_current_thread(rt.local_set()));
+        let system = System::construct(sys_tx, Arbiter::in_new_system(rt.local_set()));
 
         // init background system arbiter
         let sys_ctrl = SystemController::new(sys_rx, stop_tx);
