@@ -86,7 +86,7 @@ impl ArbiterHandle {
     }
 }
 
-/// A arbiter represents a thread that provides an asynchronous execution environment for futures
+/// An Arbiter represents a thread that provides an asynchronous execution environment for futures
 /// and functions.
 ///
 /// When an arbiter is created, it spawns a new [OS thread](thread), and hosts an event loop.

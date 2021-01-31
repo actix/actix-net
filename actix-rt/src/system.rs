@@ -36,18 +36,25 @@ impl System {
     /// Panics if underlying Tokio runtime can not be created.
     #[allow(clippy::new_ret_no_self)]
     pub fn new() -> SystemRunner {
-        Self::create_runtime(async {})
+        Self::create_runtime()
     }
 
-    /// Create a new system with given initialization future.
-    ///
-    /// The initialization future be run to completion (blocking current thread) before the system
-    /// runner is returned.
-    ///
-    /// # Panics
-    /// Panics if underlying Tokio runtime can not be created.
-    pub fn with_init(init_fut: impl Future) -> SystemRunner {
-        Self::create_runtime(init_fut)
+    fn create_runtime() -> SystemRunner {
+        let (stop_tx, stop_rx) = oneshot::channel();
+        let (sys_tx, sys_rx) = mpsc::unbounded_channel();
+
+        let rt = Runtime::new().expect("Actix (Tokio) runtime could not be created.");
+        let system = System::construct(sys_tx, Arbiter::new_current_thread(rt.local_set()));
+
+        // init background system arbiter
+        let sys_ctrl = SystemController::new(sys_rx, stop_tx);
+        rt.spawn(sys_ctrl);
+
+        SystemRunner {
+            rt,
+            stop_rx,
+            system,
+        }
     }
 
     /// Constructs new system and registers it on the current thread.
@@ -64,27 +71,6 @@ impl System {
         System::set_current(sys.clone());
 
         sys
-    }
-
-    fn create_runtime(init_fut: impl Future) -> SystemRunner {
-        let (stop_tx, stop_rx) = oneshot::channel();
-        let (sys_tx, sys_rx) = mpsc::unbounded_channel();
-
-        let rt = Runtime::new().expect("Actix (Tokio) runtime could not be created.");
-        let system = System::construct(sys_tx, Arbiter::new_current_thread(rt.local_set()));
-
-        // init background system arbiter
-        let sys_ctrl = SystemController::new(sys_rx, stop_tx);
-        rt.spawn(sys_ctrl);
-
-        // run system init future
-        rt.block_on(init_fut);
-
-        SystemRunner {
-            rt,
-            stop_rx,
-            system,
-        }
     }
 
     /// Get current running system.

@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use actix_rt::{System, Arbiter};
+use actix_rt::{Arbiter, System};
 use tokio::sync::oneshot;
 
 #[test]
@@ -50,7 +50,7 @@ fn join_another_arbiter() {
     });
     assert!(
         instant.elapsed() >= time,
-        "Join on a arbiter that has used actix_rt::spawn should wait for said future"
+        "Join on an arbiter that has used actix_rt::spawn should wait for said future"
     );
 
     let instant = Instant::now();
@@ -72,28 +72,21 @@ fn join_another_arbiter() {
 #[test]
 fn non_static_block_on() {
     let string = String::from("test_str");
-    let str = string.as_str();
+    let string = string.as_str();
 
     let sys = System::new();
 
     sys.block_on(async {
         actix_rt::time::sleep(Duration::from_millis(1)).await;
-        assert_eq!("test_str", str);
+        assert_eq!("test_str", string);
     });
 
     let rt = actix_rt::Runtime::new().unwrap();
 
     rt.block_on(async {
         actix_rt::time::sleep(Duration::from_millis(1)).await;
-        assert_eq!("test_str", str);
+        assert_eq!("test_str", string);
     });
-
-    System::with_init(async {
-        assert_eq!("test_str", str);
-        System::current().stop();
-    })
-    .run()
-    .unwrap();
 }
 
 #[test]
