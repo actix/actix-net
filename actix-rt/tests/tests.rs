@@ -28,7 +28,7 @@ fn join_another_arbiter() {
         let arbiter = Arbiter::new();
         arbiter.spawn(Box::pin(async move {
             tokio::time::sleep(time).await;
-            Arbiter::handle().stop();
+            Arbiter::current().stop();
         }));
         arbiter.join().unwrap();
     });
@@ -43,7 +43,7 @@ fn join_another_arbiter() {
         arbiter.spawn_fn(move || {
             actix_rt::spawn(async move {
                 tokio::time::sleep(time).await;
-                Arbiter::handle().stop();
+                Arbiter::current().stop();
             });
         });
         arbiter.join().unwrap();
@@ -58,7 +58,7 @@ fn join_another_arbiter() {
         let arbiter = Arbiter::new();
         arbiter.spawn(Box::pin(async move {
             tokio::time::sleep(time).await;
-            Arbiter::handle().stop();
+            Arbiter::current().stop();
         }));
         arbiter.stop();
         arbiter.join().unwrap();
@@ -190,7 +190,7 @@ fn system_arbiter_spawn() {
 
     thread::spawn(|| {
         // this thread will have no arbiter in it's thread local so call will panic
-        Arbiter::handle();
+        Arbiter::current();
     })
     .join()
     .unwrap_err();
@@ -200,8 +200,8 @@ fn system_arbiter_spawn() {
         System::set_current(sys);
         let sys = System::current();
 
-        let wrk = sys.arbiter();
-        wrk.spawn(async move {
+        let arb = sys.arbiter();
+        arb.spawn(async move {
             tx.send(42u32).unwrap();
             System::current().stop();
         });
@@ -209,4 +209,23 @@ fn system_arbiter_spawn() {
 
     assert_eq!(runner.block_on(rx).unwrap(), 42);
     thread.join().unwrap();
+}
+
+#[test]
+fn system_stop_stops_arbiters() {
+    let sys = System::new();
+    let arb = Arbiter::new();
+
+    // arbiter should be alive to receive spawn msg
+    assert!(Arbiter::current().spawn_fn(|| {}));
+    assert!(arb.spawn_fn(|| {}));
+
+    System::current().stop();
+    sys.run().unwrap();
+
+    // arbiter should be dead and return false
+    assert!(!Arbiter::current().spawn_fn(|| {}));
+    assert!(!arb.spawn_fn(|| {}));
+
+    arb.join().unwrap();
 }

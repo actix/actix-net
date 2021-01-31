@@ -42,12 +42,12 @@ impl fmt::Debug for ArbiterCommand {
 /// A handle for sending spawn and stop messages to an [Arbiter].
 #[derive(Debug, Clone)]
 pub struct ArbiterHandle {
-    sender: mpsc::UnboundedSender<ArbiterCommand>,
+    tx: mpsc::UnboundedSender<ArbiterCommand>,
 }
 
 impl ArbiterHandle {
-    pub(crate) fn new(sender: mpsc::UnboundedSender<ArbiterCommand>) -> Self {
-        Self { sender }
+    pub(crate) fn new(tx: mpsc::UnboundedSender<ArbiterCommand>) -> Self {
+        Self { tx }
     }
 
     /// Send a future to the [Arbiter]'s thread and spawn it.
@@ -59,7 +59,7 @@ impl ArbiterHandle {
     where
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.sender
+        self.tx
             .send(ArbiterCommand::Execute(Box::pin(future)))
             .is_ok()
     }
@@ -82,7 +82,7 @@ impl ArbiterHandle {
     /// Returns true if stop message was sent successfully and false if the [Arbiter] has
     /// been dropped.
     pub fn stop(&self) -> bool {
-        self.sender.send(ArbiterCommand::Stop).is_ok()
+        self.tx.send(ArbiterCommand::Stop).is_ok()
     }
 }
 
@@ -92,7 +92,7 @@ impl ArbiterHandle {
 /// When an arbiter is created, it spawns a new [OS thread](thread), and hosts an event loop.
 #[derive(Debug)]
 pub struct Arbiter {
-    sender: mpsc::UnboundedSender<ArbiterCommand>,
+    tx: mpsc::UnboundedSender<ArbiterCommand>,
     thread_handle: thread::JoinHandle<()>,
 }
 
@@ -109,12 +109,14 @@ impl Arbiter {
         let sys = System::current();
         let (tx, rx) = mpsc::unbounded_channel();
 
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
+
         let thread_handle = thread::Builder::new()
             .name(name.clone())
             .spawn({
                 let tx = tx.clone();
                 move || {
-                    let rt = Runtime::new().expect("Can not create Runtime");
+                    let rt = Runtime::new().expect("Cannot create new Arbiter's Runtime.");
                     let hnd = ArbiterHandle::new(tx);
 
                     System::set_current(sys);
@@ -126,6 +128,8 @@ impl Arbiter {
                     let _ = System::current()
                         .tx()
                         .send(SystemCommand::RegisterArbiter(id, hnd));
+
+                    ready_tx.send(()).unwrap();
 
                     // run arbiter event processing loop
                     rt.block_on(ArbiterRunner { rx });
@@ -140,13 +144,12 @@ impl Arbiter {
                 panic!("Cannot spawn Arbiter's thread: {:?}. {:?}", &name, err)
             });
 
-        Arbiter {
-            sender: tx,
-            thread_handle,
-        }
+        ready_rx.recv().unwrap();
+
+        Arbiter { tx, thread_handle }
     }
 
-    /// Sets up an Arbiter runner on the current thread using the provided runtime local task set.
+    /// Sets up an Arbiter runner in a new System using the provided runtime local task set.
     pub(crate) fn in_new_system(local: &LocalSet) -> ArbiterHandle {
         let (tx, rx) = mpsc::unbounded_channel();
 
@@ -160,11 +163,11 @@ impl Arbiter {
         hnd
     }
 
-    /// Return a handle to the Arbiter's message sender.
+    /// Return a handle to the current thread's Arbiter's message sender.
     ///
     /// # Panics
     /// Panics if no Arbiter is running on the current thread.
-    pub fn handle() -> ArbiterHandle {
+    pub fn current() -> ArbiterHandle {
         HANDLE.with(|cell| match *cell.borrow() {
             Some(ref addr) => addr.clone(),
             None => panic!("Arbiter is not running."),
@@ -175,7 +178,7 @@ impl Arbiter {
     ///
     /// Returns true if stop message was sent successfully and false if the Arbiter has been dropped.
     pub fn stop(&self) -> bool {
-        self.sender.send(ArbiterCommand::Stop).is_ok()
+        self.tx.send(ArbiterCommand::Stop).is_ok()
     }
 
     /// Send a future to the Arbiter's thread and spawn it.
@@ -187,7 +190,7 @@ impl Arbiter {
     where
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.sender
+        self.tx
             .send(ArbiterCommand::Execute(Box::pin(future)))
             .is_ok()
     }

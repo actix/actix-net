@@ -40,7 +40,13 @@ impl System {
         let (sys_tx, sys_rx) = mpsc::unbounded_channel();
 
         let rt = Runtime::new().expect("Actix (Tokio) runtime could not be created.");
-        let system = System::construct(sys_tx, Arbiter::in_new_system(rt.local_set()));
+        let sys_arbiter = Arbiter::in_new_system(rt.local_set());
+        let system = System::construct(sys_tx, sys_arbiter.clone());
+
+        system
+            .tx()
+            .send(SystemCommand::RegisterArbiter(usize::MAX, sys_arbiter))
+            .unwrap();
 
         // init background system arbiter
         let sys_ctrl = SystemController::new(sys_rx, stop_tx);
@@ -201,8 +207,8 @@ impl Future for SystemController {
                 Some(cmd) => match cmd {
                     SystemCommand::Exit(code) => {
                         // stop all arbiters
-                        for wkr in self.arbiters.values() {
-                            wkr.stop();
+                        for arb in self.arbiters.values() {
+                            arb.stop();
                         }
 
                         // stop event loop
@@ -212,12 +218,12 @@ impl Future for SystemController {
                         }
                     }
 
-                    SystemCommand::RegisterArbiter(name, hnd) => {
-                        self.arbiters.insert(name, hnd);
+                    SystemCommand::RegisterArbiter(id, arb) => {
+                        self.arbiters.insert(id, arb);
                     }
 
-                    SystemCommand::DeregisterArbiter(name) => {
-                        self.arbiters.remove(&name);
+                    SystemCommand::DeregisterArbiter(id) => {
+                        self.arbiters.remove(&id);
                     }
                 },
             }

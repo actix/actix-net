@@ -14,8 +14,8 @@
 * Add `System::with_init` as replacement for `Builder::run`. [#257]
 * Rename `System::{is_set => is_registered}`. [#257]
 * Add `ArbiterHandle` for sending messages to non-current-thread arbiters. [#257].
-* `System::arbiter` now returns a `&ArbiterHandle`. [#257]
-* Rename `Arbiter::{current => handle}` and return a `ArbiterHandle` instead. [#257]
+* `System::arbiter` now returns an `&ArbiterHandle`. [#257]
+* `Arbiter::current` now returns an `ArbiterHandle` instead. [#257]
 * `Arbiter::join` now takes self by value. [#257]
 
 [#253]: https://github.com/actix/actix-net/pull/253
