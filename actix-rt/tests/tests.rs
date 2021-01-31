@@ -141,6 +141,7 @@ fn arbiter_drop_no_panic_fut() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn arbiter_item_storage() {
     let _ = System::new();
 

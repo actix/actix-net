@@ -218,11 +218,13 @@ impl Arbiter {
     /// Insert item into Arbiter's thread-local storage.
     ///
     /// Overwrites any item of the same type previously inserted.
+    #[deprecated = "Will be removed in stable v2."]
     pub fn set_item<T: 'static>(item: T) {
         STORAGE.with(move |cell| cell.borrow_mut().insert(TypeId::of::<T>(), Box::new(item)));
     }
 
     /// Check if Arbiter's thread-local storage contains an item type.
+    #[deprecated = "Will be removed in stable v2."]
     pub fn contains_item<T: 'static>() -> bool {
         STORAGE.with(move |cell| cell.borrow().contains_key(&TypeId::of::<T>()))
     }
@@ -231,6 +233,7 @@ impl Arbiter {
     ///
     /// # Panics
     /// Panics if item is not in Arbiter's thread-local item storage.
+    #[deprecated = "Will be removed in stable v2."]
     pub fn get_item<T: 'static, F, R>(mut f: F) -> R
     where
         F: FnMut(&T) -> R,
@@ -249,6 +252,7 @@ impl Arbiter {
     ///
     /// # Panics
     /// Panics if item is not in Arbiter's thread-local item storage.
+    #[deprecated = "Will be removed in stable v2."]
     pub fn get_mut_item<T: 'static, F, R>(mut f: F) -> R
     where
         F: FnMut(&mut T) -> R,
