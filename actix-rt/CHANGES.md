@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.3 - 2021-01-31
 * Remove `run_in_tokio`, `attach_to_tokio` and `AsyncSystemRunner`. [#253]
 * Return `JoinHandle` from `actix_rt::spawn`. [#253]
 * Remove old `Arbiter::spawn`. Implementation is now inlined into `actix_rt::spawn`. [#253]

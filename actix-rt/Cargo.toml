@@ -1,7 +1,10 @@
 [package]
 name = "actix-rt"
-version = "2.0.0-beta.2"
-authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
+version = "2.0.0-beta.3"
+authors = [
+    "Nikolay Kim <fafhrd91@gmail.com>",
+    "Rob Ede <robjtede@icloud.com>",
+]
 description = "Tokio-based single-thread async runtime for the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
 homepage = "https://actix.rs"
