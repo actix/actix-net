@@ -80,7 +80,7 @@ struct Accept {
     next: usize,
     backpressure: bool,
     // poll time duration.
-    // use the nearest timeout from socket timeout settings.
+    // use the smallest duration from sockets timeout_deadline.
     timeout: Option<Duration>,
 }
 
