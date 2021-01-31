@@ -7,6 +7,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use actix_codec::ReusableBoxFuture;
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
@@ -65,7 +66,7 @@ pub enum TcpConnectorResponse<T> {
         req: Option<T>,
         port: u16,
         addrs: Option<VecDeque<SocketAddr>>,
-        stream: Option<LocalBoxFuture<'static, Result<TcpStream, io::Error>>>,
+        stream: Option<ReusableBoxFuture<Result<TcpStream, io::Error>>>,
     },
     Error(Option<ConnectError>),
 }
@@ -90,7 +91,7 @@ impl<T: Address> TcpConnectorResponse<T> {
                 req: Some(req),
                 port,
                 addrs: None,
-                stream: Some(Box::pin(TcpStream::connect(addr))),
+                stream: Some(ReusableBoxFuture::new(TcpStream::connect(addr))),
             },
 
             // when resolver returns multiple socket addr for request they would be popped from
@@ -119,7 +120,7 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
                 stream,
             } => loop {
                 if let Some(new) = stream.as_mut() {
-                    match ready!(new.as_mut().poll(cx)) {
+                    match ready!(new.get_pin().poll(cx)) {
                         Ok(sock) => {
                             let req = req.take().unwrap();
                             trace!(
@@ -146,7 +147,11 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
 
                 // try to connect
                 let addr = addrs.as_mut().unwrap().pop_front().unwrap();
-                *stream = Some(Box::pin(TcpStream::connect(addr)));
+                if let Some(ref mut stream) = *stream {
+                    stream.set(TcpStream::connect(addr));
+                } else {
+                    *stream = Some(ReusableBoxFuture::new(TcpStream::connect(addr)));
+                }
             },
         }
     }

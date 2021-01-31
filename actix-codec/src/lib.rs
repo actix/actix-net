@@ -21,3 +21,5 @@ pub use self::framed::{Framed, FramedParts};
 pub use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 pub use tokio_util::codec::{Decoder, Encoder};
 pub use tokio_util::io::poll_read_buf;
+// TODO: reconsider ReusableBoxFuture should be re-export from actix-codec.
+pub use tokio_util::sync::ReusableBoxFuture;

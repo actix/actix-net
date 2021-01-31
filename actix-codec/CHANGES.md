@@ -1,6 +1,10 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Upgrade `tokio-util` dependency to `0.6.3`. [#260]
+* Export `tokio_util::sync::ReusableBoxFuture`. [#260]
+
+[#260]: https://github.com/actix/actix-net/pull/260
 
 
 ## 0.4.0-beta.1 - 2020-12-28
