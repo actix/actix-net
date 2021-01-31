@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use actix_rt::time::{sleep_until, Instant, Sleep};
-use actix_rt::{spawn, Worker as Arbiter};
+use actix_rt::{spawn, Arbiter};
 use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
 use log::{error, info, trace};
@@ -215,7 +215,7 @@ impl ServerWorker {
                     }
                     Err(e) => {
                         error!("Can not start worker: {:?}", e);
-                        Arbiter::current().stop();
+                        Arbiter::handle().stop();
                     }
                 }
                 wrk.await
@@ -386,7 +386,7 @@ impl Future for ServerWorker {
                 let num = num_connections();
                 if num == 0 {
                     let _ = tx.take().unwrap().send(true);
-                    Arbiter::current().stop();
+                    Arbiter::handle().stop();
                     return Poll::Ready(());
                 }
 
@@ -394,7 +394,7 @@ impl Future for ServerWorker {
                 if Pin::new(t2).poll(cx).is_ready() {
                     let _ = tx.take().unwrap().send(false);
                     self.shutdown(true);
-                    Arbiter::current().stop();
+                    Arbiter::handle().stop();
                     return Poll::Ready(());
                 }
 

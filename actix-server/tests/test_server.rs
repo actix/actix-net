@@ -21,7 +21,7 @@ fn test_bind() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new("test");
+        let sys = actix_rt::System::new();
         let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .workers(1)
@@ -47,7 +47,7 @@ fn test_listen() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new("test");
+        let sys = actix_rt::System::new();
         let lst = net::TcpListener::bind(addr).unwrap();
         sys.block_on(async {
             Server::build()
@@ -81,7 +81,7 @@ fn test_start() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new("test");
+        let sys = actix_rt::System::new();
         let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .backlog(100)
@@ -150,7 +150,7 @@ fn test_configure() {
 
     let h = thread::spawn(move || {
         let num = num2.clone();
-        let sys = actix_rt::System::new("test");
+        let sys = actix_rt::System::new();
         let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .disable_signals()

@@ -15,15 +15,13 @@ use tokio::task::JoinHandle;
 #[cfg(all(feature = "macros", not(test)))]
 pub use actix_macros::{main, test};
 
-mod builder;
+mod arbiter;
 mod runtime;
 mod system;
-mod worker;
 
-pub use self::builder::{Builder, SystemRunner};
+pub use self::arbiter::{Arbiter, ArbiterHandle};
 pub use self::runtime::Runtime;
-pub use self::system::System;
-pub use self::worker::Worker;
+pub use self::system::{System, SystemRunner};
 
 pub mod signal {
     //! Asynchronous signal handling (Tokio re-exports).
@@ -61,7 +59,7 @@ pub mod task {
     pub use tokio::task::{spawn_blocking, yield_now, JoinHandle};
 }
 
-/// Spawns a future on the current [Worker].
+/// Spawns a future on the current thread.
 ///
 /// # Panics
 /// Panics if Actix system is not running.
