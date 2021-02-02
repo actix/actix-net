@@ -4,10 +4,10 @@
 
 
 ## 2.0.0 - 2021-02-02
-* Remove all Arbiter-local storage methods. [#???]
-* Re-export `tokio::pin`. [#???]
+* Remove all Arbiter-local storage methods. [#262]
+* Re-export `tokio::pin`. [#262]
 
-[#???]: https://github.com/actix/actix-net/pull/???
+[#262]: https://github.com/actix/actix-net/pull/262
 
 
 ## 2.0.0-beta.3 - 2021-01-31
