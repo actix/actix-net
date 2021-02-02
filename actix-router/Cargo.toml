@@ -6,7 +6,7 @@ description = "Resource path matching library"
 keywords = ["actix"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-router/"
+documentation = "https://docs.rs/actix-router"
 license = "MIT OR Apache-2.0"
 edition = "2018"
 
