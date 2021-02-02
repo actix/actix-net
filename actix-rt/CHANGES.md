@@ -3,6 +3,13 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 2.0.0 - 2021-02-02
+* Remove all Arbiter-local storage methods. [#???]
+* Re-export `tokio::pin`. [#???]
+
+[#???]: https://github.com/actix/actix-net/pull/???
+
+
 ## 2.0.0-beta.3 - 2021-01-31
 * Remove `run_in_tokio`, `attach_to_tokio` and `AsyncSystemRunner`. [#253]
 * Return `JoinHandle` from `actix_rt::spawn`. [#253]

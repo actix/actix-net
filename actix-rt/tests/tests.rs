@@ -141,36 +141,6 @@ fn arbiter_drop_no_panic_fut() {
 }
 
 #[test]
-#[allow(deprecated)]
-fn arbiter_item_storage() {
-    let _ = System::new();
-
-    let arbiter = Arbiter::new();
-
-    assert!(!Arbiter::contains_item::<u32>());
-    Arbiter::set_item(42u32);
-    assert!(Arbiter::contains_item::<u32>());
-
-    Arbiter::get_item(|&item: &u32| assert_eq!(item, 42));
-    Arbiter::get_mut_item(|&mut item: &mut u32| assert_eq!(item, 42));
-
-    let thread = thread::spawn(move || {
-        Arbiter::get_item(|&_item: &u32| unreachable!("u32 not in this thread"));
-    })
-    .join();
-    assert!(thread.is_err());
-
-    let thread = thread::spawn(move || {
-        Arbiter::get_mut_item(|&mut _item: &mut i8| unreachable!("i8 not in this thread"));
-    })
-    .join();
-    assert!(thread.is_err());
-
-    arbiter.stop();
-    arbiter.join().unwrap();
-}
-
-#[test]
 #[should_panic]
 fn no_system_current_panic() {
     System::current();
