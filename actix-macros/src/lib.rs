@@ -65,7 +65,7 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn test_base(_: TokenStream, item: TokenStream) -> TokenStream {
+pub fn test(_: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = syn::parse_macro_input!(item as syn::ItemFn);
     let attrs = &input.attrs;
     let vis = &input.vis;
