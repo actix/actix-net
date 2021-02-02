@@ -1,4 +1,4 @@
-//! Tokio-based single-thread async runtime for the Actix ecosystem.
+//! Tokio-based single-threaded async runtime for the Actix ecosystem.
 //!
 //! In most parts of the the Actix ecosystem, it has been chosen to use !Send futures. For this
 //! reason, a single-threaded runtime is appropriate since it is guaranteed that futures will not

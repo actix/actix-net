@@ -5,11 +5,11 @@ authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
 ]
-description = "Tokio-based single-thread async runtime for the Actix ecosystem"
+description = "Tokio-based single-threaded async runtime for the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-rt/"
+documentation = "https://docs.rs/actix-rt"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
@@ -23,7 +23,7 @@ default = ["macros"]
 macros = ["actix-macros"]
 
 [dependencies]
-actix-macros = { version = "0.2.0-beta.1", optional = true }
+actix-macros = { version = "0.2.0", optional = true }
 
 futures-core = { version = "0.3", default-features = false }
 tokio = { version = "1", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }

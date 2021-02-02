@@ -6,7 +6,7 @@ description = "TLS acceptor and connector services for Actix ecosystem"
 keywords = ["network", "tls", "ssl", "async", "transport"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-tls/"
+documentation = "https://docs.rs/actix-tls"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
@@ -41,7 +41,7 @@ uri = ["http"]
 
 [dependencies]
 actix-codec = "0.4.0-beta.1"
-actix-rt = { version = "2.0.0-beta.2", default-features = false }
+actix-rt = { version = "2.0.0-beta.3", default-features = false }
 actix-service = "2.0.0-beta.3"
 actix-utils = "3.0.0-beta.1"
 
@@ -67,7 +67,7 @@ tls-native-tls = { package = "native-tls", version = "0.2", optional = true }
 tokio-native-tls = { version = "0.3", optional = true }
 
 [dev-dependencies]
-actix-rt = "2.0.0-beta.2"
+actix-rt = "2.0.0-beta.3"
 actix-server = "2.0.0-beta.2"
 bytes = "1"
 env_logger = "0.8"
