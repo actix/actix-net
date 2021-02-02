@@ -1,4 +1,12 @@
-//! Macros for use with Tokio
+//! Macros for Actix system and runtime.
+//!
+//! The [`actix-rt`](https://docs.rs/actix-rt) crate must be available for macro output to compile.
+//!
+//! # Entry-point
+//! See docs for the [`#[main]`](macro@main) macro.
+//!
+//! # Tests
+//! See docs for the [`#[test]`](macro@test) macro.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
@@ -7,10 +15,9 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
-/// Marks async function to be executed by Actix system.
+/// Marks async entry-point function to be executed by Actix system.
 ///
-/// ## Usage
-///
+/// # Examples
 /// ```
 /// #[actix_rt::main]
 /// async fn main() {
@@ -28,9 +35,12 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
     let body = &input.block;
 
     if sig.asyncness.is_none() {
-        return syn::Error::new_spanned(sig.fn_token, "only async fn is supported")
-            .to_compile_error()
-            .into();
+        return syn::Error::new_spanned(
+            sig.fn_token,
+            "the async keyword is missing from the function declaration",
+        )
+        .to_compile_error()
+        .into();
     }
 
     sig.asyncness = None;
@@ -45,18 +55,17 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
     .into()
 }
 
-/// Marks async test function to be executed by Actix system.
+/// Marks async test function to be executed in an Actix system.
 ///
-/// ## Usage
-///
-/// ```no_run
+/// # Examples
+/// ```
 /// #[actix_rt::test]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn test(_: TokenStream, item: TokenStream) -> TokenStream {
+pub fn test_base(_: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = syn::parse_macro_input!(item as syn::ItemFn);
     let attrs = &input.attrs;
     let vis = &input.vis;
@@ -73,7 +82,7 @@ pub fn test(_: TokenStream, item: TokenStream) -> TokenStream {
     if sig.asyncness.is_none() {
         return syn::Error::new_spanned(
             input.sig.fn_token,
-            format!("only async fn is supported, {}", input.sig.ident),
+            "the async keyword is missing from the function declaration",
         )
         .to_compile_error()
         .into();
@@ -81,24 +90,19 @@ pub fn test(_: TokenStream, item: TokenStream) -> TokenStream {
 
     sig.asyncness = None;
 
-    let result = if has_test_attr {
-        quote! {
-            #(#attrs)*
-            #vis #sig {
-                actix_rt::System::new()
-                    .block_on(async { #body })
-            }
-        }
+    let missing_test_attr = if has_test_attr {
+        quote!()
     } else {
-        quote! {
-            #[test]
-            #(#attrs)*
-            #vis #sig {
-                actix_rt::System::new()
-                    .block_on(async { #body })
-            }
-        }
+        quote!(#[test])
     };
 
-    result.into()
+    (quote! {
+        #missing_test_attr
+        #(#attrs)*
+        #vis #sig {
+            actix_rt::System::new()
+                .block_on(async { #body })
+        }
+    })
+    .into()
 }

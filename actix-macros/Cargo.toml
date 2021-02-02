@@ -1,8 +1,8 @@
 [package]
 name = "actix-macros"
-version = "0.2.0-beta.1"
+version = "0.2.0"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
-description = "Actix runtime macros"
+description = "Macros for Actix system and runtime"
 repository = "https://github.com/actix/actix-net"
 documentation = "https://docs.rs/actix-macros/"
 categories = ["network-programming", "asynchronous"]
@@ -16,11 +16,8 @@ proc-macro = true
 quote = "1.0.3"
 syn = { version = "^1", features = ["full"] }
 
-[features]
-actix-reexport = []
-
 [dev-dependencies]
-actix-rt = "2.0.0-beta.2"
+actix-rt = "2.0.0-beta.3"
 
 futures-util = { version = "0.3", default-features = false }
 trybuild = "1"
