@@ -1,12 +1,12 @@
 [package]
 name = "actix-rt"
-version = "2.0.0-beta.3"
+version = "2.0.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
 ]
 description = "Tokio-based single-threaded async runtime for the Actix ecosystem"
-keywords = ["network", "framework", "async", "futures"]
+keywords = ["async", "futures", "io", "runtime"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 documentation = "https://docs.rs/actix-rt"
@@ -30,3 +30,4 @@ tokio = { version = "1", features = ["rt", "net", "parking_lot", "signal", "sync
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+hyper = { version = "0.14", default-features = false, features = ["server", "tcp", "http1"] }

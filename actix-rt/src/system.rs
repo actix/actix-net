@@ -11,7 +11,7 @@ use std::{
 use futures_core::ready;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{arbiter::ArbiterHandle, Arbiter, Runtime};
+use crate::{arbiter::ArbiterHandle, runtime::default_tokio_runtime, Arbiter, Runtime};
 
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -36,10 +36,24 @@ impl System {
     /// Panics if underlying Tokio runtime can not be created.
     #[allow(clippy::new_ret_no_self)]
     pub fn new() -> SystemRunner {
+        Self::with_tokio_rt(|| {
+            default_tokio_runtime()
+                .expect("Default Actix (Tokio) runtime could not be created.")
+        })
+    }
+
+    /// Create a new System using the [Tokio Runtime](tokio-runtime) returned from a closure.
+    ///
+    /// [tokio-runtime]: tokio::runtime::Runtime
+    #[doc(hidden)]
+    pub fn with_tokio_rt<F>(runtime_factory: F) -> SystemRunner
+    where
+        F: Fn() -> tokio::runtime::Runtime,
+    {
         let (stop_tx, stop_rx) = oneshot::channel();
         let (sys_tx, sys_rx) = mpsc::unbounded_channel();
 
-        let rt = Runtime::new().expect("Actix (Tokio) runtime could not be created.");
+        let rt = Runtime::from(runtime_factory());
         let sys_arbiter = Arbiter::in_new_system(rt.local_set());
         let system = System::construct(sys_tx, sys_arbiter.clone());
 
