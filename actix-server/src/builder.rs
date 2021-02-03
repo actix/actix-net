@@ -19,7 +19,7 @@ use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{self, ServerWorker, WorkerAvailability, WorkerHandle};
+use crate::worker::{self, ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandle};
 use crate::{join_all, Token};
 
 /// Server builder
@@ -32,11 +32,11 @@ pub struct ServerBuilder {
     sockets: Vec<(Token, String, MioListener)>,
     accept: AcceptLoop,
     exit: bool,
-    shutdown_timeout: Duration,
     no_signals: bool,
     cmd: UnboundedReceiver<ServerCommand>,
     server: Server,
     notify: Vec<oneshot::Sender<()>>,
+    worker_config: ServerWorkerConfig,
 }
 
 impl Default for ServerBuilder {
@@ -60,11 +60,11 @@ impl ServerBuilder {
             accept: AcceptLoop::new(server.clone()),
             backlog: 2048,
             exit: false,
-            shutdown_timeout: Duration::from_secs(30),
             no_signals: false,
             cmd: rx,
             notify: Vec::new(),
             server,
+            worker_config: ServerWorkerConfig::default(),
         }
     }
 
@@ -75,6 +75,25 @@ impl ServerBuilder {
     pub fn workers(mut self, num: usize) -> Self {
         assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;
+        self
+    }
+
+    /// Set number of max blocking threads for running blocking task on thread pool.
+    ///
+    /// * This thread pool is per worker and `NOT` shared across workers.
+    ///
+    /// # Examples:
+    /// ```rust
+    /// # use actix_server::ServerBuilder;
+    /// let builder = ServerBuilder::new()
+    ///     .workers(4) // server has 4 worker thread.
+    ///     .worker_max_blocking_threads(4); // every worker has 4 max blocking threads.
+    /// ```
+    ///
+    /// See [tokio::runtime::Builder::max_blocking_threads](tokio::runtime::Builder::max_blocking_threads)
+    /// for behavior reference.
+    pub fn worker_max_blocking_threads(mut self, num: usize) -> Self {
+        self.worker_config.max_blocking_threads(num);
         self
     }
 
@@ -124,7 +143,8 @@ impl ServerBuilder {
     ///
     /// By default shutdown timeout sets to 30 seconds.
     pub fn shutdown_timeout(mut self, sec: u64) -> Self {
-        self.shutdown_timeout = Duration::from_secs(sec);
+        self.worker_config
+            .shutdown_timeout(Duration::from_secs(sec));
         self
     }
 
@@ -297,7 +317,7 @@ impl ServerBuilder {
         let avail = WorkerAvailability::new(waker);
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
 
-        ServerWorker::start(idx, services, avail, self.shutdown_timeout)
+        ServerWorker::start(idx, services, avail, self.worker_config)
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) {

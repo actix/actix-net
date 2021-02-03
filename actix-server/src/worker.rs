@@ -133,7 +133,7 @@ pub(crate) struct ServerWorker {
     conns: Counter,
     factories: Vec<Box<dyn InternalServiceFactory>>,
     state: WorkerState,
-    shutdown_timeout: Duration,
+    config: ServerWorkerConfig,
 }
 
 struct WorkerService {
@@ -159,26 +159,61 @@ enum WorkerServiceStatus {
     Stopped,
 }
 
+// config for worker behavior passed from server builder.
+#[derive(Copy, Clone)]
+pub(crate) struct ServerWorkerConfig {
+    shutdown_timeout: Duration,
+    max_blocking_threads: usize,
+}
+
+impl Default for ServerWorkerConfig {
+    fn default() -> Self {
+        Self {
+            shutdown_timeout: Duration::from_secs(30),
+            // default max_blocking_threads is the same as tokio's default
+            max_blocking_threads: 512,
+        }
+    }
+}
+
+impl ServerWorkerConfig {
+    pub(crate) fn max_blocking_threads(&mut self, num: usize) {
+        self.max_blocking_threads = num;
+    }
+
+    pub(crate) fn shutdown_timeout(&mut self, dur: Duration) {
+        self.shutdown_timeout = dur;
+    }
+}
+
 impl ServerWorker {
     pub(crate) fn start(
         idx: usize,
         factories: Vec<Box<dyn InternalServiceFactory>>,
         availability: WorkerAvailability,
-        shutdown_timeout: Duration,
+        config: ServerWorkerConfig,
     ) -> WorkerHandle {
         let (tx1, rx) = unbounded_channel();
         let (tx2, rx2) = unbounded_channel();
         let avail = availability.clone();
 
         // every worker runs in it's own arbiter.
-        Arbiter::new().spawn(Box::pin(async move {
+        // use a custom tokio runtime builder to change the settings of runtime.
+        Arbiter::with_tokio_rt(move || {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .max_blocking_threads(config.max_blocking_threads)
+                .build()
+                .unwrap()
+        })
+        .spawn(async move {
             availability.set(false);
             let mut wrk = MAX_CONNS_COUNTER.with(move |conns| ServerWorker {
                 rx,
                 rx2,
                 availability,
                 factories,
-                shutdown_timeout,
+                config,
                 services: Vec::new(),
                 conns: conns.clone(),
                 state: WorkerState::Unavailable,
@@ -198,6 +233,8 @@ impl ServerWorker {
                 })
                 .collect::<Vec<_>>();
 
+            // a second spawn to make sure worker future runs as non boxed future.
+            // As Arbiter::spawn would box the future before send it to arbiter.
             spawn(async move {
                 let res: Result<Vec<_>, _> = join_all(fut).await.into_iter().collect();
                 match res {
@@ -220,7 +257,7 @@ impl ServerWorker {
                 }
                 wrk.await
             });
-        }));
+        });
 
         WorkerHandle::new(idx, tx1, tx2, avail)
     }
@@ -324,7 +361,7 @@ impl Future for ServerWorker {
                     info!("Graceful worker shutdown, {} connections", num);
                     self.state = WorkerState::Shutdown(
                         Box::pin(sleep_until(Instant::now() + Duration::from_secs(1))),
-                        Box::pin(sleep_until(Instant::now() + self.shutdown_timeout)),
+                        Box::pin(sleep_until(Instant::now() + self.config.shutdown_timeout)),
                         Some(result),
                     );
                 } else {
