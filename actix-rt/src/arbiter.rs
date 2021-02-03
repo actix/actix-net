@@ -12,7 +12,7 @@ use futures_core::ready;
 use tokio::{sync::mpsc, task::LocalSet};
 
 use crate::{
-    runtime::Runtime,
+    runtime::{default_tokio_runtime, Runtime},
     system::{System, SystemCommand},
 };
 
@@ -94,12 +94,25 @@ pub struct Arbiter {
 }
 
 impl Arbiter {
-    /// Spawn new Arbiter thread and start its event loop.
+    /// Spawn a new Arbiter thread and start its event loop.
     ///
     /// # Panics
     /// Panics if a [System] is not registered on the current thread.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Arbiter {
+        Self::with_tokio_rt(|| {
+            default_tokio_runtime().expect("Cannot create new Arbiter's Runtime.")
+        })
+    }
+
+    /// Spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
+    ///
+    /// [tokio-runtime]: tokio::runtime::Runtime
+    #[doc(hidden)]
+    pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
+    where
+        F: Fn() -> tokio::runtime::Runtime + Send + 'static,
+    {
         let id = COUNT.fetch_add(1, Ordering::Relaxed);
         let system_id = System::current().id();
         let name = format!("actix-rt|system:{}|arbiter:{}", system_id, id);
@@ -113,7 +126,7 @@ impl Arbiter {
             .spawn({
                 let tx = tx.clone();
                 move || {
-                    let rt = Runtime::new().expect("Cannot create new Arbiter's Runtime.");
+                    let rt = Runtime::from(runtime_factory());
                     let hnd = ArbiterHandle::new(tx);
 
                     System::set_current(sys);

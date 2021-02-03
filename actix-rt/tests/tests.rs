@@ -1,5 +1,9 @@
 use std::{
-    sync::mpsc::channel,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::channel,
+        Arc,
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -199,4 +203,63 @@ fn system_stop_stops_arbiters() {
     assert!(!arb.spawn_fn(|| {}));
 
     arb.join().unwrap();
+}
+
+#[test]
+fn new_system_with_tokio() {
+    let (tx, rx) = channel();
+
+    let res = System::with_tokio_rt(move || {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_io()
+            .enable_time()
+            .thread_keep_alive(Duration::from_millis(1000))
+            .worker_threads(2)
+            .max_blocking_threads(2)
+            .on_thread_start(|| {})
+            .on_thread_stop(|| {})
+            .build()
+            .unwrap()
+    })
+    .block_on(async {
+        actix_rt::time::sleep(Duration::from_millis(1)).await;
+
+        tokio::task::spawn(async move {
+            tx.send(42).unwrap();
+        })
+        .await
+        .unwrap();
+
+        123usize
+    });
+
+    assert_eq!(res, 123);
+    assert_eq!(rx.recv().unwrap(), 42);
+}
+
+#[test]
+fn new_arbiter_with_tokio() {
+    let _ = System::new();
+
+    let arb = Arbiter::with_tokio_rt(|| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    });
+
+    let counter = Arc::new(AtomicBool::new(true));
+
+    let counter1 = counter.clone();
+    let did_spawn = arb.spawn(async move {
+        actix_rt::time::sleep(Duration::from_millis(1)).await;
+        counter1.store(false, Ordering::SeqCst);
+        Arbiter::current().stop();
+    });
+
+    assert!(did_spawn);
+
+    arb.join().unwrap();
+
+    assert_eq!(false, counter.load(Ordering::SeqCst));
 }
