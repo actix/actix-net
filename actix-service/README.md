@@ -2,6 +2,4 @@
 
 > Service trait and combinators for representing asynchronous request/response operations.
 
-See documentation for detailed explanations these components: [https://docs.rs/actix-service][docs].
-
-[docs]: https://docs.rs/actix-service
+See documentation for detailed explanations of these components: https://docs.rs/actix-service.
