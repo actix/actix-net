@@ -40,10 +40,6 @@ impl Server {
         ServerBuilder::default()
     }
 
-    pub(crate) fn signal(&self, sig: Signal) {
-        let _ = self.0.send(ServerCommand::Signal(sig));
-    }
-
     pub(crate) fn worker_faulted(&self, idx: usize) {
         let _ = self.0.send(ServerCommand::WorkerFaulted(idx));
     }
@@ -104,9 +100,6 @@ impl Future for Server {
             this.1 = Some(rx);
         }
 
-        match Pin::new(this.1.as_mut().unwrap()).poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(_) => Poll::Ready(Ok(())),
-        }
+        Pin::new(this.1.as_mut().unwrap()).poll(cx).map(|_| Ok(()))
     }
 }

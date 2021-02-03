@@ -27,54 +27,8 @@ struct ServerSocketInfo {
     timeout: Option<Instant>,
 }
 
-/// Accept loop would live with `ServerBuilder`.
-///
-/// It's tasked with construct `Poll` instance and `WakerQueue` which would be distributed to
-/// `Accept` and `Worker`.
-///
-/// It would also listen to `ServerCommand` and push interests to `WakerQueue`.
-pub(crate) struct AcceptLoop {
-    srv: Option<Server>,
-    poll: Option<Poll>,
-    waker: WakerQueue,
-}
-
-impl AcceptLoop {
-    pub fn new(srv: Server) -> Self {
-        let poll = Poll::new().unwrap_or_else(|e| panic!("Can not create `mio::Poll`: {}", e));
-        let waker = WakerQueue::new(poll.registry())
-            .unwrap_or_else(|e| panic!("Can not create `mio::Waker`: {}", e));
-
-        Self {
-            srv: Some(srv),
-            poll: Some(poll),
-            waker,
-        }
-    }
-
-    pub(crate) fn waker_owned(&self) -> WakerQueue {
-        self.waker.clone()
-    }
-
-    pub fn wake(&self, i: WakerInterest) {
-        self.waker.wake(i);
-    }
-
-    pub(crate) fn start(
-        &mut self,
-        socks: Vec<(Token, MioListener)>,
-        handles: Vec<WorkerHandle>,
-    ) {
-        let srv = self.srv.take().expect("Can not re-use AcceptInfo");
-        let poll = self.poll.take().unwrap();
-        let waker = self.waker.clone();
-
-        Accept::start(poll, waker, socks, srv, handles);
-    }
-}
-
 /// poll instance of the server.
-struct Accept {
+pub(crate) struct Accept {
     poll: Poll,
     waker: WakerQueue,
     handles: Vec<WorkerHandle>,
@@ -97,13 +51,23 @@ fn connection_error(e: &io::Error) -> bool {
 }
 
 impl Accept {
-    pub(crate) fn start(
-        poll: Poll,
-        waker: WakerQueue,
-        socks: Vec<(Token, MioListener)>,
-        srv: Server,
-        handles: Vec<WorkerHandle>,
-    ) {
+    pub(crate) fn start<F>(
+        sockets: Vec<(Token, MioListener)>,
+        server: Server,
+        worker_factory: F,
+    ) -> WakerQueue
+    where
+        F: FnOnce(&WakerQueue) -> Vec<WorkerHandle>,
+    {
+        // construct poll instance and it's waker
+        let poll = Poll::new().unwrap_or_else(|e| panic!("Can not create `mio::Poll`: {}", e));
+        let waker = WakerQueue::new(poll.registry())
+            .unwrap_or_else(|e| panic!("Can not create `mio::Waker`: {}", e));
+        let waker_clone = waker.clone();
+
+        // construct workers and collect handles.
+        let handles = worker_factory(&waker);
+
         // Accept runs in its own thread and would want to spawn additional futures to current
         // actix system.
         let sys = System::current();
@@ -112,10 +76,13 @@ impl Accept {
             .spawn(move || {
                 System::set_current(sys);
                 let (mut accept, sockets) =
-                    Accept::new_with_sockets(poll, waker, socks, handles, srv);
+                    Accept::new_with_sockets(poll, waker, sockets, handles, server);
                 accept.poll_with(sockets);
             })
             .unwrap();
+
+        // return waker to server builder.
+        waker_clone
     }
 
     fn new_with_sockets(

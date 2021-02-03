@@ -2,9 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures_core::future::LocalBoxFuture;
-
-use crate::server::Server;
+use futures_core::future::BoxFuture;
 
 /// Different types of process signals
 #[allow(dead_code)]
@@ -21,21 +19,19 @@ pub(crate) enum Signal {
 }
 
 pub(crate) struct Signals {
-    srv: Server,
     #[cfg(not(unix))]
-    signals: LocalBoxFuture<'static, std::io::Result<()>>,
+    signals: BoxFuture<'static, std::io::Result<()>>,
     #[cfg(unix)]
-    signals: Vec<(Signal, LocalBoxFuture<'static, ()>)>,
+    signals: Vec<(Signal, BoxFuture<'static, ()>)>,
 }
 
 impl Signals {
-    pub(crate) fn start(srv: Server) {
+    pub(crate) fn new() -> Self {
         #[cfg(not(unix))]
         {
-            actix_rt::spawn(Signals {
-                srv,
+            Signals {
                 signals: Box::pin(actix_rt::signal::ctrl_c()),
-            });
+            }
         }
         #[cfg(unix)]
         {
@@ -66,30 +62,25 @@ impl Signals {
                 }
             }
 
-            actix_rt::spawn(Signals { srv, signals });
+            Signals { signals }
         }
     }
 }
 
 impl Future for Signals {
-    type Output = ();
+    type Output = Signal;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         #[cfg(not(unix))]
-        match self.signals.as_mut().poll(cx) {
-            Poll::Ready(_) => {
-                self.srv.signal(Signal::Int);
-                Poll::Ready(())
-            }
-            Poll::Pending => Poll::Pending,
+        {
+            self.signals.as_mut().poll(cx).map(|_| Signal::Int)
         }
+
         #[cfg(unix)]
         {
             for (sig, fut) in self.signals.iter_mut() {
                 if fut.as_mut().poll(cx).is_ready() {
-                    let sig = *sig;
-                    self.srv.signal(sig);
-                    return Poll::Ready(());
+                    return Poll::Ready(*sig);
                 }
             }
             Poll::Pending
