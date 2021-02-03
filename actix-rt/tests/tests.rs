@@ -198,6 +198,9 @@ fn system_stop_stops_arbiters() {
     System::current().stop();
     sys.run().unwrap();
 
+    // account for slightly slow thread de-spawns (only observed on windows)
+    thread::sleep(Duration::from_millis(100));
+
     // arbiter should be dead and return false
     assert!(!Arbiter::current().spawn_fn(|| {}));
     assert!(!arb.spawn_fn(|| {}));

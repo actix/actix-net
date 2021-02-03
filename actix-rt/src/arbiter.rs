@@ -113,10 +113,11 @@ impl Arbiter {
     where
         F: Fn() -> tokio::runtime::Runtime + Send + 'static,
     {
-        let id = COUNT.fetch_add(1, Ordering::Relaxed);
-        let system_id = System::current().id();
-        let name = format!("actix-rt|system:{}|arbiter:{}", system_id, id);
         let sys = System::current();
+        let system_id = sys.id();
+        let arb_id = COUNT.fetch_add(1, Ordering::Relaxed);
+
+        let name = format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id);
         let (tx, rx) = mpsc::unbounded_channel();
 
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
@@ -136,7 +137,7 @@ impl Arbiter {
                     // register arbiter
                     let _ = System::current()
                         .tx()
-                        .send(SystemCommand::RegisterArbiter(id, hnd));
+                        .send(SystemCommand::RegisterArbiter(arb_id, hnd));
 
                     ready_tx.send(()).unwrap();
 
@@ -146,7 +147,7 @@ impl Arbiter {
                     // deregister arbiter
                     let _ = System::current()
                         .tx()
-                        .send(SystemCommand::DeregisterArbiter(id));
+                        .send(SystemCommand::DeregisterArbiter(arb_id));
                 }
             })
             .unwrap_or_else(|err| {
