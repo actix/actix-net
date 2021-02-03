@@ -161,9 +161,13 @@ impl Accept {
         let mut events = mio::Events::with_capacity(128);
 
         loop {
-            self.poll
-                .poll(&mut events, None)
-                .unwrap_or_else(|e| panic!("Poll error: {}", e));
+            if let Err(e) = self.poll.poll(&mut events, None) {
+                if matches!(e.kind(), std::io::ErrorKind::Interrupted) {
+                    continue;
+                } else {
+                    panic!("Poll error: {}", e);
+                }
+            }
 
             for event in events.iter() {
                 let token = event.token();
