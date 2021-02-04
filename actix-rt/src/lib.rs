@@ -1,4 +1,4 @@
-//! Tokio-based single-thread async runtime for the Actix ecosystem.
+//! Tokio-based single-threaded async runtime for the Actix ecosystem.
 //!
 //! In most parts of the the Actix ecosystem, it has been chosen to use !Send futures. For this
 //! reason, a single-threaded runtime is appropriate since it is guaranteed that futures will not
@@ -12,7 +12,7 @@
 //!
 //! The disadvantage is that idle threads will not steal work from very busy, stuck or otherwise
 //! backlogged threads. Tasks that are disproportionately expensive should be offloaded to the
-//! blocking thread-pool using [`task::spawn_blocking`].
+//! blocking task thread-pool using [`task::spawn_blocking`].
 //!
 //! # Examples
 //! ```
@@ -55,6 +55,8 @@ mod system;
 pub use self::arbiter::{Arbiter, ArbiterHandle};
 pub use self::runtime::Runtime;
 pub use self::system::{System, SystemRunner};
+
+pub use tokio::pin;
 
 pub mod signal {
     //! Asynchronous signal handling (Tokio re-exports).

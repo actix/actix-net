@@ -2,7 +2,7 @@ use std::{future::Future, io};
 
 use tokio::task::{JoinHandle, LocalSet};
 
-/// A single-threaded runtime based on Tokio's "current thread" runtime.
+/// A Tokio-based runtime proxy.
 ///
 /// All spawned futures will be executed on the current thread. Therefore, there is no `Send` bound
 /// on submitted futures.
@@ -12,14 +12,18 @@ pub struct Runtime {
     rt: tokio::runtime::Runtime,
 }
 
+pub(crate) fn default_tokio_runtime() -> io::Result<tokio::runtime::Runtime> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .enable_time()
+        .build()
+}
+
 impl Runtime {
     /// Returns a new runtime initialized with default configuration values.
     #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> io::Result<Runtime> {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_io()
-            .enable_time()
-            .build()?;
+    pub fn new() -> io::Result<Self> {
+        let rt = default_tokio_runtime()?;
 
         Ok(Runtime {
             rt,
@@ -79,5 +83,14 @@ impl Runtime {
         F: Future,
     {
         self.local.block_on(&self.rt, f)
+    }
+}
+
+impl From<tokio::runtime::Runtime> for Runtime {
+    fn from(rt: tokio::runtime::Runtime) -> Self {
+        Self {
+            local: LocalSet::new(),
+            rt,
+        }
     }
 }

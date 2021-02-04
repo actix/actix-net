@@ -1,7 +1,5 @@
 use std::{
-    any::{Any, TypeId},
     cell::RefCell,
-    collections::HashMap,
     fmt,
     future::Future,
     pin::Pin,
@@ -14,7 +12,7 @@ use futures_core::ready;
 use tokio::{sync::mpsc, task::LocalSet};
 
 use crate::{
-    runtime::Runtime,
+    runtime::{default_tokio_runtime, Runtime},
     system::{System, SystemCommand},
 };
 
@@ -22,7 +20,6 @@ pub(crate) static COUNT: AtomicUsize = AtomicUsize::new(0);
 
 thread_local!(
     static HANDLE: RefCell<Option<ArbiterHandle>> = RefCell::new(None);
-    static STORAGE: RefCell<HashMap<TypeId, Box<dyn Any>>> = RefCell::new(HashMap::new());
 );
 
 pub(crate) enum ArbiterCommand {
@@ -97,16 +94,30 @@ pub struct Arbiter {
 }
 
 impl Arbiter {
-    /// Spawn new Arbiter thread and start its event loop.
+    /// Spawn a new Arbiter thread and start its event loop.
     ///
     /// # Panics
     /// Panics if a [System] is not registered on the current thread.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Arbiter {
-        let id = COUNT.fetch_add(1, Ordering::Relaxed);
-        let system_id = System::current().id();
-        let name = format!("actix-rt|system:{}|arbiter:{}", system_id, id);
+        Self::with_tokio_rt(|| {
+            default_tokio_runtime().expect("Cannot create new Arbiter's Runtime.")
+        })
+    }
+
+    /// Spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
+    ///
+    /// [tokio-runtime]: tokio::runtime::Runtime
+    #[doc(hidden)]
+    pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
+    where
+        F: Fn() -> tokio::runtime::Runtime + Send + 'static,
+    {
         let sys = System::current();
+        let system_id = sys.id();
+        let arb_id = COUNT.fetch_add(1, Ordering::Relaxed);
+
+        let name = format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id);
         let (tx, rx) = mpsc::unbounded_channel();
 
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
@@ -116,18 +127,17 @@ impl Arbiter {
             .spawn({
                 let tx = tx.clone();
                 move || {
-                    let rt = Runtime::new().expect("Cannot create new Arbiter's Runtime.");
+                    let rt = Runtime::from(runtime_factory());
                     let hnd = ArbiterHandle::new(tx);
 
                     System::set_current(sys);
 
-                    STORAGE.with(|cell| cell.borrow_mut().clear());
                     HANDLE.with(|cell| *cell.borrow_mut() = Some(hnd.clone()));
 
                     // register arbiter
                     let _ = System::current()
                         .tx()
-                        .send(SystemCommand::RegisterArbiter(id, hnd));
+                        .send(SystemCommand::RegisterArbiter(arb_id, hnd));
 
                     ready_tx.send(()).unwrap();
 
@@ -137,7 +147,7 @@ impl Arbiter {
                     // deregister arbiter
                     let _ = System::current()
                         .tx()
-                        .send(SystemCommand::DeregisterArbiter(id));
+                        .send(SystemCommand::DeregisterArbiter(arb_id));
                 }
             })
             .unwrap_or_else(|err| {
@@ -156,7 +166,6 @@ impl Arbiter {
         let hnd = ArbiterHandle::new(tx);
 
         HANDLE.with(|cell| *cell.borrow_mut() = Some(hnd.clone()));
-        STORAGE.with(|cell| cell.borrow_mut().clear());
 
         local.spawn_local(ArbiterRunner { rx });
 
@@ -214,58 +223,6 @@ impl Arbiter {
     pub fn join(self) -> thread::Result<()> {
         self.thread_handle.join()
     }
-
-    /// Insert item into Arbiter's thread-local storage.
-    ///
-    /// Overwrites any item of the same type previously inserted.
-    #[deprecated = "Will be removed in stable v2."]
-    pub fn set_item<T: 'static>(item: T) {
-        STORAGE.with(move |cell| cell.borrow_mut().insert(TypeId::of::<T>(), Box::new(item)));
-    }
-
-    /// Check if Arbiter's thread-local storage contains an item type.
-    #[deprecated = "Will be removed in stable v2."]
-    pub fn contains_item<T: 'static>() -> bool {
-        STORAGE.with(move |cell| cell.borrow().contains_key(&TypeId::of::<T>()))
-    }
-
-    /// Call a function with a shared reference to an item in this Arbiter's thread-local storage.
-    ///
-    /// # Panics
-    /// Panics if item is not in Arbiter's thread-local item storage.
-    #[deprecated = "Will be removed in stable v2."]
-    pub fn get_item<T: 'static, F, R>(mut f: F) -> R
-    where
-        F: FnMut(&T) -> R,
-    {
-        STORAGE.with(move |cell| {
-            let st = cell.borrow();
-
-            let type_id = TypeId::of::<T>();
-            let item = st.get(&type_id).and_then(downcast_ref).unwrap();
-
-            f(item)
-        })
-    }
-
-    /// Call a function with a mutable reference to an item in this Arbiter's thread-local storage.
-    ///
-    /// # Panics
-    /// Panics if item is not in Arbiter's thread-local item storage.
-    #[deprecated = "Will be removed in stable v2."]
-    pub fn get_mut_item<T: 'static, F, R>(mut f: F) -> R
-    where
-        F: FnMut(&mut T) -> R,
-    {
-        STORAGE.with(move |cell| {
-            let mut st = cell.borrow_mut();
-
-            let type_id = TypeId::of::<T>();
-            let item = st.get_mut(&type_id).and_then(downcast_mut).unwrap();
-
-            f(item)
-        })
-    }
 }
 
 /// A persistent future that processes [Arbiter] commands.
@@ -295,12 +252,4 @@ impl Future for ArbiterRunner {
             }
         }
     }
-}
-
-fn downcast_ref<T: 'static>(boxed: &Box<dyn Any>) -> Option<&T> {
-    boxed.downcast_ref()
-}
-
-fn downcast_mut<T: 'static>(boxed: &mut Box<dyn Any>) -> Option<&mut T> {
-    boxed.downcast_mut()
 }

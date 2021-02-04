@@ -9,7 +9,7 @@ description = "General purpose TCP server built for the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-server/"
+documentation = "https://docs.rs/actix-server"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 exclude = [".gitignore", ".cargo/config"]
@@ -24,7 +24,7 @@ default = []
 
 [dependencies]
 actix-codec = "0.4.0-beta.1"
-actix-rt = { version = "2.0.0-beta.2", default-features = false }
+actix-rt = { version = "2.0.0", default-features = false }
 actix-service = "2.0.0-beta.3"
 actix-utils = "3.0.0-beta.1"
 
