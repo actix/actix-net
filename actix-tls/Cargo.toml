@@ -31,10 +31,10 @@ connect = []
 openssl = ["tls-openssl", "tokio-openssl"]
 
 # use rustls impls
-rustls = ["tls-rustls", "webpki", "webpki-roots", "tokio-rustls"]
+rustls = ["tokio-rustls", "webpki-roots"]
 
 # use native-tls impls
-native-tls = ["tls-native-tls", "tokio-native-tls"]
+native-tls = ["tokio-native-tls"]
 
 # support http::Uri as connect address
 uri = ["http"]
@@ -55,16 +55,11 @@ tokio-util = { version = "0.6.3", default-features = false }
 tls-openssl = { package = "openssl", version = "0.10", optional = true }
 tokio-openssl = { version = "0.6", optional = true }
 
-# TODO: Reduce dependencies where tokio wrappers re-export base crate.
-
 # rustls
-tls-rustls = { package = "rustls", version = "0.19", optional = true }
 tokio-rustls = { version = "0.22", optional = true }
-webpki = { version = "0.21", optional = true }
 webpki-roots = { version = "0.21", optional = true }
 
 # native-tls
-tls-native-tls = { package = "native-tls", version = "0.2", optional = true }
 tokio-native-tls = { version = "0.3", optional = true }
 
 [dev-dependencies]

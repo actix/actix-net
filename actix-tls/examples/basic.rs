@@ -15,9 +15,9 @@
 //! http --verify=false https://127.0.0.1:8443
 //! ```
 
-// this rename only exists because of how we have organised the crate's feature flags
+// this use only exists because of how we have organised the crate
 // it is not necessary for your actual code
-extern crate tls_rustls as rustls;
+use tokio_rustls::rustls;
 
 use std::{
     env,

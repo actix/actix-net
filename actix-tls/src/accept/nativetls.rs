@@ -5,7 +5,7 @@ use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
 
-pub use native_tls::Error;
+pub use tokio_native_tls::native_tls::Error;
 pub use tokio_native_tls::{TlsAcceptor, TlsStream};
 
 use super::MAX_CONN_COUNTER;
