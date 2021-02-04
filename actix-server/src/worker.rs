@@ -168,10 +168,11 @@ pub(crate) struct ServerWorkerConfig {
 
 impl Default for ServerWorkerConfig {
     fn default() -> Self {
+        // 512 is the default max blocking thread count of tokio runtime.
+        let max_blocking_threads = std::cmp::max(512 / num_cpus::get(), 1);
         Self {
             shutdown_timeout: Duration::from_secs(30),
-            // default max_blocking_threads is the same as tokio's default
-            max_blocking_threads: 512,
+            max_blocking_threads,
         }
     }
 }
