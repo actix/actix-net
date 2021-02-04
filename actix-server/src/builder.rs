@@ -20,7 +20,7 @@ use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{self, ServerWorker, WorkerAvailability, WorkerHandle};
+use crate::worker::{self, ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandle};
 use crate::Token;
 
 /// Server builder
@@ -31,10 +31,10 @@ pub struct ServerBuilder {
     services: Vec<Box<dyn InternalServiceFactory>>,
     sockets: Vec<(Token, String, MioListener)>,
     exit: bool,
-    shutdown_timeout: Duration,
     no_signals: bool,
     cmd: UnboundedReceiver<ServerCommand>,
     server: Server,
+    worker_config: ServerWorkerConfig,
 }
 
 impl Default for ServerBuilder {
@@ -56,10 +56,10 @@ impl ServerBuilder {
             sockets: Vec::new(),
             backlog: 2048,
             exit: false,
-            shutdown_timeout: Duration::from_secs(30),
             no_signals: false,
             cmd: rx,
             server,
+            worker_config: ServerWorkerConfig::default(),
         }
     }
 
@@ -70,6 +70,24 @@ impl ServerBuilder {
     pub fn workers(mut self, num: usize) -> Self {
         assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;
+        self
+    }
+
+    /// Set max number of threads for each worker's blocking task thread pool.
+    ///
+    /// One thread pool is set up **per worker**; not shared across workers.
+    ///
+    /// # Examples:
+    /// ```
+    /// # use actix_server::ServerBuilder;
+    /// let builder = ServerBuilder::new()
+    ///     .workers(4) // server has 4 worker thread.
+    ///     .worker_max_blocking_threads(4); // every worker has 4 max blocking threads.
+    /// ```
+    ///
+    /// See [tokio::runtime::Builder::max_blocking_threads] for behavior reference.
+    pub fn worker_max_blocking_threads(mut self, num: usize) -> Self {
+        self.worker_config.max_blocking_threads(num);
         self
     }
 
@@ -119,7 +137,8 @@ impl ServerBuilder {
     ///
     /// By default shutdown timeout sets to 30 seconds.
     pub fn shutdown_timeout(mut self, sec: u64) -> Self {
-        self.shutdown_timeout = Duration::from_secs(sec);
+        self.worker_config
+            .shutdown_timeout(Duration::from_secs(sec));
         self
     }
 
@@ -274,14 +293,14 @@ impl ServerBuilder {
                     (0..self.threads)
                         .map(|idx| {
                             // start workers
-                            let avail = WorkerAvailability::new(waker.clone());
-                            let services =
+                            let availability = WorkerAvailability::new(waker.clone());
+                            let factories =
                                 self.services.iter().map(|v| v.clone_factory()).collect();
                             let handle = ServerWorker::start(
                                 idx,
-                                services,
-                                avail,
-                                self.shutdown_timeout,
+                                factories,
+                                availability,
+                                self.worker_config,
                             );
                             handles.push((idx, handle.clone()));
                             handle
@@ -303,7 +322,7 @@ impl ServerBuilder {
                 services: self.services,
                 notify: Vec::new(),
                 exit: self.exit,
-                shutdown_timeout: self.shutdown_timeout,
+                worker_config: self.worker_config,
                 signals,
                 on_stop_task: None,
                 waker_queue,
@@ -324,7 +343,7 @@ struct ServerFuture {
     services: Vec<Box<dyn InternalServiceFactory>>,
     notify: Vec<oneshot::Sender<()>>,
     exit: bool,
-    shutdown_timeout: Duration,
+    worker_config: ServerWorkerConfig,
     signals: Option<Signals>,
     on_stop_task: Option<BoxFuture<'static, ()>>,
     waker_queue: WakerQueue,
@@ -452,10 +471,14 @@ impl ServerFuture {
                         break;
                     }
 
-                    let avail = WorkerAvailability::new(self.waker_queue.clone());
-                    let services = self.services.iter().map(|v| v.clone_factory()).collect();
-                    let handle =
-                        ServerWorker::start(new_idx, services, avail, self.shutdown_timeout);
+                    let availability = WorkerAvailability::new(self.waker_queue.clone());
+                    let factories = self.services.iter().map(|v| v.clone_factory()).collect();
+                    let handle = ServerWorker::start(
+                        new_idx,
+                        factories,
+                        availability,
+                        self.worker_config,
+                    );
 
                     self.handles.push((new_idx, handle.clone()));
                     self.waker_queue.wake(WakerInterest::Worker(handle));
