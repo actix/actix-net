@@ -12,7 +12,7 @@ use actix_utils::counter::{Counter, CounterGuard};
 use futures_core::future::LocalBoxFuture;
 use tokio_rustls::{Accept, TlsAcceptor};
 
-pub use rustls::{ServerConfig, Session};
+pub use tokio_rustls::rustls::{ServerConfig, Session};
 pub use tokio_rustls::server::TlsStream;
 
 use super::MAX_CONN_COUNTER;

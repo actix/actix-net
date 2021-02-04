@@ -6,7 +6,7 @@ use std::{
     task::{Context, Poll},
 };
 
-pub use rustls::Session;
+pub use tokio_rustls::rustls::Session;
 pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
 pub use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -15,7 +15,7 @@ use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::trace;
 use tokio_rustls::{Connect, TlsConnector};
-use webpki::DNSNameRef;
+use tokio_rustls::webpki::DNSNameRef;
 
 use crate::connect::{Address, Connection};
 
