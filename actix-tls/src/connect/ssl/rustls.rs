@@ -14,8 +14,8 @@ use actix_codec::{AsyncRead, AsyncWrite};
 use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::trace;
-use tokio_rustls::{Connect, TlsConnector};
 use tokio_rustls::webpki::DNSNameRef;
+use tokio_rustls::{Connect, TlsConnector};
 
 use crate::connect::{Address, Connection};
 
