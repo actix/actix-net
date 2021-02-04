@@ -162,10 +162,13 @@ impl Accept {
 
         loop {
             if let Err(e) = self.poll.poll(&mut events, None) {
-                if matches!(e.kind(), std::io::ErrorKind::Interrupted) {
-                    continue;
-                } else {
-                    panic!("Poll error: {}", e);
+                match e.kind() {
+                    std::io::ErrorKind::Interrupted => {
+                        continue;
+                    }
+                    _ => {
+                        panic!("Poll error: {}", e);
+                    }
                 }
             }
 

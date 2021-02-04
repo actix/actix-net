@@ -2,6 +2,7 @@
 
 ## Unreleased - 2021-xx-xx
 * Hidden `ServerBuilder::start` method has been removed. Use `ServerBuilder::run`. [#246]
+* Add retry for EINTR(`io::Interrupted`) in `Accept`'s poll loop.
 
 [#246]: https://github.com/actix/actix-net/pull/246
 
