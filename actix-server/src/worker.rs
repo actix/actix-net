@@ -159,7 +159,7 @@ enum WorkerServiceStatus {
     Stopped,
 }
 
-// config for worker behavior passed from server builder.
+/// Config for worker behavior passed down from server builder.
 #[derive(Copy, Clone)]
 pub(crate) struct ServerWorkerConfig {
     shutdown_timeout: Duration,

@@ -78,20 +78,19 @@ impl ServerBuilder {
         self
     }
 
-    /// Set number of max blocking threads for running blocking task on thread pool.
+    /// Set max number of threads for each worker's blocking task thread pool.
     ///
-    /// * This thread pool is per worker and `NOT` shared across workers.
+    /// One thread pool is set up **per worker**; not shared across workers.
     ///
     /// # Examples:
-    /// ```rust
+    /// ```
     /// # use actix_server::ServerBuilder;
     /// let builder = ServerBuilder::new()
     ///     .workers(4) // server has 4 worker thread.
     ///     .worker_max_blocking_threads(4); // every worker has 4 max blocking threads.
     /// ```
     ///
-    /// See [tokio::runtime::Builder::max_blocking_threads](tokio::runtime::Builder::max_blocking_threads)
-    /// for behavior reference.
+    /// See [tokio::runtime::Builder::max_blocking_threads] for behavior reference.
     pub fn worker_max_blocking_threads(mut self, num: usize) -> Self {
         self.worker_config.max_blocking_threads(num);
         self
