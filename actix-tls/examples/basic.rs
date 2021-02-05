@@ -29,7 +29,7 @@ use std::{
     },
 };
 
-use actix_server::Server;
+use actix_server::ServerHandle;
 use actix_service::pipeline_factory;
 use actix_tls::accept::rustls::Acceptor as RustlsAcceptor;
 use futures_util::future::ok;
@@ -67,7 +67,7 @@ async fn main() -> io::Result<()> {
     let addr = ("127.0.0.1", 8443);
     info!("starting server on port: {}", &addr.0);
 
-    Server::build()
+    ServerHandle::build()
         .bind("tls-example", addr, move || {
             let count = Arc::clone(&count);
 

@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::{mpsc, Arc};
 use std::{net, thread, time};
 
-use actix_server::Server;
+use actix_server::ServerHandle;
 use actix_service::fn_service;
 use futures_util::future::{lazy, ok};
 
@@ -22,18 +22,21 @@ fn test_bind() {
 
     let h = thread::spawn(move || {
         let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
-            Server::build()
-                .workers(1)
-                .disable_signals()
-                .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
-                .unwrap()
-                .run()
-        }));
-        let _ = tx.send((srv, actix_rt::System::current()));
+        sys.block_on(async {
+            actix_rt::spawn(async move {
+                let _ = ServerHandle::build()
+                    .workers(1)
+                    .disable_signals()
+                    .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
+                    .unwrap()
+                    .run()
+                    .await;
+            });
+        });
+        let _ = tx.send(actix_rt::System::current());
         let _ = sys.run();
     });
-    let (_, sys) = rx.recv().unwrap();
+    let sys = rx.recv().unwrap();
 
     thread::sleep(time::Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
@@ -50,14 +53,17 @@ fn test_listen() {
         let sys = actix_rt::System::new();
         let lst = net::TcpListener::bind(addr).unwrap();
         sys.block_on(async {
-            Server::build()
-                .disable_signals()
-                .workers(1)
-                .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
-                .unwrap()
-                .run();
-            let _ = tx.send(actix_rt::System::current());
+            actix_rt::spawn(async move {
+                let _ = ServerHandle::build()
+                    .disable_signals()
+                    .workers(1)
+                    .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
+                    .unwrap()
+                    .run()
+                    .await;
+            });
         });
+        let _ = tx.send(actix_rt::System::current());
         let _ = sys.run();
     });
     let sys = rx.recv().unwrap();
@@ -81,9 +87,8 @@ fn test_start() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
-            Server::build()
+        actix_rt::System::new().block_on(async {
+            let server = ServerHandle::build()
                 .backlog(100)
                 .disable_signals()
                 .bind("test", addr, move || {
@@ -94,11 +99,11 @@ fn test_start() {
                     })
                 })
                 .unwrap()
-                .run()
-        }));
-
-        let _ = tx.send((srv, actix_rt::System::current()));
-        let _ = sys.run();
+                .run();
+            let handle = server.handle();
+            let _ = tx.send((handle, actix_rt::System::current()));
+            let _ = server.await;
+        });
     });
 
     let (srv, sys) = rx.recv().unwrap();
@@ -150,9 +155,8 @@ fn test_configure() {
 
     let h = thread::spawn(move || {
         let num = num2.clone();
-        let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
-            Server::build()
+        actix_rt::System::new().block_on(async {
+            let server = ServerHandle::build()
                 .disable_signals()
                 .configure(move |cfg| {
                     let num = num.clone();
@@ -173,18 +177,21 @@ fn test_configure() {
                 })
                 .unwrap()
                 .workers(1)
-                .run()
-        }));
-        let _ = tx.send((srv, actix_rt::System::current()));
-        let _ = sys.run();
+                .run();
+
+            let handle = server.handle();
+            let _ = tx.send((handle, actix_rt::System::current()));
+            let _ = server.await;
+        });
     });
-    let (_, sys) = rx.recv().unwrap();
+    let (server, sys) = rx.recv().unwrap();
     thread::sleep(time::Duration::from_millis(500));
 
     assert!(net::TcpStream::connect(addr1).is_ok());
     assert!(net::TcpStream::connect(addr2).is_ok());
     assert!(net::TcpStream::connect(addr3).is_ok());
     assert_eq!(num.load(Relaxed), 1);
+    let _ = server.stop(true);
     sys.stop();
     let _ = h.join();
 }

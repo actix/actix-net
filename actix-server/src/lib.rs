@@ -7,7 +7,7 @@
 mod accept;
 mod builder;
 mod config;
-mod server;
+mod server_handle;
 mod service;
 mod signals;
 mod socket;
@@ -17,7 +17,7 @@ mod worker;
 
 pub use self::builder::ServerBuilder;
 pub use self::config::{ServiceConfig, ServiceRuntime};
-pub use self::server::Server;
+pub use self::server_handle::ServerHandle;
 pub use self::service::ServiceFactory;
 pub use self::test_server::TestServer;
 

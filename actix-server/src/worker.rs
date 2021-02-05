@@ -6,7 +6,6 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use actix_rt::time::{sleep_until, Instant, Sleep};
-use actix_rt::{spawn, Arbiter};
 use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
 use log::{error, info, trace};
@@ -198,17 +197,11 @@ impl ServerWorker {
         let (tx2, rx2) = unbounded_channel();
         let avail = availability.clone();
 
+        availability.set(false);
+
         // every worker runs in it's own arbiter.
         // use a custom tokio runtime builder to change the settings of runtime.
-        Arbiter::with_tokio_rt(move || {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .max_blocking_threads(config.max_blocking_threads)
-                .build()
-                .unwrap()
-        })
-        .spawn(async move {
-            availability.set(false);
+        std::thread::spawn(move || {
             let mut wrk = MAX_CONNS_COUNTER.with(move |conns| ServerWorker {
                 rx,
                 rx2,
@@ -219,7 +212,6 @@ impl ServerWorker {
                 conns: conns.clone(),
                 state: WorkerState::Unavailable,
             });
-
             let fut = wrk
                 .factories
                 .iter()
@@ -234,30 +226,35 @@ impl ServerWorker {
                 })
                 .collect::<Vec<_>>();
 
-            // a second spawn to make sure worker future runs as non boxed future.
-            // As Arbiter::spawn would box the future before send it to arbiter.
-            spawn(async move {
-                let res: Result<Vec<_>, _> = join_all(fut).await.into_iter().collect();
-                match res {
-                    Ok(services) => {
-                        for item in services {
-                            for (factory, token, service) in item {
-                                assert_eq!(token.0, wrk.services.len());
-                                wrk.services.push(WorkerService {
-                                    factory,
-                                    service,
-                                    status: WorkerServiceStatus::Unavailable,
-                                });
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .max_blocking_threads(config.max_blocking_threads)
+                .build()
+                .unwrap()
+                .block_on(tokio::task::LocalSet::new().run_until(async move {
+                    let res = join_all(fut)
+                        .await
+                        .into_iter()
+                        .collect::<Result<Vec<_>, _>>();
+                    match res {
+                        Ok(services) => {
+                            for item in services {
+                                for (factory, token, service) in item {
+                                    assert_eq!(token.0, wrk.services.len());
+                                    wrk.services.push(WorkerService {
+                                        factory,
+                                        service,
+                                        status: WorkerServiceStatus::Unavailable,
+                                    });
+                                }
                             }
                         }
+                        Err(e) => {
+                            error!("Can not start worker: {:?}", e);
+                        }
                     }
-                    Err(e) => {
-                        error!("Can not start worker: {:?}", e);
-                        Arbiter::current().stop();
-                    }
-                }
-                wrk.await
-            });
+                    wrk.await
+                }))
         });
 
         WorkerHandle::new(idx, tx1, tx2, avail)
@@ -424,7 +421,6 @@ impl Future for ServerWorker {
                 let num = num_connections();
                 if num == 0 {
                     let _ = tx.take().unwrap().send(true);
-                    Arbiter::current().stop();
                     return Poll::Ready(());
                 }
 
@@ -432,7 +428,6 @@ impl Future for ServerWorker {
                 if Pin::new(t2).poll(cx).is_ready() {
                     let _ = tx.take().unwrap().send(false);
                     self.shutdown(true);
-                    Arbiter::current().stop();
                     return Poll::Ready(());
                 }
 

@@ -6,15 +6,15 @@ use std::{io, mem};
 
 use actix_rt::net::TcpStream;
 use actix_rt::time::{sleep_until, Instant};
-use actix_rt::{self as rt, System};
+use actix_rt::System;
 use futures_core::future::BoxFuture;
 use log::{error, info};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 
 use crate::accept::Accept;
 use crate::config::{ConfiguredService, ServiceConfig};
-use crate::server::{Server, ServerCommand};
+use crate::server_handle::{ServerCommand, ServerHandle};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
@@ -32,8 +32,8 @@ pub struct ServerBuilder {
     sockets: Vec<(Token, String, MioListener)>,
     exit: bool,
     no_signals: bool,
-    cmd: UnboundedReceiver<ServerCommand>,
-    server: Server,
+    cmd_tx: UnboundedSender<ServerCommand>,
+    cmd_rx: UnboundedReceiver<ServerCommand>,
     worker_config: ServerWorkerConfig,
 }
 
@@ -47,8 +47,6 @@ impl ServerBuilder {
     /// Create new Server builder instance
     pub fn new() -> ServerBuilder {
         let (tx, rx) = unbounded_channel();
-        let server = Server::new(tx);
-
         ServerBuilder {
             threads: num_cpus::get(),
             token: Token::default(),
@@ -57,8 +55,8 @@ impl ServerBuilder {
             backlog: 2048,
             exit: false,
             no_signals: false,
-            cmd: rx,
-            server,
+            cmd_tx: tx,
+            cmd_rx: rx,
             worker_config: ServerWorkerConfig::default(),
         }
     }
@@ -267,7 +265,7 @@ impl ServerBuilder {
     }
 
     /// Starts processing incoming connections and return server controller.
-    pub fn run(mut self) -> Server {
+    pub fn run(mut self) -> ServerFuture {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
@@ -287,7 +285,7 @@ impl ServerBuilder {
             // start accept thread. return waker_queue for wake up it.
             let waker_queue = Accept::start(
                 sockets,
-                self.server.clone(),
+                ServerHandle::new(self.cmd_tx.clone()),
                 // closure for construct worker and return it's handler.
                 |waker| {
                     (0..self.threads)
@@ -316,8 +314,9 @@ impl ServerBuilder {
                 None
             };
 
-            let server_future = ServerFuture {
-                cmd: self.cmd,
+            ServerFuture {
+                cmd_tx: self.cmd_tx,
+                cmd_rx: self.cmd_rx,
                 handles,
                 services: self.services,
                 notify: Vec::new(),
@@ -326,19 +325,16 @@ impl ServerBuilder {
                 signals,
                 on_stop_task: None,
                 waker_queue,
-            };
-
-            // spawn server future.
-            rt::spawn(server_future);
-
-            self.server
+            }
         }
     }
 }
 
-/// `ServerFuture` when awaited or spawned would listen to signal and message from `Server`.
-struct ServerFuture {
-    cmd: UnboundedReceiver<ServerCommand>,
+/// When awaited or spawned would listen to signal and message from [ServerHandle](crate::server::ServerHandle).
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct ServerFuture {
+    cmd_tx: UnboundedSender<ServerCommand>,
+    cmd_rx: UnboundedReceiver<ServerCommand>,
     handles: Vec<(usize, WorkerHandle)>,
     services: Vec<Box<dyn InternalServiceFactory>>,
     notify: Vec<oneshot::Sender<()>>,
@@ -350,6 +346,13 @@ struct ServerFuture {
 }
 
 impl ServerFuture {
+    /// Obtain a Handle for ServerFuture that can be used to change state of actix server.
+    ///
+    /// See [ServerHandle](crate::server::ServerHandle) for usage.
+    pub fn handle(&self) -> ServerHandle {
+        ServerHandle::new(self.cmd_tx.clone())
+    }
+
     fn handle_cmd(&mut self, item: ServerCommand) -> Option<BoxFuture<'static, ()>> {
         match item {
             ServerCommand::Pause(tx) => {
@@ -415,6 +418,7 @@ impl ServerFuture {
                         .map(move |worker| worker.1.stop(graceful))
                         .collect::<Vec<_>>();
 
+                    // TODO: this async block can return io::Error.
                     Some(Box::pin(async move {
                         for handle in iter {
                             let _ = handle.await;
@@ -433,6 +437,7 @@ impl ServerFuture {
                 } else {
                     // we need to stop system if server was spawned
                     let exit = self.exit;
+                    // TODO: this async block can return io::Error.
                     Some(Box::pin(async move {
                         if exit {
                             sleep_until(Instant::now() + Duration::from_millis(300)).await;
@@ -490,7 +495,7 @@ impl ServerFuture {
 }
 
 impl Future for ServerFuture {
-    type Output = ();
+    type Output = io::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.as_mut().get_mut();
@@ -509,10 +514,10 @@ impl Future for ServerFuture {
         loop {
             // got on stop task. resolve it exclusively and exit.
             if let Some(ref mut fut) = this.on_stop_task {
-                return fut.as_mut().poll(cx);
+                return fut.as_mut().poll(cx).map(|_| Ok(()));
             }
 
-            match Pin::new(&mut this.cmd).poll_recv(cx) {
+            match Pin::new(&mut this.cmd_rx).poll_recv(cx) {
                 Poll::Ready(Some(it)) => {
                     this.on_stop_task = this.handle_cmd(it);
                 }
