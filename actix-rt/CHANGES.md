@@ -1,6 +1,7 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Expose JoinError from tokio
 
 
 ## 2.0.0 - 2021-02-02
