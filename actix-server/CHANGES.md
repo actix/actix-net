@@ -1,13 +1,18 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.3 - 2021-02-06
 * Hidden `ServerBuilder::start` method has been removed. Use `ServerBuilder::run`. [#246]
-* Add retry for EINTR(`io::Interrupted`) in `Accept`'s poll loop. [#264]
+* Add retry for EINTR signal (`io::Interrupted`) in `Accept`'s poll loop. [#264]
 * Add `ServerBuilder::worker_max_blocking_threads` for customize blocking thread pool. [#265]
+* Update `actix-rt` to `2.0.0`. [#273]
 
 [#246]: https://github.com/actix/actix-net/pull/246
 [#264]: https://github.com/actix/actix-net/pull/264
 [#265]: https://github.com/actix/actix-net/pull/265
+[#273]: https://github.com/actix/actix-net/pull/273
 
 
 ## 2.0.0-beta.2 - 2021-01-03
