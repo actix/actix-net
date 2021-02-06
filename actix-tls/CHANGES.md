@@ -6,7 +6,7 @@
 ## 3.0.0-beta.3 - 2021-02-06
 * Remove `trust-dns-proto` and `trust-dns-resolver`. [#248]
 * Use `std::net::ToSocketAddrs` as simple and basic default resolver. [#248]
-* Add `Resolve` trait for custom dns resolver. [#248]
+* Add `Resolve` trait for custom DNS resolvers. [#248]
 * Add `Resolver::new_custom` function to construct custom resolvers. [#248]
 * Export `webpki_roots::TLS_SERVER_ROOTS` in `actix_tls::connect` mod and remove
   the export from `actix_tls::accept` [#248]
