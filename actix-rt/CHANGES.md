@@ -1,7 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Expose JoinError from tokio
+* Expose JoinError from tokio. [#271]
+
+[#271]: https://github.com/actix/actix-net/pull/271
 
 
 ## 2.0.0 - 2021-02-02
