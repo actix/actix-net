@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 0.2.7 - 2021-02-06
 * Add `Router::recognize_checked` [#247]
 
 [#247]: https://github.com/actix/actix-net/pull/247
