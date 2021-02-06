@@ -91,7 +91,7 @@ pub mod time {
 pub mod task {
     //! Task management (Tokio re-exports).
 
-    pub use tokio::task::{spawn_blocking, yield_now, JoinHandle};
+    pub use tokio::task::{spawn_blocking, yield_now, JoinError, JoinHandle};
 }
 
 /// Spawns a future on the current thread.
