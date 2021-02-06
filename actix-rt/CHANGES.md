@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Add `Arbiter::handle` to get a handle of an owned Arbiter. [#???]
+
+[#???]: https://github.com/actix/actix-net/pull/???
 
 
 ## 2.0.1 - 2021-02-06
