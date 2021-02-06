@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures_core::future::BoxFuture;
+use crate::server::Server;
 
 /// Different types of process signals
 #[allow(dead_code)]
@@ -20,9 +20,9 @@ pub(crate) enum Signal {
 
 pub(crate) struct Signals {
     #[cfg(not(unix))]
-    signals: BoxFuture<'static, std::io::Result<()>>,
+    signals: futures_core::future::LocalBoxFuture<'static, std::io::Result<()>>,
     #[cfg(unix)]
-    signals: Vec<(Signal, BoxFuture<'static, ()>)>,
+    signals: Vec<(Signal, actix_rt::signal::unix::Signal)>,
 }
 
 impl Signals {
@@ -44,23 +44,21 @@ impl Signals {
                 (unix::SignalKind::quit(), Signal::Quit),
             ];
 
-            let mut signals = Vec::new();
-
-            for (kind, sig) in sig_map.iter() {
-                match unix::signal(*kind) {
-                    Ok(mut stream) => {
-                        let fut = Box::pin(async move {
-                            let _ = stream.recv().await;
-                        }) as _;
-                        signals.push((*sig, fut));
-                    }
-                    Err(e) => log::error!(
-                        "Can not initialize stream handler for {:?} err: {}",
-                        sig,
-                        e
-                    ),
-                }
-            }
+            let signals = sig_map
+                .iter()
+                .filter_map(|(kind, sig)| {
+                    unix::signal(*kind)
+                        .map(|tokio_sig| (*sig, tokio_sig))
+                        .map_err(|e| {
+                            log::error!(
+                                "Can not initialize stream handler for {:?} err: {}",
+                                sig,
+                                e
+                            )
+                        })
+                        .ok()
+                })
+                .collect::<Vec<_>>();
 
             Signals { signals }
         }
@@ -79,7 +77,7 @@ impl Future for Signals {
         #[cfg(unix)]
         {
             for (sig, fut) in self.signals.iter_mut() {
-                if fut.as_mut().poll(cx).is_ready() {
+                if Pin::new(fut).poll_recv(cx).is_ready() {
                     return Poll::Ready(*sig);
                 }
             }
