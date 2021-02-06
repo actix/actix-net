@@ -2,8 +2,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use crate::server::Server;
-
 /// Different types of process signals
 #[allow(dead_code)]
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -20,7 +18,7 @@ pub(crate) enum Signal {
 
 pub(crate) struct Signals {
     #[cfg(not(unix))]
-    signals: futures_core::future::LocalBoxFuture<'static, std::io::Result<()>>,
+    signals: futures_core::future::BoxFuture<'static, std::io::Result<()>>,
     #[cfg(unix)]
     signals: Vec<(Signal, actix_rt::signal::unix::Signal)>,
 }

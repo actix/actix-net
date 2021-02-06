@@ -505,8 +505,6 @@ impl Future for ServerFuture {
             if let Poll::Ready(signal) = Pin::new(signals).poll(cx) {
                 this.on_stop_task = this.handle_cmd(ServerCommand::Signal(signal));
                 this.signals = None;
-                // poll another round for trying on_stop_task.
-                return self.poll(cx);
             }
         }
 
