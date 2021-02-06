@@ -21,7 +21,7 @@ pub(crate) enum Signal {
 pub(crate) struct Signals {
     srv: Server,
     #[cfg(not(unix))]
-    signals: LocalBoxFuture<'static, std::io::Result<()>>,
+    signals: futures_core::future::LocalBoxFuture<'static, std::io::Result<()>>,
     #[cfg(unix)]
     signals: Vec<(Signal, actix_rt::signal::unix::Signal)>,
 }
