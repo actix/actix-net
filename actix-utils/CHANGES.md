@@ -4,7 +4,9 @@
 
 
 ## 3.0.0-beta.2 - 2021-02-06
-* Update `actix-rt` to `2.0.0`. [#???]
+* Update `actix-rt` to `2.0.0`. [#273]
+
+[#273]: https://github.com/actix/actix-net/pull/273
 
 
 ## 3.0.0-beta.1 - 2020-12-28
