@@ -2,8 +2,10 @@
 
 ## Unreleased - 2021-xx-xx
 * Add `Arbiter::handle` to get a handle of an owned Arbiter. [#274]
+* Add `System::try_current` for situations where actix may or may not be running a System. [#???]
 
 [#274]: https://github.com/actix/actix-net/pull/274
+[#???]: https://github.com/actix/actix-net/pull/???
 
 
 ## 2.0.1 - 2021-02-06

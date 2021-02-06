@@ -288,3 +288,13 @@ fn new_arbiter_with_tokio() {
 
     assert_eq!(false, counter.load(Ordering::SeqCst));
 }
+
+#[test]
+fn try_current_no_system() {
+    assert!(System::try_current().is_none())
+}
+
+#[test]
+fn try_current_with_system() {
+    System::new().block_on(async { assert!(System::try_current().is_some()) });
+}

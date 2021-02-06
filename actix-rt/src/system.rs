@@ -100,6 +100,15 @@ impl System {
         })
     }
 
+    /// Try to get current running system.
+    ///
+    /// Returns `None` if no System has been started.
+    ///
+    /// Contrary to `current`, this never panics.
+    pub fn try_current() -> Option<System> {
+        CURRENT.with(|cell| cell.borrow().clone())
+    }
+
     /// Get handle to a the System's initial [Arbiter].
     pub fn arbiter(&self) -> &ArbiterHandle {
         &self.arbiter_handle
