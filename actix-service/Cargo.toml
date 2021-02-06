@@ -1,9 +1,10 @@
 [package]
 name = "actix-service"
-version = "2.0.0-beta.3"
+version = "2.0.0-beta.4"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
+    "fakeshadow <24548779@qq.com>",
 ]
 description = "Service trait and combinators for representing asynchronous request/response operations."
 keywords = ["network", "framework", "async", "futures", "service"]
