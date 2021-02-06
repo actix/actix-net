@@ -3,6 +3,10 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.0-beta.2 - 2021-02-06
+* Update `actix-rt` to `2.0.0`. [#???]
+
+
 ## 3.0.0-beta.1 - 2020-12-28
 * Update `bytes` dependency to `1`. [#237]
 * Use `pin-project-lite` to replace `pin-project`. [#229]
