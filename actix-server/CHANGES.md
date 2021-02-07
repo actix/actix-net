@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Added ServerBuilder::on_stop to run an async closure before Server shutdown [#230]
+
+[#230]: https://github.com/actix/actix-net/pull/230
 
 
 ## 2.0.0-beta.3 - 2021-02-06
@@ -24,13 +27,6 @@
 ## 2.0.0-beta.1 - 2020-12-28
 * Added explicit info log message on accept queue pause. [#215]
 * Prevent double registration of sockets when back-pressure is resolved. [#223]
-<<<<<<< HEAD
-* Added ServerBuilder::on_stop to run an async closure before Server shutdown [#230]
-
-[#215]: https://github.com/actix/actix-net/pull/215
-[#223]: https://github.com/actix/actix-net/pull/223
-[#230]: https://github.com/actix/actix-net/pull/230
-=======
 * Update `mio` dependency to `0.7.3`. [#239]
 * Remove `socket2` dependency. [#239]
 * `ServerBuilder::backlog` now accepts `u32` instead of `i32`. [#239]
@@ -43,7 +39,6 @@
 [#223]: https://github.com/actix/actix-net/pull/223
 [#239]: https://github.com/actix/actix-net/pull/239
 
->>>>>>> master
 
 ## 1.0.4 - 2020-09-12
 * Update actix-codec to 0.3.0.
