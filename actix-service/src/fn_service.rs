@@ -1,17 +1,13 @@
-use std::future::Future;
-use std::marker::PhantomData;
-use std::task::{Context, Poll};
+use core::{future::Future, marker::PhantomData, task::Poll};
 
-use futures_util::future::{ok, Ready};
-
-use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
+use crate::{ok, IntoService, IntoServiceFactory, Ready, Service, ServiceFactory};
 
 /// Create `ServiceFactory` for function that can act as a `Service`
 pub fn fn_service<F, Fut, Req, Res, Err, Cfg>(
     f: F,
 ) -> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     FnServiceFactory::new(f)
@@ -21,7 +17,7 @@ where
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use std::io;
 /// use actix_service::{fn_factory, fn_service, Service, ServiceFactory};
 /// use futures_util::future::ok;
@@ -43,7 +39,7 @@ where
 ///     });
 ///
 ///     // construct new service
-///     let mut srv = factory.new_service(()).await?;
+///     let srv = factory.new_service(()).await?;
 ///
 ///     // now we can use `div` service
 ///     let result = srv.call((10, 20)).await?;
@@ -53,9 +49,11 @@ where
 ///     Ok(())
 /// }
 /// ```
-pub fn fn_factory<F, Cfg, Srv, Fut, Err>(f: F) -> FnServiceNoConfig<F, Cfg, Srv, Fut, Err>
+pub fn fn_factory<F, Cfg, Srv, Req, Fut, Err>(
+    f: F,
+) -> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
 where
-    Srv: Service,
+    Srv: Service<Req>,
     F: Fn() -> Fut,
     Fut: Future<Output = Result<Srv, Err>>,
 {
@@ -69,7 +67,7 @@ where
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use std::io;
 /// use actix_service::{fn_factory_with_config, fn_service, Service, ServiceFactory};
 /// use futures_util::future::ok;
@@ -83,7 +81,7 @@ where
 ///     });
 ///
 ///     // construct new service with config argument
-///     let mut srv = factory.new_service(10).await?;
+///     let srv = factory.new_service(10).await?;
 ///
 ///     let result = srv.call(10).await?;
 ///     assert_eq!(result, 100);
@@ -92,13 +90,13 @@ where
 ///     Ok(())
 /// }
 /// ```
-pub fn fn_factory_with_config<F, Fut, Cfg, Srv, Err>(
+pub fn fn_factory_with_config<F, Fut, Cfg, Srv, Req, Err>(
     f: F,
-) -> FnServiceConfig<F, Fut, Cfg, Srv, Err>
+) -> FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
 where
     F: Fn(Cfg) -> Fut,
     Fut: Future<Output = Result<Srv, Err>>,
-    Srv: Service,
+    Srv: Service<Req>,
 {
     FnServiceConfig::new(f)
 }
@@ -132,28 +130,25 @@ where
     }
 }
 
-impl<F, Fut, Req, Res, Err> Service for FnService<F, Fut, Req, Res, Err>
+impl<F, Fut, Req, Res, Err> Service<Req> for FnService<F, Fut, Req, Res, Err>
 where
-    F: FnMut(Req) -> Fut,
+    F: Fn(Req) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
-    type Request = Req;
     type Response = Res;
     type Error = Err;
     type Future = Fut;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    crate::always_ready!();
 
-    fn call(&mut self, req: Req) -> Self::Future {
+    fn call(&self, req: Req) -> Self::Future {
         (self.f)(req)
     }
 }
 
-impl<F, Fut, Req, Res, Err> IntoService<FnService<F, Fut, Req, Res, Err>> for F
+impl<F, Fut, Req, Res, Err> IntoService<FnService<F, Fut, Req, Res, Err>, Req> for F
 where
-    F: FnMut(Req) -> Fut,
+    F: Fn(Req) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn into_service(self) -> FnService<F, Fut, Req, Res, Err> {
@@ -163,7 +158,7 @@ where
 
 pub struct FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
-    F: FnMut(Req) -> Fut,
+    F: Fn(Req) -> Fut,
     Fut: Future<Output = Result<Res, Err>>,
 {
     f: F,
@@ -172,7 +167,7 @@ where
 
 impl<F, Fut, Req, Res, Err, Cfg> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn new(f: F) -> Self {
@@ -182,7 +177,7 @@ where
 
 impl<F, Fut, Req, Res, Err, Cfg> Clone for FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
     fn clone(&self) -> Self {
@@ -190,31 +185,28 @@ where
     }
 }
 
-impl<F, Fut, Req, Res, Err> Service for FnServiceFactory<F, Fut, Req, Res, Err, ()>
+impl<F, Fut, Req, Res, Err> Service<Req> for FnServiceFactory<F, Fut, Req, Res, Err, ()>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
-    type Request = Req;
     type Response = Res;
     type Error = Err;
     type Future = Fut;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
+    crate::always_ready!();
 
-    fn call(&mut self, req: Self::Request) -> Self::Future {
+    fn call(&self, req: Req) -> Self::Future {
         (self.f)(req)
     }
 }
 
-impl<F, Fut, Req, Res, Err, Cfg> ServiceFactory for FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
+impl<F, Fut, Req, Res, Err, Cfg> ServiceFactory<Req>
+    for FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
-    F: FnMut(Req) -> Fut + Clone,
+    F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
 {
-    type Request = Req;
     type Response = Res;
     type Error = Err;
 
@@ -229,7 +221,7 @@ where
 }
 
 impl<F, Fut, Req, Res, Err, Cfg>
-    IntoServiceFactory<FnServiceFactory<F, Fut, Req, Res, Err, Cfg>> for F
+    IntoServiceFactory<FnServiceFactory<F, Fut, Req, Res, Err, Cfg>, Req> for F
 where
     F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
@@ -240,32 +232,32 @@ where
 }
 
 /// Convert `Fn(&Config) -> Future<Service>` fn to NewService
-pub struct FnServiceConfig<F, Fut, Cfg, Srv, Err>
+pub struct FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
 where
     F: Fn(Cfg) -> Fut,
     Fut: Future<Output = Result<Srv, Err>>,
-    Srv: Service,
+    Srv: Service<Req>,
 {
     f: F,
-    _t: PhantomData<(Fut, Cfg, Srv, Err)>,
+    _t: PhantomData<(Fut, Cfg, Req, Srv, Err)>,
 }
 
-impl<F, Fut, Cfg, Srv, Err> FnServiceConfig<F, Fut, Cfg, Srv, Err>
+impl<F, Fut, Cfg, Srv, Req, Err> FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
 where
     F: Fn(Cfg) -> Fut,
     Fut: Future<Output = Result<Srv, Err>>,
-    Srv: Service,
+    Srv: Service<Req>,
 {
     fn new(f: F) -> Self {
         FnServiceConfig { f, _t: PhantomData }
     }
 }
 
-impl<F, Fut, Cfg, Srv, Err> Clone for FnServiceConfig<F, Fut, Cfg, Srv, Err>
+impl<F, Fut, Cfg, Srv, Req, Err> Clone for FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
 where
     F: Fn(Cfg) -> Fut + Clone,
     Fut: Future<Output = Result<Srv, Err>>,
-    Srv: Service,
+    Srv: Service<Req>,
 {
     fn clone(&self) -> Self {
         FnServiceConfig {
@@ -275,13 +267,13 @@ where
     }
 }
 
-impl<F, Fut, Cfg, Srv, Err> ServiceFactory for FnServiceConfig<F, Fut, Cfg, Srv, Err>
+impl<F, Fut, Cfg, Srv, Req, Err> ServiceFactory<Req>
+    for FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
 where
     F: Fn(Cfg) -> Fut,
     Fut: Future<Output = Result<Srv, Err>>,
-    Srv: Service,
+    Srv: Service<Req>,
 {
-    type Request = Srv::Request;
     type Response = Srv::Response;
     type Error = Srv::Error;
 
@@ -296,82 +288,83 @@ where
 }
 
 /// Converter for `Fn() -> Future<Service>` fn
-pub struct FnServiceNoConfig<F, C, S, R, E>
+pub struct FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
 where
-    F: Fn() -> R,
-    S: Service,
-    R: Future<Output = Result<S, E>>,
+    F: Fn() -> Fut,
+    Srv: Service<Req>,
+    Fut: Future<Output = Result<Srv, Err>>,
 {
     f: F,
-    _t: PhantomData<C>,
+    _t: PhantomData<(Cfg, Req)>,
 }
 
-impl<F, C, S, R, E> FnServiceNoConfig<F, C, S, R, E>
+impl<F, Cfg, Srv, Req, Fut, Err> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
 where
-    F: Fn() -> R,
-    R: Future<Output = Result<S, E>>,
-    S: Service,
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<Srv, Err>>,
+    Srv: Service<Req>,
 {
     fn new(f: F) -> Self {
         Self { f, _t: PhantomData }
     }
 }
 
-impl<F, C, S, R, E> ServiceFactory for FnServiceNoConfig<F, C, S, R, E>
+impl<F, Cfg, Srv, Req, Fut, Err> ServiceFactory<Req>
+    for FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
 where
-    F: Fn() -> R,
-    R: Future<Output = Result<S, E>>,
-    S: Service,
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<Srv, Err>>,
+    Srv: Service<Req>,
 {
-    type Request = S::Request;
-    type Response = S::Response;
-    type Error = S::Error;
-    type Service = S;
-    type Config = C;
-    type InitError = E;
-    type Future = R;
+    type Response = Srv::Response;
+    type Error = Srv::Error;
+    type Config = Cfg;
+    type Service = Srv;
+    type InitError = Err;
+    type Future = Fut;
 
-    fn new_service(&self, _: C) -> Self::Future {
+    fn new_service(&self, _: Cfg) -> Self::Future {
         (self.f)()
     }
 }
 
-impl<F, C, S, R, E> Clone for FnServiceNoConfig<F, C, S, R, E>
+impl<F, Cfg, Srv, Req, Fut, Err> Clone for FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
 where
-    F: Fn() -> R + Clone,
-    R: Future<Output = Result<S, E>>,
-    S: Service,
+    F: Fn() -> Fut + Clone,
+    Fut: Future<Output = Result<Srv, Err>>,
+    Srv: Service<Req>,
 {
     fn clone(&self) -> Self {
         Self::new(self.f.clone())
     }
 }
 
-impl<F, C, S, R, E> IntoServiceFactory<FnServiceNoConfig<F, C, S, R, E>> for F
+impl<F, Cfg, Srv, Req, Fut, Err>
+    IntoServiceFactory<FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>, Req> for F
 where
-    F: Fn() -> R,
-    R: Future<Output = Result<S, E>>,
-    S: Service,
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<Srv, Err>>,
+    Srv: Service<Req>,
 {
-    fn into_factory(self) -> FnServiceNoConfig<F, C, S, R, E> {
+    fn into_factory(self) -> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err> {
         FnServiceNoConfig::new(self)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::task::Poll;
+    use core::task::Poll;
 
-    use futures_util::future::{lazy, ok};
+    use futures_util::future::lazy;
 
     use super::*;
-    use crate::{Service, ServiceFactory};
+    use crate::{ok, Service, ServiceFactory};
 
     #[actix_rt::test]
     async fn test_fn_service() {
         let new_srv = fn_service(|()| ok::<_, ()>("srv"));
 
-        let mut srv = new_srv.new_service(()).await.unwrap();
+        let srv = new_srv.new_service(()).await.unwrap();
         let res = srv.call(()).await;
         assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
         assert!(res.is_ok());
@@ -380,7 +373,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_fn_service_service() {
-        let mut srv = fn_service(|()| ok::<_, ()>("srv"));
+        let srv = fn_service(|()| ok::<_, ()>("srv"));
 
         let res = srv.call(()).await;
         assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
@@ -394,7 +387,7 @@ mod tests {
             ok::<_, ()>(fn_service(move |()| ok::<_, ()>(("srv", cfg))))
         });
 
-        let mut srv = new_srv.new_service(1).await.unwrap();
+        let srv = new_srv.new_service(1).await.unwrap();
         let res = srv.call(()).await;
         assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
         assert!(res.is_ok());

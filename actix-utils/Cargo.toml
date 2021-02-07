@@ -1,12 +1,12 @@
 [package]
 name = "actix-utils"
-version = "2.0.0"
+version = "3.0.0-beta.2"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
-description = "Various network related services and utilities for the Actix ecosystem."
+description = "Various network related services and utilities for the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-utils/"
+documentation = "https://docs.rs/actix-utils"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
@@ -16,15 +16,15 @@ name = "actix_utils"
 path = "src/lib.rs"
 
 [dependencies]
-actix-codec = "0.3.0"
-actix-rt = "1.1.1"
-actix-service = "1.0.6"
-bitflags = "1.2.1"
-bytes = "0.5.3"
-either = "1.5.3"
-futures-channel = { version = "0.3.4", default-features = false }
-futures-sink = { version = "0.3.4", default-features = false }
-futures-util = { version = "0.3.4", default-features = false }
+actix-codec = "0.4.0-beta.1"
+actix-rt = { version = "2.0.0", default-features = false }
+actix-service = "2.0.0-beta.4"
+
+futures-core = { version = "0.3.7", default-features = false }
+futures-sink = { version = "0.3.7", default-features = false }
 log = "0.4"
-pin-project = "1.0.0"
-slab = "0.4"
+pin-project-lite = "0.2.0"
+
+[dev-dependencies]
+actix-rt = "2.0.0"
+futures-util = { version = "0.3.7", default-features = false }

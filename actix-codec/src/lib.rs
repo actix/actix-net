@@ -1,4 +1,4 @@
-//! Utilities for encoding and decoding frames.
+//! Codec utilities for working with framed protocols.
 //!
 //! Contains adapters to go from streams of bytes, [`AsyncRead`] and
 //! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].
@@ -18,5 +18,6 @@ mod framed;
 pub use self::bcodec::BytesCodec;
 pub use self::framed::{Framed, FramedParts};
 
-pub use tokio::io::{AsyncRead, AsyncWrite};
+pub use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 pub use tokio_util::codec::{Decoder, Encoder};
+pub use tokio_util::io::poll_read_buf;

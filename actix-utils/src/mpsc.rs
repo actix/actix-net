@@ -1,15 +1,17 @@
 //! A multi-producer, single-consumer, futures-aware, FIFO queue.
-use std::any::Any;
-use std::cell::RefCell;
+
+use core::any::Any;
+use core::cell::RefCell;
+use core::fmt;
+use core::pin::Pin;
+use core::task::{Context, Poll};
+
 use std::collections::VecDeque;
 use std::error::Error;
-use std::fmt;
-use std::pin::Pin;
 use std::rc::Rc;
-use std::task::{Context, Poll};
 
+use futures_core::stream::Stream;
 use futures_sink::Sink;
-use futures_util::stream::Stream;
 
 use crate::task::LocalWaker;
 

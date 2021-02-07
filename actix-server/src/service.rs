@@ -2,18 +2,16 @@ use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
 
-use actix_rt::spawn;
-use actix_service::{self as actix, Service, ServiceFactory as ActixServiceFactory};
+use actix_service::{Service, ServiceFactory as BaseServiceFactory};
 use actix_utils::counter::CounterGuard;
-use futures_util::future::{err, ok, LocalBoxFuture, Ready};
-use futures_util::{FutureExt, TryFutureExt};
+use futures_core::future::LocalBoxFuture;
 use log::error;
 
-use super::Token;
-use crate::socket::{FromStream, StdStream};
+use crate::socket::{FromStream, MioStream};
+use crate::{ready, Ready, Token};
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
-    type Factory: actix::ServiceFactory<Config = (), Request = Stream>;
+    type Factory: BaseServiceFactory<Stream, Config = ()>;
 
     fn create(&self) -> Self::Factory;
 }
@@ -28,54 +26,57 @@ pub(crate) trait InternalServiceFactory: Send {
 
 pub(crate) type BoxedServerService = Box<
     dyn Service<
-        Request = (Option<CounterGuard>, StdStream),
+        (Option<CounterGuard>, MioStream),
         Response = (),
         Error = (),
         Future = Ready<Result<(), ()>>,
     >,
 >;
 
-pub(crate) struct StreamService<T> {
-    service: T,
+pub(crate) struct StreamService<S, I> {
+    service: S,
+    _phantom: PhantomData<I>,
 }
 
-impl<T> StreamService<T> {
-    pub(crate) fn new(service: T) -> Self {
-        StreamService { service }
+impl<S, I> StreamService<S, I> {
+    pub(crate) fn new(service: S) -> Self {
+        StreamService {
+            service,
+            _phantom: PhantomData,
+        }
     }
 }
 
-impl<T, I> Service for StreamService<T>
+impl<S, I> Service<(Option<CounterGuard>, MioStream)> for StreamService<S, I>
 where
-    T: Service<Request = I>,
-    T::Future: 'static,
-    T::Error: 'static,
+    S: Service<I>,
+    S::Future: 'static,
+    S::Error: 'static,
     I: FromStream,
 {
-    type Request = (Option<CounterGuard>, StdStream);
     type Response = ();
     type Error = ();
     type Future = Ready<Result<(), ()>>;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(ctx).map_err(|_| ())
     }
 
-    fn call(&mut self, (guard, req): (Option<CounterGuard>, StdStream)) -> Self::Future {
-        match FromStream::from_stdstream(req) {
+    fn call(&self, (guard, req): (Option<CounterGuard>, MioStream)) -> Self::Future {
+        ready(match FromStream::from_mio(req) {
             Ok(stream) => {
                 let f = self.service.call(stream);
-                spawn(async move {
+                actix_rt::spawn(async move {
                     let _ = f.await;
                     drop(guard);
                 });
-                ok(())
+                Ok(())
             }
             Err(e) => {
                 error!("Can not convert to an async tcp stream: {}", e);
-                err(())
+                Err(())
             }
-        }
+        })
     }
 }
 
@@ -129,22 +130,23 @@ where
 
     fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>> {
         let token = self.token;
-        self.inner
-            .create()
-            .new_service(())
-            .map_err(|_| ())
-            .map_ok(move |inner| {
-                let service: BoxedServerService = Box::new(StreamService::new(inner));
-                vec![(token, service)]
-            })
-            .boxed_local()
+        let fut = self.inner.create().new_service(());
+        Box::pin(async move {
+            match fut.await {
+                Ok(inner) => {
+                    let service = Box::new(StreamService::new(inner)) as _;
+                    Ok(vec![(token, service)])
+                }
+                Err(_) => Err(()),
+            }
+        })
     }
 }
 
 impl<F, T, I> ServiceFactory<I> for F
 where
     F: Fn() -> T + Send + Clone + 'static,
-    T: actix::ServiceFactory<Config = (), Request = I>,
+    T: BaseServiceFactory<I, Config = ()>,
     I: FromStream,
 {
     type Factory = T;

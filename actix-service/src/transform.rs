@@ -1,18 +1,23 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use alloc::{rc::Rc, sync::Arc};
+use core::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use futures_core::ready;
+use pin_project_lite::pin_project;
 
 use crate::transform_err::TransformMapInitErr;
 use crate::{IntoServiceFactory, Service, ServiceFactory};
 
 /// Apply transform to a service.
-pub fn apply<T, S, U>(t: T, factory: U) -> ApplyTransform<T, S>
+pub fn apply<T, S, I, Req>(t: T, factory: I) -> ApplyTransform<T, S, Req>
 where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
-    U: IntoServiceFactory<S>,
+    I: IntoServiceFactory<S, Req>,
+    S: ServiceFactory<Req>,
+    T: Transform<S::Service, Req, InitError = S::InitError>,
 {
     ApplyTransform::new(t, factory.into_factory())
 }
@@ -26,7 +31,7 @@ where
 ///
 /// For example, timeout transform:
 ///
-/// ```rust,ignore
+/// ```ignore
 /// pub struct Timeout<S> {
 ///     service: S,
 ///     timeout: Duration,
@@ -41,11 +46,9 @@ where
 ///     type Error = TimeoutError<S::Error>;
 ///     type Future = TimeoutServiceResponse<S>;
 ///
-///     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-///         ready!(self.service.poll_ready(cx)).map_err(TimeoutError::Service)
-///     }
+///     actix_service::forward_ready!(service);
 ///
-///     fn call(&mut self, req: S::Request) -> Self::Future {
+///     fn call(&self, req: S::Request) -> Self::Future {
 ///         TimeoutServiceResponse {
 ///             fut: self.service.call(req),
 ///             sleep: Delay::new(clock::now() + self.timeout),
@@ -65,7 +68,7 @@ where
 ///
 /// Factory for `Timeout` middleware from the above example could look like this:
 ///
-/// ```rust,,ignore
+/// ```ignore
 /// pub struct TimeoutTransform {
 ///     timeout: Duration,
 /// }
@@ -89,10 +92,7 @@ where
 ///     }
 /// }
 /// ```
-pub trait Transform<S> {
-    /// Requests handled by the service.
-    type Request;
-
+pub trait Transform<S, Req> {
     /// Responses given by the service.
     type Response;
 
@@ -100,11 +100,7 @@ pub trait Transform<S> {
     type Error;
 
     /// The `TransformService` value created by this factory
-    type Transform: Service<
-        Request = Self::Request,
-        Response = Self::Response,
-        Error = Self::Error,
-    >;
+    type Transform: Service<Req, Response = Self::Response, Error = Self::Error>;
 
     /// Errors produced while building a transform service.
     type InitError;
@@ -117,7 +113,7 @@ pub trait Transform<S> {
 
     /// Map this transform's factory error to a different error,
     /// returning a new transform service factory.
-    fn map_init_err<F, E>(self, f: F) -> TransformMapInitErr<Self, S, F, E>
+    fn map_init_err<F, E>(self, f: F) -> TransformMapInitErr<Self, S, Req, F, E>
     where
         Self: Sized,
         F: Fn(Self::InitError) -> E + Clone,
@@ -126,15 +122,14 @@ pub trait Transform<S> {
     }
 }
 
-impl<T, S> Transform<S> for Rc<T>
+impl<T, S, Req> Transform<S, Req> for Rc<T>
 where
-    T: Transform<S>,
+    T: Transform<S, Req>,
 {
-    type Request = T::Request;
     type Response = T::Response;
     type Error = T::Error;
-    type InitError = T::InitError;
     type Transform = T::Transform;
+    type InitError = T::InitError;
     type Future = T::Future;
 
     fn new_transform(&self, service: S) -> T::Future {
@@ -142,15 +137,14 @@ where
     }
 }
 
-impl<T, S> Transform<S> for Arc<T>
+impl<T, S, Req> Transform<S, Req> for Arc<T>
 where
-    T: Transform<S>,
+    T: Transform<S, Req>,
 {
-    type Request = T::Request;
     type Response = T::Response;
     type Error = T::Error;
-    type InitError = T::InitError;
     type Transform = T::Transform;
+    type InitError = T::InitError;
     type Future = T::Future;
 
     fn new_transform(&self, service: S) -> T::Future {
@@ -159,72 +153,76 @@ where
 }
 
 /// `Apply` transform to new service
-pub struct ApplyTransform<T, S>(Rc<(T, S)>);
+pub struct ApplyTransform<T, S, Req>(Rc<(T, S)>, PhantomData<Req>);
 
-impl<T, S> ApplyTransform<T, S>
+impl<T, S, Req> ApplyTransform<T, S, Req>
 where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
+    S: ServiceFactory<Req>,
+    T: Transform<S::Service, Req, InitError = S::InitError>,
 {
     /// Create new `ApplyTransform` new service instance
     fn new(t: T, service: S) -> Self {
-        Self(Rc::new((t, service)))
+        Self(Rc::new((t, service)), PhantomData)
     }
 }
 
-impl<T, S> Clone for ApplyTransform<T, S> {
+impl<T, S, Req> Clone for ApplyTransform<T, S, Req> {
     fn clone(&self) -> Self {
-        ApplyTransform(self.0.clone())
+        ApplyTransform(self.0.clone(), PhantomData)
     }
 }
 
-impl<T, S> ServiceFactory for ApplyTransform<T, S>
+impl<T, S, Req> ServiceFactory<Req> for ApplyTransform<T, S, Req>
 where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
+    S: ServiceFactory<Req>,
+    T: Transform<S::Service, Req, InitError = S::InitError>,
 {
-    type Request = T::Request;
     type Response = T::Response;
     type Error = T::Error;
 
     type Config = S::Config;
     type Service = T::Transform;
     type InitError = T::InitError;
-    type Future = ApplyTransformFuture<T, S>;
+    type Future = ApplyTransformFuture<T, S, Req>;
 
     fn new_service(&self, cfg: S::Config) -> Self::Future {
         ApplyTransformFuture {
             store: self.0.clone(),
-            state: ApplyTransformFutureState::A(self.0.as_ref().1.new_service(cfg)),
+            state: ApplyTransformFutureState::A {
+                fut: self.0.as_ref().1.new_service(cfg),
+            },
         }
     }
 }
 
-#[pin_project::pin_project]
-pub struct ApplyTransformFuture<T, S>
-where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
-{
-    store: Rc<(T, S)>,
-    #[pin]
-    state: ApplyTransformFutureState<T, S>,
+pin_project! {
+    pub struct ApplyTransformFuture<T, S, Req>
+    where
+        S: ServiceFactory<Req>,
+        T: Transform<S::Service, Req, InitError = S::InitError>,
+    {
+        store: Rc<(T, S)>,
+        #[pin]
+        state: ApplyTransformFutureState<T, S, Req>,
+    }
 }
 
-#[pin_project::pin_project(project = ApplyTransformFutureStateProj)]
-pub enum ApplyTransformFutureState<T, S>
-where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
-{
-    A(#[pin] S::Future),
-    B(#[pin] T::Future),
+pin_project! {
+    #[project = ApplyTransformFutureStateProj]
+    pub enum ApplyTransformFutureState<T, S, Req>
+    where
+        S: ServiceFactory<Req>,
+        T: Transform<S::Service, Req, InitError = S::InitError>,
+    {
+        A { #[pin] fut: S::Future },
+        B { #[pin] fut: T::Future },
+    }
 }
 
-impl<T, S> Future for ApplyTransformFuture<T, S>
+impl<T, S, Req> Future for ApplyTransformFuture<T, S, Req>
 where
-    S: ServiceFactory,
-    T: Transform<S::Service, InitError = S::InitError>,
+    S: ServiceFactory<Req>,
+    T: Transform<S::Service, Req, InitError = S::InitError>,
 {
     type Output = Result<T::Transform, T::InitError>;
 
@@ -232,15 +230,13 @@ where
         let mut this = self.as_mut().project();
 
         match this.state.as_mut().project() {
-            ApplyTransformFutureStateProj::A(fut) => match fut.poll(cx)? {
-                Poll::Ready(srv) => {
-                    let fut = this.store.0.new_transform(srv);
-                    this.state.set(ApplyTransformFutureState::B(fut));
-                    self.poll(cx)
-                }
-                Poll::Pending => Poll::Pending,
-            },
-            ApplyTransformFutureStateProj::B(fut) => fut.poll(cx),
+            ApplyTransformFutureStateProj::A { fut } => {
+                let srv = ready!(fut.poll(cx))?;
+                let fut = this.store.0.new_transform(srv);
+                this.state.set(ApplyTransformFutureState::B { fut });
+                self.poll(cx)
+            }
+            ApplyTransformFutureStateProj::B { fut } => fut.poll(cx),
         }
     }
 }

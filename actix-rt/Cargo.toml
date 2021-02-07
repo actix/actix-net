@@ -1,12 +1,15 @@
 [package]
 name = "actix-rt"
-version = "1.1.1"
-authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
-description = "Actix runtime"
-keywords = ["network", "framework", "async", "futures"]
+version = "2.0.2"
+authors = [
+    "Nikolay Kim <fafhrd91@gmail.com>",
+    "Rob Ede <robjtede@icloud.com>",
+]
+description = "Tokio-based single-threaded async runtime for the Actix ecosystem"
+keywords = ["async", "futures", "io", "runtime"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-rt/"
+documentation = "https://docs.rs/actix-rt"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
@@ -15,13 +18,16 @@ edition = "2018"
 name = "actix_rt"
 path = "src/lib.rs"
 
+[features]
+default = ["macros"]
+macros = ["actix-macros"]
+
 [dependencies]
-actix-macros = "0.1.0"
-copyless = "0.1.4"
-futures-channel = "0.3.4"
-futures-util = { version = "0.3.4", default-features = false, features = ["alloc"] }
-smallvec = "1"
-tokio = { version = "0.2.6", default-features = false, features = ["rt-core", "rt-util", "io-driver", "tcp", "uds", "udp", "time", "signal", "stream"] }
+actix-macros = { version = "0.2.0", optional = true }
+
+futures-core = { version = "0.3", default-features = false }
+tokio = { version = "1.2", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }
 
 [dev-dependencies]
-tokio = { version = "0.2.6", features = ["full"] }
+tokio = { version = "1.2", features = ["full"] }
+hyper = { version = "0.14", default-features = false, features = ["server", "tcp", "http1"] }

@@ -1,13 +1,49 @@
 # Changes
 
-## Unreleased - 2020-xx-xx
+## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.3 - 2021-02-06
+* Hidden `ServerBuilder::start` method has been removed. Use `ServerBuilder::run`. [#246]
+* Add retry for EINTR signal (`io::Interrupted`) in `Accept`'s poll loop. [#264]
+* Add `ServerBuilder::worker_max_blocking_threads` to customize blocking thread pool size. [#265]
+* Update `actix-rt` to `2.0.0`. [#273]
+
+[#246]: https://github.com/actix/actix-net/pull/246
+[#264]: https://github.com/actix/actix-net/pull/264
+[#265]: https://github.com/actix/actix-net/pull/265
+[#273]: https://github.com/actix/actix-net/pull/273
+
+
+## 2.0.0-beta.2 - 2021-01-03
+* Merge `actix-testing` to `actix-server` as `test_server` mod. [#242]
+
+[#242]: https://github.com/actix/actix-net/pull/242
+
+
+## 2.0.0-beta.1 - 2020-12-28
 * Added explicit info log message on accept queue pause. [#215]
 * Prevent double registration of sockets when back-pressure is resolved. [#223]
+<<<<<<< HEAD
 * Added ServerBuilder::on_stop to run an async closure before Server shutdown [#230]
 
 [#215]: https://github.com/actix/actix-net/pull/215
 [#223]: https://github.com/actix/actix-net/pull/223
 [#230]: https://github.com/actix/actix-net/pull/230
+=======
+* Update `mio` dependency to `0.7.3`. [#239]
+* Remove `socket2` dependency. [#239]
+* `ServerBuilder::backlog` now accepts `u32` instead of `i32`. [#239]
+* Remove `AcceptNotify` type and pass `WakerQueue` to `Worker` to wake up `Accept`'s `Poll`. [#239]
+* Convert `mio::net::TcpStream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using
+  `FromRawFd` and `IntoRawFd`(`FromRawSocket` and `IntoRawSocket` on windows). [#239]
+* Remove `AsyncRead` and `AsyncWrite` trait bound for `socket::FromStream` trait. [#239]
+
+[#215]: https://github.com/actix/actix-net/pull/215
+[#223]: https://github.com/actix/actix-net/pull/223
+[#239]: https://github.com/actix/actix-net/pull/239
+
+>>>>>>> master
 
 ## 1.0.4 - 2020-09-12
 * Update actix-codec to 0.3.0.

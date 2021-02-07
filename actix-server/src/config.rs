@@ -1,26 +1,30 @@
 use std::collections::HashMap;
-use std::{fmt, io, net};
+use std::future::Future;
+use std::{fmt, io};
 
 use actix_rt::net::TcpStream;
-use actix_service as actix;
+use actix_service::{
+    fn_service, IntoServiceFactory as IntoBaseServiceFactory,
+    ServiceFactory as BaseServiceFactory,
+};
 use actix_utils::counter::CounterGuard;
-use futures_util::future::{ok, Future, FutureExt, LocalBoxFuture};
+use futures_core::future::LocalBoxFuture;
 use log::error;
 
-use super::builder::bind_addr;
-use super::service::{BoxedServerService, InternalServiceFactory, StreamService};
-use super::Token;
-use crate::socket::StdStream;
+use crate::builder::bind_addr;
+use crate::service::{BoxedServerService, InternalServiceFactory, StreamService};
+use crate::socket::{MioStream, MioTcpListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
+use crate::{ready, Token};
 
 pub struct ServiceConfig {
-    pub(crate) services: Vec<(String, net::TcpListener)>,
+    pub(crate) services: Vec<(String, MioTcpListener)>,
     pub(crate) apply: Option<Box<dyn ServiceRuntimeConfiguration>>,
     pub(crate) threads: usize,
-    pub(crate) backlog: i32,
+    pub(crate) backlog: u32,
 }
 
 impl ServiceConfig {
-    pub(super) fn new(threads: usize, backlog: i32) -> ServiceConfig {
+    pub(super) fn new(threads: usize, backlog: u32) -> ServiceConfig {
         ServiceConfig {
             threads,
             backlog,
@@ -40,24 +44,20 @@ impl ServiceConfig {
     /// Add new service to server
     pub fn bind<U, N: AsRef<str>>(&mut self, name: N, addr: U) -> io::Result<&mut Self>
     where
-        U: net::ToSocketAddrs,
+        U: ToSocketAddrs,
     {
         let sockets = bind_addr(addr, self.backlog)?;
 
         for lst in sockets {
-            self.listen(name.as_ref(), lst);
+            self._listen(name.as_ref(), lst);
         }
 
         Ok(self)
     }
 
     /// Add new service to server
-    pub fn listen<N: AsRef<str>>(&mut self, name: N, lst: net::TcpListener) -> &mut Self {
-        if self.apply.is_none() {
-            self.apply = Some(Box::new(not_configured));
-        }
-        self.services.push((name.as_ref().to_string(), lst));
-        self
+    pub fn listen<N: AsRef<str>>(&mut self, name: N, lst: StdTcpListener) -> &mut Self {
+        self._listen(name, MioTcpListener::from_std(lst))
     }
 
     /// Register service configuration function. This function get called
@@ -69,11 +69,19 @@ impl ServiceConfig {
         self.apply = Some(Box::new(f));
         Ok(())
     }
+
+    fn _listen<N: AsRef<str>>(&mut self, name: N, lst: MioTcpListener) -> &mut Self {
+        if self.apply.is_none() {
+            self.apply = Some(Box::new(not_configured));
+        }
+        self.services.push((name.as_ref().to_string(), lst));
+        self
+    }
 }
 
 pub(super) struct ConfiguredService {
     rt: Box<dyn ServiceRuntimeConfiguration>,
-    names: HashMap<Token, (String, net::SocketAddr)>,
+    names: HashMap<Token, (String, StdSocketAddr)>,
     topics: HashMap<String, Token>,
     services: Vec<Token>,
 }
@@ -88,7 +96,7 @@ impl ConfiguredService {
         }
     }
 
-    pub(super) fn stream(&mut self, token: Token, name: String, addr: net::SocketAddr) {
+    pub(super) fn stream(&mut self, token: Token, name: String, addr: StdSocketAddr) {
         self.names.insert(token, (name.clone(), addr));
         self.topics.insert(name, token);
         self.services.push(token);
@@ -118,7 +126,7 @@ impl InternalServiceFactory for ConfiguredService {
         let tokens = self.services.clone();
 
         // construct services
-        async move {
+        Box::pin(async move {
             let mut services = rt.services;
             // TODO: Proper error handling here
             for f in rt.onstart.into_iter() {
@@ -141,18 +149,15 @@ impl InternalServiceFactory for ConfiguredService {
                     let name = names.remove(&token).unwrap().0;
                     res.push((
                         token,
-                        Box::new(StreamService::new(actix::fn_service(
-                            move |_: TcpStream| {
-                                error!("Service {:?} is not configured", name);
-                                ok::<_, ()>(())
-                            },
-                        ))),
+                        Box::new(StreamService::new(fn_service(move |_: TcpStream| {
+                            error!("Service {:?} is not configured", name);
+                            ready::<Result<_, ()>>(Ok(()))
+                        }))),
                     ));
                 };
             }
             Ok(res)
-        }
-        .boxed_local()
+        })
     }
 }
 
@@ -208,8 +213,8 @@ impl ServiceRuntime {
     /// *ServiceConfig::bind()* or *ServiceConfig::listen()* methods.
     pub fn service<T, F>(&mut self, name: &str, service: F)
     where
-        F: actix::IntoServiceFactory<T>,
-        T: actix::ServiceFactory<Config = (), Request = TcpStream> + 'static,
+        F: IntoBaseServiceFactory<T, TcpStream>,
+        T: BaseServiceFactory<TcpStream, Config = ()> + 'static,
         T::Future: 'static,
         T::Service: 'static,
         T::InitError: fmt::Debug,
@@ -232,13 +237,13 @@ impl ServiceRuntime {
     where
         F: Future<Output = ()> + 'static,
     {
-        self.onstart.push(fut.boxed_local())
+        self.onstart.push(Box::pin(fut))
     }
 }
 
 type BoxedNewService = Box<
-    dyn actix::ServiceFactory<
-        Request = (Option<CounterGuard>, StdStream),
+    dyn BaseServiceFactory<
+        (Option<CounterGuard>, MioStream),
         Response = (),
         Error = (),
         InitError = (),
@@ -252,15 +257,14 @@ struct ServiceFactory<T> {
     inner: T,
 }
 
-impl<T> actix::ServiceFactory for ServiceFactory<T>
+impl<T> BaseServiceFactory<(Option<CounterGuard>, MioStream)> for ServiceFactory<T>
 where
-    T: actix::ServiceFactory<Config = (), Request = TcpStream>,
+    T: BaseServiceFactory<TcpStream, Config = ()>,
     T::Future: 'static,
     T::Service: 'static,
     T::Error: 'static,
     T::InitError: fmt::Debug + 'static,
 {
-    type Request = (Option<CounterGuard>, StdStream);
     type Response = ();
     type Error = ();
     type Config = ();
@@ -270,7 +274,7 @@ where
 
     fn new_service(&self, _: ()) -> Self::Future {
         let fut = self.inner.new_service(());
-        async move {
+        Box::pin(async move {
             match fut.await {
                 Ok(s) => Ok(Box::new(StreamService::new(s)) as BoxedServerService),
                 Err(e) => {
@@ -278,7 +282,6 @@ where
                     Err(())
                 }
             }
-        }
-        .boxed_local()
+        })
     }
 }

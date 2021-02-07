@@ -1,8 +1,13 @@
-use std::cell::RefCell;
-use std::future::Future;
-use std::pin::Pin;
-use std::rc::Rc;
-use std::task::{Context, Poll};
+use alloc::rc::Rc;
+use core::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use futures_core::ready;
+use pin_project_lite::pin_project;
 
 use super::{Service, ServiceFactory};
 
@@ -10,77 +15,81 @@ use super::{Service, ServiceFactory};
 /// another service.
 ///
 /// This is created by the `Pipeline::then` method.
-pub(crate) struct ThenService<A, B>(Rc<RefCell<(A, B)>>);
+pub(crate) struct ThenService<A, B, Req>(Rc<(A, B)>, PhantomData<Req>);
 
-impl<A, B> ThenService<A, B> {
+impl<A, B, Req> ThenService<A, B, Req> {
     /// Create new `.then()` combinator
-    pub(crate) fn new(a: A, b: B) -> ThenService<A, B>
+    pub(crate) fn new(a: A, b: B) -> ThenService<A, B, Req>
     where
-        A: Service,
-        B: Service<Request = Result<A::Response, A::Error>, Error = A::Error>,
+        A: Service<Req>,
+        B: Service<Result<A::Response, A::Error>, Error = A::Error>,
     {
-        Self(Rc::new(RefCell::new((a, b))))
+        Self(Rc::new((a, b)), PhantomData)
     }
 }
 
-impl<A, B> Clone for ThenService<A, B> {
+impl<A, B, Req> Clone for ThenService<A, B, Req> {
     fn clone(&self) -> Self {
-        ThenService(self.0.clone())
+        ThenService(self.0.clone(), PhantomData)
     }
 }
 
-impl<A, B> Service for ThenService<A, B>
+impl<A, B, Req> Service<Req> for ThenService<A, B, Req>
 where
-    A: Service,
-    B: Service<Request = Result<A::Response, A::Error>, Error = A::Error>,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>, Error = A::Error>,
 {
-    type Request = A::Request;
     type Response = B::Response;
     type Error = B::Error;
-    type Future = ThenServiceResponse<A, B>;
+    type Future = ThenServiceResponse<A, B, Req>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let mut srv = self.0.borrow_mut();
-        let not_ready = !srv.0.poll_ready(cx)?.is_ready();
-        if !srv.1.poll_ready(cx)?.is_ready() || not_ready {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let (a, b) = &*self.0;
+        let not_ready = !a.poll_ready(cx)?.is_ready();
+        if !b.poll_ready(cx)?.is_ready() || not_ready {
             Poll::Pending
         } else {
             Poll::Ready(Ok(()))
         }
     }
 
-    fn call(&mut self, req: A::Request) -> Self::Future {
+    fn call(&self, req: Req) -> Self::Future {
         ThenServiceResponse {
-            state: State::A(self.0.borrow_mut().0.call(req), Some(self.0.clone())),
+            state: State::A {
+                fut: self.0 .0.call(req),
+                b: Some(self.0.clone()),
+            },
         }
     }
 }
 
-#[pin_project::pin_project]
-pub(crate) struct ThenServiceResponse<A, B>
-where
-    A: Service,
-    B: Service<Request = Result<A::Response, A::Error>>,
-{
-    #[pin]
-    state: State<A, B>,
+pin_project! {
+    pub(crate) struct ThenServiceResponse<A, B, Req>
+    where
+        A: Service<Req>,
+        B: Service<Result<A::Response, A::Error>>,
+    {
+        #[pin]
+        state: State<A, B, Req>,
+    }
 }
 
-#[pin_project::pin_project(project = StateProj)]
-enum State<A, B>
-where
-    A: Service,
-    B: Service<Request = Result<A::Response, A::Error>>,
-{
-    A(#[pin] A::Future, Option<Rc<RefCell<(A, B)>>>),
-    B(#[pin] B::Future),
-    Empty,
+pin_project! {
+    #[project = StateProj]
+    enum State<A, B, Req>
+    where
+        A: Service<Req>,
+        B: Service<Result<A::Response, A::Error>>,
+    {
+        A { #[pin] fut: A::Future, b: Option<Rc<(A, B)>> },
+        B { #[pin] fut: B::Future },
+    }
 }
 
-impl<A, B> Future for ThenServiceResponse<A, B>
+impl<A, B, Req> Future for ThenServiceResponse<A, B, Req>
 where
-    A: Service,
-    B: Service<Request = Result<A::Response, A::Error>>,
+    A: Service<Req>,
+    B: Service<Result<A::Response, A::Error>>,
 {
     type Output = Result<B::Response, B::Error>;
 
@@ -88,66 +97,56 @@ where
         let mut this = self.as_mut().project();
 
         match this.state.as_mut().project() {
-            StateProj::A(fut, b) => match fut.poll(cx) {
-                Poll::Ready(res) => {
-                    let b = b.take().unwrap();
-                    this.state.set(State::Empty); // drop fut A
-                    let fut = b.borrow_mut().1.call(res);
-                    this.state.set(State::B(fut));
-                    self.poll(cx)
-                }
-                Poll::Pending => Poll::Pending,
-            },
-            StateProj::B(fut) => fut.poll(cx).map(|r| {
-                this.state.set(State::Empty);
-                r
-            }),
-            StateProj::Empty => {
-                panic!("future must not be polled after it returned `Poll::Ready`")
+            StateProj::A { fut, b } => {
+                let res = ready!(fut.poll(cx));
+                let b = b.take().unwrap();
+                let fut = b.1.call(res);
+                this.state.set(State::B { fut });
+                self.poll(cx)
             }
+            StateProj::B { fut } => fut.poll(cx),
         }
     }
 }
 
 /// `.then()` service factory combinator
-pub(crate) struct ThenServiceFactory<A, B>(Rc<(A, B)>);
+pub(crate) struct ThenServiceFactory<A, B, Req>(Rc<(A, B)>, PhantomData<Req>);
 
-impl<A, B> ThenServiceFactory<A, B>
+impl<A, B, Req> ThenServiceFactory<A, B, Req>
 where
-    A: ServiceFactory,
+    A: ServiceFactory<Req>,
     A::Config: Clone,
     B: ServiceFactory<
+        Result<A::Response, A::Error>,
         Config = A::Config,
-        Request = Result<A::Response, A::Error>,
         Error = A::Error,
         InitError = A::InitError,
     >,
 {
     /// Create new `AndThen` combinator
     pub(crate) fn new(a: A, b: B) -> Self {
-        Self(Rc::new((a, b)))
+        Self(Rc::new((a, b)), PhantomData)
     }
 }
 
-impl<A, B> ServiceFactory for ThenServiceFactory<A, B>
+impl<A, B, Req> ServiceFactory<Req> for ThenServiceFactory<A, B, Req>
 where
-    A: ServiceFactory,
+    A: ServiceFactory<Req>,
     A::Config: Clone,
     B: ServiceFactory<
+        Result<A::Response, A::Error>,
         Config = A::Config,
-        Request = Result<A::Response, A::Error>,
         Error = A::Error,
         InitError = A::InitError,
     >,
 {
-    type Request = A::Request;
     type Response = B::Response;
     type Error = A::Error;
 
     type Config = A::Config;
-    type Service = ThenService<A::Service, B::Service>;
+    type Service = ThenService<A::Service, B::Service, Req>;
     type InitError = A::InitError;
-    type Future = ThenServiceFactoryResponse<A, B>;
+    type Future = ThenServiceFactoryResponse<A, B, Req>;
 
     fn new_service(&self, cfg: A::Config) -> Self::Future {
         let srv = &*self.0;
@@ -155,37 +154,38 @@ where
     }
 }
 
-impl<A, B> Clone for ThenServiceFactory<A, B> {
+impl<A, B, Req> Clone for ThenServiceFactory<A, B, Req> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        Self(self.0.clone(), PhantomData)
     }
 }
 
-#[pin_project::pin_project]
-pub(crate) struct ThenServiceFactoryResponse<A, B>
-where
-    A: ServiceFactory,
-    B: ServiceFactory<
-        Config = A::Config,
-        Request = Result<A::Response, A::Error>,
-        Error = A::Error,
-        InitError = A::InitError,
-    >,
-{
-    #[pin]
-    fut_b: B::Future,
-    #[pin]
-    fut_a: A::Future,
-    a: Option<A::Service>,
-    b: Option<B::Service>,
+pin_project! {
+    pub(crate) struct ThenServiceFactoryResponse<A, B, Req>
+    where
+        A: ServiceFactory<Req>,
+        B: ServiceFactory<
+            Result<A::Response, A::Error>,
+            Config = A::Config,
+            Error = A::Error,
+            InitError = A::InitError,
+        >,
+    {
+        #[pin]
+        fut_b: B::Future,
+        #[pin]
+        fut_a: A::Future,
+        a: Option<A::Service>,
+        b: Option<B::Service>,
+    }
 }
 
-impl<A, B> ThenServiceFactoryResponse<A, B>
+impl<A, B, Req> ThenServiceFactoryResponse<A, B, Req>
 where
-    A: ServiceFactory,
+    A: ServiceFactory<Req>,
     B: ServiceFactory<
+        Result<A::Response, A::Error>,
         Config = A::Config,
-        Request = Result<A::Response, A::Error>,
         Error = A::Error,
         InitError = A::InitError,
     >,
@@ -200,17 +200,17 @@ where
     }
 }
 
-impl<A, B> Future for ThenServiceFactoryResponse<A, B>
+impl<A, B, Req> Future for ThenServiceFactoryResponse<A, B, Req>
 where
-    A: ServiceFactory,
+    A: ServiceFactory<Req>,
     B: ServiceFactory<
+        Result<A::Response, A::Error>,
         Config = A::Config,
-        Request = Result<A::Response, A::Error>,
         Error = A::Error,
         InitError = A::InitError,
     >,
 {
-    type Output = Result<ThenService<A::Service, B::Service>, A::InitError>;
+    type Output = Result<ThenService<A::Service, B::Service, Req>, A::InitError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
@@ -238,29 +238,30 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
-    use std::rc::Rc;
-    use std::task::{Context, Poll};
+    use alloc::rc::Rc;
+    use core::{
+        cell::Cell,
+        task::{Context, Poll},
+    };
 
-    use futures_util::future::{err, lazy, ok, ready, Ready};
+    use futures_util::future::lazy;
 
-    use crate::{pipeline, pipeline_factory, Service, ServiceFactory};
+    use crate::{err, ok, pipeline, pipeline_factory, ready, Ready, Service, ServiceFactory};
 
     #[derive(Clone)]
     struct Srv1(Rc<Cell<usize>>);
 
-    impl Service for Srv1 {
-        type Request = Result<&'static str, &'static str>;
+    impl Service<Result<&'static str, &'static str>> for Srv1 {
         type Response = &'static str;
         type Error = ();
         type Future = Ready<Result<Self::Response, Self::Error>>;
 
-        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
             self.0.set(self.0.get() + 1);
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, req: Result<&'static str, &'static str>) -> Self::Future {
+        fn call(&self, req: Result<&'static str, &'static str>) -> Self::Future {
             match req {
                 Ok(msg) => ok(msg),
                 Err(_) => err(()),
@@ -270,18 +271,17 @@ mod tests {
 
     struct Srv2(Rc<Cell<usize>>);
 
-    impl Service for Srv2 {
-        type Request = Result<&'static str, ()>;
+    impl Service<Result<&'static str, ()>> for Srv2 {
         type Response = (&'static str, &'static str);
         type Error = ();
         type Future = Ready<Result<Self::Response, ()>>;
 
-        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
             self.0.set(self.0.get() + 1);
             Poll::Ready(Err(()))
         }
 
-        fn call(&mut self, req: Result<&'static str, ()>) -> Self::Future {
+        fn call(&self, req: Result<&'static str, ()>) -> Self::Future {
             match req {
                 Ok(msg) => ok((msg, "ok")),
                 Err(()) => ok(("srv2", "err")),
@@ -292,7 +292,7 @@ mod tests {
     #[actix_rt::test]
     async fn test_poll_ready() {
         let cnt = Rc::new(Cell::new(0));
-        let mut srv = pipeline(Srv1(cnt.clone())).then(Srv2(cnt.clone()));
+        let srv = pipeline(Srv1(cnt.clone())).then(Srv2(cnt.clone()));
         let res = lazy(|cx| srv.poll_ready(cx)).await;
         assert_eq!(res, Poll::Ready(Err(())));
         assert_eq!(cnt.get(), 2);
@@ -301,7 +301,7 @@ mod tests {
     #[actix_rt::test]
     async fn test_call() {
         let cnt = Rc::new(Cell::new(0));
-        let mut srv = pipeline(Srv1(cnt.clone())).then(Srv2(cnt));
+        let srv = pipeline(Srv1(cnt.clone())).then(Srv2(cnt));
 
         let res = srv.call(Ok("srv1")).await;
         assert!(res.is_ok());
@@ -318,7 +318,7 @@ mod tests {
         let cnt2 = cnt.clone();
         let blank = move || ready(Ok::<_, ()>(Srv1(cnt2.clone())));
         let factory = pipeline_factory(blank).then(move || ready(Ok(Srv2(cnt.clone()))));
-        let mut srv = factory.new_service(&()).await.unwrap();
+        let srv = factory.new_service(&()).await.unwrap();
         let res = srv.call(Ok("srv1")).await;
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), ("srv1", "ok"));

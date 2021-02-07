@@ -15,6 +15,10 @@
 //! http --verify=false https://127.0.0.1:8443
 //! ```
 
+// this use only exists because of how we have organised the crate
+// it is not necessary for your actual code
+use tokio_rustls::rustls;
+
 use std::{
     env,
     fs::File,
@@ -27,10 +31,10 @@ use std::{
 
 use actix_server::Server;
 use actix_service::pipeline_factory;
-use actix_tls::rustls::Acceptor as RustlsAcceptor;
+use actix_tls::accept::rustls::Acceptor as RustlsAcceptor;
 use futures_util::future::ok;
 use log::info;
-use rust_tls::{
+use rustls::{
     internal::pemfile::certs, internal::pemfile::rsa_private_keys, NoClientAuth, ServerConfig,
 };
 

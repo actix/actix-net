@@ -2,43 +2,43 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use std::{io, mem, net};
+use std::{io, mem};
 
 use actix_rt::net::TcpStream;
-use actix_rt::time::{delay_until, Instant};
-use actix_rt::{spawn, System};
-use futures_channel::mpsc::{unbounded, UnboundedReceiver};
-use futures_channel::oneshot;
-use futures_util::stream::FuturesUnordered;
-use futures_util::{ready, stream::Stream, StreamExt};
+use actix_rt::time::{sleep_until, Instant};
+use actix_rt::{self as rt, System};
 use log::{error, info};
-use socket2::{Domain, Protocol, Socket, Type};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+use tokio::sync::oneshot;
 
-use crate::accept::{AcceptLoop, AcceptNotify, Command};
+use crate::accept::AcceptLoop;
 use crate::config::{ConfiguredService, ServiceConfig};
 use crate::server::{Server, ServerCommand};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
-use crate::socket::StdListener;
-use crate::worker::{self, Worker, WorkerAvailability, WorkerClient};
-use crate::Token;
+use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
+use crate::socket::{MioTcpListener, MioTcpSocket};
+use crate::waker_queue::{WakerInterest, WakerQueue};
+use crate::worker::{self, ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandle};
+use crate::{join_all, Token};
+use futures_core::future::LocalBoxFuture;
 
 /// Server builder
 pub struct ServerBuilder {
     threads: usize,
     token: Token,
-    backlog: i32,
-    workers: Vec<(usize, WorkerClient)>,
+    backlog: u32,
+    handles: Vec<(usize, WorkerHandle)>,
     services: Vec<Box<dyn InternalServiceFactory>>,
-    sockets: Vec<(Token, String, StdListener)>,
+    sockets: Vec<(Token, String, MioListener)>,
     accept: AcceptLoop,
     exit: bool,
-    shutdown_timeout: Duration,
     no_signals: bool,
     cmd: UnboundedReceiver<ServerCommand>,
     server: Server,
-    on_stop: Pin<Box<dyn Future<Output = ()>>>,
+    on_stop: Box<dyn Fn() -> LocalBoxFuture<'static, ()>>,
     notify: Vec<oneshot::Sender<()>>,
+    worker_config: ServerWorkerConfig,
 }
 
 impl Default for ServerBuilder {
@@ -50,24 +50,24 @@ impl Default for ServerBuilder {
 impl ServerBuilder {
     /// Create new Server builder instance
     pub fn new() -> ServerBuilder {
-        let (tx, rx) = unbounded();
+        let (tx, rx) = unbounded_channel();
         let server = Server::new(tx);
 
         ServerBuilder {
             threads: num_cpus::get(),
-            token: Token(0),
-            workers: Vec::new(),
+            token: Token::default(),
+            handles: Vec::new(),
             services: Vec::new(),
             sockets: Vec::new(),
             accept: AcceptLoop::new(server.clone()),
             backlog: 2048,
             exit: false,
-            shutdown_timeout: Duration::from_secs(30),
             no_signals: false,
             cmd: rx,
             notify: Vec::new(),
             server,
-            on_stop: Box::pin(async {}),
+            on_stop: Box::new(|| Box::pin(async {})),
+            worker_config: ServerWorkerConfig::default(),
         }
     }
 
@@ -81,6 +81,24 @@ impl ServerBuilder {
         self
     }
 
+    /// Set max number of threads for each worker's blocking task thread pool.
+    ///
+    /// One thread pool is set up **per worker**; not shared across workers.
+    ///
+    /// # Examples:
+    /// ```
+    /// # use actix_server::ServerBuilder;
+    /// let builder = ServerBuilder::new()
+    ///     .workers(4) // server has 4 worker thread.
+    ///     .worker_max_blocking_threads(4); // every worker has 4 max blocking threads.
+    /// ```
+    ///
+    /// See [tokio::runtime::Builder::max_blocking_threads] for behavior reference.
+    pub fn worker_max_blocking_threads(mut self, num: usize) -> Self {
+        self.worker_config.max_blocking_threads(num);
+        self
+    }
+
     /// Set the maximum number of pending connections.
     ///
     /// This refers to the number of clients that can be waiting to be served.
@@ -91,7 +109,7 @@ impl ServerBuilder {
     /// Generally set in the 64-2048 range. Default value is 2048.
     ///
     /// This method should be called before `bind()` method call.
-    pub fn backlog(mut self, num: i32) -> Self {
+    pub fn backlog(mut self, num: u32) -> Self {
         self.backlog = num;
         self
     }
@@ -127,7 +145,8 @@ impl ServerBuilder {
     ///
     /// By default shutdown timeout sets to 30 seconds.
     pub fn shutdown_timeout(mut self, sec: u64) -> Self {
-        self.shutdown_timeout = Duration::from_secs(sec);
+        self.worker_config
+            .shutdown_timeout(Duration::from_secs(sec));
         self
     }
 
@@ -149,7 +168,7 @@ impl ServerBuilder {
             for (name, lst) in cfg.services {
                 let token = self.token.next();
                 srv.stream(token, name.clone(), lst.local_addr()?);
-                self.sockets.push((token, name, StdListener::Tcp(lst)));
+                self.sockets.push((token, name, MioListener::Tcp(lst)));
             }
             self.services.push(Box::new(srv));
         }
@@ -162,7 +181,7 @@ impl ServerBuilder {
     pub fn bind<F, U, N: AsRef<str>>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
         F: ServiceFactory<TcpStream>,
-        U: net::ToSocketAddrs,
+        U: ToSocketAddrs,
     {
         let sockets = bind_addr(addr, self.backlog)?;
 
@@ -175,21 +194,19 @@ impl ServerBuilder {
                 lst.local_addr()?,
             ));
             self.sockets
-                .push((token, name.as_ref().to_string(), StdListener::Tcp(lst)));
+                .push((token, name.as_ref().to_string(), MioListener::Tcp(lst)));
         }
         Ok(self)
     }
 
-    #[cfg(all(unix))]
     /// Add new unix domain service to the server.
+    #[cfg(unix)]
     pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
         F: ServiceFactory<actix_rt::net::UnixStream>,
         N: AsRef<str>,
         U: AsRef<std::path::Path>,
     {
-        use std::os::unix::net::UnixListener;
-
         // The path must not exist when we try to bind.
         // Try to remove it to avoid bind error.
         if let Err(e) = std::fs::remove_file(addr.as_ref()) {
@@ -199,26 +216,27 @@ impl ServerBuilder {
             }
         }
 
-        let lst = UnixListener::bind(addr)?;
+        let lst = crate::socket::StdUnixListener::bind(addr)?;
         self.listen_uds(name, lst, factory)
     }
 
-    #[cfg(all(unix))]
     /// Add new unix domain service to the server.
     /// Useful when running as a systemd service and
     /// a socket FD can be acquired using the systemd crate.
+    #[cfg(unix)]
     pub fn listen_uds<F, N: AsRef<str>>(
         mut self,
         name: N,
-        lst: std::os::unix::net::UnixListener,
+        lst: crate::socket::StdUnixListener,
         factory: F,
     ) -> io::Result<Self>
     where
         F: ServiceFactory<actix_rt::net::UnixStream>,
     {
-        use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+        use std::net::{IpAddr, Ipv4Addr};
+        lst.set_nonblocking(true)?;
         let token = self.token.next();
-        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         self.services.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
@@ -226,7 +244,7 @@ impl ServerBuilder {
             addr,
         ));
         self.sockets
-            .push((token, name.as_ref().to_string(), StdListener::Uds(lst)));
+            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
         Ok(self)
     }
 
@@ -234,27 +252,26 @@ impl ServerBuilder {
     pub fn listen<F, N: AsRef<str>>(
         mut self,
         name: N,
-        lst: net::TcpListener,
+        lst: StdTcpListener,
         factory: F,
     ) -> io::Result<Self>
     where
         F: ServiceFactory<TcpStream>,
     {
+        lst.set_nonblocking(true)?;
+        let addr = lst.local_addr()?;
+
         let token = self.token.next();
         self.services.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
             factory,
-            lst.local_addr()?,
+            addr,
         ));
-        self.sockets
-            .push((token, name.as_ref().to_string(), StdListener::Tcp(lst)));
-        Ok(self)
-    }
 
-    #[doc(hidden)]
-    pub fn start(self) -> Server {
-        self.run()
+        self.sockets
+            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
+        Ok(self)
     }
 
     /// Starts processing incoming connections and return server controller.
@@ -265,12 +282,12 @@ impl ServerBuilder {
             info!("Starting {} workers", self.threads);
 
             // start workers
-            let workers = (0..self.threads)
+            let handles = (0..self.threads)
                 .map(|idx| {
-                    let worker = self.start_worker(idx, self.accept.get_notify());
-                    self.workers.push((idx, worker.clone()));
+                    let handle = self.start_worker(idx, self.accept.waker_owned());
+                    self.handles.push((idx, handle.clone()));
 
-                    worker
+                    handle
                 })
                 .collect();
 
@@ -283,7 +300,7 @@ impl ServerBuilder {
                     .into_iter()
                     .map(|t| (t.0, t.2))
                     .collect(),
-                workers,
+                handles,
             );
 
             // handle signals
@@ -293,43 +310,46 @@ impl ServerBuilder {
 
             // start http server actor
             let server = self.server.clone();
-            spawn(self);
+            rt::spawn(self);
             server
         }
     }
 
     /// Async closure that would run before Server is shutdown.
     ///
-    /// The exact timing is after `ServerCommand::Stop` is received.
+    /// The exact timing is after server received stopping command.
+    ///
     /// Before worker threads stopped if the shutdown is graceful.
     ///
-    /// Or before `actix::System` is stopped when not graceful.
-    /// (If `ServerBuilder::system_exit` is set to true)
-    pub fn on_stop<F, Fut>(mut self, future: F) -> Self
+    /// Or before [actix_rt::System] is stopped when not graceful.
+    /// (If [ServerBuilder::system_exit] is set to true)
+    pub fn on_stop<F, Fut>(mut self, func: F) -> Self
     where
-        F: FnOnce() -> Fut + 'static,
+        F: Fn() -> Fut + Clone + 'static,
         Fut: Future<Output = ()>,
     {
-        self.on_stop = Box::pin(async move { future().await });
+        self.on_stop = Box::new(move || {
+            let func = func.clone();
+            Box::pin(async move { func().await })
+        });
         self
     }
 
-    fn start_worker(&self, idx: usize, notify: AcceptNotify) -> WorkerClient {
-        let avail = WorkerAvailability::new(notify);
-        let services: Vec<Box<dyn InternalServiceFactory>> =
-            self.services.iter().map(|v| v.clone_factory()).collect();
+    fn start_worker(&self, idx: usize, waker: WakerQueue) -> WorkerHandle {
+        let avail = WorkerAvailability::new(waker);
+        let services = self.services.iter().map(|v| v.clone_factory()).collect();
 
-        Worker::start(idx, services, avail, self.shutdown_timeout)
+        ServerWorker::start(idx, services, avail, self.worker_config)
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) {
         match item {
             ServerCommand::Pause(tx) => {
-                self.accept.send(Command::Pause);
+                self.accept.wake(WakerInterest::Pause);
                 let _ = tx.send(());
             }
             ServerCommand::Resume(tx) => {
-                self.accept.send(Command::Resume);
+                self.accept.wake(WakerInterest::Resume);
                 let _ = tx.send(());
             }
             ServerCommand::Signal(sig) => {
@@ -373,25 +393,28 @@ impl ServerBuilder {
                 let exit = self.exit;
 
                 // stop accept thread
-                self.accept.send(Command::Stop);
+                self.accept.wake(WakerInterest::Stop);
                 let notify = std::mem::take(&mut self.notify);
 
                 // take the on_stop future.
-                let mut on_stop = Box::pin(async {}) as _;
+                let mut on_stop =
+                    Box::new(|| Box::pin(async {}) as LocalBoxFuture<'static, ()>) as _;
                 std::mem::swap(&mut self.on_stop, &mut on_stop);
 
                 // stop workers
-                if !self.workers.is_empty() && graceful {
-                    let stop_workers = self
-                        .workers
+                if !self.handles.is_empty() && graceful {
+                    let iter = self
+                        .handles
                         .iter()
                         .map(move |worker| worker.1.stop(graceful))
-                        .collect::<FuturesUnordered<_>>()
-                        .collect::<Vec<_>>();
+                        .collect();
 
-                    spawn(async move {
-                        on_stop.await;
-                        stop_workers.await;
+                    let fut = join_all(iter);
+
+                    rt::spawn(async move {
+                        on_stop().await;
+
+                        let _ = fut.await;
                         if let Some(tx) = completion {
                             let _ = tx.send(());
                         }
@@ -399,18 +422,18 @@ impl ServerBuilder {
                             let _ = tx.send(());
                         }
                         if exit {
-                            spawn(async {
-                                delay_until(Instant::now() + Duration::from_millis(300)).await;
+                            rt::spawn(async {
+                                sleep_until(Instant::now() + Duration::from_millis(300)).await;
                                 System::current().stop();
                             });
                         }
                     });
                 // we need to stop system if server was spawned
                 } else {
-                    spawn(async move {
-                        on_stop.await;
+                    rt::spawn(async move {
+                        on_stop().await;
                         if exit {
-                            delay_until(Instant::now() + Duration::from_millis(300)).await;
+                            sleep_until(Instant::now() + Duration::from_millis(300)).await;
                             System::current().stop();
                         }
                     });
@@ -425,9 +448,9 @@ impl ServerBuilder {
             }
             ServerCommand::WorkerFaulted(idx) => {
                 let mut found = false;
-                for i in 0..self.workers.len() {
-                    if self.workers[i].0 == idx {
-                        self.workers.swap_remove(i);
+                for i in 0..self.handles.len() {
+                    if self.handles[i].0 == idx {
+                        self.handles.swap_remove(i);
                         found = true;
                         break;
                     }
@@ -436,10 +459,10 @@ impl ServerBuilder {
                 if found {
                     error!("Worker has died {:?}, restarting", idx);
 
-                    let mut new_idx = self.workers.len();
+                    let mut new_idx = self.handles.len();
                     'found: loop {
-                        for i in 0..self.workers.len() {
-                            if self.workers[i].0 == new_idx {
+                        for i in 0..self.handles.len() {
+                            if self.handles[i].0 == new_idx {
                                 new_idx += 1;
                                 continue 'found;
                             }
@@ -447,9 +470,9 @@ impl ServerBuilder {
                         break;
                     }
 
-                    let worker = self.start_worker(new_idx, self.accept.get_notify());
-                    self.workers.push((new_idx, worker.clone()));
-                    self.accept.send(Command::Worker(worker));
+                    let handle = self.start_worker(new_idx, self.accept.waker_owned());
+                    self.handles.push((new_idx, handle.clone()));
+                    self.accept.wake(WakerInterest::Worker(handle));
                 }
             }
         }
@@ -461,20 +484,18 @@ impl Future for ServerBuilder {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
-            match ready!(Pin::new(&mut self.cmd).poll_next(cx)) {
-                Some(it) => self.as_mut().get_mut().handle_cmd(it),
-                None => {
-                    return Poll::Pending;
-                }
+            match Pin::new(&mut self.cmd).poll_recv(cx) {
+                Poll::Ready(Some(it)) => self.as_mut().get_mut().handle_cmd(it),
+                _ => return Poll::Pending,
             }
         }
     }
 }
 
-pub(super) fn bind_addr<S: net::ToSocketAddrs>(
+pub(super) fn bind_addr<S: ToSocketAddrs>(
     addr: S,
-    backlog: i32,
-) -> io::Result<Vec<net::TcpListener>> {
+    backlog: u32,
+) -> io::Result<Vec<MioTcpListener>> {
     let mut err = None;
     let mut succ = false;
     let mut sockets = Vec::new();
@@ -502,14 +523,13 @@ pub(super) fn bind_addr<S: net::ToSocketAddrs>(
     }
 }
 
-fn create_tcp_listener(addr: net::SocketAddr, backlog: i32) -> io::Result<net::TcpListener> {
-    let domain = match addr {
-        net::SocketAddr::V4(_) => Domain::ipv4(),
-        net::SocketAddr::V6(_) => Domain::ipv6(),
+fn create_tcp_listener(addr: StdSocketAddr, backlog: u32) -> io::Result<MioTcpListener> {
+    let socket = match addr {
+        StdSocketAddr::V4(_) => MioTcpSocket::new_v4()?,
+        StdSocketAddr::V6(_) => MioTcpSocket::new_v6()?,
     };
-    let socket = Socket::new(domain, Type::stream(), Some(Protocol::tcp()))?;
-    socket.set_reuse_address(true)?;
-    socket.bind(&addr.into())?;
-    socket.listen(backlog)?;
-    Ok(socket.into_tcp_listener())
+
+    socket.set_reuseaddr(true)?;
+    socket.bind(addr)?;
+    socket.listen(backlog)
 }

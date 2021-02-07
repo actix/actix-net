@@ -4,8 +4,7 @@
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
-use std::marker::PhantomData;
-use std::task::{Context, Poll};
+use core::marker::PhantomData;
 
 use actix_service::{
     apply, dev::ApplyTransform, IntoServiceFactory, Service, ServiceFactory, Transform,
@@ -27,21 +26,18 @@ impl<S, F> TracingService<S, F> {
     }
 }
 
-impl<S, F> Service for TracingService<S, F>
+impl<S, Req, F> Service<Req> for TracingService<S, F>
 where
-    S: Service,
-    F: Fn(&S::Request) -> Option<tracing::Span>,
+    S: Service<Req>,
+    F: Fn(&Req) -> Option<tracing::Span>,
 {
-    type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
     type Future = Either<S::Future, Instrumented<S::Future>>;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(ctx)
-    }
+    actix_service::forward_ready!(inner);
 
-    fn call(&mut self, req: Self::Request) -> Self::Future {
+    fn call(&self, req: Req) -> Self::Future {
         let span = (self.make_span)(&req);
         let _enter = span.as_ref().map(|s| s.enter());
 
@@ -74,18 +70,12 @@ impl<S, U, F> TracingTransform<S, U, F> {
     }
 }
 
-impl<S, U, F> Transform<S> for TracingTransform<S, U, F>
+impl<S, Req, U, F> Transform<S, Req> for TracingTransform<S, U, F>
 where
-    S: Service,
-    U: ServiceFactory<
-        Request = S::Request,
-        Response = S::Response,
-        Error = S::Error,
-        Service = S,
-    >,
-    F: Fn(&S::Request) -> Option<tracing::Span> + Clone,
+    S: Service<Req>,
+    U: ServiceFactory<Req, Response = S::Response, Error = S::Error, Service = S>,
+    F: Fn(&Req) -> Option<tracing::Span> + Clone,
 {
-    type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
     type Transform = TracingService<S, F>;
@@ -104,20 +94,20 @@ where
 /// is passed in a reference to the request being handled by the service.
 ///
 /// For example:
-/// ```rust,ignore
+/// ```ignore
 /// let traced_service = trace(
 ///     web_service,
 ///     |req: &Request| Some(span!(Level::INFO, "request", req.id))
 /// );
 /// ```
-pub fn trace<S, U, F>(
-    service_factory: U,
+pub fn trace<S, Req, I, F>(
+    service_factory: I,
     make_span: F,
-) -> ApplyTransform<TracingTransform<S::Service, S, F>, S>
+) -> ApplyTransform<TracingTransform<S::Service, S, F>, S, Req>
 where
-    S: ServiceFactory,
-    F: Fn(&S::Request) -> Option<tracing::Span> + Clone,
-    U: IntoServiceFactory<S>,
+    I: IntoServiceFactory<S, Req>,
+    S: ServiceFactory<Req>,
+    F: Fn(&Req) -> Option<tracing::Span> + Clone,
 {
     apply(
         TracingTransform::new(make_span),
@@ -239,7 +229,7 @@ mod test {
 
         let span_svc = span!(Level::TRACE, "span_svc");
         let trace_service_factory = trace(service_factory, |_: &&str| Some(span_svc.clone()));
-        let mut service = trace_service_factory.new_service(()).await.unwrap();
+        let service = trace_service_factory.new_service(()).await.unwrap();
         service.call("boo").await.unwrap();
 
         let id = span_svc.id().unwrap().into_u64();

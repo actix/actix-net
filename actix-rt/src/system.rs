@@ -1,195 +1,98 @@
-use std::cell::RefCell;
-use std::future::Future;
-use std::io;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    future::Future,
+    io,
+    pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
+    task::{Context, Poll},
+};
 
-use futures_channel::mpsc::UnboundedSender;
-use tokio::task::LocalSet;
+use futures_core::ready;
+use tokio::sync::{mpsc, oneshot};
 
-use crate::arbiter::{Arbiter, SystemCommand};
-use crate::builder::{Builder, SystemRunner};
+use crate::{arbiter::ArbiterHandle, runtime::default_tokio_runtime, Arbiter, Runtime};
 
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-/// System is a runtime manager.
-#[derive(Clone, Debug)]
-pub struct System {
-    id: usize,
-    sys: UnboundedSender<SystemCommand>,
-    arbiter: Arbiter,
-    stop_on_panic: bool,
-}
 
 thread_local!(
     static CURRENT: RefCell<Option<System>> = RefCell::new(None);
 );
 
+/// A manager for a per-thread distributed async runtime.
+#[derive(Clone, Debug)]
+pub struct System {
+    id: usize,
+    sys_tx: mpsc::UnboundedSender<SystemCommand>,
+
+    /// Handle to the first [Arbiter] that is created with the System.
+    arbiter_handle: ArbiterHandle,
+}
+
 impl System {
-    /// Constructs new system and sets it as current
+    /// Create a new system.
+    ///
+    /// # Panics
+    /// Panics if underlying Tokio runtime can not be created.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new() -> SystemRunner {
+        Self::with_tokio_rt(|| {
+            default_tokio_runtime()
+                .expect("Default Actix (Tokio) runtime could not be created.")
+        })
+    }
+
+    /// Create a new System using the [Tokio Runtime](tokio-runtime) returned from a closure.
+    ///
+    /// [tokio-runtime]: tokio::runtime::Runtime
+    #[doc(hidden)]
+    pub fn with_tokio_rt<F>(runtime_factory: F) -> SystemRunner
+    where
+        F: Fn() -> tokio::runtime::Runtime,
+    {
+        let (stop_tx, stop_rx) = oneshot::channel();
+        let (sys_tx, sys_rx) = mpsc::unbounded_channel();
+
+        let rt = Runtime::from(runtime_factory());
+        let sys_arbiter = Arbiter::in_new_system(rt.local_set());
+        let system = System::construct(sys_tx, sys_arbiter.clone());
+
+        system
+            .tx()
+            .send(SystemCommand::RegisterArbiter(usize::MAX, sys_arbiter))
+            .unwrap();
+
+        // init background system arbiter
+        let sys_ctrl = SystemController::new(sys_rx, stop_tx);
+        rt.spawn(sys_ctrl);
+
+        SystemRunner {
+            rt,
+            stop_rx,
+            system,
+        }
+    }
+
+    /// Constructs new system and registers it on the current thread.
     pub(crate) fn construct(
-        sys: UnboundedSender<SystemCommand>,
-        arbiter: Arbiter,
-        stop_on_panic: bool,
+        sys_tx: mpsc::UnboundedSender<SystemCommand>,
+        arbiter_handle: ArbiterHandle,
     ) -> Self {
         let sys = System {
-            sys,
-            arbiter,
-            stop_on_panic,
+            sys_tx,
+            arbiter_handle,
             id: SYSTEM_COUNT.fetch_add(1, Ordering::SeqCst),
         };
+
         System::set_current(sys.clone());
+
         sys
     }
 
-    /// Build a new system with a customized tokio runtime.
-    ///
-    /// This allows to customize the runtime. See struct level docs on
-    /// `Builder` for more information.
-    pub fn builder() -> Builder {
-        Builder::new()
-    }
-
-    #[allow(clippy::new_ret_no_self)]
-    /// Create new system.
-    ///
-    /// This method panics if it can not create tokio runtime
-    pub fn new<T: Into<String>>(name: T) -> SystemRunner {
-        Self::builder().name(name).build()
-    }
-
-    /// Create new system using provided tokio `LocalSet`.
-    ///
-    /// This method panics if it can not spawn system arbiter
-    ///
-    /// Note: This method uses provided `LocalSet` to create a `System` future only.
-    /// All the [`Arbiter`]s will be started in separate threads using their own tokio `Runtime`s.
-    /// It means that using this method currently it is impossible to make `actix-rt` work in the
-    /// alternative `tokio` `Runtime`s (e.g. provided by [`tokio_compat`]).
-    ///
-    /// [`tokio_compat`]: https://crates.io/crates/tokio-compat
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::{runtime::Runtime, task::LocalSet};
-    /// use actix_rt::System;
-    /// use futures_util::future::try_join_all;
-    ///
-    /// async fn run_application() {
-    ///     let first_task = tokio::spawn(async {
-    ///         // ...
-    /// #        println!("One task");
-    /// #        Ok::<(),()>(())
-    ///     });
-    ///
-    ///     let second_task = tokio::spawn(async {
-    ///         // ...
-    /// #       println!("Another task");
-    /// #       Ok::<(),()>(())
-    ///     });
-    ///
-    ///     try_join_all(vec![first_task, second_task])
-    ///         .await
-    ///         .expect("Some of the futures finished unexpectedly");
-    /// }
-    ///
-    ///
-    /// let mut runtime = tokio::runtime::Builder::new()
-    ///     .core_threads(2)
-    ///     .enable_all()
-    ///     .threaded_scheduler()
-    ///     .build()
-    ///     .unwrap();
-    ///
-    ///
-    /// let actix_system_task = LocalSet::new();
-    /// let sys = System::run_in_tokio("actix-main-system", &actix_system_task);
-    /// actix_system_task.spawn_local(sys);
-    ///
-    /// let rest_operations = run_application();
-    /// runtime.block_on(actix_system_task.run_until(rest_operations));
-    /// ```
-    pub fn run_in_tokio<T: Into<String>>(
-        name: T,
-        local: &LocalSet,
-    ) -> impl Future<Output = io::Result<()>> {
-        Self::builder()
-            .name(name)
-            .build_async(local)
-            .run_nonblocking()
-    }
-
-    /// Consume the provided tokio Runtime and start the `System` in it.
-    /// This method will create a `LocalSet` object and occupy the current thread
-    /// for the created `System` exclusively. All the other asynchronous tasks that
-    /// should be executed as well must be aggregated into one future, provided as the last
-    /// argument to this method.
-    ///
-    /// Note: This method uses provided `Runtime` to create a `System` future only.
-    /// All the [`Arbiter`]s will be started in separate threads using their own tokio `Runtime`s.
-    /// It means that using this method currently it is impossible to make `actix-rt` work in the
-    /// alternative `tokio` `Runtime`s (e.g. provided by `tokio_compat`).
-    ///
-    /// [`tokio_compat`]: https://crates.io/crates/tokio-compat
-    ///
-    /// # Arguments
-    ///
-    /// - `name`: Name of the System
-    /// - `runtime`: A tokio Runtime to run the system in.
-    /// - `rest_operations`: A future to be executed in the runtime along with the System.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::runtime::Runtime;
-    /// use actix_rt::System;
-    /// use futures_util::future::try_join_all;
-    ///
-    /// async fn run_application() {
-    ///     let first_task = tokio::spawn(async {
-    ///         // ...
-    /// #        println!("One task");
-    /// #        Ok::<(),()>(())
-    ///     });
-    ///
-    ///     let second_task = tokio::spawn(async {
-    ///         // ...
-    /// #       println!("Another task");
-    /// #       Ok::<(),()>(())
-    ///     });
-    ///
-    ///     try_join_all(vec![first_task, second_task])
-    ///         .await
-    ///         .expect("Some of the futures finished unexpectedly");
-    /// }
-    ///
-    ///
-    /// let runtime = tokio::runtime::Builder::new()
-    ///     .core_threads(2)
-    ///     .enable_all()
-    ///     .threaded_scheduler()
-    ///     .build()
-    ///     .unwrap();
-    ///
-    /// let rest_operations = run_application();
-    /// System::attach_to_tokio("actix-main-system", runtime, rest_operations);
-    /// ```
-    pub fn attach_to_tokio<Fut, R>(
-        name: impl Into<String>,
-        mut runtime: tokio::runtime::Runtime,
-        rest_operations: Fut,
-    ) -> R
-    where
-        Fut: std::future::Future<Output = R>,
-    {
-        let actix_system_task = LocalSet::new();
-        let sys = System::run_in_tokio(name.into(), &actix_system_task);
-        actix_system_task.spawn_local(sys);
-
-        runtime.block_on(actix_system_task.run_until(rest_operations))
-    }
-
     /// Get current running system.
+    ///
+    /// # Panics
+    /// Panics if no system is registered on the current thread.
     pub fn current() -> System {
         CURRENT.with(|cell| match *cell.borrow() {
             Some(ref sys) => sys.clone(),
@@ -197,67 +100,156 @@ impl System {
         })
     }
 
-    /// Check if current system is set, i.e., as already been started.
-    pub fn is_set() -> bool {
-        CURRENT.with(|cell| cell.borrow().is_some())
+    /// Try to get current running system.
+    ///
+    /// Returns `None` if no System has been started.
+    ///
+    /// Contrary to `current`, this never panics.
+    pub fn try_current() -> Option<System> {
+        CURRENT.with(|cell| cell.borrow().clone())
     }
 
-    /// Set current running system.
+    /// Get handle to a the System's initial [Arbiter].
+    pub fn arbiter(&self) -> &ArbiterHandle {
+        &self.arbiter_handle
+    }
+
+    /// Check if there is a System registered on the current thread.
+    pub fn is_registered() -> bool {
+        CURRENT.with(|sys| sys.borrow().is_some())
+    }
+
+    /// Register given system on current thread.
     #[doc(hidden)]
     pub fn set_current(sys: System) {
-        CURRENT.with(|s| {
-            *s.borrow_mut() = Some(sys);
+        CURRENT.with(|cell| {
+            *cell.borrow_mut() = Some(sys);
         })
     }
 
-    /// Execute function with system reference.
-    pub fn with_current<F, R>(f: F) -> R
-    where
-        F: FnOnce(&System) -> R,
-    {
-        CURRENT.with(|cell| match *cell.borrow() {
-            Some(ref sys) => f(sys),
-            None => panic!("System is not running"),
-        })
-    }
-
-    /// System id
+    /// Numeric system identifier.
+    ///
+    /// Useful when using multiple Systems.
     pub fn id(&self) -> usize {
         self.id
     }
 
-    /// Stop the system
+    /// Stop the system (with code 0).
     pub fn stop(&self) {
         self.stop_with_code(0)
     }
 
-    /// Stop the system with a particular exit code.
+    /// Stop the system with a given exit code.
     pub fn stop_with_code(&self, code: i32) {
-        let _ = self.sys.unbounded_send(SystemCommand::Exit(code));
+        let _ = self.sys_tx.send(SystemCommand::Exit(code));
     }
 
-    pub(crate) fn sys(&self) -> &UnboundedSender<SystemCommand> {
-        &self.sys
+    pub(crate) fn tx(&self) -> &mpsc::UnboundedSender<SystemCommand> {
+        &self.sys_tx
+    }
+}
+
+/// Runner that keeps a [System]'s event loop alive until stop message is received.
+#[must_use = "A SystemRunner does nothing unless `run` is called."]
+#[derive(Debug)]
+pub struct SystemRunner {
+    rt: Runtime,
+    stop_rx: oneshot::Receiver<i32>,
+    system: System,
+}
+
+impl SystemRunner {
+    /// Starts event loop and will return once [System] is [stopped](System::stop).
+    pub fn run(self) -> io::Result<()> {
+        let SystemRunner { rt, stop_rx, .. } = self;
+
+        // run loop
+        match rt.block_on(stop_rx) {
+            Ok(code) => {
+                if code != 0 {
+                    Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("Non-zero exit code: {}", code),
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
+
+            Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
+        }
     }
 
-    /// Return status of 'stop_on_panic' option which controls whether the System is stopped when an
-    /// uncaught panic is thrown from a worker thread.
-    pub fn stop_on_panic(&self) -> bool {
-        self.stop_on_panic
+    /// Runs the provided future, blocking the current thread until the future completes.
+    #[inline]
+    pub fn block_on<F: Future>(&self, fut: F) -> F::Output {
+        self.rt.block_on(fut)
     }
+}
 
-    /// System arbiter
-    pub fn arbiter(&self) -> &Arbiter {
-        &self.arbiter
+#[derive(Debug)]
+pub(crate) enum SystemCommand {
+    Exit(i32),
+    RegisterArbiter(usize, ArbiterHandle),
+    DeregisterArbiter(usize),
+}
+
+/// There is one `SystemController` per [System]. It runs in the background, keeping track of
+/// [Arbiter]s and is able to distribute a system-wide stop command.
+#[derive(Debug)]
+pub(crate) struct SystemController {
+    stop_tx: Option<oneshot::Sender<i32>>,
+    cmd_rx: mpsc::UnboundedReceiver<SystemCommand>,
+    arbiters: HashMap<usize, ArbiterHandle>,
+}
+
+impl SystemController {
+    pub(crate) fn new(
+        cmd_rx: mpsc::UnboundedReceiver<SystemCommand>,
+        stop_tx: oneshot::Sender<i32>,
+    ) -> Self {
+        SystemController {
+            cmd_rx,
+            stop_tx: Some(stop_tx),
+            arbiters: HashMap::with_capacity(4),
+        }
     }
+}
 
-    /// This function will start tokio runtime and will finish once the
-    /// `System::stop()` message get called.
-    /// Function `f` get called within tokio runtime context.
-    pub fn run<F>(f: F) -> io::Result<()>
-    where
-        F: FnOnce() + 'static,
-    {
-        Self::builder().run(f)
+impl Future for SystemController {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // process all items currently buffered in channel
+        loop {
+            match ready!(Pin::new(&mut self.cmd_rx).poll_recv(cx)) {
+                // channel closed; no more messages can be received
+                None => return Poll::Ready(()),
+
+                // process system command
+                Some(cmd) => match cmd {
+                    SystemCommand::Exit(code) => {
+                        // stop all arbiters
+                        for arb in self.arbiters.values() {
+                            arb.stop();
+                        }
+
+                        // stop event loop
+                        // will only fire once
+                        if let Some(stop_tx) = self.stop_tx.take() {
+                            let _ = stop_tx.send(code);
+                        }
+                    }
+
+                    SystemCommand::RegisterArbiter(id, arb) => {
+                        self.arbiters.insert(id, arb);
+                    }
+
+                    SystemCommand::DeregisterArbiter(id) => {
+                        self.arbiters.remove(&id);
+                    }
+                },
+            }
+        }
     }
 }

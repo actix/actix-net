@@ -1,145 +1,141 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
-use futures_util::future::FutureExt;
+use alloc::boxed::Box;
+use core::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use crate::{Service, ServiceFactory};
 
-pub type BoxFuture<I, E> = Pin<Box<dyn Future<Output = Result<I, E>>>>;
+pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T>>>;
 
 pub type BoxService<Req, Res, Err> =
-    Box<dyn Service<Request = Req, Response = Res, Error = Err, Future = BoxFuture<Res, Err>>>;
+    Box<dyn Service<Req, Response = Res, Error = Err, Future = BoxFuture<Result<Res, Err>>>>;
 
-pub struct BoxServiceFactory<C, Req, Res, Err, InitErr>(Inner<C, Req, Res, Err, InitErr>);
+pub struct BoxServiceFactory<Cfg, Req, Res, Err, InitErr>(Inner<Cfg, Req, Res, Err, InitErr>);
 
 /// Create boxed service factory
-pub fn factory<T>(
-    factory: T,
-) -> BoxServiceFactory<T::Config, T::Request, T::Response, T::Error, T::InitError>
+pub fn factory<SF, Req>(
+    factory: SF,
+) -> BoxServiceFactory<SF::Config, Req, SF::Response, SF::Error, SF::InitError>
 where
-    T: ServiceFactory + 'static,
-    T::Request: 'static,
-    T::Response: 'static,
-    T::Service: 'static,
-    T::Future: 'static,
-    T::Error: 'static,
-    T::InitError: 'static,
+    SF: ServiceFactory<Req> + 'static,
+    Req: 'static,
+    SF::Response: 'static,
+    SF::Service: 'static,
+    SF::Future: 'static,
+    SF::Error: 'static,
+    SF::InitError: 'static,
 {
     BoxServiceFactory(Box::new(FactoryWrapper {
         factory,
-        _t: std::marker::PhantomData,
+        _t: PhantomData,
     }))
 }
 
 /// Create boxed service
-pub fn service<T>(service: T) -> BoxService<T::Request, T::Response, T::Error>
+pub fn service<S, Req>(service: S) -> BoxService<Req, S::Response, S::Error>
 where
-    T: Service + 'static,
-    T::Future: 'static,
+    S: Service<Req> + 'static,
+    Req: 'static,
+    S::Future: 'static,
 {
-    Box::new(ServiceWrapper(service))
+    Box::new(ServiceWrapper(service, PhantomData))
 }
 
 type Inner<C, Req, Res, Err, InitErr> = Box<
     dyn ServiceFactory<
+        Req,
         Config = C,
-        Request = Req,
         Response = Res,
         Error = Err,
         InitError = InitErr,
         Service = BoxService<Req, Res, Err>,
-        Future = BoxFuture<BoxService<Req, Res, Err>, InitErr>,
+        Future = BoxFuture<Result<BoxService<Req, Res, Err>, InitErr>>,
     >,
 >;
 
-impl<C, Req, Res, Err, InitErr> ServiceFactory for BoxServiceFactory<C, Req, Res, Err, InitErr>
+impl<C, Req, Res, Err, InitErr> ServiceFactory<Req>
+    for BoxServiceFactory<C, Req, Res, Err, InitErr>
 where
     Req: 'static,
     Res: 'static,
     Err: 'static,
     InitErr: 'static,
 {
-    type Request = Req;
     type Response = Res;
     type Error = Err;
     type InitError = InitErr;
     type Config = C;
     type Service = BoxService<Req, Res, Err>;
 
-    type Future = BoxFuture<Self::Service, InitErr>;
+    type Future = BoxFuture<Result<Self::Service, InitErr>>;
 
     fn new_service(&self, cfg: C) -> Self::Future {
         self.0.new_service(cfg)
     }
 }
 
-struct FactoryWrapper<C, T: ServiceFactory> {
-    factory: T,
-    _t: std::marker::PhantomData<C>,
+struct FactoryWrapper<SF, Req, Cfg> {
+    factory: SF,
+    _t: PhantomData<(Req, Cfg)>,
 }
 
-impl<C, T, Req, Res, Err, InitErr> ServiceFactory for FactoryWrapper<C, T>
+impl<SF, Req, Cfg, Res, Err, InitErr> ServiceFactory<Req> for FactoryWrapper<SF, Req, Cfg>
 where
     Req: 'static,
     Res: 'static,
     Err: 'static,
     InitErr: 'static,
-    T: ServiceFactory<
-        Config = C,
-        Request = Req,
-        Response = Res,
-        Error = Err,
-        InitError = InitErr,
-    >,
-    T::Future: 'static,
-    T::Service: 'static,
-    <T::Service as Service>::Future: 'static,
+    SF: ServiceFactory<Req, Config = Cfg, Response = Res, Error = Err, InitError = InitErr>,
+    SF::Future: 'static,
+    SF::Service: 'static,
+    <SF::Service as Service<Req>>::Future: 'static,
 {
-    type Request = Req;
     type Response = Res;
     type Error = Err;
     type InitError = InitErr;
-    type Config = C;
+    type Config = Cfg;
     type Service = BoxService<Req, Res, Err>;
-    type Future = BoxFuture<Self::Service, Self::InitError>;
+    type Future = BoxFuture<Result<Self::Service, Self::InitError>>;
 
-    fn new_service(&self, cfg: C) -> Self::Future {
-        Box::pin(
-            self.factory
-                .new_service(cfg)
-                .map(|res| res.map(ServiceWrapper::boxed)),
-        )
+    fn new_service(&self, cfg: Cfg) -> Self::Future {
+        let fut = self.factory.new_service(cfg);
+        Box::pin(async {
+            let res = fut.await;
+            res.map(ServiceWrapper::boxed)
+        })
     }
 }
 
-struct ServiceWrapper<T: Service>(T);
+struct ServiceWrapper<S: Service<Req>, Req>(S, PhantomData<Req>);
 
-impl<T> ServiceWrapper<T>
+impl<S, Req> ServiceWrapper<S, Req>
 where
-    T: Service + 'static,
-    T::Future: 'static,
+    S: Service<Req> + 'static,
+    Req: 'static,
+    S::Future: 'static,
 {
-    fn boxed(service: T) -> BoxService<T::Request, T::Response, T::Error> {
-        Box::new(ServiceWrapper(service))
+    fn boxed(service: S) -> BoxService<Req, S::Response, S::Error> {
+        Box::new(ServiceWrapper(service, PhantomData))
     }
 }
 
-impl<T, Req, Res, Err> Service for ServiceWrapper<T>
+impl<S, Req, Res, Err> Service<Req> for ServiceWrapper<S, Req>
 where
-    T: Service<Request = Req, Response = Res, Error = Err>,
-    T::Future: 'static,
+    S: Service<Req, Response = Res, Error = Err>,
+    S::Future: 'static,
 {
-    type Request = Req;
     type Response = Res;
     type Error = Err;
-    type Future = BoxFuture<Res, Err>;
+    type Future = BoxFuture<Result<Res, Err>>;
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.0.poll_ready(ctx)
     }
 
-    fn call(&mut self, req: Self::Request) -> Self::Future {
+    fn call(&self, req: Req) -> Self::Future {
         Box::pin(self.0.call(req))
     }
 }

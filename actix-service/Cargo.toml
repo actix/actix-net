@@ -1,7 +1,11 @@
 [package]
 name = "actix-service"
-version = "1.0.6"
-authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
+version = "2.0.0-beta.4"
+authors = [
+    "Nikolay Kim <fafhrd91@gmail.com>",
+    "Rob Ede <robjtede@icloud.com>",
+    "fakeshadow <24548779@qq.com>",
+]
 description = "Service trait and combinators for representing asynchronous request/response operations."
 keywords = ["network", "framework", "async", "futures", "service"]
 homepage = "https://actix.rs"
@@ -17,17 +21,9 @@ name = "actix_service"
 path = "src/lib.rs"
 
 [dependencies]
-futures-util = "0.3.1"
-pin-project = "1.0.0"
+futures-core = { version = "0.3.7", default-features = false }
+pin-project-lite = "0.2"
 
 [dev-dependencies]
-actix-rt = "1.0.0"
-criterion = "0.3"
-
-[[bench]]
-name = "unsafecell_vs_refcell"
-harness = false
-
-[[bench]]
-name = "and_then"
-harness = false
+actix-rt = "2.0.0"
+futures-util = { version = "0.3.7", default-features = false }

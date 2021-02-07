@@ -1,12 +1,12 @@
 [package]
 name = "actix-codec"
-version = "0.3.0"
+version = "0.4.0-beta.1"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
-description = "Codec utilities for working with framed protocols."
+description = "Codec utilities for working with framed protocols"
 keywords = ["network", "framework", "async", "futures"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-codec/"
+documentation = "https://docs.rs/actix-codec"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
@@ -17,10 +17,10 @@ path = "src/lib.rs"
 
 [dependencies]
 bitflags = "1.2.1"
-bytes = "0.5.2"
-futures-core = { version = "0.3.4", default-features = false }
-futures-sink = { version = "0.3.4", default-features = false }
+bytes = "1"
+futures-core = { version = "0.3.7", default-features = false }
+futures-sink = { version = "0.3.7", default-features = false }
 log = "0.4"
-pin-project = "1.0.0"
-tokio = { version = "0.2.5", default-features = false }
-tokio-util = { version = "0.3.1", default-features = false, features = ["codec"] }
+pin-project-lite = "0.2"
+tokio = "1"
+tokio-util = { version = "0.6", features = ["codec", "io"] }

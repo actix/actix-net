@@ -1,4 +1,4 @@
-error: only async fn is supported
+error: the async keyword is missing from the function declaration
  --> $DIR/main-02-only-async.rs:2:1
   |
 2 | fn main() {

@@ -1,64 +1,76 @@
 [package]
 name = "actix-tls"
-version = "2.0.0"
+version = "3.0.0-beta.3"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
-description = "TLS acceptor services for Actix ecosystem."
-keywords = ["network", "framework", "async", "tls", "ssl"]
+description = "TLS acceptor and connector services for Actix ecosystem"
+keywords = ["network", "tls", "ssl", "async", "transport"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-tls/"
+documentation = "https://docs.rs/actix-tls"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 
 [package.metadata.docs.rs]
-features = ["openssl", "rustls", "nativetls"]
+features = ["openssl", "rustls", "native-tls", "accept", "connect", "uri"]
 
 [lib]
 name = "actix_tls"
 path = "src/lib.rs"
 
-[[example]]
-name = "basic"
-required-features = ["rustls"]
-
 [features]
-default = []
+default = ["accept", "connect", "uri"]
 
-# openssl
-openssl = ["open-ssl", "tokio-openssl"]
+# enable acceptor services
+accept = []
 
-# rustls
-rustls = ["rust-tls", "webpki", "webpki-roots", "tokio-rustls"]
+# enable connector services
+connect = []
 
-# nativetls
-nativetls = ["native-tls", "tokio-tls"]
+# use openssl impls
+openssl = ["tls-openssl", "tokio-openssl"]
+
+# use rustls impls
+rustls = ["tokio-rustls", "webpki-roots"]
+
+# use native-tls impls
+native-tls = ["tokio-native-tls"]
+
+# support http::Uri as connect address
+uri = ["http"]
 
 [dependencies]
-actix-service = "1.0.0"
-actix-codec = "0.3.0"
-actix-utils = "2.0.0"
+actix-codec = "0.4.0-beta.1"
+actix-rt = { version = "2.0.0", default-features = false }
+actix-service = "2.0.0-beta.4"
+actix-utils = "3.0.0-beta.2"
 
-futures-util = { version = "0.3.4", default-features = false }
+derive_more = "0.99.5"
+futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
+http = { version = "0.2.3", optional = true }
+log = "0.4"
+tokio-util = { version = "0.6.3", default-features = false }
 
 # openssl
-open-ssl = { package = "openssl", version = "0.10", optional = true }
-tokio-openssl = { version = "0.4.0", optional = true }
+tls-openssl = { package = "openssl", version = "0.10", optional = true }
+tokio-openssl = { version = "0.6", optional = true }
 
 # rustls
-rust-tls = { package = "rustls", version = "0.18.0", optional = true }
-webpki = { version = "0.21", optional = true }
-webpki-roots = { version = "0.20", optional = true }
-tokio-rustls = { version = "0.14.0", optional = true }
+tokio-rustls = { version = "0.22", optional = true }
+webpki-roots = { version = "0.21", optional = true }
 
 # native-tls
-native-tls = { version = "0.2", optional = true }
-tokio-tls = { version = "0.3", optional = true }
+tokio-native-tls = { version = "0.3", optional = true }
 
 [dev-dependencies]
-bytes = "0.5"
+actix-rt = "2.0.0"
+actix-server = "2.0.0-beta.3"
+bytes = "1"
+env_logger = "0.8"
+futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
 log = "0.4"
-env_logger = "0.7"
-actix-testing = "1.0.0"
-actix-server = "1"
-actix-rt = "1"
+trust-dns-resolver = "0.20.0"
+
+[[example]]
+name = "basic"
+required-features = ["accept", "rustls"]
