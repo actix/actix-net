@@ -123,6 +123,28 @@ fn arbiter_spawn_fn_runs() {
 }
 
 #[test]
+fn arbiter_handle_spawn_fn_runs() {
+    let sys = System::new();
+
+    let (tx, rx) = channel::<u32>();
+
+    let arbiter = Arbiter::new();
+    let handle = arbiter.handle();
+    drop(arbiter);
+
+    handle.spawn_fn(move || {
+        tx.send(42).unwrap();
+        System::current().stop()
+    });
+
+    let num = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert_eq!(num, 42);
+
+    handle.stop();
+    sys.run().unwrap();
+}
+
+#[test]
 fn arbiter_drop_no_panic_fn() {
     let _ = System::new();
 
@@ -265,4 +287,14 @@ fn new_arbiter_with_tokio() {
     arb.join().unwrap();
 
     assert_eq!(false, counter.load(Ordering::SeqCst));
+}
+
+#[test]
+fn try_current_no_system() {
+    assert!(System::try_current().is_none())
+}
+
+#[test]
+fn try_current_with_system() {
+    System::new().block_on(async { assert!(System::try_current().is_some()) });
 }

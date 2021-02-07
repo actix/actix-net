@@ -1,17 +1,22 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 3.0.0-beta.3 - 2021-02-06
 * Remove `trust-dns-proto` and `trust-dns-resolver`. [#248]
 * Use `std::net::ToSocketAddrs` as simple and basic default resolver. [#248]
-* Add `Resolve` trait for custom dns resolver. [#248]
+* Add `Resolve` trait for custom DNS resolvers. [#248]
 * Add `Resolver::new_custom` function to construct custom resolvers. [#248]
 * Export `webpki_roots::TLS_SERVER_ROOTS` in `actix_tls::connect` mod and remove
   the export from `actix_tls::accept` [#248]
 * Remove `ConnectTakeAddrsIter`. `Connect::take_addrs` now returns `ConnectAddrsIter<'static>`
   as owned iterator. [#248]
 * Rename `Address::{host => hostname}` to more accurately describe which URL segment is returned.
+* Update `actix-rt` to `2.0.0`. [#273]
 
 [#248]: https://github.com/actix/actix-net/pull/248
+[#273]: https://github.com/actix/actix-net/pull/273
 
 
 ## 3.0.0-beta.2 - 2021-xx-xx

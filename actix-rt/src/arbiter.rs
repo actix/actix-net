@@ -172,13 +172,18 @@ impl Arbiter {
         hnd
     }
 
+    /// Return a handle to the this Arbiter's message sender.
+    pub fn handle(&self) -> ArbiterHandle {
+        ArbiterHandle::new(self.tx.clone())
+    }
+
     /// Return a handle to the current thread's Arbiter's message sender.
     ///
     /// # Panics
     /// Panics if no Arbiter is running on the current thread.
     pub fn current() -> ArbiterHandle {
         HANDLE.with(|cell| match *cell.borrow() {
-            Some(ref addr) => addr.clone(),
+            Some(ref hnd) => hnd.clone(),
             None => panic!("Arbiter is not running."),
         })
     }

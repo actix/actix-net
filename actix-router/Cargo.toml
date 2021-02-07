@@ -1,9 +1,9 @@
 [package]
 name = "actix-router"
-version = "0.2.6"
+version = "0.2.7"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "Resource path matching library"
-keywords = ["actix"]
+keywords = ["actix", "router", "routing"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 documentation = "https://docs.rs/actix-router"

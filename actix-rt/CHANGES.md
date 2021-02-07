@@ -3,6 +3,20 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 2.0.2 - 2021-02-06
+* Add `Arbiter::handle` to get a handle of an owned Arbiter. [#274]
+* Add `System::try_current` for situations where actix may or may not be running a System. [#275]
+
+[#274]: https://github.com/actix/actix-net/pull/274
+[#275]: https://github.com/actix/actix-net/pull/275
+
+
+## 2.0.1 - 2021-02-06
+* Expose `JoinError` from Tokio. [#271]
+
+[#271]: https://github.com/actix/actix-net/pull/271
+
+
 ## 2.0.0 - 2021-02-02
 * Remove all Arbiter-local storage methods. [#262]
 * Re-export `tokio::pin`. [#262]
