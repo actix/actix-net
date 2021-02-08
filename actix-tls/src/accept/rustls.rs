@@ -86,7 +86,7 @@ impl<T: ActixStream> ActixStream for TlsStream<T> {
         T::poll_read_ready((&**self).get_ref().0, cx)
     }
 
-    fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         T::poll_write_ready((&**self).get_ref().0, cx)
     }
 }

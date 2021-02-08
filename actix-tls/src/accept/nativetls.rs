@@ -1,7 +1,11 @@
-use std::io;
-use std::ops::{Deref, DerefMut};
-use std::task::{Context, Poll};
+use std::{
+    io::{self, IoSlice},
+    ops::{Deref, DerefMut},
+    pin::Pin,
+    task::{Context, Poll},
+};
 
+use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
 use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
@@ -11,9 +15,6 @@ pub use tokio_native_tls::native_tls::Error;
 pub use tokio_native_tls::TlsAcceptor;
 
 use super::MAX_CONN_COUNTER;
-use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
-use std::io::IoSlice;
-use std::pin::Pin;
 
 /// wrapper type for `tokio_native_tls::TlsStream` in order to impl `ActixStream` trait.
 pub struct TlsStream<T>(tokio_native_tls::TlsStream<T>);
@@ -83,7 +84,7 @@ impl<T: ActixStream> ActixStream for TlsStream<T> {
         T::poll_read_ready((&**self).get_ref().get_ref().get_ref(), cx)
     }
 
-    fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         T::poll_write_ready((&**self).get_ref().get_ref().get_ref(), cx)
     }
 }
