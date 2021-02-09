@@ -325,12 +325,12 @@ impl ServerBuilder {
     /// (If [ServerBuilder::system_exit] is set to true)
     pub fn on_stop<F, Fut>(mut self, func: F) -> Self
     where
-        F: Fn() -> Fut + Clone + 'static,
-        Fut: Future<Output = ()>,
+        F: Fn() -> Fut + 'static,
+        Fut: Future<Output = ()> + 'static,
     {
         self.on_stop = Box::new(move || {
-            let func = func.clone();
-            Box::pin(async move { func().await })
+            let fut = func();
+            Box::pin(async move { fut.await })
         });
         self
     }
