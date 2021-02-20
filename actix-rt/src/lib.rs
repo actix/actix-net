@@ -70,28 +70,27 @@ pub mod signal {
 }
 
 pub mod net {
-    //! TCP/UDP/Unix bindings (Tokio re-exports).
+    //! TCP/UDP/Unix bindings (mostly Tokio re-exports).
 
+    use std::task::{Context, Poll};
+
+    use tokio::io::{AsyncRead, AsyncWrite};
     pub use tokio::net::UdpSocket;
     pub use tokio::net::{TcpListener, TcpStream};
 
     #[cfg(unix)]
     pub use tokio::net::{UnixDatagram, UnixListener, UnixStream};
 
-    use std::task::{Context, Poll};
-
-    use tokio::io::{AsyncRead, AsyncWrite};
-
-    /// Trait for generic over tokio stream types and various wrapper types around them.
+    /// Extension trait over async read+write types that can also signal readiness.
     pub trait ActixStream: AsyncRead + AsyncWrite + Unpin + 'static {
-        /// poll stream and check read readiness of Self.
+        /// Poll stream and check read readiness of Self.
         ///
-        /// See [tokio::net::TcpStream::poll_read_ready] for detail
+        /// See [tokio::net::TcpStream::poll_read_ready] for detail on intended use.
         fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>>;
 
-        /// poll stream and check write readiness of Self.
+        /// Poll stream and check write readiness of Self.
         ///
-        /// See [tokio::net::TcpStream::poll_write_ready] for detail
+        /// See [tokio::net::TcpStream::poll_write_ready] for detail on intended use.
         fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>>;
     }
 

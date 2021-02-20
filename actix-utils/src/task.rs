@@ -1,38 +1,30 @@
-use core::cell::Cell;
-use core::fmt;
-use core::marker::PhantomData;
-use core::task::Waker;
+use core::{cell::Cell, fmt, marker::PhantomData, task::Waker};
 
 /// A synchronization primitive for task wakeup.
 ///
-/// Sometimes the task interested in a given event will change over time.
-/// An `LocalWaker` can coordinate concurrent notifications with the consumer
-/// potentially "updating" the underlying task to wake up. This is useful in
-/// scenarios where a computation completes in another task and wants to
-/// notify the consumer, but the consumer is in the process of being migrated to
-/// a new logical task.
+/// Sometimes the task interested in a given event will change over time. A `LocalWaker` can
+/// coordinate concurrent notifications with the consumer, potentially "updating" the underlying
+/// task to wake up. This is useful in scenarios where a computation completes in another task and
+/// wants to notify the consumer, but the consumer is in the process of being migrated to a new
+/// logical task.
 ///
-/// Consumers should call `register` before checking the result of a computation
-/// and producers should call `wake` after producing the computation (this
-/// differs from the usual `thread::park` pattern). It is also permitted for
-/// `wake` to be called **before** `register`. This results in a no-op.
+/// Consumers should call [`register`] before checking the result of a computation and producers
+/// should call `wake` after producing the computation (this differs from the usual `thread::park`
+/// pattern). It is also permitted for [`wake`] to be called _before_ [`register`]. This results in
+/// a no-op.
 ///
-/// A single `AtomicWaker` may be reused for any number of calls to `register` or
-/// `wake`.
+/// A single `LocalWaker` may be reused for any number of calls to [`register`] or [`wake`].
 #[derive(Default)]
 pub struct LocalWaker {
     pub(crate) waker: Cell<Option<Waker>>,
     // mark LocalWaker as a !Send type.
-    _t: PhantomData<*const ()>,
+    _phantom: PhantomData<*const ()>,
 }
 
 impl LocalWaker {
-    /// Create an `LocalWaker`.
+    /// Creates a new, empty `LocalWaker`.
     pub fn new() -> Self {
-        LocalWaker {
-            waker: Cell::new(None),
-            _t: PhantomData,
-        }
+        LocalWaker::default()
     }
 
     /// Registers the waker to be notified on calls to `wake`.
