@@ -1,4 +1,4 @@
-use core::cell::UnsafeCell;
+use core::cell::Cell;
 use core::fmt;
 use core::marker::PhantomData;
 use core::task::Waker;
@@ -19,10 +19,9 @@ use core::task::Waker;
 ///
 /// A single `AtomicWaker` may be reused for any number of calls to `register` or
 /// `wake`.
-// TODO: Refactor to Cell when remove deprecated methods (@botika)
 #[derive(Default)]
 pub struct LocalWaker {
-    pub(crate) waker: UnsafeCell<Option<Waker>>,
+    pub(crate) waker: Cell<Option<Waker>>,
     // mark LocalWaker as a !Send type.
     _t: PhantomData<*const ()>,
 }
@@ -31,19 +30,9 @@ impl LocalWaker {
     /// Create an `LocalWaker`.
     pub fn new() -> Self {
         LocalWaker {
-            waker: UnsafeCell::new(None),
+            waker: Cell::new(None),
             _t: PhantomData,
         }
-    }
-
-    #[deprecated(
-        since = "2.1.0",
-        note = "In favor of `wake`. State of the register doesn't matter at `wake` up"
-    )]
-    /// Check if waker has been registered.
-    #[inline]
-    pub fn is_registered(&self) -> bool {
-        unsafe { (*self.waker.get()).is_some() }
     }
 
     /// Registers the waker to be notified on calls to `wake`.
@@ -51,11 +40,8 @@ impl LocalWaker {
     /// Returns `true` if waker was registered before.
     #[inline]
     pub fn register(&self, waker: &Waker) -> bool {
-        unsafe {
-            let w = self.waker.get();
-            let last_waker = w.replace(Some(waker.clone()));
-            last_waker.is_some()
-        }
+        let last_waker = self.waker.replace(Some(waker.clone()));
+        last_waker.is_some()
     }
 
     /// Calls `wake` on the last `Waker` passed to `register`.
@@ -73,7 +59,7 @@ impl LocalWaker {
     /// If a waker has not been registered, this returns `None`.
     #[inline]
     pub fn take(&self) -> Option<Waker> {
-        unsafe { (*self.waker.get()).take() }
+        self.waker.take()
     }
 }
 
