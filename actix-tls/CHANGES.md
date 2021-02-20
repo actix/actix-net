@@ -1,6 +1,7 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Rename `accept::openssl::{SslStream => TlsStream}`.
 
 
 ## 3.0.0-beta.3 - 2021-02-06

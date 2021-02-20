@@ -18,16 +18,16 @@ pub use openssl::ssl::{
 
 use super::MAX_CONN_COUNTER;
 
-/// wrapper type for `tokio_openssl::SslStream` in order to impl `ActixStream` trait.
-pub struct SslStream<T>(tokio_openssl::SslStream<T>);
+/// Wrapper type for `tokio_openssl::SslStream` in order to impl `ActixStream` trait.
+pub struct TlsStream<T>(tokio_openssl::SslStream<T>);
 
-impl<T> From<tokio_openssl::SslStream<T>> for SslStream<T> {
+impl<T> From<tokio_openssl::SslStream<T>> for TlsStream<T> {
     fn from(stream: tokio_openssl::SslStream<T>) -> Self {
         Self(stream)
     }
 }
 
-impl<T> Deref for SslStream<T> {
+impl<T> Deref for TlsStream<T> {
     type Target = tokio_openssl::SslStream<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -35,13 +35,13 @@ impl<T> Deref for SslStream<T> {
     }
 }
 
-impl<T> DerefMut for SslStream<T> {
+impl<T> DerefMut for TlsStream<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T: ActixStream> AsyncRead for SslStream<T> {
+impl<T: ActixStream> AsyncRead for TlsStream<T> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -51,7 +51,7 @@ impl<T: ActixStream> AsyncRead for SslStream<T> {
     }
 }
 
-impl<T: ActixStream> AsyncWrite for SslStream<T> {
+impl<T: ActixStream> AsyncWrite for TlsStream<T> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -81,7 +81,7 @@ impl<T: ActixStream> AsyncWrite for SslStream<T> {
     }
 }
 
-impl<T: ActixStream> ActixStream for SslStream<T> {
+impl<T: ActixStream> ActixStream for TlsStream<T> {
     fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         T::poll_read_ready((&**self).get_ref(), cx)
     }
@@ -116,7 +116,7 @@ impl Clone for Acceptor {
 }
 
 impl<T: ActixStream> ServiceFactory<T> for Acceptor {
-    type Response = SslStream<T>;
+    type Response = TlsStream<T>;
     type Error = SslError;
     type Config = ();
     type Service = AcceptorService;
@@ -140,7 +140,7 @@ pub struct AcceptorService {
 }
 
 impl<T: ActixStream> Service<T> for AcceptorService {
-    type Response = SslStream<T>;
+    type Response = TlsStream<T>;
     type Error = SslError;
     type Future = AcceptorServiceResponse<T>;
 
@@ -168,7 +168,7 @@ pub struct AcceptorServiceResponse<T: ActixStream> {
 }
 
 impl<T: ActixStream> Future for AcceptorServiceResponse<T> {
-    type Output = Result<SslStream<T>, SslError>;
+    type Output = Result<TlsStream<T>, SslError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         ready!(Pin::new(self.stream.as_mut().unwrap()).poll_accept(cx))?;

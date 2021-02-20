@@ -18,7 +18,7 @@ pub use tokio_rustls::rustls::{ServerConfig, Session};
 
 use super::MAX_CONN_COUNTER;
 
-/// wrapper type for `tokio_openssl::SslStream` in order to impl `ActixStream` trait.
+/// Wrapper type for `tokio_openssl::SslStream` in order to impl `ActixStream` trait.
 pub struct TlsStream<T>(tokio_rustls::server::TlsStream<T>);
 
 impl<T> From<tokio_rustls::server::TlsStream<T>> for TlsStream<T> {

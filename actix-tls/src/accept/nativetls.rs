@@ -16,7 +16,7 @@ pub use tokio_native_tls::TlsAcceptor;
 
 use super::MAX_CONN_COUNTER;
 
-/// wrapper type for `tokio_native_tls::TlsStream` in order to impl `ActixStream` trait.
+/// Wrapper type for `tokio_native_tls::TlsStream` in order to impl `ActixStream` trait.
 pub struct TlsStream<T>(tokio_native_tls::TlsStream<T>);
 
 impl<T> From<tokio_native_tls::TlsStream<T>> for TlsStream<T> {

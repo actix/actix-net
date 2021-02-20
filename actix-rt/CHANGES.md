@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Add `ActixStream` extension trait to include readiness methods. [#276]
+
+[#276]: https://github.com/actix/actix-net/pull/276
 
 
 ## 2.0.2 - 2021-02-06
