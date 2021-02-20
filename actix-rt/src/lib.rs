@@ -77,6 +77,44 @@ pub mod net {
 
     #[cfg(unix)]
     pub use tokio::net::{UnixDatagram, UnixListener, UnixStream};
+
+    use std::task::{Context, Poll};
+
+    use tokio::io::{AsyncRead, AsyncWrite};
+
+    /// Trait for generic over tokio stream types and various wrapper types around them.
+    pub trait ActixStream: AsyncRead + AsyncWrite + Unpin + 'static {
+        /// poll stream and check read readiness of Self.
+        ///
+        /// See [tokio::net::TcpStream::poll_read_ready] for detail
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>>;
+
+        /// poll stream and check write readiness of Self.
+        ///
+        /// See [tokio::net::TcpStream::poll_write_ready] for detail
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>>;
+    }
+
+    impl ActixStream for TcpStream {
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            TcpStream::poll_read_ready(self, cx)
+        }
+
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            TcpStream::poll_write_ready(self, cx)
+        }
+    }
+
+    #[cfg(unix)]
+    impl ActixStream for UnixStream {
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            UnixStream::poll_read_ready(self, cx)
+        }
+
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            UnixStream::poll_write_ready(self, cx)
+        }
+    }
 }
 
 pub mod time {

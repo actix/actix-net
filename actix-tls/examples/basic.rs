@@ -29,9 +29,10 @@ use std::{
     },
 };
 
+use actix_rt::net::TcpStream;
 use actix_server::Server;
 use actix_service::pipeline_factory;
-use actix_tls::accept::rustls::Acceptor as RustlsAcceptor;
+use actix_tls::accept::rustls::{Acceptor as RustlsAcceptor, TlsStream};
 use futures_util::future::ok;
 use log::info;
 use rustls::{
@@ -74,9 +75,9 @@ async fn main() -> io::Result<()> {
             // Set up TLS service factory
             pipeline_factory(tls_acceptor.clone())
                 .map_err(|err| println!("Rustls error: {:?}", err))
-                .and_then(move |stream| {
+                .and_then(move |stream: TlsStream<TcpStream>| {
                     let num = count.fetch_add(1, Ordering::Relaxed);
-                    info!("[{}] Got TLS connection: {:?}", num, stream);
+                    info!("[{}] Got TLS connection: {:?}", num, &*stream);
                     ok(())
                 })
         })?
