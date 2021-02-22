@@ -5,14 +5,11 @@ use std::{
 
 use actix_rt::{time, Arbiter, System};
 
-
-
 #[test]
 #[should_panic]
 fn no_system_arbiter_new_panic() {
     Arbiter::new();
 }
-
 
 #[test]
 fn join_arbiter_wait_fut() {

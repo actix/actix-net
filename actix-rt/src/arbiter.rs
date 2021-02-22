@@ -100,7 +100,7 @@ impl ArbiterHandle {
         self.tx.send(ArbiterCommand::Stop).is_ok()
     }
 
-    /// Will wait for [Arbiter] to complete all commands up until it's Stop command is processed.
+    /// Will wait for associated [Arbiter] to complete all commands up until it is stopped.
     ///
     /// For [Arbiter]s that have already stopped, the future will resolve immediately.
     ///
