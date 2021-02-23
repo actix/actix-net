@@ -1,4 +1,7 @@
-use std::io;
+use std::{
+    io,
+    net::{IpAddr, Ipv4Addr},
+};
 
 use actix_codec::{BytesCodec, Framed};
 use actix_rt::net::TcpStream;
@@ -124,4 +127,26 @@ async fn test_rustls_uri() {
     let addr = http::Uri::try_from(format!("https://localhost:{}", srv.port())).unwrap();
     let con = conn.call(addr.into()).await.unwrap();
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
+}
+
+#[actix_rt::test]
+async fn test_local_addr() {
+    let srv = TestServer::with(|| {
+        fn_service(|io: TcpStream| async {
+            let mut framed = Framed::new(io, BytesCodec);
+            framed.send(Bytes::from_static(b"test")).await?;
+            Ok::<_, io::Error>(())
+        })
+    });
+
+    let conn = actix_connect::default_connector();
+    let local = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 3));
+
+    let (con, _) = conn
+        .call(Connect::with_addr("10", srv.addr()).set_local_addr(local))
+        .await
+        .unwrap()
+        .into_parts();
+
+    assert_eq!(con.local_addr().unwrap().ip(), local)
 }

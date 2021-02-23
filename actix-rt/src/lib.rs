@@ -76,7 +76,7 @@ pub mod net {
 
     use tokio::io::{AsyncRead, AsyncWrite};
     pub use tokio::net::UdpSocket;
-    pub use tokio::net::{TcpListener, TcpStream};
+    pub use tokio::net::{TcpListener, TcpSocket, TcpStream};
 
     #[cfg(unix)]
     pub use tokio::net::{UnixDatagram, UnixListener, UnixStream};
