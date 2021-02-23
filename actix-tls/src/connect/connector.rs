@@ -191,8 +191,6 @@ async fn connect(addr: SocketAddr, local_addr: Option<IpAddr>) -> io::Result<Tcp
                 }
             };
 
-            socket.set_reuseaddr(true)?;
-
             socket.connect(addr).await
         }
 
