@@ -1,7 +1,13 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Hide `mpsc` mod. [#286]
+* Add `async fn mpsc::Receiver::recv`. [#286]
+* `SendError` inner field is now public. [#286]
+* Rename `Dispatcher::{get_sink => tx}`. [#286]
+* Rename `Dispatcher::{get_ref => service}`. [#286]
+* Rename `Dispatcher::{get_mut => service_mut}`. [#286]
+* Rename `Dispatcher::{get_framed => framed}`. [#286]
+* Rename `Dispatcher::{get_framed_mut => framed_mut}`. [#286]
 
 [#286]: https://github.com/actix/actix-net/pull/286
 
