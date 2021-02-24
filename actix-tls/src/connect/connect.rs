@@ -3,7 +3,7 @@ use std::{
     fmt,
     iter::{self, FromIterator as _},
     mem,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
 };
 
 /// Parse a host into parts (hostname and port).
@@ -67,6 +67,7 @@ pub struct Connect<T> {
     pub(crate) req: T,
     pub(crate) port: u16,
     pub(crate) addr: ConnectAddrs,
+    pub(crate) local_addr: Option<IpAddr>,
 }
 
 impl<T: Address> Connect<T> {
@@ -78,6 +79,7 @@ impl<T: Address> Connect<T> {
             req,
             port: port.unwrap_or(0),
             addr: ConnectAddrs::None,
+            local_addr: None,
         }
     }
 
@@ -88,6 +90,7 @@ impl<T: Address> Connect<T> {
             req,
             port: 0,
             addr: ConnectAddrs::One(addr),
+            local_addr: None,
         }
     }
 
@@ -116,6 +119,12 @@ impl<T: Address> Connect<T> {
         } else {
             ConnectAddrs::Multi(addrs)
         };
+        self
+    }
+
+    /// Set local_addr of connect.
+    pub fn set_local_addr(mut self, addr: impl Into<IpAddr>) -> Self {
+        self.local_addr = Some(addr.into());
         self
     }
 
@@ -285,7 +294,7 @@ fn parse_host(host: &str) -> (&str, Option<u16>) {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr};
+    use std::net::Ipv4Addr;
 
     use super::*;
 
@@ -328,5 +337,14 @@ mod tests {
 
         let mut iter = ConnectAddrsIter::None;
         assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_local_addr() {
+        let conn = Connect::new("hello").set_local_addr([127, 0, 0, 1]);
+        assert_eq!(
+            conn.local_addr.unwrap(),
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
+        )
     }
 }
