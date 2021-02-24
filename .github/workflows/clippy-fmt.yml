@@ -14,8 +14,10 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          profile: minimal
           components: rustfmt
-      - name: Check with rustfmt
+          override: true
+      - name: Rustfmt Check
         uses: actions-rs/cargo@v1
         with:
           command: fmt
@@ -30,9 +32,10 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          profile: minimal
           components: clippy
           override: true
-      - name: Check with Clippy
+      - name: Clippy Check
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
