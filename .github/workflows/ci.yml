@@ -70,14 +70,20 @@ jobs:
       - name: check minimal + tests
         uses: actions-rs/cargo@v1
         with:
-          command: hack
-          args: --clean-per-run check --workspace --no-default-features --tests --examples
+          command: check
+          args: --workspace --no-default-features --tests --examples
 
+      - name: check default
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --workspace --tests --examples
+      
       - name: check full
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --workspace --bins --examples --tests
+          args: --workspace --all-features --tests --examples
 
       - name: tests
         if: matrix.target.triple != 'x86_64-pc-windows-gnu'
