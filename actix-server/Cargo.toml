@@ -12,7 +12,6 @@ repository = "https://github.com/actix/actix-net.git"
 documentation = "https://docs.rs/actix-server"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
-exclude = [".gitignore", ".cargo/config"]
 edition = "2018"
 
 [lib]
