@@ -52,7 +52,7 @@ log = "0.4"
 tokio-util = { version = "0.6.3", default-features = false }
 
 # openssl
-tls-openssl = { package = "openssl", version = "0.10", features = ["vendored"], optional = true }
+tls-openssl = { package = "openssl", version = "0.10.9", optional = true }
 tokio-openssl = { version = "0.6", optional = true }
 
 # rustls
@@ -61,6 +61,12 @@ webpki-roots = { version = "0.21", optional = true }
 
 # native-tls
 tokio-native-tls = { version = "0.3", optional = true }
+
+[target.'cfg(windows)'.dependencies.tls-openssl]
+version = "0.10.9"
+package = "openssl"
+features = ["vendored"]
+optional = true
 
 [dev-dependencies]
 actix-rt = "2.0.0"
