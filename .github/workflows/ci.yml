@@ -65,7 +65,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: hack
-          args: --clean-per-run check --workspace --no-default-features --tests
+          args: --clean-per-run check --workspace --no-default-features
+      
+      - name: check minimal + tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: hack
+          args: --clean-per-run check --workspace --no-default-features --tests --examples
 
       - name: check full
         uses: actions-rs/cargo@v1
