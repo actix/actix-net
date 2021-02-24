@@ -1,21 +1,20 @@
 //! Framed dispatcher service and related utilities.
 
-#![allow(type_alias_bounds)]
-
-use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context, Poll};
-use core::{fmt, mem};
+use core::{
+    fmt,
+    future::Future,
+    mem,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use actix_codec::{AsyncRead, AsyncWrite, Decoder, Encoder, Framed};
 use actix_service::{IntoService, Service};
-use futures_core::stream::Stream;
 use log::debug;
 use pin_project_lite::pin_project;
+use tokio::sync::mpsc;
 
-use crate::mpsc;
-
-/// Framed transport errors
+/// Framed transport errors.
 pub enum DispatcherError<E, U: Encoder<I> + Decoder, I> {
     Service(E),
     Encoder(<U as Encoder<I>>::Error),
@@ -64,8 +63,7 @@ pub enum Message<T> {
 }
 
 pin_project! {
-    /// Dispatcher is a future that reads frames from Framed object
-    /// and passes them to the service.
+    /// Dispatcher is a future that reads frames from Framed object and passes them to the service.
     pub struct Dispatcher<S, T, U, I>
     where
         S: Service<<U as Decoder>::Item, Response = I>,
@@ -82,8 +80,8 @@ pin_project! {
         state: State<S, U, I>,
         #[pin]
         framed: Framed<T, U>,
-        rx: mpsc::Receiver<Result<Message<I>, S::Error>>,
-        tx: mpsc::Sender<Result<Message<I>, S::Error>>,
+        rx: mpsc::UnboundedReceiver<Result<Message<I>, S::Error>>,
+        tx: mpsc::UnboundedSender<Result<Message<I>, S::Error>>,
     }
 }
 
@@ -134,26 +132,7 @@ where
     where
         F: IntoService<S, <U as Decoder>::Item>,
     {
-        let (tx, rx) = mpsc::channel();
-        Dispatcher {
-            framed,
-            rx,
-            tx,
-            service: service.into_service(),
-            state: State::Processing,
-        }
-    }
-
-    /// Construct new `Dispatcher` instance with customer `mpsc::Receiver`
-    pub fn with_rx<F>(
-        framed: Framed<T, U>,
-        service: F,
-        rx: mpsc::Receiver<Result<Message<I>, S::Error>>,
-    ) -> Self
-    where
-        F: IntoService<S, <U as Decoder>::Item>,
-    {
-        let tx = rx.sender();
+        let (tx, rx) = mpsc::unbounded_channel();
         Dispatcher {
             framed,
             rx,
@@ -164,28 +143,28 @@ where
     }
 
     /// Get sink
-    pub fn get_sink(&self) -> mpsc::Sender<Result<Message<I>, S::Error>> {
+    pub fn tx(&self) -> mpsc::UnboundedSender<Result<Message<I>, S::Error>> {
         self.tx.clone()
     }
 
     /// Get reference to a service wrapped by `Dispatcher` instance.
-    pub fn get_ref(&self) -> &S {
+    pub fn service(&self) -> &S {
         &self.service
     }
 
     /// Get mutable reference to a service wrapped by `Dispatcher` instance.
-    pub fn get_mut(&mut self) -> &mut S {
+    pub fn service_mut(&mut self) -> &mut S {
         &mut self.service
     }
 
     /// Get reference to a framed instance wrapped by `Dispatcher`
     /// instance.
-    pub fn get_framed(&self) -> &Framed<T, U> {
+    pub fn framed(&self) -> &Framed<T, U> {
         &self.framed
     }
 
     /// Get mutable reference to a framed instance wrapped by `Dispatcher` instance.
-    pub fn get_framed_mut(&mut self) -> &mut Framed<T, U> {
+    pub fn framed_mut(&mut self) -> &mut Framed<T, U> {
         &mut self.framed
     }
 
@@ -246,7 +225,7 @@ where
         loop {
             let mut this = self.as_mut().project();
             while !this.framed.is_write_buf_full() {
-                match Pin::new(&mut this.rx).poll_next(cx) {
+                match this.rx.poll_recv(cx) {
                     Poll::Ready(Some(Ok(Message::Item(msg)))) => {
                         if let Err(err) = this.framed.as_mut().write(msg) {
                             *this.state = State::FramedError(DispatcherError::Encoder(err));
@@ -266,7 +245,7 @@ where
             }
 
             if !this.framed.is_write_buf_empty() {
-                match this.framed.flush(cx) {
+                match this.framed.poll_flush(cx) {
                     Poll::Pending => break,
                     Poll::Ready(Ok(_)) => (),
                     Poll::Ready(Err(err)) => {
@@ -298,41 +277,43 @@ where
     type Output = Result<(), DispatcherError<S::Error, U, I>>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        loop {
-            let this = self.as_mut().project();
+        let this = self.as_mut().project();
 
-            return match this.state {
-                State::Processing => {
-                    if self.as_mut().poll_read(cx) || self.as_mut().poll_write(cx) {
-                        continue;
-                    } else {
-                        Poll::Pending
-                    }
+        match this.state {
+            State::Processing => {
+                if self.as_mut().poll_read(cx) || self.as_mut().poll_write(cx) {
+                    self.poll(cx)
+                } else {
+                    Poll::Pending
                 }
-                State::Error(_) => {
-                    // flush write buffer
-                    if !this.framed.is_write_buf_empty() && this.framed.flush(cx).is_pending() {
-                        return Poll::Pending;
-                    }
-                    Poll::Ready(Err(this.state.take_error()))
+            }
+
+            State::Error(_) => {
+                // flush write buffer
+                if !this.framed.is_write_buf_empty() && this.framed.poll_flush(cx).is_pending()
+                {
+                    return Poll::Pending;
                 }
-                State::FlushAndStop => {
-                    if !this.framed.is_write_buf_empty() {
-                        match this.framed.flush(cx) {
-                            Poll::Ready(Err(err)) => {
-                                debug!("Error sending data: {:?}", err);
-                                Poll::Ready(Ok(()))
-                            }
-                            Poll::Pending => Poll::Pending,
-                            Poll::Ready(Ok(_)) => Poll::Ready(Ok(())),
+
+                Poll::Ready(Err(this.state.take_error()))
+            }
+
+            State::FlushAndStop => {
+                if !this.framed.is_write_buf_empty() {
+                    this.framed.poll_flush(cx).map(|res| {
+                        if let Err(err) = res {
+                            debug!("Error sending data: {:?}", err);
                         }
-                    } else {
-                        Poll::Ready(Ok(()))
-                    }
+
+                        Ok(())
+                    })
+                } else {
+                    Poll::Ready(Ok(()))
                 }
-                State::FramedError(_) => Poll::Ready(Err(this.state.take_framed_error())),
-                State::Stopping => Poll::Ready(Ok(())),
-            };
+            }
+
+            State::FramedError(_) => Poll::Ready(Err(this.state.take_framed_error())),
+            State::Stopping => Poll::Ready(Ok(())),
         }
     }
 }

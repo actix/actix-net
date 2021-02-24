@@ -235,7 +235,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Flush write buffer to underlying I/O stream.
-    pub fn flush<I>(
+    pub fn poll_flush<I>(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), U::Error>>
@@ -271,7 +271,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Flush write buffer and shutdown underlying I/O stream.
-    pub fn close<I>(
+    pub fn poll_close<I>(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), U::Error>>
@@ -319,11 +319,11 @@ where
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.flush(cx)
+        self.poll_flush(cx)
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.close(cx)
+        self.poll_close(cx)
     }
 }
 
