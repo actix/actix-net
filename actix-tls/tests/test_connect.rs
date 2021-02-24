@@ -1,3 +1,5 @@
+#![cfg(feature = "connect")]
+
 use std::{
     io,
     net::{IpAddr, Ipv4Addr},
@@ -12,7 +14,7 @@ use futures_util::sink::SinkExt;
 
 use actix_tls::connect::{self as actix_connect, Connect};
 
-#[cfg(all(feature = "connect", feature = "openssl"))]
+#[cfg(feature = "openssl")]
 #[actix_rt::test]
 async fn test_string() {
     let srv = TestServer::with(|| {
