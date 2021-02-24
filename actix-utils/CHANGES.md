@@ -1,9 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Hide `mpsc` mod. [#999]
+* Hide `mpsc` mod. [#286]
 
-[#999]: https://github.com/actix/actix-net/pull/999
+[#286]: https://github.com/actix/actix-net/pull/286
 
 
 ## 3.0.0-beta.2 - 2021-02-06
