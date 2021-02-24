@@ -7,6 +7,6 @@
 
 pub mod counter;
 pub mod dispatcher;
-pub mod mpsc;
+mod mpsc;
 pub mod task;
 pub mod timeout;
