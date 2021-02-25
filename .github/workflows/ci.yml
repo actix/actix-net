@@ -39,21 +39,21 @@ jobs:
           profile: minimal
           override: true
 
-      - name: Install MSYS2
-        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
-        uses: msys2/setup-msys2@v2
-      - name: Install MinGW Packages
-        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
-        run: |
-          msys2 -c 'pacman -Sy --noconfirm pacman'
-          msys2 -c 'pacman --noconfirm -S base-devel pkg-config'
+      # - name: Install MSYS2
+      #   if: matrix.target.triple == 'x86_64-pc-windows-gnu'
+      #   uses: msys2/setup-msys2@v2
+      # - name: Install MinGW Packages
+      #   if: matrix.target.triple == 'x86_64-pc-windows-gnu'
+      #   run: |
+      #     msys2 -c 'pacman -Sy --noconfirm pacman'
+      #     msys2 -c 'pacman --noconfirm -S base-devel pkg-config'
 
-      - name: Generate Cargo.lock
-        uses: actions-rs/cargo@v1
-        with:
-          command: generate-lockfile
-      - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v1.2.0
+      # - name: Generate Cargo.lock
+      #   uses: actions-rs/cargo@v1
+      #   with:
+      #     command: generate-lockfile
+      # - name: Cache Dependencies
+      #   uses: Swatinem/rust-cache@v1.2.0
 
       - name: Install cargo-hack
         uses: actions-rs/cargo@v1
@@ -65,13 +65,27 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: hack
-          args: --clean-per-run check --workspace --no-default-features --tests
+          args: check --workspace --no-default-features
 
-      - name: check full
+      - name: check minimal + tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: hack
+          args: check --workspace --no-default-features --tests --examples
+
+      - name: check default
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --workspace --bins --examples --tests
+          args: --workspace --tests --examples
+
+      - name: check full
+        # TODO: compile OpenSSL and run tests on MinGW
+        if: matrix.target.triple != 'x86_64-pc-windows-gnu'
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --workspace --all-features --tests --examples
 
       - name: tests
         if: matrix.target.triple != 'x86_64-pc-windows-gnu'

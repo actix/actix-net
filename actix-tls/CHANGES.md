@@ -1,9 +1,12 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 3.0.0-beta.4 - 2021-02-24
 * Rename `accept::openssl::{SslStream => TlsStream}`.
-* Add `connect::Connect::set_local_addr` to attach local `Ipaddr`. [#282]
-* `connector::TcpConnector` service would try to bind to local_addr of `IpAddr` when given [#282]
+* Add `connect::Connect::set_local_addr` to attach local `IpAddr`. [#282]
+* `connector::TcpConnector` service will try to bind to local_addr of `IpAddr` when given. [#282]
 
 [#282]: https://github.com/actix/actix-net/pull/282
 

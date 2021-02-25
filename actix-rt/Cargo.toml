@@ -1,6 +1,6 @@
 [package]
 name = "actix-rt"
-version = "2.0.2"
+version = "2.1.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
@@ -8,7 +8,7 @@ authors = [
 description = "Tokio-based single-threaded async runtime for the Actix ecosystem"
 keywords = ["async", "futures", "io", "runtime"]
 homepage = "https://actix.rs"
-repository = "https://github.com/actix/actix-net.git"
+repository = "https://github.com/actix/actix-net"
 documentation = "https://docs.rs/actix-rt"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
