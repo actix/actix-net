@@ -204,7 +204,7 @@ where
 
 impl<S, Req> Service<Req> for Rc<S>
 where
-    S: Service<Req>,
+    S: Service<Req> + ?Sized,
 {
     type Response = S::Response;
     type Error = S::Error;
