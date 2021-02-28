@@ -150,7 +150,25 @@ pub trait ServiceFactory<Req> {
     fn new_service(&self, cfg: Self::Config) -> Self::Future;
 }
 
+// TODO: remove implement on mut reference.
 impl<'a, S, Req> Service<Req> for &'a mut S
+where
+    S: Service<Req> + 'a,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        (**self).poll_ready(ctx)
+    }
+
+    fn call(&self, request: Req) -> S::Future {
+        (**self).call(request)
+    }
+}
+
+impl<'a, S, Req> Service<Req> for &'a S
 where
     S: Service<Req> + 'a,
 {
@@ -184,7 +202,7 @@ where
     }
 }
 
-impl<S, Req> Service<Req> for RefCell<S>
+impl<S, Req> Service<Req> for Rc<S>
 where
     S: Service<Req>,
 {
@@ -193,15 +211,15 @@ where
     type Future = S::Future;
 
     fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.borrow().poll_ready(ctx)
+        (&**self).poll_ready(ctx)
     }
 
     fn call(&self, request: Req) -> S::Future {
-        self.borrow().call(request)
+        (&**self).call(request)
     }
 }
 
-impl<S, Req> Service<Req> for Rc<RefCell<S>>
+impl<S, Req> Service<Req> for RefCell<S>
 where
     S: Service<Req>,
 {
