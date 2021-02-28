@@ -211,11 +211,11 @@ where
     type Future = S::Future;
 
     fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        (&**self).poll_ready(ctx)
+        (**self).poll_ready(ctx)
     }
 
     fn call(&self, request: Req) -> S::Future {
-        (&**self).call(request)
+        (**self).call(request)
     }
 }
 
