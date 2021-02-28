@@ -204,18 +204,18 @@ where
 
 impl<S, Req> Service<Req> for Rc<S>
 where
-    S: Service<Req>,
+    S: Service<Req> + ?Sized,
 {
     type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
 
     fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        (&**self).poll_ready(ctx)
+        (**self).poll_ready(ctx)
     }
 
     fn call(&self, request: Req) -> S::Future {
-        (&**self).call(request)
+        (**self).call(request)
     }
 }
 
