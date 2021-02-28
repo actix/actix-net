@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.1.0 - 2021-02-24
 * Add `ActixStream` extension trait to include readiness methods. [#276]
 * Re-export `tokio::net::TcpSocket` in `net` module [#282]
 
