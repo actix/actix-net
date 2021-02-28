@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Add default `Service` trait impl for `Rc<S: Service>` and `&S: Service`. [#288]
+
+[#288]: https://github.com/actix/actix-net/pull/288
 
 
 ## 2.0.0-beta.4 - 2021-02-04
