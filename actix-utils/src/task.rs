@@ -9,11 +9,14 @@ use core::{cell::Cell, fmt, marker::PhantomData, task::Waker};
 /// logical task.
 ///
 /// Consumers should call [`register`] before checking the result of a computation and producers
-/// should call `wake` after producing the computation (this differs from the usual `thread::park`
+/// should call [`wake`] after producing the computation (this differs from the usual `thread::park`
 /// pattern). It is also permitted for [`wake`] to be called _before_ [`register`]. This results in
 /// a no-op.
 ///
 /// A single `LocalWaker` may be reused for any number of calls to [`register`] or [`wake`].
+///
+/// [`register`]: LocalWaker::register
+/// [`wake`]: LocalWaker::wake
 #[derive(Default)]
 pub struct LocalWaker {
     pub(crate) waker: Cell<Option<Waker>>,

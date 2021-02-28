@@ -163,29 +163,28 @@ where
         }
     }
 
-    /// Get sink
-    pub fn get_sink(&self) -> mpsc::Sender<Result<Message<I>, S::Error>> {
+    /// Get sender handle.
+    pub fn tx(&self) -> mpsc::Sender<Result<Message<I>, S::Error>> {
         self.tx.clone()
     }
 
     /// Get reference to a service wrapped by `Dispatcher` instance.
-    pub fn get_ref(&self) -> &S {
+    pub fn service(&self) -> &S {
         &self.service
     }
 
     /// Get mutable reference to a service wrapped by `Dispatcher` instance.
-    pub fn get_mut(&mut self) -> &mut S {
+    pub fn service_mut(&mut self) -> &mut S {
         &mut self.service
     }
 
-    /// Get reference to a framed instance wrapped by `Dispatcher`
-    /// instance.
-    pub fn get_framed(&self) -> &Framed<T, U> {
+    /// Get reference to a framed instance wrapped by `Dispatcher` instance.
+    pub fn framed(&self) -> &Framed<T, U> {
         &self.framed
     }
 
     /// Get mutable reference to a framed instance wrapped by `Dispatcher` instance.
-    pub fn get_framed_mut(&mut self) -> &mut Framed<T, U> {
+    pub fn framed_mut(&mut self) -> &mut Framed<T, U> {
         &mut self.framed
     }
 
@@ -268,7 +267,7 @@ where
             if !this.framed.is_write_buf_empty() {
                 match this.framed.flush(cx) {
                     Poll::Pending => break,
-                    Poll::Ready(Ok(_)) => (),
+                    Poll::Ready(Ok(_)) => {}
                     Poll::Ready(Err(err)) => {
                         debug!("Error sending data: {:?}", err);
                         *this.state = State::FramedError(DispatcherError::Encoder(err));
@@ -318,14 +317,13 @@ where
                 }
                 State::FlushAndStop => {
                     if !this.framed.is_write_buf_empty() {
-                        match this.framed.flush(cx) {
-                            Poll::Ready(Err(err)) => {
+                        this.framed.flush(cx).map(|res| {
+                            if let Err(err) = res {
                                 debug!("Error sending data: {:?}", err);
-                                Poll::Ready(Ok(()))
                             }
-                            Poll::Pending => Poll::Pending,
-                            Poll::Ready(Ok(_)) => Poll::Ready(Ok(())),
-                        }
+
+                            Ok(())
+                        })
                     } else {
                         Poll::Ready(Ok(()))
                     }
