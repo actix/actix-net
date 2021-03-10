@@ -9,10 +9,8 @@ use pin_project_lite::pin_project;
 
 use super::Transform;
 
-/// Transform for the `map_init_err` combinator, changing the type of a new
-/// transform's init error.
-///
-/// This is created by the `Transform::map_init_err` method.
+/// Transform for the [`TransformExt::map_init_err`] combinator, changing the type of a new
+/// [`Transform`]'s initialization error.
 pub struct TransformMapInitErr<T, S, Req, F, E> {
     transform: T,
     mapper: F,

@@ -1,12 +1,11 @@
+//! Trait object forms of services and service factories.
+
 use alloc::{boxed::Box, rc::Rc};
-use core::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use core::{future::Future, pin::Pin};
 
 use crate::{Service, ServiceFactory};
 
+/// A boxed future without a Send bound or lifetime parameters.
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T>>>;
 
 macro_rules! service_object {
@@ -23,17 +22,41 @@ macro_rules! service_object {
             Req: 'static,
             S::Future: 'static,
         {
-            $type::new(ServiceWrapper(service))
+            $type::new(ServiceWrapper::new(service))
         }
     };
 }
 
 service_object!(BoxService, Box, service);
-
 service_object!(RcService, Rc, rc_service);
 
-/// Type alias for service factory trait object that would produce a trait object service
-/// (`BoxService`, `RcService`, etc.)
+struct ServiceWrapper<S> {
+    inner: S,
+}
+
+impl<S> ServiceWrapper<S> {
+    fn new(inner: S) -> Self {
+        Self { inner }
+    }
+}
+
+impl<S, Req, Res, Err> Service<Req> for ServiceWrapper<S>
+where
+    S: Service<Req, Response = Res, Error = Err>,
+    S::Future: 'static,
+{
+    type Response = Res;
+    type Error = Err;
+    type Future = BoxFuture<Result<Res, Err>>;
+
+    crate::forward_ready!(inner);
+
+    fn call(&self, req: Req) -> Self::Future {
+        Box::pin(self.inner.call(req))
+    }
+}
+
+/// Wrapper for a service factory trait object that will produce a boxed trait object service.
 pub struct BoxServiceFactory<Cfg, Req, Res, Err, InitErr>(Inner<Cfg, Req, Res, Err, InitErr>);
 
 /// Create service factory trait object.
@@ -107,26 +130,6 @@ where
 
     fn new_service(&self, cfg: Cfg) -> Self::Future {
         let f = self.0.new_service(cfg);
-        Box::pin(async { f.await.map(|s| Box::new(ServiceWrapper(s)) as _) })
-    }
-}
-
-struct ServiceWrapper<S>(S);
-
-impl<S, Req, Res, Err> Service<Req> for ServiceWrapper<S>
-where
-    S: Service<Req, Response = Res, Error = Err>,
-    S::Future: 'static,
-{
-    type Response = Res;
-    type Error = Err;
-    type Future = BoxFuture<Result<Res, Err>>;
-
-    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.0.poll_ready(ctx)
-    }
-
-    fn call(&self, req: Req) -> Self::Future {
-        Box::pin(self.0.call(req))
+        Box::pin(async { f.await.map(|s| Box::new(ServiceWrapper::new(s)) as _) })
     }
 }

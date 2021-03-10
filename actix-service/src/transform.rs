@@ -9,10 +9,9 @@ use core::{
 use futures_core::ready;
 use pin_project_lite::pin_project;
 
-use crate::transform_err::TransformMapInitErr;
 use crate::{IntoServiceFactory, Service, ServiceFactory};
 
-/// Apply transform to a service.
+/// Apply a [`Transform`] to a [`Service`].
 pub fn apply<T, S, I, Req>(t: T, factory: I) -> ApplyTransform<T, S, Req>
 where
     I: IntoServiceFactory<S, Req>,
@@ -25,9 +24,8 @@ where
 /// The `Transform` trait defines the interface of a service factory that wraps inner service
 /// during construction.
 ///
-/// Transform(middleware) wraps inner service and runs during
-/// inbound and/or outbound processing in the request/response lifecycle.
-/// It may modify request and/or response.
+/// Transform(middleware) wraps inner service and runs during inbound and/or outbound processing in
+/// the request/response lifecycle. It may modify request and/or response.
 ///
 /// For example, timeout transform:
 ///
@@ -51,20 +49,19 @@ where
 ///     fn call(&self, req: S::Request) -> Self::Future {
 ///         TimeoutServiceResponse {
 ///             fut: self.service.call(req),
-///             sleep: Delay::new(clock::now() + self.timeout),
+///             sleep: Sleep::new(clock::now() + self.timeout),
 ///         }
 ///     }
 /// }
 /// ```
 ///
-/// Timeout service in above example is decoupled from underlying service implementation
-/// and could be applied to any service.
+/// Timeout service in above example is decoupled from underlying service implementation and could
+/// be applied to any service.
 ///
-/// The `Transform` trait defines the interface of a Service factory. `Transform`
-/// is often implemented for middleware, defining how to construct a
-/// middleware Service. A Service that is constructed by the factory takes
-/// the Service that follows it during execution as a parameter, assuming
-/// ownership of the next Service.
+/// The `Transform` trait defines the interface of a Service factory. `Transform` is often
+/// implemented for middleware, defining how to construct a middleware Service. A Service that is
+/// constructed by the factory takes the Service that follows it during execution as a parameter,
+/// assuming ownership of the next Service.
 ///
 /// Factory for `Timeout` middleware from the above example could look like this:
 ///
@@ -85,15 +82,15 @@ where
 ///     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 ///
 ///     fn new_transform(&self, service: S) -> Self::Future {
-///         ok(TimeoutService {
+///         ready(Ok(TimeoutService {
 ///             service,
 ///             timeout: self.timeout,
-///         })
+///         }))
 ///     }
 /// }
 /// ```
 pub trait Transform<S, Req> {
-    /// Responses given by the service.
+    /// Responses produced by the service.
     type Response;
 
     /// Errors produced by the service.
@@ -110,16 +107,6 @@ pub trait Transform<S, Req> {
 
     /// Creates and returns a new Transform component, asynchronously
     fn new_transform(&self, service: S) -> Self::Future;
-
-    /// Map this transform's factory error to a different error,
-    /// returning a new transform service factory.
-    fn map_init_err<F, E>(self, f: F) -> TransformMapInitErr<Self, S, Req, F, E>
-    where
-        Self: Sized,
-        F: Fn(Self::InitError) -> E + Clone,
-    {
-        TransformMapInitErr::new(self, f)
-    }
 }
 
 impl<T, S, Req> Transform<S, Req> for Rc<T>
@@ -152,7 +139,7 @@ where
     }
 }
 
-/// `Apply` transform to new service
+/// Apply a [`Transform`] to a [`Service`].
 pub struct ApplyTransform<T, S, Req>(Rc<(T, S)>, PhantomData<Req>);
 
 impl<T, S, Req> ApplyTransform<T, S, Req>

@@ -7,7 +7,7 @@
 use core::marker::PhantomData;
 
 use actix_service::{
-    apply, dev::ApplyTransform, IntoServiceFactory, Service, ServiceFactory, Transform,
+    apply, ApplyTransform, IntoServiceFactory, Service, ServiceFactory, Transform,
 };
 use futures_util::future::{ok, Either, Ready};
 use tracing_futures::{Instrument, Instrumented};

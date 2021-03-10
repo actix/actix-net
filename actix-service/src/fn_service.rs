@@ -15,8 +15,7 @@ where
 
 /// Create `ServiceFactory` for function that can produce services
 ///
-/// # Example
-///
+/// # Examples
 /// ```
 /// use std::io;
 /// use actix_service::{fn_factory, fn_service, Service, ServiceFactory};
@@ -62,11 +61,10 @@ where
 
 /// Create `ServiceFactory` for function that accepts config argument and can produce services
 ///
-/// Any function that has following form `Fn(Config) -> Future<Output = Service>` could
-/// act as a `ServiceFactory`.
+/// Any function that has following form `Fn(Config) -> Future<Output = Service>` could act as
+/// a `ServiceFactory`.
 ///
-/// # Example
-///
+/// # Examples
 /// ```
 /// use std::io;
 /// use actix_service::{fn_factory_with_config, fn_service, Service, ServiceFactory};

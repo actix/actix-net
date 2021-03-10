@@ -34,11 +34,11 @@ mod transform_err;
 
 pub use self::apply::{apply_fn, apply_fn_factory};
 pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
-pub use self::ext::{ServiceExt, ServiceFactoryExt};
+pub use self::ext::{ServiceExt, ServiceFactoryExt, TransformExt};
 pub use self::fn_service::{fn_factory, fn_factory_with_config, fn_service};
 pub use self::map_config::{map_config, unit_config};
 pub use self::pipeline::{pipeline, pipeline_factory, Pipeline, PipelineFactory};
-pub use self::transform::{apply, Transform};
+pub use self::transform::{apply, ApplyTransform, Transform};
 
 #[allow(unused_imports)]
 use self::ready::{err, ok, ready, Ready};
@@ -220,6 +220,7 @@ where
     }
 }
 
+/// This impl is deprecated since v2 because the `Service` trait now receives shared reference.
 impl<S, Req> Service<Req> for RefCell<S>
 where
     S: Service<Req>,
@@ -312,17 +313,4 @@ where
     S: Service<Req>,
 {
     tp.into_service()
-}
-
-pub mod dev {
-    pub use crate::apply::{Apply, ApplyFactory};
-    pub use crate::fn_service::{
-        FnService, FnServiceConfig, FnServiceFactory, FnServiceNoConfig,
-    };
-    pub use crate::map::{Map, MapServiceFactory};
-    pub use crate::map_config::{MapConfig, UnitConfig};
-    pub use crate::map_err::{MapErr, MapErrServiceFactory};
-    pub use crate::map_init_err::MapInitErr;
-    pub use crate::transform::ApplyTransform;
-    pub use crate::transform_err::TransformMapInitErr;
 }
