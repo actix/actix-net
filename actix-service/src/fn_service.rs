@@ -1,4 +1,4 @@
-use core::{future::Future, marker::PhantomData, task::Poll};
+use core::{future::Future, marker::PhantomData};
 
 use crate::{ok, IntoService, IntoServiceFactory, Ready, Service, ServiceFactory};
 

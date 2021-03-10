@@ -197,7 +197,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::task::Poll;
     use core::time::Duration;
 
     use super::*;

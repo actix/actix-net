@@ -21,6 +21,7 @@ mod apply_cfg;
 pub mod boxed;
 mod ext;
 mod fn_service;
+mod macros;
 mod map;
 mod map_config;
 mod map_err;
@@ -324,32 +325,4 @@ pub mod dev {
     pub use crate::map_init_err::MapInitErr;
     pub use crate::transform::ApplyTransform;
     pub use crate::transform_err::TransformMapInitErr;
-}
-
-#[macro_export]
-macro_rules! always_ready {
-    () => {
-        #[inline]
-        fn poll_ready(
-            &self,
-            _: &mut ::core::task::Context<'_>,
-        ) -> ::core::task::Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! forward_ready {
-    ($field:ident) => {
-        #[inline]
-        fn poll_ready(
-            &self,
-            cx: &mut ::core::task::Context<'_>,
-        ) -> ::core::task::Poll<Result<(), Self::Error>> {
-            self.$field
-                .poll_ready(cx)
-                .map_err(::core::convert::Into::into)
-        }
-    };
 }
