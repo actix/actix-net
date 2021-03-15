@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.5 - 2021-03-15
 * Add default `Service` trait impl for `Rc<S: Service>` and `&S: Service`. [#288]
 * Add `boxed::rc_service` function for constructing `boxed::RcService` type [#290]
 

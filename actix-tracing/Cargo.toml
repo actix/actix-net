@@ -16,7 +16,7 @@ name = "actix_tracing"
 path = "src/lib.rs"
 
 [dependencies]
-actix-service = "2.0.0-beta.4"
+actix-service = "2.0.0-beta.5"
 
 futures-util = { version = "0.3.4", default-features = false }
 tracing = "0.1"
