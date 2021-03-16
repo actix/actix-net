@@ -72,8 +72,12 @@ pub mod signal {
 pub mod net {
     //! TCP/UDP/Unix bindings (mostly Tokio re-exports).
 
-    use std::task::{Context, Poll};
+    use std::{
+        io,
+        task::{Context, Poll},
+    };
 
+    pub use tokio::io::Ready;
     use tokio::io::{AsyncRead, AsyncWrite};
     pub use tokio::net::UdpSocket;
     pub use tokio::net::{TcpListener, TcpSocket, TcpStream};
@@ -86,32 +90,32 @@ pub mod net {
         /// Poll stream and check read readiness of Self.
         ///
         /// See [tokio::net::TcpStream::poll_read_ready] for detail on intended use.
-        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>>;
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>>;
 
         /// Poll stream and check write readiness of Self.
         ///
         /// See [tokio::net::TcpStream::poll_write_ready] for detail on intended use.
-        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>>;
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>>;
     }
 
     impl ActixStream for TcpStream {
-        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-            TcpStream::poll_read_ready(self, cx)
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            TcpStream::poll_ready(self, cx)
         }
 
-        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-            TcpStream::poll_write_ready(self, cx)
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            TcpStream::poll_ready(self, cx)
         }
     }
 
     #[cfg(unix)]
     impl ActixStream for UnixStream {
-        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-            UnixStream::poll_read_ready(self, cx)
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            UnixStream::poll_ready(self, cx)
         }
 
-        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-            UnixStream::poll_write_ready(self, cx)
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            UnixStream::poll_ready(self, cx)
         }
     }
 }
