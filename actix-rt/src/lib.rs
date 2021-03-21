@@ -117,13 +117,13 @@ pub mod net {
     impl ActixStream for UnixStream {
         fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
             let ready = self.ready(Interest::READABLE);
-            self::pin!(ready);
+            tokio::pin!(ready);
             ready.poll(cx)
         }
 
         fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
             let ready = self.ready(Interest::WRITABLE);
-            self::pin!(ready);
+            tokio::pin!(ready);
             ready.poll(cx)
         }
     }
