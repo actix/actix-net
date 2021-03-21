@@ -23,5 +23,3 @@ actix-tls = { path = "actix-tls" }
 actix-tracing = { path = "actix-tracing" }
 actix-utils = { path = "actix-utils" }
 bytestring = { path = "bytestring" }
-
-tokio = { git = "https://github.com/fakeshadow/tokio", branch = "feature/net_poll_ready" }
