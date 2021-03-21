@@ -73,12 +73,13 @@ pub mod net {
     //! TCP/UDP/Unix bindings (mostly Tokio re-exports).
 
     use std::{
+        future::Future,
         io,
         task::{Context, Poll},
     };
 
     pub use tokio::io::Ready;
-    use tokio::io::{AsyncRead, AsyncWrite};
+    use tokio::io::{AsyncRead, AsyncWrite, Interest};
     pub use tokio::net::UdpSocket;
     pub use tokio::net::{TcpListener, TcpSocket, TcpStream};
 
@@ -100,22 +101,30 @@ pub mod net {
 
     impl ActixStream for TcpStream {
         fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-            TcpStream::poll_ready(self, cx)
+            let ready = self.ready(Interest::READABLE);
+            tokio::pin!(ready);
+            ready.poll(cx)
         }
 
         fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-            TcpStream::poll_ready(self, cx)
+            let ready = self.ready(Interest::WRITABLE);
+            tokio::pin!(ready);
+            ready.poll(cx)
         }
     }
 
     #[cfg(unix)]
     impl ActixStream for UnixStream {
         fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-            UnixStream::poll_ready(self, cx)
+            let ready = self.ready(Interest::READABLE);
+            self::pin!(ready);
+            ready.poll(cx)
         }
 
         fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-            UnixStream::poll_ready(self, cx)
+            let ready = self.ready(Interest::WRITABLE);
+            self::pin!(ready);
+            ready.poll(cx)
         }
     }
 }
