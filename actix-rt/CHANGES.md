@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* `ActixStream::{poll_read_ready, poll_write_ready}` would return `Ready` in Ok variant. [#293]
+
+[#293] https://github.com/actix/actix-net/pull/293
 
 
 ## 2.1.0 - 2021-02-24
