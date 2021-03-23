@@ -16,7 +16,7 @@ use std::sync::{
 use std::{env, io};
 
 use actix_rt::net::TcpStream;
-use actix_server::ServerHandle;
+use actix_server::Server;
 use actix_service::pipeline_factory;
 use bytes::BytesMut;
 use futures_util::future::ok;
@@ -36,7 +36,7 @@ async fn main() -> io::Result<()> {
     // Bind socket address and start worker(s). By default, the server uses the number of available
     // logical CPU cores as the worker count. For this reason, the closure passed to bind needs
     // to return a service *factory*; so it can be created once per worker.
-    ServerHandle::build()
+    Server::build()
         .bind("echo", addr, move || {
             let count = Arc::clone(&count);
             let num2 = Arc::clone(&count);

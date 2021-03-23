@@ -1,31 +1,35 @@
 //! A multi-producer, single-consumer, futures-aware, FIFO queue.
 
-use core::any::Any;
-use core::cell::RefCell;
-use core::fmt;
-use core::pin::Pin;
-use core::task::{Context, Poll};
+use core::{
+    cell::RefCell,
+    fmt,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-use std::collections::VecDeque;
-use std::error::Error;
-use std::rc::Rc;
+use std::{collections::VecDeque, error::Error, rc::Rc};
 
 use futures_core::stream::Stream;
 use futures_sink::Sink;
 
-use crate::task::LocalWaker;
+use crate::{poll_fn, task::LocalWaker};
 
 /// Creates a unbounded in-memory channel with buffered storage.
+///
+/// [Sender]s and [Receiver]s are `!Send`.
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let shared = Rc::new(RefCell::new(Shared {
         has_receiver: true,
         buffer: VecDeque::new(),
         blocked_recv: LocalWaker::new(),
     }));
+
     let sender = Sender {
         shared: shared.clone(),
     };
+
     let receiver = Receiver { shared };
+
     (sender, receiver)
 }
 
@@ -50,18 +54,22 @@ impl<T> Sender<T> {
     /// Sends the provided message along this channel.
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
         let mut shared = self.shared.borrow_mut();
+
         if !shared.has_receiver {
-            return Err(SendError(item)); // receiver was dropped
+            // receiver was dropped
+            return Err(SendError(item));
         };
+
         shared.buffer.push_back(item);
         shared.blocked_recv.wake();
+
         Ok(())
     }
 
-    /// Closes the sender half
+    /// Closes the sender half.
     ///
-    /// This prevents any further messages from being sent on the channel while
-    /// still enabling the receiver to drain messages that are buffered.
+    /// This prevents any further messages from being sent on the channel, by any sender, while
+    /// still enabling the receiver to drain messages that are already buffered.
     pub fn close(&mut self) {
         self.shared.borrow_mut().has_receiver = false;
     }
@@ -110,14 +118,24 @@ impl<T> Drop for Sender<T> {
 
 /// The receiving end of a channel which implements the `Stream` trait.
 ///
-/// This is created by the `channel` function.
+/// This is created by the [`channel`] function.
 #[derive(Debug)]
 pub struct Receiver<T> {
     shared: Rc<RefCell<Shared<T>>>,
 }
 
 impl<T> Receiver<T> {
-    /// Create Sender
+    /// Receive the next value.
+    ///
+    /// Returns `None` if the channel is empty and has been [closed](Sender::close) explicitly or
+    /// when all senders have been dropped and, therefore, no more values can ever be sent though
+    /// this channel.
+    pub async fn recv(&mut self) -> Option<T> {
+        let mut this = Pin::new(self);
+        poll_fn(|cx| this.as_mut().poll_next(cx)).await
+    }
+
+    /// Create an associated [Sender].
     pub fn sender(&self) -> Sender<T> {
         Sender {
             shared: self.shared.clone(),
@@ -132,11 +150,13 @@ impl<T> Stream for Receiver<T> {
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut shared = self.shared.borrow_mut();
+
         if Rc::strong_count(&self.shared) == 1 {
-            // All senders have been dropped, so drain the buffer and end the
-            // stream.
-            Poll::Ready(shared.buffer.pop_front())
-        } else if let Some(msg) = shared.buffer.pop_front() {
+            // All senders have been dropped, so drain the buffer and end the stream.
+            return Poll::Ready(shared.buffer.pop_front());
+        }
+
+        if let Some(msg) = shared.buffer.pop_front() {
             Poll::Ready(Some(msg))
         } else {
             shared.blocked_recv.register(cx.waker());
@@ -153,9 +173,15 @@ impl<T> Drop for Receiver<T> {
     }
 }
 
-/// Error type for sending, used when the receiving end of a channel is
-/// dropped
-pub struct SendError<T>(T);
+/// Error returned when attempting to send after the channels' [Receiver] is dropped or closed.
+pub struct SendError<T>(pub T);
+
+impl<T> SendError<T> {
+    /// Returns the message that was attempted to be sent but failed.
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
 
 impl<T> fmt::Debug for SendError<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -169,18 +195,7 @@ impl<T> fmt::Display for SendError<T> {
     }
 }
 
-impl<T: Any> Error for SendError<T> {
-    fn description(&self) -> &str {
-        "send failed because receiver is gone"
-    }
-}
-
-impl<T> SendError<T> {
-    /// Returns the message that was attempted to be sent but failed.
-    pub fn into_inner(self) -> T {
-        self.0
-    }
-}
+impl<T> Error for SendError<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -220,5 +235,19 @@ mod tests {
         tx.close();
         assert!(tx.send("test").is_err());
         assert!(tx2.send("test").is_err());
+    }
+
+    #[actix_rt::test]
+    async fn test_recv() {
+        let (tx, mut rx) = channel();
+        tx.send("test").unwrap();
+        assert_eq!(rx.recv().await.unwrap(), "test");
+        drop(tx);
+
+        let (tx, mut rx) = channel();
+        tx.send("test").unwrap();
+        assert_eq!(rx.recv().await.unwrap(), "test");
+        drop(tx);
+        assert!(rx.recv().await.is_none());
     }
 }

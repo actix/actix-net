@@ -21,6 +21,7 @@ mod apply_cfg;
 pub mod boxed;
 mod ext;
 mod fn_service;
+mod macros;
 mod map;
 mod map_config;
 mod map_err;
@@ -33,11 +34,11 @@ mod transform_err;
 
 pub use self::apply::{apply_fn, apply_fn_factory};
 pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
-pub use self::ext::{ServiceExt, ServiceFactoryExt};
+pub use self::ext::{ServiceExt, ServiceFactoryExt, TransformExt};
 pub use self::fn_service::{fn_factory, fn_factory_with_config, fn_service};
 pub use self::map_config::{map_config, unit_config};
 pub use self::pipeline::{pipeline, pipeline_factory, Pipeline, PipelineFactory};
-pub use self::transform::{apply, Transform};
+pub use self::transform::{apply, ApplyTransform, Transform};
 
 #[allow(unused_imports)]
 use self::ready::{err, ok, ready, Ready};
@@ -102,8 +103,8 @@ pub trait Service<Req> {
     /// call and the next invocation of `call` results in an error.
     ///
     /// # Notes
-    /// 1. `.poll_ready()` might be called on different task from actual service call.
-    /// 1. In case of chained services, `.poll_ready()` get called for all services at once.
+    /// 1. `poll_ready` might be called on a different task to `call`.
+    /// 1. In cases of chained services, `.poll_ready()` is called for all services at once.
     fn poll_ready(&self, ctx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>>;
 
     /// Process the request and return the response asynchronously.
@@ -150,7 +151,25 @@ pub trait ServiceFactory<Req> {
     fn new_service(&self, cfg: Self::Config) -> Self::Future;
 }
 
+// TODO: remove implement on mut reference.
 impl<'a, S, Req> Service<Req> for &'a mut S
+where
+    S: Service<Req> + 'a,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        (**self).poll_ready(ctx)
+    }
+
+    fn call(&self, request: Req) -> S::Future {
+        (**self).call(request)
+    }
+}
+
+impl<'a, S, Req> Service<Req> for &'a S
 where
     S: Service<Req> + 'a,
 {
@@ -184,24 +203,25 @@ where
     }
 }
 
-impl<S, Req> Service<Req> for RefCell<S>
+impl<S, Req> Service<Req> for Rc<S>
 where
-    S: Service<Req>,
+    S: Service<Req> + ?Sized,
 {
     type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
 
     fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.borrow().poll_ready(ctx)
+        (**self).poll_ready(ctx)
     }
 
     fn call(&self, request: Req) -> S::Future {
-        self.borrow().call(request)
+        (**self).call(request)
     }
 }
 
-impl<S, Req> Service<Req> for Rc<RefCell<S>>
+/// This impl is deprecated since v2 because the `Service` trait now receives shared reference.
+impl<S, Req> Service<Req> for RefCell<S>
 where
     S: Service<Req>,
 {
@@ -293,45 +313,4 @@ where
     S: Service<Req>,
 {
     tp.into_service()
-}
-
-pub mod dev {
-    pub use crate::apply::{Apply, ApplyFactory};
-    pub use crate::fn_service::{
-        FnService, FnServiceConfig, FnServiceFactory, FnServiceNoConfig,
-    };
-    pub use crate::map::{Map, MapServiceFactory};
-    pub use crate::map_config::{MapConfig, UnitConfig};
-    pub use crate::map_err::{MapErr, MapErrServiceFactory};
-    pub use crate::map_init_err::MapInitErr;
-    pub use crate::transform::ApplyTransform;
-    pub use crate::transform_err::TransformMapInitErr;
-}
-
-#[macro_export]
-macro_rules! always_ready {
-    () => {
-        #[inline]
-        fn poll_ready(
-            &self,
-            _: &mut ::core::task::Context<'_>,
-        ) -> ::core::task::Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! forward_ready {
-    ($field:ident) => {
-        #[inline]
-        fn poll_ready(
-            &self,
-            cx: &mut ::core::task::Context<'_>,
-        ) -> ::core::task::Poll<Result<(), Self::Error>> {
-            self.$field
-                .poll_ready(cx)
-                .map_err(::core::convert::Into::into)
-        }
-    };
 }

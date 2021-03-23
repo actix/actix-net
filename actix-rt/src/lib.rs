@@ -70,13 +70,63 @@ pub mod signal {
 }
 
 pub mod net {
-    //! TCP/UDP/Unix bindings (Tokio re-exports).
+    //! TCP/UDP/Unix bindings (mostly Tokio re-exports).
 
+    use std::{
+        future::Future,
+        io,
+        task::{Context, Poll},
+    };
+
+    pub use tokio::io::Ready;
+    use tokio::io::{AsyncRead, AsyncWrite, Interest};
     pub use tokio::net::UdpSocket;
-    pub use tokio::net::{TcpListener, TcpStream};
+    pub use tokio::net::{TcpListener, TcpSocket, TcpStream};
 
     #[cfg(unix)]
     pub use tokio::net::{UnixDatagram, UnixListener, UnixStream};
+
+    /// Extension trait over async read+write types that can also signal readiness.
+    pub trait ActixStream: AsyncRead + AsyncWrite + Unpin + 'static {
+        /// Poll stream and check read readiness of Self.
+        ///
+        /// See [tokio::net::TcpStream::poll_read_ready] for detail on intended use.
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>>;
+
+        /// Poll stream and check write readiness of Self.
+        ///
+        /// See [tokio::net::TcpStream::poll_write_ready] for detail on intended use.
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>>;
+    }
+
+    impl ActixStream for TcpStream {
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            let ready = self.ready(Interest::READABLE);
+            tokio::pin!(ready);
+            ready.poll(cx)
+        }
+
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            let ready = self.ready(Interest::WRITABLE);
+            tokio::pin!(ready);
+            ready.poll(cx)
+        }
+    }
+
+    #[cfg(unix)]
+    impl ActixStream for UnixStream {
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            let ready = self.ready(Interest::READABLE);
+            tokio::pin!(ready);
+            ready.poll(cx)
+        }
+
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            let ready = self.ready(Interest::WRITABLE);
+            tokio::pin!(ready);
+            ready.poll(cx)
+        }
+    }
 }
 
 pub mod time {

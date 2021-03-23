@@ -1,4 +1,7 @@
-use crate::{dev, Service, ServiceFactory};
+use crate::{
+    map::Map, map_err::MapErr, transform_err::TransformMapInitErr, Service, ServiceFactory,
+    Transform,
+};
 
 pub trait ServiceExt<Req>: Service<Req> {
     /// Map this service's output to a different type, returning a new service
@@ -10,12 +13,12 @@ pub trait ServiceExt<Req>: Service<Req> {
     /// Note that this function consumes the receiving service and returns a
     /// wrapped version of it, similar to the existing `map` methods in the
     /// standard library.
-    fn map<F, R>(self, f: F) -> dev::Map<Self, F, Req, R>
+    fn map<F, R>(self, f: F) -> Map<Self, F, Req, R>
     where
         Self: Sized,
         F: FnMut(Self::Response) -> R,
     {
-        dev::Map::new(self, f)
+        Map::new(self, f)
     }
 
     /// Map this service's error to a different error, returning a new service.
@@ -26,12 +29,12 @@ pub trait ServiceExt<Req>: Service<Req> {
     ///
     /// Note that this function consumes the receiving service and returns a
     /// wrapped version of it.
-    fn map_err<F, E>(self, f: F) -> dev::MapErr<Self, Req, F, E>
+    fn map_err<F, E>(self, f: F) -> MapErr<Self, Req, F, E>
     where
         Self: Sized,
         F: Fn(Self::Error) -> E,
     {
-        dev::MapErr::new(self, f)
+        MapErr::new(self, f)
     }
 }
 
@@ -67,4 +70,17 @@ pub trait ServiceFactoryExt<Req>: ServiceFactory<Req> {
     }
 }
 
-impl<S, Req> ServiceFactoryExt<Req> for S where S: ServiceFactory<Req> {}
+impl<SF, Req> ServiceFactoryExt<Req> for SF where SF: ServiceFactory<Req> {}
+
+pub trait TransformExt<S, Req>: Transform<S, Req> {
+    /// Return a new `Transform` whose init error is mapped to to a different type.
+    fn map_init_err<F, E>(self, f: F) -> TransformMapInitErr<Self, S, Req, F, E>
+    where
+        Self: Sized,
+        F: Fn(Self::InitError) -> E + Clone,
+    {
+        TransformMapInitErr::new(self, f)
+    }
+}
+
+impl<T, Req> TransformExt<T, Req> for T where T: Transform<T, Req> {}

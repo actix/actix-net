@@ -3,7 +3,7 @@ use std::{net, thread};
 
 use actix_rt::{net::TcpStream, System};
 
-use crate::{ServerBuilder, ServerHandle, ServiceFactory};
+use crate::{Server, ServerBuilder, ServiceFactory};
 
 /// The `TestServer` type.
 ///
@@ -51,7 +51,7 @@ impl TestServer {
             let sys = System::new();
             sys.block_on(async {
                 actix_rt::spawn(async move {
-                    let _ = factory(ServerHandle::build())
+                    let _ = factory(Server::build())
                         .workers(1)
                         .disable_signals()
                         .run()
@@ -84,7 +84,7 @@ impl TestServer {
 
             sys.block_on(async {
                 actix_rt::spawn(async move {
-                    let _ = ServerHandle::build()
+                    let _ = Server::build()
                         .listen("test", tcp, factory)
                         .unwrap()
                         .workers(1)

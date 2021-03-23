@@ -2,12 +2,12 @@ use std::{
     collections::VecDeque,
     future::Future,
     io,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
     pin::Pin,
     task::{Context, Poll},
 };
 
-use actix_rt::net::TcpStream;
+use actix_rt::net::{TcpSocket, TcpStream};
 use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::{error, trace};
@@ -54,9 +54,14 @@ impl<T: Address> Service<Connect<T>> for TcpConnector {
 
     fn call(&self, req: Connect<T>) -> Self::Future {
         let port = req.port();
-        let Connect { req, addr, .. } = req;
+        let Connect {
+            req,
+            addr,
+            local_addr,
+            ..
+        } = req;
 
-        TcpConnectorResponse::new(req, port, addr)
+        TcpConnectorResponse::new(req, port, local_addr, addr)
     }
 }
 
@@ -65,6 +70,7 @@ pub enum TcpConnectorResponse<T> {
     Response {
         req: Option<T>,
         port: u16,
+        local_addr: Option<IpAddr>,
         addrs: Option<VecDeque<SocketAddr>>,
         stream: Option<ReusableBoxFuture<Result<TcpStream, io::Error>>>,
     },
@@ -72,7 +78,12 @@ pub enum TcpConnectorResponse<T> {
 }
 
 impl<T: Address> TcpConnectorResponse<T> {
-    pub(crate) fn new(req: T, port: u16, addr: ConnectAddrs) -> TcpConnectorResponse<T> {
+    pub(crate) fn new(
+        req: T,
+        port: u16,
+        local_addr: Option<IpAddr>,
+        addr: ConnectAddrs,
+    ) -> TcpConnectorResponse<T> {
         if addr.is_none() {
             error!("TCP connector: unresolved connection address");
             return TcpConnectorResponse::Error(Some(ConnectError::Unresolved));
@@ -90,8 +101,9 @@ impl<T: Address> TcpConnectorResponse<T> {
             ConnectAddrs::One(addr) => TcpConnectorResponse::Response {
                 req: Some(req),
                 port,
+                local_addr,
                 addrs: None,
-                stream: Some(ReusableBoxFuture::new(TcpStream::connect(addr))),
+                stream: Some(ReusableBoxFuture::new(connect(addr, local_addr))),
             },
 
             // when resolver returns multiple socket addr for request they would be popped from
@@ -99,6 +111,7 @@ impl<T: Address> TcpConnectorResponse<T> {
             ConnectAddrs::Multi(addrs) => TcpConnectorResponse::Response {
                 req: Some(req),
                 port,
+                local_addr,
                 addrs: Some(addrs),
                 stream: None,
             },
@@ -116,6 +129,7 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
             TcpConnectorResponse::Response {
                 req,
                 port,
+                local_addr,
                 addrs,
                 stream,
             } => loop {
@@ -148,11 +162,38 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
                 // try to connect
                 let addr = addrs.as_mut().unwrap().pop_front().unwrap();
 
+                let fut = connect(addr, *local_addr);
                 match stream {
-                    Some(rbf) => rbf.set(TcpStream::connect(addr)),
-                    None => *stream = Some(ReusableBoxFuture::new(TcpStream::connect(addr))),
+                    Some(rbf) => rbf.set(fut),
+                    None => *stream = Some(ReusableBoxFuture::new(fut)),
                 }
             },
         }
+    }
+}
+
+async fn connect(addr: SocketAddr, local_addr: Option<IpAddr>) -> io::Result<TcpStream> {
+    // use local addr if connect asks for it.
+    match local_addr {
+        Some(ip_addr) => {
+            let socket = match ip_addr {
+                IpAddr::V4(ip_addr) => {
+                    let socket = TcpSocket::new_v4()?;
+                    let addr = SocketAddr::V4(SocketAddrV4::new(ip_addr, 0));
+                    socket.bind(addr)?;
+                    socket
+                }
+                IpAddr::V6(ip_addr) => {
+                    let socket = TcpSocket::new_v6()?;
+                    let addr = SocketAddr::V6(SocketAddrV6::new(ip_addr, 0, 0, 0));
+                    socket.bind(addr)?;
+                    socket
+                }
+            };
+
+            socket.connect(addr).await
+        }
+
+        None => TcpStream::connect(addr).await,
     }
 }

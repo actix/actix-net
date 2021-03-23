@@ -14,7 +14,7 @@ use tokio::sync::oneshot;
 
 use crate::accept::Accept;
 use crate::config::{ConfiguredService, ServiceConfig};
-use crate::server_handle::{ServerCommand, ServerHandle};
+use crate::server_handle::{Server, ServerCommand};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
@@ -285,7 +285,7 @@ impl ServerBuilder {
             // start accept thread. return waker_queue for wake up it.
             let waker_queue = Accept::start(
                 sockets,
-                ServerHandle::new(self.cmd_tx.clone()),
+                Server::new(self.cmd_tx.clone()),
                 // closure for construct worker and return it's handler.
                 |waker| {
                     (0..self.threads)
@@ -349,8 +349,8 @@ impl ServerFuture {
     /// Obtain a Handle for ServerFuture that can be used to change state of actix server.
     ///
     /// See [ServerHandle](crate::server::ServerHandle) for usage.
-    pub fn handle(&self) -> ServerHandle {
-        ServerHandle::new(self.cmd_tx.clone())
+    pub fn handle(&self) -> Server {
+        Server::new(self.cmd_tx.clone())
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) -> Option<BoxFuture<'static, ()>> {

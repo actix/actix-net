@@ -8,5 +8,8 @@
 pub mod counter;
 pub mod dispatcher;
 pub mod mpsc;
+mod poll_fn;
 pub mod task;
 pub mod timeout;
+
+use self::poll_fn::poll_fn;

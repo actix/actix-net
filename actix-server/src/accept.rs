@@ -5,7 +5,7 @@ use log::{error, info};
 use mio::{Interest, Poll, Token as MioToken};
 use slab::Slab;
 
-use crate::server_handle::ServerHandle;
+use crate::server_handle::Server;
 use crate::socket::{MioListener, SocketAddr};
 use crate::waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN};
 use crate::worker::{Conn, WorkerHandle};
@@ -29,7 +29,7 @@ pub(crate) struct Accept {
     poll: Poll,
     waker_queue: WakerQueue,
     handles: Vec<WorkerHandle>,
-    srv: ServerHandle,
+    srv: Server,
     next: usize,
     backpressure: bool,
     // poll time duration.
@@ -53,7 +53,7 @@ fn connection_error(e: &io::Error) -> bool {
 impl Accept {
     pub(crate) fn start<F>(
         sockets: Vec<(Token, MioListener)>,
-        server_handle: ServerHandle,
+        server_handle: Server,
         worker_factory: F,
     ) -> WakerQueue
     where
@@ -92,7 +92,7 @@ impl Accept {
         waker_queue: WakerQueue,
         socks: Vec<(Token, MioListener)>,
         handles: Vec<WorkerHandle>,
-        srv: ServerHandle,
+        srv: Server,
     ) -> (Accept, Slab<ServerSocketInfo>) {
         let mut sockets = Slab::new();
         for (hnd_token, mut lst) in socks.into_iter() {

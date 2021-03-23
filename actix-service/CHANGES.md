@@ -3,6 +3,14 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 2.0.0-beta.5 - 2021-03-15
+* Add default `Service` trait impl for `Rc<S: Service>` and `&S: Service`. [#288]
+* Add `boxed::rc_service` function for constructing `boxed::RcService` type [#290]
+
+[#288]: https://github.com/actix/actix-net/pull/288
+[#290]: https://github.com/actix/actix-net/pull/290
+
+
 ## 2.0.0-beta.4 - 2021-02-04
 * `Service::poll_ready` and `Service::call` receive `&self`. [#247]
 * `apply_fn` and `apply_fn_factory` now receive `Fn(Req, &Service)` function type. [#247]

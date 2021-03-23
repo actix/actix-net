@@ -670,8 +670,6 @@ pub(crate) fn insert_slash(path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use http::Uri;
-    use std::convert::TryFrom;
 
     #[test]
     fn test_parse_static() {
@@ -833,8 +831,11 @@ mod tests {
         assert!(re.is_match("/user/2345/sdg"));
     }
 
+    #[cfg(feature = "http")]
     #[test]
     fn test_parse_urlencoded_param() {
+        use std::convert::TryFrom;
+
         let re = ResourceDef::new("/user/{id}/test");
 
         let mut path = Path::new("/user/2345/test");
@@ -845,7 +846,7 @@ mod tests {
         assert!(re.match_path(&mut path));
         assert_eq!(path.get("id").unwrap(), "qwe%25");
 
-        let uri = Uri::try_from("/user/qwe%25/test").unwrap();
+        let uri = http::Uri::try_from("/user/qwe%25/test").unwrap();
         let mut path = Path::new(uri);
         assert!(re.match_path(&mut path));
         assert_eq!(path.get("id").unwrap(), "qwe%25");

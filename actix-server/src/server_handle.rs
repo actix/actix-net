@@ -25,14 +25,14 @@ pub(crate) enum ServerCommand {
 }
 
 #[derive(Debug)]
-pub struct ServerHandle(
+pub struct Server(
     UnboundedSender<ServerCommand>,
     Option<oneshot::Receiver<()>>,
 );
 
-impl ServerHandle {
+impl Server {
     pub(crate) fn new(tx: UnboundedSender<ServerCommand>) -> Self {
-        ServerHandle(tx, None)
+        Server(tx, None)
     }
 
     /// Start server building process
@@ -80,13 +80,13 @@ impl ServerHandle {
     }
 }
 
-impl Clone for ServerHandle {
+impl Clone for Server {
     fn clone(&self) -> Self {
         Self(self.0.clone(), None)
     }
 }
 
-impl Future for ServerHandle {
+impl Future for Server {
     type Output = io::Result<()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

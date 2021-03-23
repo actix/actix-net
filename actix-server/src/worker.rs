@@ -199,62 +199,59 @@ impl ServerWorker {
 
         availability.set(false);
 
+        let handle = tokio::runtime::Handle::current();
+
         // every worker runs in it's own arbiter.
         // use a custom tokio runtime builder to change the settings of runtime.
         std::thread::spawn(move || {
-            let mut wrk = MAX_CONNS_COUNTER.with(move |conns| ServerWorker {
-                rx,
-                rx2,
-                availability,
-                factories,
-                config,
-                services: Vec::new(),
-                conns: conns.clone(),
-                state: WorkerState::Unavailable,
-            });
-            let fut = wrk
-                .factories
-                .iter()
-                .enumerate()
-                .map(|(idx, factory)| {
-                    let fut = factory.create();
-                    async move {
-                        fut.await.map(|r| {
-                            r.into_iter().map(|(t, s)| (idx, t, s)).collect::<Vec<_>>()
-                        })
-                    }
-                })
-                .collect::<Vec<_>>();
+            handle.block_on(tokio::task::LocalSet::new().run_until(async move {
+                let mut wrk = MAX_CONNS_COUNTER.with(move |conns| ServerWorker {
+                    rx,
+                    rx2,
+                    availability,
+                    factories,
+                    config,
+                    services: Vec::new(),
+                    conns: conns.clone(),
+                    state: WorkerState::Unavailable,
+                });
+                let fut = wrk
+                    .factories
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, factory)| {
+                        let fut = factory.create();
+                        async move {
+                            fut.await.map(|r| {
+                                r.into_iter().map(|(t, s)| (idx, t, s)).collect::<Vec<_>>()
+                            })
+                        }
+                    })
+                    .collect::<Vec<_>>();
 
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .max_blocking_threads(config.max_blocking_threads)
-                .build()
-                .unwrap()
-                .block_on(tokio::task::LocalSet::new().run_until(async move {
-                    let res = join_all(fut)
-                        .await
-                        .into_iter()
-                        .collect::<Result<Vec<_>, _>>();
-                    match res {
-                        Ok(services) => {
-                            for item in services {
-                                for (factory, token, service) in item {
-                                    assert_eq!(token.0, wrk.services.len());
-                                    wrk.services.push(WorkerService {
-                                        factory,
-                                        service,
-                                        status: WorkerServiceStatus::Unavailable,
-                                    });
-                                }
+                let res = join_all(fut)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>();
+                match res {
+                    Ok(services) => {
+                        for item in services {
+                            for (factory, token, service) in item {
+                                assert_eq!(token.0, wrk.services.len());
+                                wrk.services.push(WorkerService {
+                                    factory,
+                                    service,
+                                    status: WorkerServiceStatus::Unavailable,
+                                });
                             }
                         }
-                        Err(e) => {
-                            error!("Can not start worker: {:?}", e);
-                        }
                     }
-                    wrk.await
-                }))
+                    Err(e) => {
+                        error!("Can not start worker: {:?}", e);
+                    }
+                }
+                wrk.await
+            }))
         });
 
         WorkerHandle::new(idx, tx1, tx2, avail)
