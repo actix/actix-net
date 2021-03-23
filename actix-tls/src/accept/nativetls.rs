@@ -6,7 +6,7 @@ use std::{
 };
 
 use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
-use actix_rt::net::ActixStream;
+use actix_rt::net::{ActixStream, Ready};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
@@ -80,11 +80,11 @@ impl<T: ActixStream> AsyncWrite for TlsStream<T> {
 }
 
 impl<T: ActixStream> ActixStream for TlsStream<T> {
-    fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
         T::poll_read_ready((&**self).get_ref().get_ref().get_ref(), cx)
     }
 
-    fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
         T::poll_write_ready((&**self).get_ref().get_ref().get_ref(), cx)
     }
 }
