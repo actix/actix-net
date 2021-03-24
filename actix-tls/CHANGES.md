@@ -1,6 +1,10 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Changed `connect::ssl::rustls::RustlsConnectorService` to return error when `DNSNameRef` 
+  generation failed instead of panic. [#296]
+
+[#296]: https://github.com/actix/actix-net/pull/296
 
 
 ## 3.0.0-beta.4 - 2021-02-24
