@@ -5,3 +5,6 @@ pub mod openssl;
 
 #[cfg(feature = "rustls")]
 pub mod rustls;
+
+#[cfg(feature = "native-tls")]
+pub mod nativetls;

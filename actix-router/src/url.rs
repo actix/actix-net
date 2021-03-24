@@ -170,13 +170,11 @@ impl Quoter {
             idx += 1;
         }
 
-        if let Some(data) = cloned {
+        cloned.map(|data| {
             // Unsafe: we get data from http::Uri, which does utf-8 checks already
             // this code only decodes valid pct encoded values
-            Some(unsafe { String::from_utf8_unchecked(data) })
-        } else {
-            None
-        }
+            unsafe { String::from_utf8_unchecked(data) }
+        })
     }
 }
 
