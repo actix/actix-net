@@ -1,5 +1,5 @@
-// An example on how to build a multi-thread tokio runtime for Actix System.
-// Then spawn async task that can make use of work stealing of tokio runtime.
+//! An example on how to build a multi-thread tokio runtime for Actix System.
+//! Then spawn async task that can make use of work stealing of tokio runtime.
 
 use actix_rt::System;
 
@@ -15,19 +15,19 @@ fn main() {
     .block_on(async_main());
 }
 
-// async main function that act similar to #[actix_web::main] or #[tokio::main]
+// async main function that acts like #[actix_web::main] or #[tokio::main]
 async fn async_main() {
     let (tx, rx) = tokio::sync::oneshot::channel();
 
-    // get a handler of system arbiter and spawn async task on it.
+    // get a handle to system arbiter and spawn async task on it
     System::current().arbiter().spawn(async {
-        // use another tokio::spawn to get inside the context of multi thread tokio runtime.
+        // use tokio::spawn to get inside the context of multi thread tokio runtime
         let h1 = tokio::spawn(async {
             println!("thread id is {:?}", std::thread::current().id());
             std::thread::sleep(std::time::Duration::from_secs(2));
         });
 
-        // work steal happens.
+        // work stealing occurs for this task spawn
         let h2 = tokio::spawn(async {
             println!("thread id is {:?}", std::thread::current().id());
         });
@@ -42,7 +42,7 @@ async fn async_main() {
     let (tx, rx) = tokio::sync::oneshot::channel();
     let now = std::time::Instant::now();
 
-    // Without additional tokio::spawn. all spawned task would run on single thread.
+    // without additional tokio::spawn, all spawned tasks run on single thread
     System::current().arbiter().spawn(async {
         println!("thread id is {:?}", std::thread::current().id());
         std::thread::sleep(std::time::Duration::from_secs(2));
@@ -50,7 +50,7 @@ async fn async_main() {
     });
 
     // previous spawn task has blocked the system arbiter thread
-    // so this task would wait for 2 sec until it can be ran.
+    // so this task will wait for 2 seconds until it can be run
     System::current().arbiter().spawn(async move {
         println!("thread id is {:?}", std::thread::current().id());
         assert!(now.elapsed() > std::time::Duration::from_secs(2));
