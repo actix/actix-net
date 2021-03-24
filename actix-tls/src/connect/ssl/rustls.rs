@@ -100,7 +100,7 @@ where
 }
 
 pub enum RustlsConnectorServiceFuture<T, U> {
-    // See issue https://github.com/briansmith/webpki/issues/54
+    /// See issue https://github.com/briansmith/webpki/issues/54
     InvalidDns,
     Future {
         connect: Connect<U>,
@@ -120,7 +120,7 @@ where
             Self::InvalidDns => Poll::Ready(Err(
                 io::Error::new(io::ErrorKind::Other, "rustls currently only handles hostname-based connections. See https://github.com/briansmith/webpki/issues/54")
             )),
-            Self::Future { connect, connection} => {
+            Self::Future { connect, connection } => {
                 let stream = ready!(Pin::new(connect).poll(cx))?;
                 let connection = connection.take().unwrap();
                 trace!("SSL Handshake success: {:?}", connection.host());
