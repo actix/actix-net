@@ -1,24 +1,19 @@
 use std::{
-    fmt,
     future::Future,
     io,
     pin::Pin,
     task::{Context, Poll},
 };
 
-use actix_codec::{AsyncRead, AsyncWrite};
-use actix_rt::net::TcpStream;
+use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::trace;
 
-pub use openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
+pub use tls_openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
 pub use tokio_openssl::SslStream;
 
-use crate::connect::resolve::Resolve;
-use crate::connect::{
-    Address, Connect, ConnectError, ConnectService, ConnectServiceFactory, Connection, Resolver,
-};
+use crate::connect::{Address, Connection};
 
 /// OpenSSL connector factory
 pub struct OpensslConnector {
@@ -45,8 +40,8 @@ impl Clone for OpensslConnector {
 
 impl<T, U> ServiceFactory<Connection<T, U>> for OpensslConnector
 where
-    T: Address + 'static,
-    U: AsyncRead + AsyncWrite + Unpin + fmt::Debug + 'static,
+    T: Address,
+    U: ActixStream + 'static,
 {
     type Response = Connection<T, SslStream<U>>;
     type Error = io::Error;
@@ -75,8 +70,8 @@ impl Clone for OpensslConnectorService {
 
 impl<T, U> Service<Connection<T, U>> for OpensslConnectorService
 where
-    T: Address + 'static,
-    U: AsyncRead + AsyncWrite + Unpin + fmt::Debug + 'static,
+    T: Address,
+    U: ActixStream,
 {
     type Response = Connection<T, SslStream<U>>;
     type Error = io::Error;
@@ -112,7 +107,8 @@ pub struct ConnectAsyncExt<T, U> {
 
 impl<T: Address, U> Future for ConnectAsyncExt<T, U>
 where
-    U: AsyncRead + AsyncWrite + Unpin + fmt::Debug + 'static,
+    T: Address,
+    U: ActixStream,
 {
     type Output = Result<Connection<T, SslStream<U>>, io::Error>;
 
@@ -129,118 +125,6 @@ where
                 trace!("SSL Handshake error: {:?}", e);
                 Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, format!("{}", e))))
             }
-        }
-    }
-}
-
-pub struct OpensslConnectServiceFactory {
-    tcp: ConnectServiceFactory,
-    openssl: OpensslConnector,
-}
-
-impl OpensslConnectServiceFactory {
-    /// Construct new OpensslConnectService factory
-    pub fn new(connector: SslConnector) -> Self {
-        OpensslConnectServiceFactory {
-            tcp: ConnectServiceFactory::new(Resolver::Default),
-            openssl: OpensslConnector::new(connector),
-        }
-    }
-
-    /// Construct new connect service with custom DNS resolver
-    pub fn with_resolver(connector: SslConnector, resolver: impl Resolve + 'static) -> Self {
-        OpensslConnectServiceFactory {
-            tcp: ConnectServiceFactory::new(Resolver::new_custom(resolver)),
-            openssl: OpensslConnector::new(connector),
-        }
-    }
-
-    /// Construct OpenSSL connect service
-    pub fn service(&self) -> OpensslConnectService {
-        OpensslConnectService {
-            tcp: self.tcp.service(),
-            openssl: OpensslConnectorService {
-                connector: self.openssl.connector.clone(),
-            },
-        }
-    }
-}
-
-impl Clone for OpensslConnectServiceFactory {
-    fn clone(&self) -> Self {
-        OpensslConnectServiceFactory {
-            tcp: self.tcp.clone(),
-            openssl: self.openssl.clone(),
-        }
-    }
-}
-
-impl<T: Address + 'static> ServiceFactory<Connect<T>> for OpensslConnectServiceFactory {
-    type Response = SslStream<TcpStream>;
-    type Error = ConnectError;
-    type Config = ();
-    type Service = OpensslConnectService;
-    type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
-
-    fn new_service(&self, _: ()) -> Self::Future {
-        let service = self.service();
-        Box::pin(async { Ok(service) })
-    }
-}
-
-#[derive(Clone)]
-pub struct OpensslConnectService {
-    tcp: ConnectService,
-    openssl: OpensslConnectorService,
-}
-
-impl<T: Address + 'static> Service<Connect<T>> for OpensslConnectService {
-    type Response = SslStream<TcpStream>;
-    type Error = ConnectError;
-    type Future = OpensslConnectServiceResponse<T>;
-
-    actix_service::always_ready!();
-
-    fn call(&self, req: Connect<T>) -> Self::Future {
-        OpensslConnectServiceResponse {
-            fut1: Some(self.tcp.call(req)),
-            fut2: None,
-            openssl: self.openssl.clone(),
-        }
-    }
-}
-
-pub struct OpensslConnectServiceResponse<T: Address + 'static> {
-    fut1: Option<<ConnectService as Service<Connect<T>>>::Future>,
-    fut2: Option<<OpensslConnectorService as Service<Connection<T, TcpStream>>>::Future>,
-    openssl: OpensslConnectorService,
-}
-
-impl<T: Address> Future for OpensslConnectServiceResponse<T> {
-    type Output = Result<SslStream<TcpStream>, ConnectError>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if let Some(ref mut fut) = self.fut1 {
-            match ready!(Pin::new(fut).poll(cx)) {
-                Ok(res) => {
-                    let _ = self.fut1.take();
-                    self.fut2 = Some(self.openssl.call(res));
-                }
-                Err(e) => return Poll::Ready(Err(e)),
-            }
-        }
-
-        if let Some(ref mut fut) = self.fut2 {
-            match ready!(Pin::new(fut).poll(cx)) {
-                Ok(connect) => Poll::Ready(Ok(connect.into_parts().0)),
-                Err(e) => Poll::Ready(Err(ConnectError::Io(io::Error::new(
-                    io::ErrorKind::Other,
-                    e,
-                )))),
-            }
-        } else {
-            Poll::Pending
         }
     }
 }

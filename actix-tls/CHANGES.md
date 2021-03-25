@@ -3,6 +3,8 @@
 ## Unreleased - 2021-xx-xx
 * Changed `connect::ssl::rustls::RustlsConnectorService` to return error when `DNSNameRef` 
   generation failed instead of panic. [#296]
+* Remove `connect::ssl::openssl::OpensslConnectServiceFactory`
+* Remove `connect::ssl::openssl::OpensslConnectService`
 
 [#296]: https://github.com/actix/actix-net/pull/296
 

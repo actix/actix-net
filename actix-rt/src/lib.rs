@@ -87,7 +87,7 @@ pub mod net {
     pub use tokio::net::{UnixDatagram, UnixListener, UnixStream};
 
     /// Extension trait over async read+write types that can also signal readiness.
-    pub trait ActixStream: AsyncRead + AsyncWrite + Unpin + 'static {
+    pub trait ActixStream: AsyncRead + AsyncWrite + Unpin {
         /// Poll stream and check read readiness of Self.
         ///
         /// See [tokio::net::TcpStream::poll_read_ready] for detail on intended use.
@@ -125,6 +125,16 @@ pub mod net {
             let ready = self.ready(Interest::WRITABLE);
             tokio::pin!(ready);
             ready.poll(cx)
+        }
+    }
+
+    impl<Io: ActixStream + ?Sized> ActixStream for Box<Io> {
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            (**self).poll_read_ready(cx)
+        }
+
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            (**self).poll_write_ready(cx)
         }
     }
 }

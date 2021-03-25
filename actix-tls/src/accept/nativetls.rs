@@ -113,7 +113,7 @@ impl Clone for Acceptor {
     }
 }
 
-impl<T: ActixStream> ServiceFactory<T> for Acceptor {
+impl<T: ActixStream + 'static> ServiceFactory<T> for Acceptor {
     type Response = TlsStream<T>;
     type Error = Error;
     type Config = ();
@@ -138,16 +138,7 @@ pub struct NativeTlsAcceptorService {
     conns: Counter,
 }
 
-impl Clone for NativeTlsAcceptorService {
-    fn clone(&self) -> Self {
-        Self {
-            acceptor: self.acceptor.clone(),
-            conns: self.conns.clone(),
-        }
-    }
-}
-
-impl<T: ActixStream> Service<T> for NativeTlsAcceptorService {
+impl<T: ActixStream + 'static> Service<T> for NativeTlsAcceptorService {
     type Response = TlsStream<T>;
     type Error = Error;
     type Future = LocalBoxFuture<'static, Result<TlsStream<T>, Error>>;
@@ -162,9 +153,9 @@ impl<T: ActixStream> Service<T> for NativeTlsAcceptorService {
 
     fn call(&self, io: T) -> Self::Future {
         let guard = self.conns.get();
-        let this = self.clone();
+        let acceptor = self.acceptor.clone();
         Box::pin(async move {
-            let io = this.acceptor.accept(io).await;
+            let io = acceptor.accept(io).await;
             drop(guard);
             io.map(Into::into)
         })

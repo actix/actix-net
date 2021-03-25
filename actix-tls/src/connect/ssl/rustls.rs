@@ -47,7 +47,7 @@ impl Clone for RustlsConnector {
 impl<T, U> ServiceFactory<Connection<T, U>> for RustlsConnector
 where
     T: Address,
-    U: ActixStream,
+    U: ActixStream + 'static,
 {
     type Response = Connection<T, TlsStream<U>>;
     type Error = io::Error;

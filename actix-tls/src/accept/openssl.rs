@@ -12,7 +12,7 @@ use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
 use futures_core::{future::LocalBoxFuture, ready};
 
-pub use openssl::ssl::{
+pub use tls_openssl::ssl::{
     AlpnError, Error as SslError, HandshakeError, Ssl, SslAcceptor, SslAcceptorBuilder,
 };
 
