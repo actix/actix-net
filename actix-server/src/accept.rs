@@ -2,7 +2,7 @@ use std::time::Duration;
 use std::{io, thread};
 
 use actix_rt::{
-    time::{sleep_until, Instant},
+    time::{sleep, Instant},
     System,
 };
 use log::{error, info};
@@ -16,14 +16,17 @@ use crate::worker::{Conn, WorkerHandle};
 use crate::Token;
 
 struct ServerSocketInfo {
-    // addr for socket. mainly used for logging.
+    /// Address of socket. Mainly used for logging.
     addr: SocketAddr,
-    // be ware this is the crate token for identify socket and should not be confused with
-    // mio::Token
+
+    /// Beware this is the crate token for identify socket and should not be confused
+    /// with `mio::Token`.
     token: Token,
+
     lst: MioListener,
-    // timeout is used to mark the deadline when this socket's listener should be registered again
-    // after an error.
+
+    /// Timeout is used to mark the deadline when this socket's listener should be registered again
+    /// after an error.
     timeout: Option<Instant>,
 }
 
@@ -226,10 +229,9 @@ impl Accept {
                             Some(WakerInterest::Stop) => {
                                 return self.deregister_all(&mut sockets);
                             }
-                            // waker queue is drained.
+                            // waker queue is drained
                             None => {
-                                // Reset the WakerQueue before break so it does not grow
-                                // infinitely.
+                                // Reset the WakerQueue before break so it does not grow infinitely
                                 WakerQueue::reset(&mut guard);
                                 break 'waker;
                             }
@@ -328,8 +330,8 @@ impl Accept {
                     }
                     Err(tmp) => {
                         // worker lost contact and could be gone. a message is sent to
-                        // `ServerBuilder` future to notify it a new worker should be made.
-                        // after that remove the fault worker.
+                        // `ServerBuilder` future to notify it a new worker should be made
+                        // after that remove the fault worker
                         self.srv.worker_faulted(self.handles[self.next].idx);
                         msg = tmp;
                         self.handles.swap_remove(self.next);
@@ -403,15 +405,15 @@ impl Accept {
                             error!("Can not deregister server socket {}", err);
                         }
 
-                        // sleep after error. write the timeout to socket info as later the poll
-                        // would need it mark which socket and when it's listener should be
-                        // registered.
+                        // sleep after error. write the timeout to socket info as later
+                        // the poll would need it mark which socket and when it's
+                        // listener should be registered
                         info.timeout = Some(Instant::now() + Duration::from_millis(500));
 
                         // after the sleep a Timer interest is sent to Accept Poll
                         let waker = self.waker.clone();
                         System::current().arbiter().spawn(async move {
-                            sleep_until(Instant::now() + Duration::from_millis(510)).await;
+                            sleep(Duration::from_millis(510)).await;
                             waker.wake(WakerInterest::Timer);
                         });
 

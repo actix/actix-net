@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use actix_rt::time::{sleep_until, Instant, Sleep};
+use actix_rt::time::{sleep, Sleep};
 use actix_rt::{spawn, Arbiter};
 use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
@@ -361,8 +361,8 @@ impl Future for ServerWorker {
                 if num != 0 {
                     info!("Graceful worker shutdown, {} connections", num);
                     self.state = WorkerState::Shutdown(
-                        Box::pin(sleep_until(Instant::now() + Duration::from_secs(1))),
-                        Box::pin(sleep_until(Instant::now() + self.config.shutdown_timeout)),
+                        Box::pin(sleep(Duration::from_secs(1))),
+                        Box::pin(sleep(self.config.shutdown_timeout)),
                         Some(result),
                     );
                 } else {
@@ -438,7 +438,7 @@ impl Future for ServerWorker {
 
                 // sleep for 1 second and then check again
                 if t1.as_mut().poll(cx).is_ready() {
-                    *t1 = Box::pin(sleep_until(Instant::now() + Duration::from_secs(1)));
+                    *t1 = Box::pin(sleep(Duration::from_secs(1)));
                     let _ = t1.as_mut().poll(cx);
                 }
 
