@@ -10,7 +10,7 @@ use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::trace;
 
-pub use tls_openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
+pub use openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
 pub use tokio_openssl::SslStream;
 
 use crate::connect::{Address, Connection};
