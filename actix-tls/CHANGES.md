@@ -5,7 +5,8 @@
   generation failed instead of panic. [#296]
 * Remove `connect::ssl::openssl::OpensslConnectServiceFactory`. [#297]
 * Remove `connect::ssl::openssl::OpensslConnectService`. [#297]
-* Add `connect::ssl::nativetls` module for native tls support. [#295]
+* Add `connect::ssl::native_tls` module for native tls support. [#295]
+* Rename `accept::{nativetls => native_tls}`. [#295]
 
 [#295]: https://github.com/actix/actix-net/pull/295
 [#296]: https://github.com/actix/actix-net/pull/296
