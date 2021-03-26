@@ -39,7 +39,7 @@ impl Clone for NativetlsConnector {
 
 impl<T: Address, U> ServiceFactory<Connection<T, U>> for NativetlsConnector
 where
-    U: ActixStream,
+    U: ActixStream + 'static,
 {
     type Response = Connection<T, TlsStream<U>>;
     type Error = io::Error;
@@ -59,7 +59,7 @@ where
 impl<T, U> Service<Connection<T, U>> for NativetlsConnector
 where
     T: Address,
-    U: ActixStream,
+    U: ActixStream + 'static,
 {
     type Response = Connection<T, TlsStream<U>>;
     type Error = io::Error;
