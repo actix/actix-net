@@ -72,7 +72,7 @@ pub enum TcpConnectorResponse<T> {
         port: u16,
         local_addr: Option<IpAddr>,
         addrs: Option<VecDeque<SocketAddr>>,
-        stream: Option<ReusableBoxFuture<Result<TcpStream, io::Error>>>,
+        stream: ReusableBoxFuture<Result<TcpStream, io::Error>>,
     },
     Error(Option<ConnectError>),
 }
@@ -103,18 +103,22 @@ impl<T: Address> TcpConnectorResponse<T> {
                 port,
                 local_addr,
                 addrs: None,
-                stream: Some(ReusableBoxFuture::new(connect(addr, local_addr))),
+                stream: ReusableBoxFuture::new(connect(addr, local_addr)),
             },
 
             // when resolver returns multiple socket addr for request they would be popped from
             // front end of queue and returns with the first successful tcp connection.
-            ConnectAddrs::Multi(addrs) => TcpConnectorResponse::Response {
-                req: Some(req),
-                port,
-                local_addr,
-                addrs: Some(addrs),
-                stream: None,
-            },
+            ConnectAddrs::Multi(mut addrs) => {
+                let addr = addrs.pop_front().unwrap();
+
+                TcpConnectorResponse::Response {
+                    req: Some(req),
+                    port,
+                    local_addr,
+                    addrs: Some(addrs),
+                    stream: ReusableBoxFuture::new(connect(addr, local_addr)),
+                }
+            }
         }
     }
 }
@@ -133,39 +137,30 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
                 addrs,
                 stream,
             } => loop {
-                if let Some(new) = stream.as_mut() {
-                    match ready!(new.poll(cx)) {
-                        Ok(sock) => {
-                            let req = req.take().unwrap();
-                            trace!(
-                                "TCP connector: successfully connected to {:?} - {:?}",
-                                req.hostname(),
-                                sock.peer_addr()
-                            );
-                            return Poll::Ready(Ok(Connection::new(sock, req)));
-                        }
+                match ready!(stream.poll(cx)) {
+                    Ok(sock) => {
+                        let req = req.take().unwrap();
+                        trace!(
+                            "TCP connector: successfully connected to {:?} - {:?}",
+                            req.hostname(),
+                            sock.peer_addr()
+                        );
+                        return Poll::Ready(Ok(Connection::new(sock, req)));
+                    }
 
-                        Err(err) => {
-                            trace!(
-                                "TCP connector: failed to connect to {:?} port: {}",
-                                req.as_ref().unwrap().hostname(),
-                                port,
-                            );
+                    Err(err) => {
+                        trace!(
+                            "TCP connector: failed to connect to {:?} port: {}",
+                            req.as_ref().unwrap().hostname(),
+                            port,
+                        );
 
-                            if addrs.is_none() || addrs.as_ref().unwrap().is_empty() {
-                                return Poll::Ready(Err(ConnectError::Io(err)));
-                            }
+                        if let Some(addr) = addrs.as_mut().and_then(|addrs| addrs.pop_front()) {
+                            stream.set(connect(addr, *local_addr));
+                        } else {
+                            return Poll::Ready(Err(ConnectError::Io(err)));
                         }
                     }
-                }
-
-                // try to connect
-                let addr = addrs.as_mut().unwrap().pop_front().unwrap();
-
-                let fut = connect(addr, *local_addr);
-                match stream {
-                    Some(rbf) => rbf.set(fut),
-                    None => *stream = Some(ReusableBoxFuture::new(fut)),
                 }
             },
         }

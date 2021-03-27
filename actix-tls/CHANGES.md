@@ -7,10 +7,13 @@
 * Remove `connect::ssl::openssl::OpensslConnectService`. [#297]
 * Add `connect::ssl::native_tls` module for native tls support. [#295]
 * Rename `accept::{nativetls => native_tls}`. [#295]
+* Remove `connect::TcpConnectService` type. service caller expect a `TcpStream` should use 
+  `connect::ConnectService` instead and call `Connection<T, TcpStream>::into_parts`. [#299]
 
 [#295]: https://github.com/actix/actix-net/pull/295
 [#296]: https://github.com/actix/actix-net/pull/296
 [#297]: https://github.com/actix/actix-net/pull/297
+[#299]: https://github.com/actix/actix-net/pull/299
 
 
 ## 3.0.0-beta.4 - 2021-02-24

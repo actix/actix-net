@@ -34,14 +34,6 @@ impl ConnectServiceFactory {
             resolver: self.resolver.service(),
         }
     }
-
-    /// Construct new tcp stream service
-    pub fn tcp_service(&self) -> TcpConnectService {
-        TcpConnectService {
-            tcp: self.tcp.service(),
-            resolver: self.resolver.service(),
-        }
-    }
 }
 
 impl Clone for ConnectServiceFactory {
@@ -63,7 +55,7 @@ impl<T: Address> ServiceFactory<Connect<T>> for ConnectServiceFactory {
 
     fn new_service(&self, _: ()) -> Self::Future {
         let service = self.service();
-        Box::pin(async move { Ok(service) })
+        Box::pin(async { Ok(service) })
     }
 }
 
@@ -131,47 +123,6 @@ impl<T: Address> Future for ConnectServiceResponse<T> {
                     self.fut = ConnectFuture::Connect(self.tcp.call(res));
                 }
                 ConnectOutput::Connected(res) => return Poll::Ready(Ok(res)),
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct TcpConnectService {
-    tcp: TcpConnector,
-    resolver: Resolver,
-}
-
-impl<T: Address> Service<Connect<T>> for TcpConnectService {
-    type Response = TcpStream;
-    type Error = ConnectError;
-    type Future = TcpConnectServiceResponse<T>;
-
-    actix_service::always_ready!();
-
-    fn call(&self, req: Connect<T>) -> Self::Future {
-        TcpConnectServiceResponse {
-            fut: ConnectFuture::Resolve(self.resolver.call(req)),
-            tcp: self.tcp,
-        }
-    }
-}
-
-pub struct TcpConnectServiceResponse<T: Address> {
-    fut: ConnectFuture<T>,
-    tcp: TcpConnector,
-}
-
-impl<T: Address> Future for TcpConnectServiceResponse<T> {
-    type Output = Result<TcpStream, ConnectError>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        loop {
-            match ready!(self.fut.poll_connect(cx))? {
-                ConnectOutput::Resolved(res) => {
-                    self.fut = ConnectFuture::Connect(self.tcp.call(res));
-                }
-                ConnectOutput::Connected(conn) => return Poll::Ready(Ok(conn.into_parts().0)),
             }
         }
     }
