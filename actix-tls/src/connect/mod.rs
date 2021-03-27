@@ -26,20 +26,20 @@ pub mod ssl;
 mod uri;
 
 use actix_rt::net::TcpStream;
-use actix_service::{pipeline, pipeline_factory, Service, ServiceFactory};
+use actix_service::{Service, ServiceFactory};
 
 pub use self::connect::{Address, Connect, Connection};
 pub use self::connector::{TcpConnector, TcpConnectorFactory};
 pub use self::error::ConnectError;
 pub use self::resolve::{Resolve, Resolver, ResolverFactory};
-pub use self::service::{ConnectService, ConnectServiceFactory, TcpConnectService};
+pub use self::service::{ConnectService, ConnectServiceFactory};
 
 /// Create TCP connector service.
 pub fn new_connector<T: Address + 'static>(
     resolver: Resolver,
 ) -> impl Service<Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError> + Clone
 {
-    pipeline(resolver).and_then(TcpConnector)
+    ConnectServiceFactory::new(resolver).service()
 }
 
 /// Create TCP connector service factory.
@@ -52,7 +52,7 @@ pub fn new_connector_factory<T: Address + 'static>(
     Error = ConnectError,
     InitError = (),
 > + Clone {
-    pipeline_factory(ResolverFactory::new(resolver)).and_then(TcpConnectorFactory)
+    ConnectServiceFactory::new(resolver)
 }
 
 /// Create connector service with default parameters.
