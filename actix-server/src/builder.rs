@@ -5,7 +5,7 @@ use std::time::Duration;
 use std::{io, mem};
 
 use actix_rt::net::TcpStream;
-use actix_rt::time::{sleep_until, Instant};
+use actix_rt::time::sleep;
 use actix_rt::System;
 use futures_core::future::BoxFuture;
 use log::{error, info};
@@ -115,13 +115,13 @@ impl ServerBuilder {
         self
     }
 
-    /// Stop actix system.
+    /// Stop Actix system.
     pub fn system_exit(mut self) -> Self {
         self.exit = true;
         self
     }
 
-    /// Disable signal handling
+    /// Disable signal handling.
     pub fn disable_signals(mut self) -> Self {
         self.no_signals = true;
         self
@@ -129,9 +129,8 @@ impl ServerBuilder {
 
     /// Timeout for graceful workers shutdown in seconds.
     ///
-    /// After receiving a stop signal, workers have this much time to finish
-    /// serving requests. Workers still alive after the timeout are force
-    /// dropped.
+    /// After receiving a stop signal, workers have this much time to finish serving requests.
+    /// Workers still alive after the timeout are force dropped.
     ///
     /// By default shutdown timeout sets to 30 seconds.
     pub fn shutdown_timeout(mut self, sec: u64) -> Self {
@@ -140,11 +139,10 @@ impl ServerBuilder {
         self
     }
 
-    /// Execute external configuration as part of the server building
-    /// process.
+    /// Execute external configuration as part of the server building process.
     ///
-    /// This function is useful for moving parts of configuration to a
-    /// different module or even library.
+    /// This function is useful for moving parts of configuration to a different module or
+    /// even library.
     pub fn configure<F>(mut self, f: F) -> io::Result<ServerBuilder>
     where
         F: Fn(&mut ServiceConfig) -> io::Result<()>,
@@ -261,6 +259,7 @@ impl ServerBuilder {
 
         self.sockets
             .push((token, name.as_ref().to_string(), MioListener::from(lst)));
+
         Ok(self)
     }
 
@@ -430,8 +429,8 @@ impl ServerFuture {
                             let _ = tx.send(());
                         }
                         if exit {
-                            sleep_until(Instant::now() + Duration::from_millis(300)).await;
-                            System::current().stop();
+                            sleep(Duration::from_millis(300)).await;
+                            System::try_current().as_ref().map(System::stop);
                         }
                     }))
                 } else {
@@ -440,8 +439,8 @@ impl ServerFuture {
                     // TODO: this async block can return io::Error.
                     Some(Box::pin(async move {
                         if exit {
-                            sleep_until(Instant::now() + Duration::from_millis(300)).await;
-                            System::current().stop();
+                            sleep(Duration::from_millis(300)).await;
+                            System::try_current().as_ref().map(System::stop);
                         }
                         if let Some(tx) = completion {
                             let _ = tx.send(());

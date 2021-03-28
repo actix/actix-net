@@ -16,7 +16,7 @@ pub mod openssl;
 pub mod rustls;
 
 #[cfg(feature = "native-tls")]
-pub mod nativetls;
+pub mod native_tls;
 
 pub(crate) static MAX_CONN: AtomicUsize = AtomicUsize::new(256);
 

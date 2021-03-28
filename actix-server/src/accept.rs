@@ -14,12 +14,15 @@ use crate::Token;
 const DUR_ON_ERR: Duration = Duration::from_millis(500);
 
 struct ServerSocketInfo {
-    // addr for socket. mainly used for logging.
+    /// Address of socket. Mainly used for logging.
     addr: SocketAddr,
-    // be ware this is the crate token for identify socket and should not be confused with
-    // mio::Token
+
+    /// Beware this is the crate token for identify socket and should not be confused
+    /// with `mio::Token`.
     token: Token,
+
     lst: MioListener,
+
     // mark the deadline when this socket's listener should be registered again
     timeout_deadline: Option<Instant>,
 }
@@ -192,10 +195,9 @@ impl Accept {
                             Some(WakerInterest::Stop) => {
                                 return self.deregister_all(&mut sockets);
                             }
-                            // waker queue is drained.
+                            // waker queue is drained
                             None => {
-                                // Reset the WakerQueue before break so it does not grow
-                                // infinitely.
+                                // Reset the WakerQueue before break so it does not grow infinitely
                                 WakerQueue::reset(&mut guard);
                                 break 'waker;
                             }
@@ -316,8 +318,8 @@ impl Accept {
                     }
                     Err(tmp) => {
                         // worker lost contact and could be gone. a message is sent to
-                        // `ServerBuilder` future to notify it a new worker should be made.
-                        // after that remove the fault worker.
+                        // `ServerBuilder` future to notify it a new worker should be made
+                        // after that remove the fault worker
                         self.srv.worker_faulted(self.handles[self.next].idx);
                         msg = tmp;
                         self.handles.swap_remove(self.next);

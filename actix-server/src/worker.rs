@@ -5,7 +5,10 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use actix_rt::time::{sleep_until, Instant, Sleep};
+use actix_rt::{
+    time::{sleep, Sleep},
+    System,
+};
 use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
 use log::{error, info, trace};
@@ -199,12 +202,26 @@ impl ServerWorker {
 
         availability.set(false);
 
-        let handle = tokio::runtime::Handle::current();
+        // Try to get actix system when have one.
+        let system = System::try_current();
 
-        // every worker runs in it's own arbiter.
+        // every worker runs in it's own thread.
         // use a custom tokio runtime builder to change the settings of runtime.
         std::thread::spawn(move || {
-            handle.block_on(tokio::task::LocalSet::new().run_until(async move {
+            // conditionally setup actix system.
+            if let Some(system) = system {
+                System::set_current(system);
+            }
+
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .max_blocking_threads(config.max_blocking_threads)
+                .build()
+                .unwrap();
+
+            let local = tokio::task::LocalSet::new();
+
+            rt.block_on(local.run_until(async move {
                 let mut wrk = MAX_CONNS_COUNTER.with(move |conns| ServerWorker {
                     rx,
                     rx2,
@@ -355,8 +372,8 @@ impl Future for ServerWorker {
                 if num != 0 {
                     info!("Graceful worker shutdown, {} connections", num);
                     self.state = WorkerState::Shutdown(
-                        Box::pin(sleep_until(Instant::now() + Duration::from_secs(1))),
-                        Box::pin(sleep_until(Instant::now() + self.config.shutdown_timeout)),
+                        Box::pin(sleep(Duration::from_secs(1))),
+                        Box::pin(sleep(self.config.shutdown_timeout)),
                         Some(result),
                     );
                 } else {
@@ -430,7 +447,7 @@ impl Future for ServerWorker {
 
                 // sleep for 1 second and then check again
                 if t1.as_mut().poll(cx).is_ready() {
-                    *t1 = Box::pin(sleep_until(Instant::now() + Duration::from_secs(1)));
+                    *t1 = Box::pin(sleep(Duration::from_secs(1)));
                     let _ = t1.as_mut().poll(cx);
                 }
 

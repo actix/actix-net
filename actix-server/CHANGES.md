@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Prevent panic when shutdown_timeout is very large. [f9262db]
+
+[f9262db]: https://github.com/actix/actix-net/commit/f9262db
 
 
 ## 2.0.0-beta.3 - 2021-02-06
