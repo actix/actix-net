@@ -48,19 +48,12 @@ impl TestServer {
 
         // run server in separate thread
         thread::spawn(move || {
-            let sys = System::new();
-            sys.block_on(async {
-                actix_rt::spawn(async move {
-                    let _ = factory(Server::build())
-                        .workers(1)
-                        .disable_signals()
-                        .run()
-                        .await;
-                })
-            });
+            System::new().block_on(async {
+                let server = factory(Server::build()).workers(1).disable_signals().run();
+                tx.send(System::current()).unwrap();
 
-            tx.send(System::current()).unwrap();
-            sys.run()
+                server.await
+            })
         });
         let system = rx.recv().unwrap();
 
@@ -83,18 +76,17 @@ impl TestServer {
             let local_addr = tcp.local_addr().unwrap();
 
             sys.block_on(async {
-                actix_rt::spawn(async move {
-                    let _ = Server::build()
-                        .listen("test", tcp, factory)
-                        .unwrap()
-                        .workers(1)
-                        .disable_signals()
-                        .run()
-                        .await;
-                });
+                let server = Server::build()
+                    .listen("test", tcp, factory)
+                    .unwrap()
+                    .workers(1)
+                    .disable_signals()
+                    .run();
+
                 tx.send((System::current(), local_addr)).unwrap();
-            });
-            sys.run()
+
+                server.await
+            })
         });
 
         let (system, addr) = rx.recv().unwrap();
