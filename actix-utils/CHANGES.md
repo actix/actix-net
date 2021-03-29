@@ -1,7 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Add `async fn mpsc::Receiver::recv`. [#286]
+* Moved `mpsc` to own crate `local-channel`. [#???]
+* Moved `task::LocalWaker` to own crate `local-waker`. [#???]
+* Expose `future` mod with `ready` and `poll_fn` helpers. [#???]
 * `SendError` inner field is now public. [#286]
 * Rename `Dispatcher::{get_sink => tx}`. [#286]
 * Rename `Dispatcher::{get_ref => service}`. [#286]
@@ -10,6 +12,7 @@
 * Rename `Dispatcher::{get_framed_mut => framed_mut}`. [#286]
 
 [#286]: https://github.com/actix/actix-net/pull/286
+[#???]: https://github.com/actix/actix-net/pull/???
 
 
 ## 3.0.0-beta.2 - 2021-02-06

@@ -1,9 +1,11 @@
+//! Task-notifying counter.
+
 use core::cell::Cell;
 use core::task;
 
 use std::rc::Rc;
 
-use crate::task::LocalWaker;
+use local_waker::LocalWaker;
 
 #[derive(Clone)]
 /// Simple counter with ability to notify task on reaching specific number

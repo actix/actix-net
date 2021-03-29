@@ -2,23 +2,31 @@
 
 #![allow(type_alias_bounds)]
 
-use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context, Poll};
-use core::{fmt, mem};
+use core::{
+    fmt,
+    future::Future,
+    mem,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-use actix_codec::{AsyncRead, AsyncWrite, Decoder, Encoder, Framed};
 use actix_service::{IntoService, Service};
 use futures_core::stream::Stream;
+use local_channel::mpsc;
 use log::debug;
 use pin_project_lite::pin_project;
 
-use crate::mpsc;
+use crate::{AsyncRead, AsyncWrite, Decoder, Encoder, Framed};
 
 /// Framed transport errors
 pub enum DispatcherError<E, U: Encoder<I> + Decoder, I> {
+    /// Inner service error.
     Service(E),
+
+    /// Frame encoding error.
     Encoder(<U as Encoder<I>>::Error),
+
+    /// Frame decoding error.
     Decoder(<U as Decoder>::Error),
 }
 
@@ -58,14 +66,17 @@ where
     }
 }
 
+/// Message type wrapper for signalling end of message stream.
 pub enum Message<T> {
+    /// Message item.
     Item(T),
+
+    /// Signal from service to flush all messages and stop processing.
     Close,
 }
 
 pin_project! {
-    /// Dispatcher is a future that reads frames from Framed object
-    /// and passes them to the service.
+    /// A future that reads frames from a [`Framed`] object and passes them to a [`Service`].
     pub struct Dispatcher<S, T, U, I>
     where
         S: Service<<U as Decoder>::Item, Response = I>,
@@ -130,6 +141,7 @@ where
     <U as Decoder>::Error: fmt::Debug,
     <U as Encoder<I>>::Error: fmt::Debug,
 {
+    /// Create new `Dispatcher`.
     pub fn new<F>(framed: Framed<T, U>, service: F) -> Self
     where
         F: IntoService<S, <U as Decoder>::Item>,
@@ -188,6 +200,7 @@ where
         &mut self.framed
     }
 
+    /// Read from framed object.
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> bool
     where
         S: Service<<U as Decoder>::Item, Response = I>,
@@ -231,7 +244,7 @@ where
         }
     }
 
-    /// write to framed object
+    /// Write to framed object.
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> bool
     where
         S: Service<<U as Decoder>::Item, Response = I>,

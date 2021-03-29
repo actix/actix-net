@@ -16,10 +16,14 @@ name = "actix_codec"
 path = "src/lib.rs"
 
 [dependencies]
+actix-service = "2.0.0-beta.5"
+actix-rt = "2.0.0"
+
 bitflags = "1.2.1"
 bytes = "1"
 futures-core = { version = "0.3.7", default-features = false }
 futures-sink = { version = "0.3.7", default-features = false }
+local-channel = "0.1.0"
 log = "0.4"
 pin-project-lite = "0.2"
 tokio = "1"

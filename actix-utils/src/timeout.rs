@@ -2,11 +2,14 @@
 //!
 //! If the response does not complete within the specified timeout, the response will be aborted.
 
-use core::future::Future;
-use core::marker::PhantomData;
-use core::pin::Pin;
-use core::task::{Context, Poll};
-use core::{fmt, time};
+use core::{
+    fmt,
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+    time,
+};
 
 use actix_rt::time::{sleep, Sleep};
 use actix_service::{IntoService, Service, Transform};
@@ -19,11 +22,12 @@ pub struct Timeout<E = ()> {
     _t: PhantomData<E>,
 }
 
-/// Timeout error
+/// Service or timeout error.
 pub enum TimeoutError<E> {
-    /// Service error
+    /// Inner service error.
     Service(E),
-    /// Service call timeout
+
+    /// Timeout during service call.
     Timeout,
 }
 
@@ -45,8 +49,8 @@ impl<E: fmt::Debug> fmt::Debug for TimeoutError<E> {
 impl<E: fmt::Display> fmt::Display for TimeoutError<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TimeoutError::Service(e) => e.fmt(f),
-            TimeoutError::Timeout => write!(f, "Service call timeout"),
+            TimeoutError::Service(err) => err.fmt(f),
+            TimeoutError::Timeout => write!(f, "timeout during service call"),
         }
     }
 }
@@ -160,7 +164,7 @@ where
 }
 
 pin_project! {
-    /// `TimeoutService` response future
+    /// `TimeoutService` response future.
     #[derive(Debug)]
     pub struct TimeoutServiceResponse<S, Req>
     where
@@ -182,7 +186,7 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
 
-        // First, try polling the future
+        // first try polling the future
         if let Poll::Ready(res) = this.fut.poll(cx) {
             return match res {
                 Ok(v) => Poll::Ready(Ok(v)),
@@ -190,7 +194,7 @@ where
             };
         }
 
-        // Now check the sleep
+        // now check the sleep
         this.sleep.poll(cx).map(|_| Err(TimeoutError::Timeout))
     }
 }

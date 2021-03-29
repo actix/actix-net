@@ -1,8 +1,11 @@
 [package]
 name = "local-waker"
-version = "0.1.0"
+version = "0.1.1"
 description = "A synchronization primitive for thread-local task wakeup"
-authors = ["Rob Ede <robjtede@icloud.com>"]
+authors = [
+    "Nikolay Kim <fafhrd91@gmail.com>",
+    "Rob Ede <robjtede@icloud.com>",
+]
 keywords = ["waker", "local", "futures", "no-std"]
 repository = "https://github.com/actix/actix-net.git"
 documentation = "https://docs.rs/local-waker"
