@@ -1,9 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Move dispatcher from actix-utils. [#???]
+* Move dispatcher from actix-utils. [#301]
 
-[#???]: https://github.com/actix/actix-net/pull/???
+[#301]: https://github.com/actix/actix-net/pull/301
 
 
 ## 0.4.0-beta.1 - 2020-12-28
