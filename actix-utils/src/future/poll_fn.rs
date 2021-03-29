@@ -3,9 +3,9 @@
 use core::{
     fmt,
     future::Future,
+    pin::Pin,
     task::{Context, Poll},
 };
-use std::pin::Pin;
 
 /// Create a future driven by the provided function that receives a task context.
 pub fn poll_fn<F, T>(f: F) -> PollFn<F>
