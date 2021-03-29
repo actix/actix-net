@@ -174,17 +174,7 @@ impl Accept {
                             }
                             Some(WakerInterest::Pause) => {
                                 drop(guard);
-                                sockets.iter_mut().for_each(|(_, info)| {
-                                    match self.deregister(info) {
-                                        Ok(_) => info!(
-                                            "Paused accepting connections on {}",
-                                            info.addr
-                                        ),
-                                        Err(e) => {
-                                            error!("Can not deregister server socket {}", e)
-                                        }
-                                    }
-                                });
+                                self.deregister_all(&mut sockets);
                             }
                             Some(WakerInterest::Resume) => {
                                 drop(guard);
@@ -283,10 +273,18 @@ impl Accept {
         self.poll.registry().deregister(&mut info.lst)
     }
 
+    fn deregister_logged(&self, info: &mut ServerSocketInfo) {
+        match self.deregister(info) {
+            Ok(_) => info!("Paused accepting connections on {}", info.addr),
+            Err(e) => {
+                error!("Can not deregister server socket {}", e)
+            }
+        }
+    }
+
     fn deregister_all(&self, sockets: &mut Slab<ServerSocketInfo>) {
         sockets.iter_mut().for_each(|(_, info)| {
-            info!("Accepting connections on {} has been paused", info.addr);
-            let _ = self.deregister(info);
+            self.deregister_logged(info);
         });
     }
 
@@ -376,37 +374,36 @@ impl Accept {
 
     fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
         loop {
-            let msg = if let Some(info) = sockets.get_mut(token) {
-                match info.lst.accept() {
-                    Ok(Some((io, addr))) => Conn {
+            let info = sockets
+                .get_mut(token)
+                .expect("ServerSocketInfo is removed from Slab");
+
+            match info.lst.accept() {
+                Ok((io, addr)) => {
+                    let msg = Conn {
                         io,
                         token: info.token,
                         peer: Some(addr),
-                    },
-                    Ok(None) => return,
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return,
-                    Err(ref e) if connection_error(e) => continue,
-                    Err(e) => {
-                        // deregister listener temporary
-                        error!("Error accepting connection: {}", e);
-                        if let Err(err) = self.deregister(info) {
-                            error!("Can not deregister server socket {}", err);
-                        }
-
-                        // sleep after error. write the timeout deadline to socket info
-                        // as later the poll would need it mark which socket and when
-                        // it's listener should be registered again.
-                        info.timeout_deadline = Some(Instant::now() + DUR_ON_ERR);
-                        self.set_timeout(DUR_ON_ERR);
-
-                        return;
-                    }
+                    };
+                    self.accept_one(sockets, msg);
                 }
-            } else {
-                return;
-            };
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return,
+                Err(ref e) if connection_error(e) => continue,
+                Err(e) => {
+                    error!("Error accepting connection: {}", e);
 
-            self.accept_one(sockets, msg);
+                    // deregister listener temporary
+                    self.deregister_logged(info);
+
+                    // sleep after error. write the timeout deadline to socket info
+                    // as later the poll would need it mark which socket and when
+                    // it's listener should be registered again.
+                    info.timeout_deadline = Some(Instant::now() + DUR_ON_ERR);
+                    self.set_timeout(DUR_ON_ERR);
+
+                    return;
+                }
+            };
         }
     }
 }
