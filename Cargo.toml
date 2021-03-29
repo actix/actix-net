@@ -10,6 +10,7 @@ members = [
   "actix-tracing",
   "actix-utils",
   "bytestring",
+  "local-channel",
   "local-waker",
 ]
 
@@ -24,4 +25,5 @@ actix-tls = { path = "actix-tls" }
 actix-tracing = { path = "actix-tracing" }
 actix-utils = { path = "actix-utils" }
 bytestring = { path = "bytestring" }
+local-channel = { path = "local-channel" }
 local-waker = { path = "local-waker" }

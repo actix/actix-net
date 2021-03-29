@@ -1,0 +1,19 @@
+[package]
+name = "local-channel"
+version = "0.1.0"
+description = "A non-threadsafe multi-producer, single-consumer, futures-aware, FIFO queue"
+authors = ["Rob Ede <robjtede@icloud.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/actix/actix-net.git"
+documentation = "https://docs.rs/actix-server"
+keywords = ["channel", "local", "futures"]
+
+[dependencies]
+futures-core = { version = "0.3.7", default-features = false }
+futures-sink = { version = "0.3.7", default-features = false }
+futures-util = { version = "0.3.7", default-features = false }
+local-waker = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }
