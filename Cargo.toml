@@ -10,6 +10,7 @@ members = [
   "actix-tracing",
   "actix-utils",
   "bytestring",
+  "local-waker",
 ]
 
 [patch.crates-io]
@@ -23,3 +24,4 @@ actix-tls = { path = "actix-tls" }
 actix-tracing = { path = "actix-tracing" }
 actix-utils = { path = "actix-utils" }
 bytestring = { path = "bytestring" }
+local-waker = { path = "local-waker" }
