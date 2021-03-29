@@ -1,6 +1,6 @@
 [package]
 name = "actix-tls"
-version = "3.0.0-beta.4"
+version = "3.0.0-beta.5"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "TLS acceptor and connector services for Actix ecosystem"
 keywords = ["network", "tls", "ssl", "async", "transport"]
