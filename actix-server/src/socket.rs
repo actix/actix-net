@@ -40,15 +40,15 @@ impl MioListener {
         }
     }
 
-    pub(crate) fn accept(&self) -> io::Result<Option<(MioStream, SocketAddr)>> {
+    pub(crate) fn accept(&self) -> io::Result<(MioStream, SocketAddr)> {
         match *self {
             MioListener::Tcp(ref lst) => lst
                 .accept()
-                .map(|(stream, addr)| Some((MioStream::Tcp(stream), SocketAddr::Tcp(addr)))),
+                .map(|(stream, addr)| (MioStream::Tcp(stream), SocketAddr::Tcp(addr))),
             #[cfg(unix)]
             MioListener::Uds(ref lst) => lst
                 .accept()
-                .map(|(stream, addr)| Some((MioStream::Uds(stream), SocketAddr::Uds(addr)))),
+                .map(|(stream, addr)| (MioStream::Uds(stream), SocketAddr::Uds(addr))),
         }
     }
 }
