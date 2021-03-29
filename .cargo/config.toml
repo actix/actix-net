@@ -1,2 +1,2 @@
 [alias]
-lint = "hack --clean-per-run clippy --workspace --tests"
+lint = "hack --clean-per-run clippy --workspace --tests --examples"

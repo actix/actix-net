@@ -4,7 +4,8 @@ use std::{net, thread, time};
 
 use actix_server::Server;
 use actix_service::fn_service;
-use futures_util::future::{lazy, ok};
+use actix_utils::future::ok;
+use futures_util::future::lazy;
 
 fn unused_addr() -> net::SocketAddr {
     let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
@@ -22,14 +23,14 @@ fn test_bind() {
 
     let h = thread::spawn(move || {
         let sys = actix_rt::System::new();
-        let srv = sys.block_on(async {
+        let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .workers(1)
                 .disable_signals()
                 .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
                 .run()
-        });
+        }));
 
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
@@ -83,7 +84,7 @@ fn test_start() {
 
     let h = thread::spawn(move || {
         let sys = actix_rt::System::new();
-        let srv = sys.block_on(async {
+        let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .backlog(100)
                 .disable_signals()
@@ -96,7 +97,7 @@ fn test_start() {
                 })
                 .unwrap()
                 .run()
-        });
+        }));
 
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
@@ -152,7 +153,7 @@ fn test_configure() {
     let h = thread::spawn(move || {
         let num = num2.clone();
         let sys = actix_rt::System::new();
-        let srv = sys.block_on(async {
+        let srv = sys.block_on(lazy(|_| {
             Server::build()
                 .disable_signals()
                 .configure(move |cfg| {
@@ -175,7 +176,7 @@ fn test_configure() {
                 .unwrap()
                 .workers(1)
                 .run()
-        });
+        }));
 
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
