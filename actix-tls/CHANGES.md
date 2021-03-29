@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 3.0.0-beta.5 - 2021-03-29
 * Changed `connect::ssl::rustls::RustlsConnectorService` to return error when `DNSNameRef` 
   generation failed instead of panic. [#296]
 * Remove `connect::ssl::openssl::OpensslConnectServiceFactory`. [#297]

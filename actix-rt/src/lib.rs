@@ -87,6 +87,7 @@ pub mod net {
     pub use tokio::net::{UnixDatagram, UnixListener, UnixStream};
 
     /// Extension trait over async read+write types that can also signal readiness.
+    #[doc(hidden)]
     pub trait ActixStream: AsyncRead + AsyncWrite + Unpin {
         /// Poll stream and check read readiness of Self.
         ///
