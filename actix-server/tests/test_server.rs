@@ -22,14 +22,15 @@ fn test_bind() {
 
     let h = thread::spawn(move || {
         let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
+        let srv = sys.block_on(async {
             Server::build()
                 .workers(1)
                 .disable_signals()
                 .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
                 .run()
-        }));
+        });
+
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
     });
@@ -82,7 +83,7 @@ fn test_start() {
 
     let h = thread::spawn(move || {
         let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
+        let srv = sys.block_on(async {
             Server::build()
                 .backlog(100)
                 .disable_signals()
@@ -95,7 +96,7 @@ fn test_start() {
                 })
                 .unwrap()
                 .run()
-        }));
+        });
 
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
@@ -151,7 +152,7 @@ fn test_configure() {
     let h = thread::spawn(move || {
         let num = num2.clone();
         let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
+        let srv = sys.block_on(async {
             Server::build()
                 .disable_signals()
                 .configure(move |cfg| {
@@ -174,7 +175,8 @@ fn test_configure() {
                 .unwrap()
                 .workers(1)
                 .run()
-        }));
+        });
+
         let _ = tx.send((srv, actix_rt::System::current()));
         let _ = sys.run();
     });
