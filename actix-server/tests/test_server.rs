@@ -22,20 +22,21 @@ fn test_bind() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
-        sys.block_on(async {
-            actix_rt::spawn(async move {
-                let _ = Server::build()
-                    .workers(1)
-                    .disable_signals()
-                    .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
-                    .unwrap()
-                    .run()
-                    .await;
+        let system = actix_rt::System::new();
+        system.block_on(async {
+            let server = Server::build()
+                .workers(1)
+                .disable_signals()
+                .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
+                .unwrap()
+                .run();
+            let _ = tx.send(actix_rt::System::current());
+            let _ = actix_rt::spawn(async move {
+                let _ = server.await;
             });
         });
-        let _ = tx.send(actix_rt::System::current());
-        let _ = sys.run();
+
+        system.run()
     });
     let sys = rx.recv().unwrap();
 
@@ -54,18 +55,20 @@ fn test_listen() {
         let sys = actix_rt::System::new();
         let lst = net::TcpListener::bind(addr).unwrap();
         sys.block_on(async {
+            let server = Server::build()
+                .disable_signals()
+                .workers(1)
+                .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
+                .unwrap()
+                .run();
+
+            let _ = tx.send(actix_rt::System::current());
+
             actix_rt::spawn(async move {
-                let _ = Server::build()
-                    .disable_signals()
-                    .workers(1)
-                    .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
-                    .unwrap()
-                    .run()
-                    .await;
+                let _ = server.await;
             });
         });
-        let _ = tx.send(actix_rt::System::current());
-        let _ = sys.run();
+        sys.run()
     });
     let sys = rx.recv().unwrap();
 
