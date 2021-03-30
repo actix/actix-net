@@ -3,6 +3,7 @@
 ## Unreleased - 2021-xx-xx
 * Moved `mpsc` to own crate `local-channel`. [#301]
 * Moved `task::LocalWaker` to own crate `local-waker`. [#301]
+* Remove `timeout` module. [#301]
 * Expose `future` mod with `ready` and `poll_fn` helpers. [#301]
 * `SendError` inner field is now public. [#286]
 * Rename `Dispatcher::{get_sink => tx}`. [#286]

@@ -16,14 +16,8 @@ name = "actix_utils"
 path = "src/lib.rs"
 
 [dependencies]
-actix-rt = { version = "2.0.0", default-features = false }
-actix-service = "2.0.0-beta.5"
-
 local-waker = "0.1"
-log = "0.4"
-pin-project-lite = "0.2.0"
 
 [dev-dependencies]
 actix-rt = "2.0.0"
-futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.7", default-features = false }
