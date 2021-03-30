@@ -1,4 +1,4 @@
-//! A multi-producer, single-consumer, futures-aware, FIFO queue.
+//! A non-thread-safe multi-producer, single-consumer, futures-aware, FIFO queue.
 
 use core::{
     cell::RefCell,
@@ -11,8 +11,8 @@ use std::{collections::VecDeque, error::Error, rc::Rc};
 
 use futures_core::stream::Stream;
 use futures_sink::Sink;
-
-use crate::{poll_fn, task::LocalWaker};
+use futures_util::future::poll_fn;
+use local_waker::LocalWaker;
 
 /// Creates a unbounded in-memory channel with buffered storage.
 ///
@@ -174,6 +174,8 @@ impl<T> Drop for Receiver<T> {
 }
 
 /// Error returned when attempting to send after the channels' [Receiver] is dropped or closed.
+///
+/// Allows access to message that failed to send with [`into_inner`](Self::into_inner).
 pub struct SendError<T>(pub T);
 
 impl<T> SendError<T> {
@@ -199,11 +201,11 @@ impl<T> Error for SendError<T> {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use futures_util::future::lazy;
-    use futures_util::{stream::Stream, StreamExt};
+    use futures_util::{future::lazy, StreamExt as _};
 
-    #[actix_rt::test]
+    use super::*;
+
+    #[tokio::test]
     async fn test_mpsc() {
         let (tx, mut rx) = channel();
         tx.send("test").unwrap();
@@ -237,7 +239,7 @@ mod tests {
         assert!(tx2.send("test").is_err());
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_recv() {
         let (tx, mut rx) = channel();
         tx.send("test").unwrap();

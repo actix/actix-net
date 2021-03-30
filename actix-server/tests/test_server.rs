@@ -4,7 +4,8 @@ use std::{net, thread, time};
 
 use actix_server::Server;
 use actix_service::fn_service;
-use futures_util::future::{lazy, ok};
+use actix_utils::future::ok;
+use futures_util::future::lazy;
 
 fn unused_addr() -> net::SocketAddr {
     let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();

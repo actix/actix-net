@@ -3,20 +3,20 @@
 use core::{
     fmt,
     future::Future,
-    task::{self, Poll},
+    pin::Pin,
+    task::{Context, Poll},
 };
-use std::pin::Pin;
 
 /// Create a future driven by the provided function that receives a task context.
-pub(crate) fn poll_fn<F, T>(f: F) -> PollFn<F>
+pub fn poll_fn<F, T>(f: F) -> PollFn<F>
 where
-    F: FnMut(&mut task::Context<'_>) -> Poll<T>,
+    F: FnMut(&mut Context<'_>) -> Poll<T>,
 {
     PollFn { f }
 }
 
 /// A Future driven by the inner function.
-pub(crate) struct PollFn<F> {
+pub struct PollFn<F> {
     f: F,
 }
 
@@ -30,11 +30,11 @@ impl<F> fmt::Debug for PollFn<F> {
 
 impl<F, T> Future for PollFn<F>
 where
-    F: FnMut(&mut task::Context<'_>) -> task::Poll<T>,
+    F: FnMut(&mut Context<'_>) -> Poll<T>,
 {
     type Output = T;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         (self.f)(cx)
     }
 }

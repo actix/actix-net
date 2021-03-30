@@ -1,3 +1,9 @@
+//! A synchronization primitive for thread-local task wakeup.
+//!
+//! See docs for [`LocalWaker`].
+
+#![no_std]
+
 use core::{cell::Cell, fmt, marker::PhantomData, task::Waker};
 
 /// A synchronization primitive for task wakeup.
