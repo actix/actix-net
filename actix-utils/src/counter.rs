@@ -1,7 +1,7 @@
 //! Task-notifying counter.
 
-use std::rc::Rc;
 use core::{cell::Cell, task};
+use std::rc::Rc;
 
 use local_waker::LocalWaker;
 
