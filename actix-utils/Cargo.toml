@@ -16,14 +16,7 @@ name = "actix_utils"
 path = "src/lib.rs"
 
 [dependencies]
-actix-codec = "0.4.0-beta.1"
-actix-rt = { version = "2.0.0", default-features = false }
-actix-service = "2.0.0-beta.5"
-
-futures-core = { version = "0.3.7", default-features = false }
-futures-sink = { version = "0.3.7", default-features = false }
-log = "0.4"
-pin-project-lite = "0.2.0"
+local-waker = "0.1"
 
 [dev-dependencies]
 actix-rt = "2.0.0"

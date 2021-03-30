@@ -147,8 +147,8 @@ mod tests {
 
         forward_ready!(inner);
 
-        fn call(&self, req: ()) -> Self::Future {
-            self.inner.call(req)
+        fn call(&self, _: ()) -> Self::Future {
+            self.inner.call(())
         }
     }
 
