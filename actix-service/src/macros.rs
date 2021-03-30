@@ -147,9 +147,8 @@ mod tests {
 
         forward_ready!(inner);
 
-        #[allow(clippy::unit_arg)]
-        fn call(&self, req: ()) -> Self::Future {
-            self.inner.call(req)
+        fn call(&self, _: ()) -> Self::Future {
+            self.inner.call(())
         }
     }
 
