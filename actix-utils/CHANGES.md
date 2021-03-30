@@ -4,15 +4,9 @@
 * Moved `mpsc` to own crate `local-channel`. [#301]
 * Moved `task::LocalWaker` to own crate `local-waker`. [#301]
 * Remove `timeout` module. [#301]
+* Remove `dispatcher` module. [#301]
 * Expose `future` mod with `ready` and `poll_fn` helpers. [#301]
-* `SendError` inner field is now public. [#286]
-* Rename `Dispatcher::{get_sink => tx}`. [#286]
-* Rename `Dispatcher::{get_ref => service}`. [#286]
-* Rename `Dispatcher::{get_mut => service_mut}`. [#286]
-* Rename `Dispatcher::{get_framed => framed}`. [#286]
-* Rename `Dispatcher::{get_framed_mut => framed_mut}`. [#286]
 
-[#286]: https://github.com/actix/actix-net/pull/286
 [#301]: https://github.com/actix/actix-net/pull/301
 
 
