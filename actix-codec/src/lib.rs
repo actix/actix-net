@@ -13,7 +13,6 @@
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 mod bcodec;
-pub mod dispatcher;
 mod framed;
 
 pub use self::bcodec::BytesCodec;
