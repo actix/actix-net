@@ -241,7 +241,7 @@ impl Accept {
         sockets
             .iter_mut()
             // Only the ServerSocketInfo have an associate timeout value was de registered.
-            .filter(|(token, info)| info.timeout.is_some())
+            .filter(|(_, info)| info.timeout.is_some())
             .for_each(|(token, info)| {
                 let inst = info.timeout.take().unwrap();
 
