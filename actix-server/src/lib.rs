@@ -15,9 +15,9 @@ mod test_server;
 mod waker_queue;
 mod worker;
 
-pub use self::builder::{ServerBuilder, ServerFuture};
+pub use self::builder::{Server, ServerBuilder};
 pub use self::config::{ServiceConfig, ServiceRuntime};
-pub use self::server_handle::Server;
+pub use self::server_handle::ServerHandle;
 pub use self::service::ServiceFactory;
 pub use self::test_server::TestServer;
 

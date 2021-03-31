@@ -14,7 +14,7 @@ use tokio::sync::oneshot;
 
 use crate::accept::Accept;
 use crate::config::{ConfiguredService, ServiceConfig};
-use crate::server_handle::{Server, ServerCommand};
+use crate::server_handle::{ServerCommand, ServerHandle};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
@@ -25,16 +25,16 @@ use crate::Token;
 
 /// Server builder
 pub struct ServerBuilder {
-    threads: usize,
+    pub(super) threads: usize,
     token: Token,
     backlog: u32,
-    services: Vec<Box<dyn InternalServiceFactory>>,
+    pub(super) services: Vec<Box<dyn InternalServiceFactory>>,
     sockets: Vec<(Token, String, MioListener)>,
     exit: bool,
     no_signals: bool,
-    cmd_tx: UnboundedSender<ServerCommand>,
+    pub(super) cmd_tx: UnboundedSender<ServerCommand>,
     cmd_rx: UnboundedReceiver<ServerCommand>,
-    worker_config: ServerWorkerConfig,
+    pub(super) worker_config: ServerWorkerConfig,
 }
 
 impl Default for ServerBuilder {
@@ -264,7 +264,7 @@ impl ServerBuilder {
     }
 
     /// Starts processing incoming connections and return server controller.
-    pub fn run(mut self) -> ServerFuture {
+    pub fn run(mut self) -> Server {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
@@ -278,33 +278,10 @@ impl ServerBuilder {
                 })
                 .collect();
 
-            // collect worker handles on start.
-            let mut handles = Vec::new();
-
-            // start accept thread. return waker_queue for wake up it.
-            let waker_queue = Accept::start(
-                sockets,
-                Server::new(self.cmd_tx.clone()),
-                // closure for construct worker and return it's handler.
-                |waker| {
-                    (0..self.threads)
-                        .map(|idx| {
-                            // start workers
-                            let availability = WorkerAvailability::new(waker.clone());
-                            let factories =
-                                self.services.iter().map(|v| v.clone_factory()).collect();
-                            let handle = ServerWorker::start(
-                                idx,
-                                factories,
-                                availability,
-                                self.worker_config,
-                            );
-                            handles.push((idx, handle.clone()));
-                            handle
-                        })
-                        .collect()
-                },
-            );
+            // start accept thread. return waker_queue and worker handles.
+            let (waker_queue, handles) = Accept::start(sockets, &self)
+                // TODO: include error to Server type and poll return it in Future.
+                .unwrap_or_else(|e| panic!("Can not start Accept: {}", e));
 
             // construct signals future.
             let signals = if !self.no_signals {
@@ -313,7 +290,7 @@ impl ServerBuilder {
                 None
             };
 
-            ServerFuture {
+            Server {
                 cmd_tx: self.cmd_tx,
                 cmd_rx: self.cmd_rx,
                 handles,
@@ -331,7 +308,7 @@ impl ServerBuilder {
 
 /// When awaited or spawned would listen to signal and message from [ServerHandle](crate::server::ServerHandle).
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct ServerFuture {
+pub struct Server {
     cmd_tx: UnboundedSender<ServerCommand>,
     cmd_rx: UnboundedReceiver<ServerCommand>,
     handles: Vec<(usize, WorkerHandle)>,
@@ -344,12 +321,12 @@ pub struct ServerFuture {
     waker_queue: WakerQueue,
 }
 
-impl ServerFuture {
+impl Server {
     /// Obtain a Handle for ServerFuture that can be used to change state of actix server.
     ///
     /// See [ServerHandle](crate::server::ServerHandle) for usage.
-    pub fn handle(&self) -> Server {
-        Server::new(self.cmd_tx.clone())
+    pub fn handle(&self) -> ServerHandle {
+        ServerHandle::new(self.cmd_tx.clone())
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) -> Option<BoxFuture<'static, ()>> {
@@ -493,7 +470,7 @@ impl ServerFuture {
     }
 }
 
-impl Future for ServerFuture {
+impl Future for Server {
     type Output = io::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

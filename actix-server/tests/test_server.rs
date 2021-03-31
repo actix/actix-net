@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::{mpsc, Arc};
 use std::{net, thread, time};
 
-use actix_server::Server;
+use actix_server::ServerHandle;
 use actix_service::fn_service;
 use actix_utils::future::ok;
 use futures_util::future::lazy;
@@ -24,7 +24,7 @@ fn test_bind() {
     let h = thread::spawn(move || {
         let system = actix_rt::System::new();
         system.block_on(async {
-            let server = Server::build()
+            let server = ServerHandle::build()
                 .workers(1)
                 .disable_signals()
                 .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
@@ -55,7 +55,7 @@ fn test_listen() {
         let sys = actix_rt::System::new();
         let lst = net::TcpListener::bind(addr).unwrap();
         sys.block_on(async {
-            let server = Server::build()
+            let server = ServerHandle::build()
                 .disable_signals()
                 .workers(1)
                 .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
@@ -92,7 +92,7 @@ fn test_start() {
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let server = ServerHandle::build()
                 .backlog(100)
                 .disable_signals()
                 .bind("test", addr, move || {
@@ -160,7 +160,7 @@ fn test_configure() {
     let h = thread::spawn(move || {
         let num = num2.clone();
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let server = ServerHandle::build()
                 .disable_signals()
                 .configure(move |cfg| {
                     let num = num.clone();

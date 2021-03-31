@@ -5,11 +5,11 @@ use log::{error, info};
 use mio::{Interest, Poll, Token as MioToken};
 use slab::Slab;
 
-use crate::server_handle::Server;
+use crate::server_handle::ServerHandle;
 use crate::socket::{MioListener, SocketAddr};
 use crate::waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN};
-use crate::worker::{Conn, WorkerHandle};
-use crate::Token;
+use crate::worker::{Conn, ServerWorker, WorkerAvailability, WorkerHandle};
+use crate::{ServerBuilder, Token};
 
 const DUR_ON_ERR: Duration = Duration::from_millis(500);
 
@@ -32,7 +32,7 @@ pub(crate) struct Accept {
     poll: Poll,
     waker_queue: WakerQueue,
     handles: Vec<WorkerHandle>,
-    srv: Server,
+    srv: ServerHandle,
     next: usize,
     backpressure: bool,
     // poll time duration.
@@ -54,40 +54,42 @@ fn connection_error(e: &io::Error) -> bool {
 }
 
 impl Accept {
-    pub(crate) fn start<F>(
+    pub(crate) fn start(
         sockets: Vec<(Token, MioListener)>,
-        server_handle: Server,
-        worker_factory: F,
-    ) -> WakerQueue
-    where
-        F: FnOnce(&WakerQueue) -> Vec<WorkerHandle>,
-    {
+        builder: &ServerBuilder,
+    ) -> io::Result<(WakerQueue, Vec<(usize, WorkerHandle)>)> {
+        let server_handle = ServerHandle::new(builder.cmd_tx.clone());
+
         // construct poll instance and it's waker
-        let poll = Poll::new().unwrap_or_else(|e| panic!("Can not create `mio::Poll`: {}", e));
-        let waker_queue = WakerQueue::new(poll.registry())
-            .unwrap_or_else(|e| panic!("Can not create `mio::Waker`: {}", e));
-        let waker_clone = waker_queue.clone();
+        let poll = Poll::new()?;
+        let waker_queue = WakerQueue::new(poll.registry())?;
 
         // construct workers and collect handles.
-        let handles = worker_factory(&waker_queue);
+        let (handles, handles_clone) = (0..builder.threads)
+            .map(|idx| {
+                // start workers
+                let availability = WorkerAvailability::new(waker_queue.clone());
+                let factories = builder.services.iter().map(|v| v.clone_factory()).collect();
+                let handle =
+                    ServerWorker::start(idx, factories, availability, builder.worker_config);
+                let handle_clone = (idx, handle.clone());
+                (handle, handle_clone)
+            })
+            .unzip();
+
+        let wake_queue_clone = waker_queue.clone();
+
+        let (mut accept, sockets) =
+            Accept::new_with_sockets(poll, wake_queue_clone, sockets, handles, server_handle)?;
 
         // Accept runs in its own thread.
         thread::Builder::new()
             .name("actix-server acceptor".to_owned())
-            .spawn(move || {
-                let (mut accept, sockets) = Accept::new_with_sockets(
-                    poll,
-                    waker_queue,
-                    sockets,
-                    handles,
-                    server_handle,
-                );
-                accept.poll_with(sockets);
-            })
+            .spawn(move || accept.poll_with(sockets))
             .unwrap();
 
-        // return waker to server builder.
-        waker_clone
+        // return waker and worker handle clones to server builder.
+        Ok((waker_queue, handles_clone))
     }
 
     fn new_with_sockets(
@@ -95,8 +97,8 @@ impl Accept {
         waker_queue: WakerQueue,
         socks: Vec<(Token, MioListener)>,
         handles: Vec<WorkerHandle>,
-        srv: Server,
-    ) -> (Accept, Slab<ServerSocketInfo>) {
+        srv: ServerHandle,
+    ) -> io::Result<(Accept, Slab<ServerSocketInfo>)> {
         let mut sockets = Slab::new();
         for (hnd_token, mut lst) in socks.into_iter() {
             let addr = lst.local_addr();
@@ -106,8 +108,7 @@ impl Accept {
 
             // Start listening for incoming connections
             poll.registry()
-                .register(&mut lst, MioToken(token), Interest::READABLE)
-                .unwrap_or_else(|e| panic!("Can not register io: {}", e));
+                .register(&mut lst, MioToken(token), Interest::READABLE)?;
 
             entry.insert(ServerSocketInfo {
                 addr,
@@ -127,7 +128,7 @@ impl Accept {
             timeout: None,
         };
 
-        (accept, sockets)
+        Ok((accept, sockets))
     }
 
     fn poll_with(&mut self, mut sockets: Slab<ServerSocketInfo>) {
