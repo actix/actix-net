@@ -17,6 +17,7 @@ name = "actix_utils"
 path = "src/lib.rs"
 
 [dependencies]
+pin-project-lite = "0.2"
 local-waker = "0.1"
 
 [dev-dependencies]

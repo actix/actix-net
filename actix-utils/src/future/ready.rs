@@ -69,7 +69,7 @@ pub fn ready<T>(val: T) -> Ready<T> {
     Ready { val: Some(val) }
 }
 
-/// Create a future that is immediately ready with a success value.
+/// Creates a future that is immediately ready with a success value.
 ///
 /// # Examples
 /// ```no_run
@@ -84,7 +84,7 @@ pub fn ok<T, E>(val: T) -> Ready<Result<T, E>> {
     Ready { val: Some(Ok(val)) }
 }
 
-/// Create a future that is immediately ready with an error value.
+/// Creates a future that is immediately ready with an error value.
 ///
 /// # Examples
 /// ```no_run
