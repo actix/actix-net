@@ -356,18 +356,12 @@ impl Future for ServerWorker {
                 return Poll::Ready(());
             } else if graceful {
                 self.shutdown(false);
-                let num = num_connections();
-                if num != 0 {
-                    info!("Graceful worker shutdown, {} connections", num);
-                    self.state = WorkerState::Shutdown(
-                        Box::pin(sleep(Duration::from_secs(1))),
-                        Box::pin(sleep(self.config.shutdown_timeout)),
-                        Some(result),
-                    );
-                } else {
-                    let _ = result.send(true);
-                    return Poll::Ready(());
-                }
+                info!("Graceful worker shutdown, {} connections", num);
+                self.state = WorkerState::Shutdown(
+                    Box::pin(sleep(Duration::from_secs(1))),
+                    Box::pin(sleep(self.config.shutdown_timeout)),
+                    Some(result),
+                );
             } else {
                 info!("Force shutdown worker, {} connections", num);
                 self.shutdown(true);
