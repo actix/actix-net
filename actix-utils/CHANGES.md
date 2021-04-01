@@ -1,6 +1,7 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Add `future::Either` type.
 
 
 ## 3.0.0-beta.3 - 2021-04-01
