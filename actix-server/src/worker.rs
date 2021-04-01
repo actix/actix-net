@@ -16,7 +16,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 
 use crate::service::{BoxedServerService, InternalServiceFactory};
-use crate::socket::{MioStream, SocketAddr};
+use crate::socket::MioStream;
 use crate::waker_queue::{WakerInterest, WakerQueue};
 use crate::{join_all, Token};
 
@@ -33,7 +33,6 @@ pub(crate) struct StopCommand {
 pub(crate) struct Conn {
     pub io: MioStream,
     pub token: Token,
-    pub peer: Option<SocketAddr>,
 }
 
 static MAX_CONNS: AtomicUsize = AtomicUsize::new(25600);

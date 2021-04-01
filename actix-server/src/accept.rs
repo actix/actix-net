@@ -142,9 +142,7 @@ impl Accept {
                         self.process_timeout(&mut sockets);
                         continue;
                     }
-                    _ => {
-                        panic!("Poll error: {}", e);
-                    }
+                    _ => panic!("Poll error: {}", e),
                 }
             }
 
@@ -160,13 +158,12 @@ impl Accept {
                         let mut guard = self.waker_queue.guard();
                         match guard.pop_front() {
                             // worker notify it becomes available. we may want to recover
-                            // from  backpressure.
+                            // from backpressure.
                             Some(WakerInterest::WorkerAvailable) => {
                                 drop(guard);
                                 self.maybe_backpressure(&mut sockets, false);
                             }
-                            // a new worker thread is made and it's handle would be added
-                            // to Accept
+                            // a new worker thread is made and it's handle would be added to Accept
                             Some(WakerInterest::Worker(handle)) => {
                                 drop(guard);
                                 // maybe we want to recover from a backpressure.
@@ -207,23 +204,29 @@ impl Accept {
     }
 
     fn process_timeout(&mut self, sockets: &mut Slab<ServerSocketInfo>) {
-        // take old timeout as it's no use after each iteration.
+        // Take old timeout as it's no use after each iteration.
         if self.timeout.take().is_some() {
             let now = Instant::now();
-            sockets.iter_mut().for_each(|(token, info)| {
-                // only the ServerSocketInfo have an associate timeout value was de registered.
-                if let Some(inst) = info.timeout_deadline {
-                    // timeout expired register socket again.
-                    if now >= inst {
-                        info.timeout_deadline = None;
-                        self.register_logged(token, info);
-                    } else {
+            sockets
+                .iter_mut()
+                // Only sockets that had an associated timeout were deregistered.
+                .filter(|(_, info)| info.timeout_deadline.is_some())
+                .for_each(|(token, info)| {
+                    let inst = info.timeout_deadline.take().unwrap();
+
+                    if now < inst {
                         // still timed out. try set new timeout.
                         let dur = inst - now;
                         self.set_timeout(dur);
+                    } else if !self.backpressure {
+                        // timeout expired register socket again.
+                        self.register_logged(token, info);
                     }
-                }
-            });
+
+                    // Drop the timeout if server is in backpressure and socket timeout is expired.
+                    // When server recovers from backpressure it will register all sockets without
+                    // a timeout value so this socket register will be delayed till then.
+                });
         }
     }
 
@@ -290,87 +293,90 @@ impl Accept {
     }
 
     fn maybe_backpressure(&mut self, sockets: &mut Slab<ServerSocketInfo>, on: bool) {
-        if self.backpressure {
-            if !on {
+        // Only operate when server is in a different backpressure than the given flag.
+        if self.backpressure != on {
+            if on {
+                self.backpressure = true;
+                // TODO: figure out if timing out sockets can be safely de-registered twice.
+                self.deregister_all(sockets);
+            } else {
                 self.backpressure = false;
-                for (token, info) in sockets.iter_mut() {
-                    if info.timeout_deadline.is_some() {
-                        // socket will attempt to re-register itself when its timeout completes
-                        continue;
-                    }
-                    self.register_logged(token, info);
-                }
+                sockets
+                    .iter_mut()
+                    // Only operate on sockets without associated timeout.
+                    // Sockets with it will attempt to re-register when their timeout expires.
+                    .filter(|(_, info)| info.timeout_deadline.is_none())
+                    .for_each(|(token, info)| self.register_logged(token, info));
             }
-        } else if on {
-            self.backpressure = true;
-            self.deregister_all(sockets);
         }
     }
 
-    fn accept_one(&mut self, sockets: &mut Slab<ServerSocketInfo>, mut msg: Conn) {
+    fn accept_one(&mut self, sockets: &mut Slab<ServerSocketInfo>, mut conn: Conn) {
         if self.backpressure {
+            // send_connection would remove fault worker from handles.
+            // worst case here is conn get dropped after all handles are gone.
             while !self.handles.is_empty() {
-                match self.handles[self.next].send(msg) {
-                    Ok(_) => {
-                        self.set_next();
-                        break;
-                    }
-                    Err(tmp) => {
-                        // worker lost contact and could be gone. a message is sent to
-                        // `ServerBuilder` future to notify it a new worker should be made
-                        // after that remove the fault worker
-                        self.srv.worker_faulted(self.handles[self.next].idx);
-                        msg = tmp;
-                        self.handles.swap_remove(self.next);
-                        if self.handles.is_empty() {
-                            error!("No workers");
-                            return;
-                        } else if self.handles.len() <= self.next {
-                            self.next = 0;
-                        }
-                        continue;
-                    }
+                match self.send_connection(sockets, conn) {
+                    Ok(_) => return,
+                    Err(c) => conn = c,
                 }
             }
         } else {
+            // Do one round and try to send conn to all workers until it succeed.
+            // Start from self.next.
             let mut idx = 0;
             while idx < self.handles.len() {
                 idx += 1;
                 if self.handles[self.next].available() {
-                    match self.handles[self.next].send(msg) {
-                        Ok(_) => {
-                            self.set_next();
-                            return;
-                        }
-                        // worker lost contact and could be gone. a message is sent to
-                        // `ServerBuilder` future to notify it a new worker should be made.
-                        // after that remove the fault worker and enter backpressure if necessary.
-                        Err(tmp) => {
-                            self.srv.worker_faulted(self.handles[self.next].idx);
-                            msg = tmp;
-                            self.handles.swap_remove(self.next);
-                            if self.handles.is_empty() {
-                                error!("No workers");
-                                self.maybe_backpressure(sockets, true);
-                                return;
-                            } else if self.handles.len() <= self.next {
-                                self.next = 0;
-                            }
-                            continue;
-                        }
+                    match self.send_connection(sockets, conn) {
+                        Ok(_) => return,
+                        Err(c) => conn = c,
                     }
+                } else {
+                    self.set_next();
                 }
-                self.set_next();
             }
-            // enable backpressure
+            // Sending Conn failed due to either all workers are in error or not available.
+            // Enter backpressure state and try again.
             self.maybe_backpressure(sockets, true);
-            self.accept_one(sockets, msg);
+            self.accept_one(sockets, conn);
         }
     }
 
-    // set next worker handle that would accept work.
+    // Set next worker handle that would accept work.
     fn set_next(&mut self) {
         self.next = (self.next + 1) % self.handles.len();
+    }
+
+    // Send connection to worker and handle error.
+    fn send_connection(
+        &mut self,
+        sockets: &mut Slab<ServerSocketInfo>,
+        conn: Conn,
+    ) -> Result<(), Conn> {
+        match self.handles[self.next].send(conn) {
+            Ok(_) => {
+                self.set_next();
+                Ok(())
+            }
+            Err(conn) => {
+                // worker lost contact and could be gone. a message is sent to
+                // `ServerBuilder` future to notify it a new worker should be made.
+                // after that remove the fault worker and enter backpressure if necessary.
+                self.srv.worker_faulted(self.handles[self.next].idx);
+                self.handles.swap_remove(self.next);
+                if self.handles.is_empty() {
+                    error!("No workers");
+                    self.maybe_backpressure(sockets, true);
+                    // All workers are gone and Conn is nowhere to be sent.
+                    // Treat this situation as Ok and drop Conn.
+                    return Ok(());
+                } else if self.handles.len() <= self.next {
+                    self.next = 0;
+                }
+                Err(conn)
+            }
+        }
     }
 
     fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
@@ -380,11 +386,10 @@ impl Accept {
                 .expect("ServerSocketInfo is removed from Slab");
 
             match info.lst.accept() {
-                Ok((io, addr)) => {
+                Ok(io) => {
                     let msg = Conn {
                         io,
                         token: info.token,
-                        peer: Some(addr),
                     };
                     self.accept_one(sockets, msg);
                 }

@@ -1,6 +1,6 @@
 [package]
 name = "actix-server"
-version = "2.0.0-beta.3"
+version = "2.0.0-beta.4"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "fakeshadow <24548779@qq.com>",
@@ -9,7 +9,6 @@ description = "General purpose TCP server built for the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-server"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
