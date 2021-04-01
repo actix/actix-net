@@ -1,7 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Add `future::Either` type.
+* Add `future::Either` type. [#305]
+
+[#305]: https://github.com/actix/actix-net/pull/305
 
 
 ## 3.0.0-beta.3 - 2021-04-01
