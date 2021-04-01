@@ -55,24 +55,6 @@ pub fn new() -> ServerBuilder {
     ServerBuilder::default()
 }
 
-// temporary Ready type for std::future::{ready, Ready}; Can be removed when MSRV surpass 1.48
-#[doc(hidden)]
-pub struct Ready<T>(Option<T>);
-
-pub(crate) fn ready<T>(t: T) -> Ready<T> {
-    Ready(Some(t))
-}
-
-impl<T> Unpin for Ready<T> {}
-
-impl<T> Future for Ready<T> {
-    type Output = T;
-
-    fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Ready(self.get_mut().0.take().unwrap())
-    }
-}
-
 // a poor man's join future. joined future is only used when starting/stopping the server.
 // pin_project and pinned futures are overkill for this task.
 pub(crate) struct JoinAll<T> {
@@ -131,6 +113,8 @@ impl<T> Future for JoinAll<T> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    use actix_utils::future::ready;
 
     #[actix_rt::test]
     async fn test_join_all() {
