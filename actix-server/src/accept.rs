@@ -393,11 +393,10 @@ impl Accept {
                 .expect("ServerSocketInfo is removed from Slab");
 
             match info.lst.accept() {
-                Ok((io, addr)) => {
+                Ok(io) => {
                     let msg = Conn {
                         io,
                         token: info.token,
-                        peer: Some(addr),
                     };
                     self.accept_one(sockets, msg);
                 }
