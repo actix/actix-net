@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 3.0.0-beta.3 - 2021-04-01
 * Moved `mpsc` to own crate `local-channel`. [#301]
 * Moved `task::LocalWaker` to own crate `local-waker`. [#301]
 * Remove `timeout` module. [#301]
