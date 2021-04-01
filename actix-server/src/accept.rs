@@ -187,21 +187,19 @@ impl Accept {
                         let mut guard = self.waker.guard();
                         match guard.pop_front() {
                             // worker notify it becomes available. we may want to recover
-                            // from  backpressure.
+                            // from backpressure.
                             Some(WakerInterest::WorkerAvailable) => {
                                 drop(guard);
                                 self.maybe_backpressure(&mut sockets, false);
                             }
-                            // a new worker thread is made and it's handle would be added
-                            // to Accept
+                            // a new worker thread is made and it's handle would be added to Accept
                             Some(WakerInterest::Worker(handle)) => {
                                 drop(guard);
                                 // maybe we want to recover from a backpressure.
                                 self.maybe_backpressure(&mut sockets, false);
                                 self.handles.push(handle);
                             }
-                            // got timer interest and it's time to try register socket(s)
-                            // again.
+                            // got timer interest and it's time to try register socket(s) again
                             Some(WakerInterest::Timer) => {
                                 drop(guard);
                                 self.process_timer(&mut sockets)
@@ -240,7 +238,7 @@ impl Accept {
         let now = Instant::now();
         sockets
             .iter_mut()
-            // Only the ServerSocketInfo have an associate timeout value was de registered.
+            // Only sockets that had an associated timeout were deregistered.
             .filter(|(_, info)| info.timeout.is_some())
             .for_each(|(token, info)| {
                 let inst = info.timeout.take().unwrap();
@@ -250,9 +248,10 @@ impl Accept {
                 } else if !self.backpressure {
                     self.register_logged(token, info);
                 }
+
                 // Drop the timeout if server is in backpressure and socket timeout is expired.
-                // When server is recovered from backpressure it would register all socket without
-                // a timeout value so this socket register would be delayed till then.
+                // When server recovers from backpressure it will register all sockets without
+                // a timeout value so this socket register will be delayed till then.
             });
     }
 
@@ -317,9 +316,8 @@ impl Accept {
                 self.backpressure = false;
                 sockets
                     .iter_mut()
-                    // Only operate on socket without associated timeout.
-                    // Socket info with it would attempt to re-register itself when its timeout
-                    // expire.
+                    // Only operate on sockets without associated timeout.
+                    // Sockets with it will attempt to re-register when their timeout expires.
                     .filter(|(_, info)| info.timeout.is_none())
                     .for_each(|(token, info)| self.register_logged(token, info));
             }
