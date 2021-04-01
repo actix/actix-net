@@ -365,7 +365,7 @@ impl Accept {
             Ok(_) => {
                 self.set_next();
                 Ok(())
-            },
+            }
             Err(conn) => {
                 // worker lost contact and could be gone. a message is sent to
                 // `ServerBuilder` future to notify it a new worker should be made.
