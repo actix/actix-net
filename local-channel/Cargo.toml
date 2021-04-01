@@ -1,16 +1,15 @@
 [package]
 name = "local-channel"
-version = "0.1.1"
+version = "0.1.2"
 description = "A non-threadsafe multi-producer, single-consumer, futures-aware, FIFO queue"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
 ]
-edition = "2018"
-license = "MIT OR Apache-2.0"
 repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-server"
 keywords = ["channel", "local", "futures"]
+license = "MIT OR Apache-2.0"
+edition = "2018"
 
 [dependencies]
 futures-core = { version = "0.3.7", default-features = false }
