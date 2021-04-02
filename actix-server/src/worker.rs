@@ -10,7 +10,7 @@ use actix_rt::{
     System,
 };
 use actix_utils::counter::Counter;
-use futures_core::future::LocalBoxFuture;
+use futures_core::{future::LocalBoxFuture, ready};
 use log::{error, info, trace};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
@@ -274,19 +274,16 @@ impl ServerWorker {
     }
 
     fn shutdown(&mut self, force: bool) {
-        if force {
-            self.services.iter_mut().for_each(|srv| {
-                if srv.status == WorkerServiceStatus::Available {
-                    srv.status = WorkerServiceStatus::Stopped;
-                }
+        self.services
+            .iter_mut()
+            .filter(|srv| srv.status == WorkerServiceStatus::Available)
+            .for_each(|srv| {
+                srv.status = if force {
+                    WorkerServiceStatus::Stopped
+                } else {
+                    WorkerServiceStatus::Stopping
+                };
             });
-        } else {
-            self.services.iter_mut().for_each(move |srv| {
-                if srv.status == WorkerServiceStatus::Available {
-                    srv.status = WorkerServiceStatus::Stopping;
-                }
-            });
-        }
     }
 
     fn check_readiness(&mut self, cx: &mut Context<'_>) -> Result<bool, (Token, usize)> {
@@ -367,18 +364,12 @@ impl Future for ServerWorker {
                 return Poll::Ready(());
             } else if graceful {
                 self.shutdown(false);
-                let num = num_connections();
-                if num != 0 {
-                    info!("Graceful worker shutdown, {} connections", num);
-                    self.state = WorkerState::Shutdown(
-                        Box::pin(sleep(Duration::from_secs(1))),
-                        Box::pin(sleep(self.config.shutdown_timeout)),
-                        Some(result),
-                    );
-                } else {
-                    let _ = result.send(true);
-                    return Poll::Ready(());
-                }
+                info!("Graceful worker shutdown, {} connections", num);
+                self.state = WorkerState::Shutdown(
+                    Box::pin(sleep(Duration::from_secs(1))),
+                    Box::pin(sleep(self.config.shutdown_timeout)),
+                    Some(result),
+                );
             } else {
                 info!("Force shutdown worker, {} connections", num);
                 self.shutdown(true);
@@ -475,16 +466,15 @@ impl Future for ServerWorker {
                     }
                 }
 
-                match Pin::new(&mut self.rx).poll_recv(cx) {
+                match ready!(Pin::new(&mut self.rx).poll_recv(cx)) {
                     // handle incoming io stream
-                    Poll::Ready(Some(WorkerCommand(msg))) => {
+                    Some(WorkerCommand(msg)) => {
                         let guard = self.conns.get();
                         let _ = self.services[msg.token.0]
                             .service
                             .call((Some(guard), msg.io));
                     }
-                    Poll::Pending => return Poll::Pending,
-                    Poll::Ready(None) => return Poll::Ready(()),
+                    None => return Poll::Ready(()),
                 };
             },
         }
