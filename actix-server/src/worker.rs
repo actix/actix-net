@@ -8,7 +8,7 @@ use std::time::Duration;
 use actix_rt::time::{sleep, Sleep};
 use actix_rt::{spawn, Arbiter};
 use actix_utils::counter::Counter;
-use futures_core::future::LocalBoxFuture;
+use futures_core::{future::LocalBoxFuture, ready};
 use log::{error, info, trace};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
@@ -263,19 +263,16 @@ impl ServerWorker {
     }
 
     fn shutdown(&mut self, force: bool) {
-        if force {
-            self.services.iter_mut().for_each(|srv| {
-                if srv.status == WorkerServiceStatus::Available {
-                    srv.status = WorkerServiceStatus::Stopped;
-                }
+        self.services
+            .iter_mut()
+            .filter(|srv| srv.status == WorkerServiceStatus::Available)
+            .for_each(|srv| {
+                srv.status = if force {
+                    WorkerServiceStatus::Stopped
+                } else {
+                    WorkerServiceStatus::Stopping
+                };
             });
-        } else {
-            self.services.iter_mut().for_each(move |srv| {
-                if srv.status == WorkerServiceStatus::Available {
-                    srv.status = WorkerServiceStatus::Stopping;
-                }
-            });
-        }
     }
 
     fn check_readiness(&mut self, cx: &mut Context<'_>) -> Result<bool, (Token, usize)> {
@@ -460,16 +457,15 @@ impl Future for ServerWorker {
                     }
                 }
 
-                match Pin::new(&mut self.rx).poll_recv(cx) {
+                match ready!(Pin::new(&mut self.rx).poll_recv(cx)) {
                     // handle incoming io stream
-                    Poll::Ready(Some(WorkerCommand(msg))) => {
+                    Some(WorkerCommand(msg)) => {
                         let guard = self.conns.get();
                         let _ = self.services[msg.token.0]
                             .service
                             .call((Some(guard), msg.io));
                     }
-                    Poll::Pending => return Poll::Pending,
-                    Poll::Ready(None) => return Poll::Ready(()),
+                    None => return Poll::Ready(()),
                 };
             },
         }
