@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
 use std::{net, thread, time};
 
@@ -169,7 +169,7 @@ fn test_configure() {
                             rt.service("addr1", fn_service(|_| ok::<_, ()>(())));
                             rt.service("addr3", fn_service(|_| ok::<_, ()>(())));
                             rt.on_start(lazy(move |_| {
-                                let _ = num.fetch_add(1, Relaxed);
+                                let _ = num.fetch_add(1, Ordering::Relaxed);
                             }))
                         })
                 })
@@ -187,7 +187,78 @@ fn test_configure() {
     assert!(net::TcpStream::connect(addr1).is_ok());
     assert!(net::TcpStream::connect(addr2).is_ok());
     assert!(net::TcpStream::connect(addr3).is_ok());
-    assert_eq!(num.load(Relaxed), 1);
+    assert_eq!(num.load(Ordering::Relaxed), 1);
     sys.stop();
     let _ = h.join();
+}
+
+#[actix_rt::test]
+async fn test_max_concurrent_connections() {
+    // Note:
+    // A tcp listener would accept connects based on it's backlog setting.
+    //
+    // The limit test on the other hand is only for concurrent tcp stream limiting a work
+    // thread accept.
+
+    use actix_rt::net::TcpStream;
+    use tokio::io::AsyncWriteExt;
+
+    let addr = unused_addr();
+    let (tx, rx) = mpsc::channel();
+
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_clone = counter.clone();
+
+    let max_conn = 3;
+
+    let h = thread::spawn(move || {
+        actix_rt::System::new().block_on(async {
+            let server = Server::build()
+                // Set a relative higher backlog.
+                .backlog(12)
+                // max connection for a worker is 3.
+                .maxconn(max_conn)
+                .workers(1)
+                .disable_signals()
+                .bind("test", addr, move || {
+                    let counter = counter.clone();
+                    fn_service(move |_io: TcpStream| {
+                        let counter = counter.clone();
+                        async move {
+                            counter.fetch_add(1, Ordering::SeqCst);
+                            actix_rt::time::sleep(time::Duration::from_secs(3)).await;
+                            counter.fetch_sub(1, Ordering::SeqCst);
+                            Ok::<(), ()>(())
+                        }
+                    })
+                })?
+                .run();
+
+            let _ = tx.send((server.clone(), actix_rt::System::current()));
+
+            server.await
+        })
+    });
+
+    let (srv, sys) = rx.recv().unwrap();
+
+    let mut conns = vec![];
+
+    for _ in 0..12 {
+        let conn = tokio::net::TcpStream::connect(addr).await.unwrap();
+        conns.push(conn);
+    }
+
+    // counter would remain at 3 even with 12 successful connection.
+    // and 9 of them remain in backlog.
+    assert_eq!(max_conn, counter_clone.load(Ordering::SeqCst));
+
+    for mut conn in conns {
+        conn.shutdown().await.unwrap();
+    }
+
+    srv.stop(true).await;
+
+    sys.stop();
+    let _ = h.join().unwrap();
 }
