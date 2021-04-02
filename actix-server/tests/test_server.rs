@@ -226,7 +226,7 @@ async fn test_max_concurrent_connections() {
                         let counter = counter.clone();
                         async move {
                             counter.fetch_add(1, Ordering::SeqCst);
-                            actix_rt::time::sleep(time::Duration::from_secs(3)).await;
+                            actix_rt::time::sleep(time::Duration::from_secs(20)).await;
                             counter.fetch_sub(1, Ordering::SeqCst);
                             Ok::<(), ()>(())
                         }
@@ -249,6 +249,8 @@ async fn test_max_concurrent_connections() {
         conns.push(conn);
     }
 
+    actix_rt::time::sleep(time::Duration::from_secs(5)).await;
+
     // counter would remain at 3 even with 12 successful connection.
     // and 9 of them remain in backlog.
     assert_eq!(max_conn, counter_clone.load(Ordering::SeqCst));
@@ -257,7 +259,7 @@ async fn test_max_concurrent_connections() {
         conn.shutdown().await.unwrap();
     }
 
-    srv.stop(true).await;
+    srv.stop(false).await;
 
     sys.stop();
     let _ = h.join().unwrap();
