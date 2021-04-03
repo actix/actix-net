@@ -195,6 +195,7 @@ fn test_configure() {
     assert!(net::TcpStream::connect(addr2).is_ok());
     assert!(net::TcpStream::connect(addr3).is_ok());
     assert_eq!(num.load(Ordering::Relaxed), 1);
+    let _ = server.stop(true);
     sys.stop();
     let _ = h.join();
 }
@@ -220,7 +221,7 @@ async fn test_max_concurrent_connections() {
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let server = ServerHandle::build()
                 // Set a relative higher backlog.
                 .backlog(12)
                 // max connection for a worker is 3.
@@ -241,7 +242,7 @@ async fn test_max_concurrent_connections() {
                 })?
                 .run();
 
-            let _ = tx.send((server.clone(), actix_rt::System::current()));
+            let _ = tx.send((server.handle(), actix_rt::System::current()));
 
             server.await
         })
