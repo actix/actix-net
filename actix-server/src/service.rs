@@ -29,7 +29,7 @@ pub(crate) trait InternalServiceFactory: Send {
 
 pub(crate) type BoxedServerService = Box<
     dyn Service<
-        (Option<CounterGuard>, MioStream),
+        (CounterGuard, MioStream),
         Response = (),
         Error = (),
         Future = Ready<Result<(), ()>>,
@@ -50,7 +50,7 @@ impl<S, I> StreamService<S, I> {
     }
 }
 
-impl<S, I> Service<(Option<CounterGuard>, MioStream)> for StreamService<S, I>
+impl<S, I> Service<(CounterGuard, MioStream)> for StreamService<S, I>
 where
     S: Service<I>,
     S::Future: 'static,
@@ -65,7 +65,7 @@ where
         self.service.poll_ready(ctx).map_err(|_| ())
     }
 
-    fn call(&self, (guard, req): (Option<CounterGuard>, MioStream)) -> Self::Future {
+    fn call(&self, (guard, req): (CounterGuard, MioStream)) -> Self::Future {
         ready(match FromStream::from_mio(req) {
             Ok(stream) => {
                 let f = self.service.call(stream);
