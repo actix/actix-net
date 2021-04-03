@@ -217,8 +217,8 @@ impl Accept {
 
                     if now < inst {
                         // still timed out. try set new timeout.
-                        let dur = inst - now;
-                        self.set_timeout(dur);
+                        info.timeout_deadline = Some(inst);
+                        self.set_timeout(inst - now);
                     } else if !self.backpressure {
                         // timeout expired register socket again.
                         self.register_logged(token, info);
@@ -234,9 +234,9 @@ impl Accept {
     // update Accept timeout duration. would keep the smallest duration.
     fn set_timeout(&mut self, dur: Duration) {
         match self.timeout {
-            Some(timeout) => {
-                if timeout > dur {
-                    self.timeout = Some(dur);
+            Some(ref mut timeout) => {
+                if *timeout > dur {
+                    *timeout = dur;
                 }
             }
             None => self.timeout = Some(dur),
@@ -274,12 +274,8 @@ impl Accept {
         }
     }
 
-    fn deregister(&self, info: &mut ServerSocketInfo) -> io::Result<()> {
-        self.poll.registry().deregister(&mut info.lst)
-    }
-
     fn deregister_logged(&self, info: &mut ServerSocketInfo) {
-        match self.deregister(info) {
+        match self.poll.registry().deregister(&mut info.lst) {
             Ok(_) => info!("Paused accepting connections on {}", info.addr),
             Err(e) => {
                 error!("Can not deregister server socket {}", e)
