@@ -5,11 +5,12 @@ use log::{error, info};
 use mio::{Interest, Poll, Token as MioToken};
 use slab::Slab;
 
-use crate::server_handle::ServerHandle;
+use crate::builder::ServerBuilder;
+use crate::server::ServerHandle;
 use crate::socket::{MioListener, SocketAddr};
 use crate::waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN};
 use crate::worker::{Conn, ServerWorker, WorkerAvailability, WorkerHandle};
-use crate::{ServerBuilder, Token};
+use crate::Token;
 
 const DUR_ON_ERR: Duration = Duration::from_millis(500);
 
@@ -86,7 +87,7 @@ impl Accept {
         thread::Builder::new()
             .name("actix-server acceptor".to_owned())
             .spawn(move || accept.poll_with(sockets))
-            .unwrap();
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
         // return waker and worker handle clones to server builder.
         Ok((waker_queue, handles_clone))
