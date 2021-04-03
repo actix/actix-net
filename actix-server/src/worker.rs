@@ -405,27 +405,27 @@ impl Future for ServerWorker {
                 }
             },
             WorkerState::Restarting(idx, token, ref mut fut) => {
-                match fut.as_mut().poll(cx) {
-                    Poll::Ready(Ok(item)) => {
-                        // only interest in the first item?
-                        if let Some((token, service)) = item.into_iter().next() {
-                            trace!(
-                                "Service {:?} has been restarted",
-                                this.factories[idx].name(token)
-                            );
-                            this.services[token.0].created(service);
-                            this.state = WorkerState::Unavailable;
-                            return self.poll(cx);
-                        }
-                    }
-                    Poll::Ready(Err(_)) => {
-                        panic!(
-                            "Can not restart {:?} service",
-                            this.factories[idx].name(token)
-                        );
-                    }
-                    Poll::Pending => return Poll::Pending,
-                }
+                let item = ready!(fut.as_mut().poll(cx)).unwrap_or_else(|_| {
+                    panic!(
+                        "Can not restart {:?} service",
+                        this.factories[idx].name(token)
+                    )
+                });
+
+                // Only interest in the first item?
+                let (token, service) = item
+                    .into_iter()
+                    .next()
+                    .expect("No BoxedServerService. Restarting can not progress");
+
+                trace!(
+                    "Service {:?} has been restarted",
+                    this.factories[idx].name(token)
+                );
+
+                this.services[token.0].created(service);
+                this.state = WorkerState::Unavailable;
+
                 self.poll(cx)
             }
             WorkerState::Shutdown(ref mut timer, ref start_from, _) => {

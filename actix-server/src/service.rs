@@ -3,12 +3,15 @@ use std::net::SocketAddr;
 use std::task::{Context, Poll};
 
 use actix_service::{Service, ServiceFactory as BaseServiceFactory};
-use actix_utils::counter::CounterGuard;
+use actix_utils::{
+    counter::CounterGuard,
+    future::{ready, Ready},
+};
 use futures_core::future::LocalBoxFuture;
 use log::error;
 
 use crate::socket::{FromStream, MioStream};
-use crate::{ready, Ready, Token};
+use crate::Token;
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
     type Factory: BaseServiceFactory<Stream, Config = ()>;
