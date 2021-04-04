@@ -272,6 +272,13 @@ impl ServerWorker {
         WorkerHandle::new(idx, tx1, tx2, avail)
     }
 
+    fn restart_service(&mut self, token: Token, idx: usize) {
+        let factory = &self.factories[idx];
+        trace!("Service {:?} failed, restarting", factory.name(token));
+        self.services[token.0].status = WorkerServiceStatus::Restarting;
+        self.state = WorkerState::Restarting(idx, token, factory.create());
+    }
+
     fn shutdown(&mut self, force: bool) {
         self.services
             .iter_mut()
@@ -394,13 +401,7 @@ impl Future for ServerWorker {
                 }
                 Ok(false) => Poll::Pending,
                 Err((token, idx)) => {
-                    trace!(
-                        "Service {:?} failed, restarting",
-                        this.factories[idx].name(token)
-                    );
-                    this.services[token.0].status = WorkerServiceStatus::Restarting;
-                    this.state =
-                        WorkerState::Restarting(idx, token, this.factories[idx].create());
+                    this.restart_service(token, idx);
                     self.poll(cx)
                 }
             },
@@ -456,7 +457,7 @@ impl Future for ServerWorker {
             // actively poll stream and handle worker command
             WorkerState::Available => loop {
                 match this.check_readiness(cx) {
-                    Ok(true) => (),
+                    Ok(true) => {}
                     Ok(false) => {
                         trace!("Worker is unavailable");
                         this.availability.set(false);
@@ -464,14 +465,8 @@ impl Future for ServerWorker {
                         return self.poll(cx);
                     }
                     Err((token, idx)) => {
-                        trace!(
-                            "Service {:?} failed, restarting",
-                            this.factories[idx].name(token)
-                        );
+                        this.restart_service(token, idx);
                         this.availability.set(false);
-                        this.services[token.0].status = WorkerServiceStatus::Restarting;
-                        this.state =
-                            WorkerState::Restarting(idx, token, this.factories[idx].create());
                         return self.poll(cx);
                     }
                 }
@@ -480,9 +475,7 @@ impl Future for ServerWorker {
                     // handle incoming io stream
                     Some(WorkerCommand(msg)) => {
                         let guard = this.conns.get();
-                        let _ = this.services[msg.token.0]
-                            .service
-                            .call((Some(guard), msg.io));
+                        let _ = this.services[msg.token.0].service.call((guard, msg.io));
                     }
                     None => return Poll::Ready(()),
                 };
