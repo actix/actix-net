@@ -456,9 +456,7 @@ impl Future for ServerWorker {
                     // handle incoming io stream
                     Some(WorkerCommand(msg)) => {
                         let guard = self.conns.get();
-                        let _ = self.services[msg.token.0]
-                            .service
-                            .call((Some(guard), msg.io));
+                        let _ = self.services[msg.token.0].service.call((guard, msg.io));
                     }
                     None => return Poll::Ready(()),
                 };

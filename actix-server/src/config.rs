@@ -243,7 +243,7 @@ impl ServiceRuntime {
 
 type BoxedNewService = Box<
     dyn BaseServiceFactory<
-        (Option<CounterGuard>, MioStream),
+        (CounterGuard, MioStream),
         Response = (),
         Error = (),
         InitError = (),
@@ -257,7 +257,7 @@ struct ServiceFactory<T> {
     inner: T,
 }
 
-impl<T> BaseServiceFactory<(Option<CounterGuard>, MioStream)> for ServiceFactory<T>
+impl<T> BaseServiceFactory<(CounterGuard, MioStream)> for ServiceFactory<T>
 where
     T: BaseServiceFactory<TcpStream, Config = ()>,
     T::Future: 'static,
