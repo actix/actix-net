@@ -98,11 +98,8 @@ impl WorkerHandle {
     }
 
     pub fn stop(&self, graceful: bool) -> oneshot::Receiver<bool> {
-        let (result, rx) = oneshot::channel();
-        let _ = self.tx2.send(StopCommand {
-            graceful,
-            tx: result,
-        });
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx2.send(StopCommand { graceful, tx });
         rx
     }
 }
