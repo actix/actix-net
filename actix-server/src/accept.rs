@@ -72,10 +72,12 @@ impl Accept {
                 let availability = WorkerAvailability::new(waker_queue.clone());
                 let factories = builder.services.iter().map(|v| v.clone_factory()).collect();
                 let handle =
-                    ServerWorker::start(idx, factories, availability, builder.worker_config);
+                    ServerWorker::start(idx, factories, availability, builder.worker_config)?;
                 let handle_clone = (idx, handle.clone());
-                (handle, handle_clone)
+                Ok((handle, handle_clone))
             })
+            .collect::<Result<Vec<_>, io::Error>>()?
+            .into_iter()
             .unzip();
 
         let wake_queue_clone = waker_queue.clone();

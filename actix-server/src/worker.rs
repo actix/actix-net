@@ -1,8 +1,10 @@
 use std::future::Future;
+use std::io;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::thread;
 use std::time::Duration;
 
 use actix_rt::{
@@ -18,7 +20,7 @@ use tokio::sync::oneshot;
 use crate::service::{BoxedServerService, InternalServiceFactory};
 use crate::socket::MioStream;
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::{join_all, Token};
+use crate::Token;
 
 pub(crate) struct WorkerCommand(Conn);
 
@@ -194,7 +196,7 @@ impl ServerWorker {
         factories: Vec<Box<dyn InternalServiceFactory>>,
         availability: WorkerAvailability,
         config: ServerWorkerConfig,
-    ) -> WorkerHandle {
+    ) -> io::Result<WorkerHandle> {
         let (tx1, rx) = unbounded_channel();
         let (tx2, rx2) = unbounded_channel();
         let avail = availability.clone();
@@ -204,23 +206,17 @@ impl ServerWorker {
         // Try to get actix system when have one.
         let system = System::try_current();
 
+        let (factory_tx, factory_rx) = std::sync::mpsc::sync_channel(1);
+
         // every worker runs in it's own thread.
-        // use a custom tokio runtime builder to change the settings of runtime.
-        std::thread::spawn(move || {
-            // conditionally setup actix system.
-            if let Some(system) = system {
-                System::set_current(system);
-            }
+        thread::Builder::new()
+            .name(format!("actix-server-worker-{}", idx))
+            .spawn(move || {
+                // conditionally setup actix system.
+                if let Some(system) = system {
+                    System::set_current(system);
+                }
 
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .max_blocking_threads(config.max_blocking_threads)
-                .build()
-                .unwrap();
-
-            let local = tokio::task::LocalSet::new();
-
-            rt.block_on(local.run_until(async move {
                 let mut wrk = MAX_CONNS_COUNTER.with(move |conns| ServerWorker {
                     rx,
                     rx2,
@@ -231,46 +227,53 @@ impl ServerWorker {
                     conns: conns.clone(),
                     state: WorkerState::Unavailable,
                 });
-                let fut = wrk
-                    .factories
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, factory)| {
-                        let fut = factory.create();
-                        async move {
-                            fut.await.map(|r| {
-                                r.into_iter().map(|(t, s)| (idx, t, s)).collect::<Vec<_>>()
-                            })
-                        }
-                    })
-                    .collect::<Vec<_>>();
 
-                let res = join_all(fut)
-                    .await
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>();
-                match res {
-                    Ok(services) => {
-                        for item in services {
-                            for (factory, token, service) in item {
-                                assert_eq!(token.0, wrk.services.len());
-                                wrk.services.push(WorkerService {
-                                    factory,
-                                    service,
-                                    status: WorkerServiceStatus::Unavailable,
-                                });
+                // use a custom tokio runtime builder to change the settings of runtime.
+                let local = tokio::task::LocalSet::new();
+                let res = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .max_blocking_threads(config.max_blocking_threads)
+                    .build()
+                    .and_then(|rt| {
+                        local.block_on(&rt, async {
+                            for (idx, factory) in wrk.factories.iter().enumerate() {
+                                let service = factory.create().await.map_err(|_| {
+                                    io::Error::new(
+                                        io::ErrorKind::Other,
+                                        "Can not start worker service",
+                                    )
+                                })?;
+
+                                for (token, service) in service {
+                                    assert_eq!(token.0, wrk.services.len());
+                                    wrk.services.push(WorkerService {
+                                        factory: idx,
+                                        service,
+                                        status: WorkerServiceStatus::Unavailable,
+                                    })
+                                }
                             }
-                        }
-                    }
-                    Err(e) => {
-                        error!("Can not start worker: {:?}", e);
-                    }
-                }
-                wrk.await
-            }))
-        });
+                            Ok::<_, io::Error>(())
+                        })?;
 
-        WorkerHandle::new(idx, tx1, tx2, avail)
+                        Ok(rt)
+                    });
+
+                match res {
+                    Ok(rt) => {
+                        factory_tx.send(None).unwrap();
+                        local.block_on(&rt, wrk)
+                    }
+                    Err(e) => factory_tx.send(Some(e)).unwrap(),
+                }
+            })
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+        factory_rx
+            .recv()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+            .map(Err)
+            .unwrap_or_else(|| Ok(WorkerHandle::new(idx, tx1, tx2, avail)))
     }
 
     fn restart_service(&mut self, token: Token, idx: usize) {

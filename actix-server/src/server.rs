@@ -203,15 +203,17 @@ impl Server {
 
                     let availability = WorkerAvailability::new(self.waker_queue.clone());
                     let factories = self.services.iter().map(|v| v.clone_factory()).collect();
-                    let handle = ServerWorker::start(
+                    let res = ServerWorker::start(
                         new_idx,
                         factories,
                         availability,
                         self.worker_config,
                     );
 
-                    self.handles.push((new_idx, handle.clone()));
-                    self.waker_queue.wake(WakerInterest::Worker(handle));
+                    if let Ok(handle) = res {
+                        self.handles.push((new_idx, handle.clone()));
+                        self.waker_queue.wake(WakerInterest::Worker(handle));
+                    }
                 }
                 None
             }
