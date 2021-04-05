@@ -365,11 +365,14 @@ fn test_service_restart() {
     let _ = server.stop(false);
     let _ = h.join().unwrap();
 
-    let addr = unused_addr();
+    let addr1 = unused_addr();
+    let addr2 = unused_addr();
     let (tx, rx) = mpsc::channel();
     let num = Arc::new(AtomicUsize::new(0));
+    let num2 = Arc::new(AtomicUsize::new(0));
 
     let num_clone = num.clone();
+    let num2_clone = num2.clone();
 
     let h = thread::spawn(move || {
         let num = num.clone();
@@ -377,11 +380,19 @@ fn test_service_restart() {
             let server = Server::build()
                 .backlog(1)
                 .disable_signals()
-                .bind("addr", addr, move || {
+                .bind("addr1", addr1, move || {
                     let num = num.clone();
                     fn_factory(move || {
                         let num = num.clone();
                         async move { Ok::<_, ()>(TestService(num)) }
+                    })
+                })
+                .unwrap()
+                .bind("addr2", addr2, move || {
+                    let num2 = num2.clone();
+                    fn_factory(move || {
+                        let num2 = num2.clone();
+                        async move { Ok::<_, ()>(TestService(num2)) }
                     })
                 })
                 .unwrap()
@@ -397,13 +408,16 @@ fn test_service_restart() {
     thread::sleep(time::Duration::from_millis(500));
 
     for _ in 0..5 {
-        let conn = net::TcpStream::connect(addr).unwrap();
+        let conn = net::TcpStream::connect(addr1).unwrap();
+        conn.shutdown(Shutdown::Both).unwrap();
+        let conn = net::TcpStream::connect(addr2).unwrap();
         conn.shutdown(Shutdown::Both).unwrap();
     }
 
     thread::sleep(time::Duration::from_secs(1));
 
     assert!(num_clone.load(Ordering::SeqCst) > 5);
+    assert!(num2_clone.load(Ordering::SeqCst) > 5);
 
     sys.stop();
     let _ = server.stop(false);
