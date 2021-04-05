@@ -404,18 +404,16 @@ impl Future for ServerWorker {
                 let factory_id = restart.factory_id;
                 let token = restart.token;
 
-                let item = ready!(restart.fut.as_mut().poll(cx)).unwrap_or_else(|_| {
+                let mut item = ready!(restart.fut.as_mut().poll(cx)).unwrap_or_else(|_| {
                     panic!(
                         "Can not restart {:?} service",
                         this.factories[factory_id].name(token)
                     )
                 });
 
-                // Only interest in the first item?
-                let (token, service) = item
-                    .into_iter()
-                    .next()
-                    .expect("No BoxedServerService. Restarting can not progress");
+                // Token should have a matching index with returned item vec.
+                debug_assert_eq!(item.get(token.0).unwrap().0, token);
+                let (token, service) = item.remove(token.0);
 
                 trace!(
                     "Service {:?} has been restarted",
