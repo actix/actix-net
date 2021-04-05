@@ -283,7 +283,6 @@ impl ServerWorker {
 
     fn check_readiness(&mut self, cx: &mut Context<'_>) -> Result<bool, (Token, usize)> {
         let mut ready = self.conns.available(cx);
-        let mut failed = None;
         for (idx, srv) in self.services.iter_mut().enumerate() {
             if srv.status == WorkerServiceStatus::Available
                 || srv.status == WorkerServiceStatus::Unavailable
@@ -314,17 +313,14 @@ impl ServerWorker {
                             "Service {:?} readiness check returned error, restarting",
                             self.factories[srv.factory].name(Token(idx))
                         );
-                        failed = Some((Token(idx), srv.factory));
                         srv.status = WorkerServiceStatus::Failed;
+                        return Err((Token(idx), srv.factory));
                     }
                 }
             }
         }
-        if let Some(idx) = failed {
-            Err(idx)
-        } else {
-            Ok(ready)
-        }
+
+        Ok(ready)
     }
 }
 
