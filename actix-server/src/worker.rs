@@ -283,7 +283,6 @@ impl ServerWorker {
 
     fn check_readiness(&mut self, cx: &mut Context<'_>) -> Result<bool, (Token, usize)> {
         let mut ready = self.conns.available(cx);
-        let mut failed = None;
         for (idx, srv) in self.services.iter_mut().enumerate() {
             if srv.status == WorkerServiceStatus::Available
                 || srv.status == WorkerServiceStatus::Unavailable
@@ -314,17 +313,14 @@ impl ServerWorker {
                             "Service {:?} readiness check returned error, restarting",
                             self.factories[srv.factory].name(Token(idx))
                         );
-                        failed = Some((Token(idx), srv.factory));
                         srv.status = WorkerServiceStatus::Failed;
+                        return Err((Token(idx), srv.factory));
                     }
                 }
             }
         }
-        if let Some(idx) = failed {
-            Err(idx)
-        } else {
-            Ok(ready)
-        }
+
+        Ok(ready)
     }
 }
 
@@ -408,18 +404,19 @@ impl Future for ServerWorker {
                 let factory_id = restart.factory_id;
                 let token = restart.token;
 
-                let item = ready!(restart.fut.as_mut().poll(cx)).unwrap_or_else(|_| {
-                    panic!(
-                        "Can not restart {:?} service",
-                        this.factories[factory_id].name(token)
-                    )
-                });
-
-                // Only interest in the first item?
-                let (token, service) = item
+                let service = ready!(restart.fut.as_mut().poll(cx))
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Can not restart {:?} service",
+                            this.factories[factory_id].name(token)
+                        )
+                    })
                     .into_iter()
-                    .next()
-                    .expect("No BoxedServerService. Restarting can not progress");
+                    // Find the same token from vector. There should be only one
+                    // So the first match would be enough.
+                    .find(|(t, _)| *t == token)
+                    .map(|(_, service)| service)
+                    .expect("No BoxedServerService found");
 
                 trace!(
                     "Service {:?} has been restarted",
