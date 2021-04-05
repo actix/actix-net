@@ -298,7 +298,7 @@ impl Accept {
             .iter_mut()
             // Take all timeout.
             // This is to prevent Accept::process_timer method re-register a socket afterwards.
-            .map(|(_, info)| (info.timeout.take(), info))
+            .map(|(_, info)| (info.timeout_deadline.take(), info))
             // Socket info with a timeout is already deregistered so skip them.
             .filter(|(timeout, _)| timeout.is_none())
             .for_each(|(_, info)| self.deregister_logged(info));
@@ -313,7 +313,7 @@ impl Accept {
                 // Only operate on sockets without associated timeout.
                 // Sockets with it should be handled by `accept` and `process_timer` methods.
                 // They are already deregistered or need to be reregister in the future.
-                .filter(|(_, info)| info.timeout.is_none())
+                .filter(|(_, info)| info.timeout_deadline.is_none())
                 .for_each(|(token, info)| {
                     if on {
                         self.deregister_logged(info);
