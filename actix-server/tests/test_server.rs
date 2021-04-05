@@ -22,28 +22,23 @@ fn test_bind() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let system = actix_rt::System::new();
-        system.block_on(async {
+        actix_rt::System::new().block_on(async {
             let server = ServerHandle::build()
                 .workers(1)
                 .disable_signals()
                 .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
                 .run();
-            let _ = tx.send(actix_rt::System::current());
-            let _ = actix_rt::spawn(async move {
-                let _ = server.await;
-            });
-        });
-
-        system.run()
+            tx.send(server.handle()).unwrap();
+            server.await
+        })
     });
-    let sys = rx.recv().unwrap();
+    let handle = rx.recv().unwrap();
 
     thread::sleep(time::Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
-    sys.stop();
-    let _ = h.join();
+    let _ = handle.stop(true);
+    let _ = h.join().unwrap();
 }
 
 #[test]

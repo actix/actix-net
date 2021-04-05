@@ -36,6 +36,7 @@ pub struct TestServerRuntime {
     host: String,
     port: u16,
     system: System,
+    handle: ServerHandle,
 }
 
 impl TestServer {
@@ -53,18 +54,19 @@ impl TestServer {
                     .workers(1)
                     .disable_signals()
                     .run();
-                tx.send(System::current()).unwrap();
+                tx.send((server.handle(), System::current())).unwrap();
 
                 server.await
             })
         });
-        let system = rx.recv().unwrap();
+        let (handle, system) = rx.recv().unwrap();
 
         TestServerRuntime {
-            system,
             addr: "127.0.0.1:0".parse().unwrap(),
             host: "127.0.0.1".to_string(),
             port: 0,
+            system,
+            handle,
         }
     }
 
@@ -86,13 +88,14 @@ impl TestServer {
                     .disable_signals()
                     .run();
 
-                tx.send((System::current(), local_addr)).unwrap();
+                tx.send((server.handle(), System::current(), local_addr))
+                    .unwrap();
 
                 server.await
             })
         });
 
-        let (system, addr) = rx.recv().unwrap();
+        let (handle, system, addr) = rx.recv().unwrap();
 
         let host = format!("{}", addr.ip());
         let port = addr.port();
@@ -102,6 +105,7 @@ impl TestServer {
             host,
             port,
             system,
+            handle,
         }
     }
 
@@ -134,6 +138,7 @@ impl TestServerRuntime {
 
     /// Stop http server
     fn stop(&mut self) {
+        let _ = self.handle.stop(false);
         self.system.stop();
     }
 
