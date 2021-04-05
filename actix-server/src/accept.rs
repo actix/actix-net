@@ -286,27 +286,41 @@ impl Accept {
     }
 
     fn deregister_all(&self, sockets: &mut Slab<ServerSocketInfo>) {
-        sockets.iter_mut().for_each(|(_, info)| {
-            self.deregister_logged(info);
-        });
+        // This is a best effort implementation with following limitation:
+        //
+        // Every ServerSocketInfo with associate timeout will be skipped and it's timeout
+        // is removed in the process.
+        //
+        // Therefore WakerInterest::Pause followed by WakerInterest::Resume in a very short
+        // gap (less than 500ms) would cause all timing out ServerSocketInfos be reregistered
+        // before expected timing.
+        sockets
+            .iter_mut()
+            // Take all timeout.
+            // This is to prevent Accept::process_timer method re-register a socket afterwards.
+            .map(|(_, info)| (info.timeout.take(), info))
+            // Socket info with a timeout is already deregistered so skip them.
+            .filter(|(timeout, _)| timeout.is_none())
+            .for_each(|(_, info)| self.deregister_logged(info));
     }
 
     fn maybe_backpressure(&mut self, sockets: &mut Slab<ServerSocketInfo>, on: bool) {
         // Only operate when server is in a different backpressure than the given flag.
         if self.backpressure != on {
-            if on {
-                self.backpressure = true;
-                // TODO: figure out if timing out sockets can be safely de-registered twice.
-                self.deregister_all(sockets);
-            } else {
-                self.backpressure = false;
-                sockets
-                    .iter_mut()
-                    // Only operate on sockets without associated timeout.
-                    // Sockets with it will attempt to re-register when their timeout expires.
-                    .filter(|(_, info)| info.timeout_deadline.is_none())
-                    .for_each(|(token, info)| self.register_logged(token, info));
-            }
+            self.backpressure = on;
+            sockets
+                .iter_mut()
+                // Only operate on sockets without associated timeout.
+                // Sockets with it should be handled by `accept` and `process_timer` methods.
+                // They are already deregistered or need to be reregister in the future.
+                .filter(|(_, info)| info.timeout.is_none())
+                .for_each(|(token, info)| {
+                    if on {
+                        self.deregister_logged(info);
+                    } else {
+                        self.register_logged(token, info);
+                    }
+                });
         }
     }
 
