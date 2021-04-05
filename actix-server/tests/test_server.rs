@@ -265,14 +265,15 @@ async fn test_max_concurrent_connections() {
     let _ = h.join().unwrap();
 }
 
-#[test]
-fn test_service_restart() {
-    use std::net::Shutdown;
+#[actix_rt::test]
+async fn test_service_restart() {
     use std::task::{Context, Poll};
+    use std::time::Duration;
 
-    use actix_rt::net::TcpStream;
+    use actix_rt::{net::TcpStream, time::sleep};
     use actix_service::{fn_factory, Service};
     use futures_core::future::LocalBoxFuture;
+    use tokio::io::AsyncWriteExt;
 
     struct TestService(Arc<AtomicUsize>);
 
@@ -347,16 +348,23 @@ fn test_service_restart() {
     });
 
     let (server, sys) = rx.recv().unwrap();
-    thread::sleep(time::Duration::from_millis(500));
 
     for _ in 0..5 {
-        let conn = net::TcpStream::connect(addr1).unwrap();
-        conn.shutdown(Shutdown::Both).unwrap();
-        let conn = net::TcpStream::connect(addr2).unwrap();
-        conn.shutdown(Shutdown::Both).unwrap();
+        TcpStream::connect(addr1)
+            .await
+            .unwrap()
+            .shutdown()
+            .await
+            .unwrap();
+        TcpStream::connect(addr2)
+            .await
+            .unwrap()
+            .shutdown()
+            .await
+            .unwrap();
     }
 
-    thread::sleep(time::Duration::from_secs(1));
+    sleep(Duration::from_secs(3)).await;
 
     assert!(num_clone.load(Ordering::SeqCst) > 5);
     assert!(num2_clone.load(Ordering::SeqCst) > 5);
@@ -405,16 +413,23 @@ fn test_service_restart() {
     });
 
     let (server, sys) = rx.recv().unwrap();
-    thread::sleep(time::Duration::from_millis(500));
 
     for _ in 0..5 {
-        let conn = net::TcpStream::connect(addr1).unwrap();
-        conn.shutdown(Shutdown::Both).unwrap();
-        let conn = net::TcpStream::connect(addr2).unwrap();
-        conn.shutdown(Shutdown::Both).unwrap();
+        TcpStream::connect(addr1)
+            .await
+            .unwrap()
+            .shutdown()
+            .await
+            .unwrap();
+        TcpStream::connect(addr2)
+            .await
+            .unwrap()
+            .shutdown()
+            .await
+            .unwrap();
     }
 
-    thread::sleep(time::Duration::from_secs(1));
+    sleep(Duration::from_secs(3)).await;
 
     assert!(num_clone.load(Ordering::SeqCst) > 5);
     assert!(num2_clone.load(Ordering::SeqCst) > 5);
