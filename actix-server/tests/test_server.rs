@@ -52,30 +52,30 @@ fn test_listen() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
         let lst = net::TcpListener::bind(addr).unwrap();
-        sys.block_on(async {
+
+        actix_rt::System::new().block_on(async {
             let server = ServerHandle::build()
                 .disable_signals()
                 .workers(1)
-                .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
+                .listen("test", lst, move || {
+                    fn_service(|_| async { Ok::<_, ()>(()) })
+                })
                 .unwrap()
                 .run();
 
-            let _ = tx.send(actix_rt::System::current());
+            let _ = tx.send(server.handle());
 
-            actix_rt::spawn(async move {
-                let _ = server.await;
-            });
-        });
-        sys.run()
+            server.await
+        })
     });
-    let sys = rx.recv().unwrap();
+
+    let handle = rx.recv().unwrap();
 
     thread::sleep(time::Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
-    sys.stop();
-    let _ = h.join();
+    let _ = handle.stop(true);
+    let _ = h.join().unwrap();
 }
 
 #[test]
@@ -104,8 +104,8 @@ fn test_start() {
                 })
                 .unwrap()
                 .run();
-            let handle = server.handle();
-            let _ = tx.send((handle, actix_rt::System::current()));
+
+            let _ = tx.send((server.handle(), actix_rt::System::current()));
             let _ = server.await;
         });
     });
@@ -183,8 +183,7 @@ fn test_configure() {
                 .workers(1)
                 .run();
 
-            let handle = server.handle();
-            let _ = tx.send((handle, actix_rt::System::current()));
+            let _ = tx.send((server.handle(), actix_rt::System::current()));
             let _ = server.await;
         });
     });
@@ -317,7 +316,7 @@ async fn test_service_restart() {
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let server = ServerHandle::build()
                 .backlog(1)
                 .disable_signals()
                 .configure(move |cfg| {
@@ -350,7 +349,7 @@ async fn test_service_restart() {
                 .workers(1)
                 .run();
 
-            let _ = tx.send((server.clone(), actix_rt::System::current()));
+            let _ = tx.send((server.handle(), actix_rt::System::current()));
             server.await
         })
     });
@@ -393,7 +392,7 @@ async fn test_service_restart() {
     let h = thread::spawn(move || {
         let num = num.clone();
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let server = ServerHandle::build()
                 .backlog(1)
                 .disable_signals()
                 .bind("addr1", addr1, move || {
@@ -415,7 +414,7 @@ async fn test_service_restart() {
                 .workers(1)
                 .run();
 
-            let _ = tx.send((server.clone(), actix_rt::System::current()));
+            let _ = tx.send((server.handle(), actix_rt::System::current()));
             server.await
         })
     });
