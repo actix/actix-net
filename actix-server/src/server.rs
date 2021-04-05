@@ -210,11 +210,15 @@ impl Server {
                         self.worker_config,
                     );
 
-                    if let Ok(handle) = res {
-                        self.handles.push((new_idx, handle.clone()));
-                        self.waker_queue.wake(WakerInterest::Worker(handle));
+                    match res {
+                        Ok(handle) => {
+                            self.handles.push((new_idx, handle.clone()));
+                            self.waker_queue.wake(WakerInterest::Worker(handle));
+                        }
+                        Err(e) => error!("Can not start worker: {:?}", e),
                     }
                 }
+
                 None
             }
         }

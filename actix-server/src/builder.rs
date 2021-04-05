@@ -10,7 +10,7 @@ use crate::server::{Server, ServerCommand};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
-use crate::worker::{self, ServerWorkerConfig};
+use crate::worker::ServerWorkerConfig;
 use crate::Token;
 
 /// Server builder
@@ -100,8 +100,8 @@ impl ServerBuilder {
     /// reached for each worker.
     ///
     /// By default max connections is set to a 25k per worker.
-    pub fn maxconn(self, num: usize) -> Self {
-        worker::max_concurrent_connections(num);
+    pub fn maxconn(mut self, num: usize) -> Self {
+        self.worker_config.max_concurrent_connections(num);
         self
     }
 

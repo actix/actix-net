@@ -1,21 +1,27 @@
-use std::future::Future;
-use std::io;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::thread;
-use std::time::Duration;
+use std::{
+    future::Future,
+    io, mem,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    task::{Context, Poll},
+    thread,
+    time::Duration,
+};
 
 use actix_rt::{
-    time::{sleep, Sleep},
+    time::{sleep, Instant, Sleep},
     System,
 };
 use actix_utils::counter::Counter;
 use futures_core::{future::LocalBoxFuture, ready};
 use log::{error, info, trace};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tokio::sync::oneshot;
+use tokio::sync::{
+    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    oneshot,
+};
 
 use crate::service::{BoxedServerService, InternalServiceFactory};
 use crate::socket::MioStream;
@@ -28,34 +34,13 @@ pub(crate) struct WorkerCommand(Conn);
 /// and `false` if some connections still alive.
 pub(crate) struct StopCommand {
     graceful: bool,
-    result: oneshot::Sender<bool>,
+    tx: oneshot::Sender<bool>,
 }
 
 #[derive(Debug)]
 pub(crate) struct Conn {
     pub io: MioStream,
     pub token: Token,
-}
-
-static MAX_CONNS: AtomicUsize = AtomicUsize::new(25600);
-
-/// Sets the maximum per-worker number of concurrent connections.
-///
-/// All socket listeners will stop accepting connections when this limit is
-/// reached for each worker.
-///
-/// By default max connections is set to a 25k per worker.
-pub fn max_concurrent_connections(num: usize) {
-    MAX_CONNS.store(num, Ordering::Relaxed);
-}
-
-thread_local! {
-    static MAX_CONNS_COUNTER: Counter =
-        Counter::new(MAX_CONNS.load(Ordering::Relaxed));
-}
-
-pub(crate) fn num_connections() -> usize {
-    MAX_CONNS_COUNTER.with(|conns| conns.total())
 }
 
 // a handle to worker that can send message to worker and share the availability of worker to other
@@ -92,8 +77,8 @@ impl WorkerHandle {
     }
 
     pub fn stop(&self, graceful: bool) -> oneshot::Receiver<bool> {
-        let (result, rx) = oneshot::channel();
-        let _ = self.tx2.send(StopCommand { graceful, result });
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx2.send(StopCommand { graceful, tx });
         rx
     }
 }
@@ -136,7 +121,7 @@ pub(crate) struct ServerWorker {
     conns: Counter,
     factories: Vec<Box<dyn InternalServiceFactory>>,
     state: WorkerState,
-    config: ServerWorkerConfig,
+    shutdown_timeout: Duration,
 }
 
 struct WorkerService {
@@ -167,6 +152,7 @@ enum WorkerServiceStatus {
 pub(crate) struct ServerWorkerConfig {
     shutdown_timeout: Duration,
     max_blocking_threads: usize,
+    max_concurrent_connections: usize,
 }
 
 impl Default for ServerWorkerConfig {
@@ -176,6 +162,7 @@ impl Default for ServerWorkerConfig {
         Self {
             shutdown_timeout: Duration::from_secs(30),
             max_blocking_threads,
+            max_concurrent_connections: 25600,
         }
     }
 }
@@ -183,6 +170,10 @@ impl Default for ServerWorkerConfig {
 impl ServerWorkerConfig {
     pub(crate) fn max_blocking_threads(&mut self, num: usize) {
         self.max_blocking_threads = num;
+    }
+
+    pub(crate) fn max_concurrent_connections(&mut self, num: usize) {
+        self.max_concurrent_connections = num;
     }
 
     pub(crate) fn shutdown_timeout(&mut self, dur: Duration) {
@@ -217,16 +208,16 @@ impl ServerWorker {
                     System::set_current(system);
                 }
 
-                let mut wrk = MAX_CONNS_COUNTER.with(move |conns| ServerWorker {
+                let mut wrk = ServerWorker {
                     rx,
                     rx2,
-                    availability,
-                    factories,
-                    config,
                     services: Vec::new(),
-                    conns: conns.clone(),
-                    state: WorkerState::Unavailable,
-                });
+                    availability,
+                    conns: Counter::new(config.max_concurrent_connections),
+                    factories,
+                    state: Default::default(),
+                    shutdown_timeout: config.shutdown_timeout,
+                };
 
                 // use a custom tokio runtime builder to change the settings of runtime.
                 let local = tokio::task::LocalSet::new();
@@ -276,11 +267,15 @@ impl ServerWorker {
             .unwrap_or_else(|| Ok(WorkerHandle::new(idx, tx1, tx2, avail)))
     }
 
-    fn restart_service(&mut self, token: Token, idx: usize) {
-        let factory = &self.factories[idx];
+    fn restart_service(&mut self, token: Token, factory_id: usize) {
+        let factory = &self.factories[factory_id];
         trace!("Service {:?} failed, restarting", factory.name(token));
         self.services[token.0].status = WorkerServiceStatus::Restarting;
-        self.state = WorkerState::Restarting(idx, token, factory.create());
+        self.state = WorkerState::Restarting(Restart {
+            factory_id,
+            token,
+            fut: factory.create(),
+        });
     }
 
     fn shutdown(&mut self, force: bool) {
@@ -346,66 +341,87 @@ impl ServerWorker {
 enum WorkerState {
     Available,
     Unavailable,
-    Restarting(
-        usize,
-        Token,
-        LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>>,
-    ),
-    Shutdown(
-        Pin<Box<Sleep>>,
-        Pin<Box<Sleep>>,
-        Option<oneshot::Sender<bool>>,
-    ),
+    Restarting(Restart),
+    Shutdown(Shutdown),
+}
+
+struct Restart {
+    factory_id: usize,
+    token: Token,
+    fut: LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>>,
+}
+
+// Shutdown keep states necessary for server shutdown:
+// Sleep for interval check the shutdown progress.
+// Instant for the start time of shutdown.
+// Sender for send back the shutdown outcome(force/grace) to StopCommand caller.
+struct Shutdown {
+    timer: Pin<Box<Sleep>>,
+    start_from: Instant,
+    tx: oneshot::Sender<bool>,
+}
+
+impl Default for WorkerState {
+    fn default() -> Self {
+        Self::Unavailable
+    }
 }
 
 impl Future for ServerWorker {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.as_mut().get_mut();
+
         // `StopWorker` message handler
-        if let Poll::Ready(Some(StopCommand { graceful, result })) =
-            Pin::new(&mut self.rx2).poll_recv(cx)
+        if let Poll::Ready(Some(StopCommand { graceful, tx })) =
+            Pin::new(&mut this.rx2).poll_recv(cx)
         {
-            self.availability.set(false);
-            let num = num_connections();
+            this.availability.set(false);
+            let num = this.conns.total();
             if num == 0 {
                 info!("Shutting down worker, 0 connections");
-                let _ = result.send(true);
+                let _ = tx.send(true);
                 return Poll::Ready(());
             } else if graceful {
-                self.shutdown(false);
                 info!("Graceful worker shutdown, {} connections", num);
-                self.state = WorkerState::Shutdown(
-                    Box::pin(sleep(Duration::from_secs(1))),
-                    Box::pin(sleep(self.config.shutdown_timeout)),
-                    Some(result),
-                );
+                this.shutdown(false);
+
+                this.state = WorkerState::Shutdown(Shutdown {
+                    timer: Box::pin(sleep(Duration::from_secs(1))),
+                    start_from: Instant::now(),
+                    tx,
+                });
             } else {
                 info!("Force shutdown worker, {} connections", num);
-                self.shutdown(true);
-                let _ = result.send(false);
+                this.shutdown(true);
+
+                let _ = tx.send(false);
                 return Poll::Ready(());
             }
         }
 
-        match self.state {
-            WorkerState::Unavailable => match self.check_readiness(cx) {
+        match this.state {
+            WorkerState::Unavailable => match this.check_readiness(cx) {
                 Ok(true) => {
-                    self.state = WorkerState::Available;
-                    self.availability.set(true);
+                    this.state = WorkerState::Available;
+                    this.availability.set(true);
                     self.poll(cx)
                 }
                 Ok(false) => Poll::Pending,
                 Err((token, idx)) => {
-                    self.restart_service(token, idx);
+                    this.restart_service(token, idx);
                     self.poll(cx)
                 }
             },
-            WorkerState::Restarting(idx, token, ref mut fut) => {
-                let item = ready!(fut.as_mut().poll(cx)).unwrap_or_else(|_| {
+            WorkerState::Restarting(ref mut restart) => {
+                let factory_id = restart.factory_id;
+                let token = restart.token;
+
+                let item = ready!(restart.fut.as_mut().poll(cx)).unwrap_or_else(|_| {
                     panic!(
                         "Can not restart {:?} service",
-                        self.factories[idx].name(token)
+                        this.factories[factory_id].name(token)
                     )
                 });
 
@@ -417,58 +433,59 @@ impl Future for ServerWorker {
 
                 trace!(
                     "Service {:?} has been restarted",
-                    self.factories[idx].name(token)
+                    this.factories[factory_id].name(token)
                 );
 
-                self.services[token.0].created(service);
-                self.state = WorkerState::Unavailable;
+                this.services[token.0].created(service);
+                this.state = WorkerState::Unavailable;
 
                 self.poll(cx)
             }
-            WorkerState::Shutdown(ref mut t1, ref mut t2, ref mut tx) => {
-                let num = num_connections();
-                if num == 0 {
-                    let _ = tx.take().unwrap().send(true);
-                    return Poll::Ready(());
-                }
+            WorkerState::Shutdown(ref mut shutdown) => {
+                // Wait for 1 second.
+                ready!(shutdown.timer.as_mut().poll(cx));
 
-                // check graceful timeout
-                if Pin::new(t2).poll(cx).is_ready() {
-                    let _ = tx.take().unwrap().send(false);
-                    self.shutdown(true);
-                    return Poll::Ready(());
+                if this.conns.total() == 0 {
+                    // Graceful shutdown.
+                    if let WorkerState::Shutdown(shutdown) = mem::take(&mut this.state) {
+                        let _ = shutdown.tx.send(true);
+                    }
+                    Poll::Ready(())
+                } else if shutdown.start_from.elapsed() >= this.shutdown_timeout {
+                    // Timeout forceful shutdown.
+                    if let WorkerState::Shutdown(shutdown) = mem::take(&mut this.state) {
+                        let _ = shutdown.tx.send(false);
+                    }
+                    Poll::Ready(())
+                } else {
+                    // Reset timer and wait for 1 second.
+                    let time = Instant::now() + Duration::from_secs(1);
+                    shutdown.timer.as_mut().reset(time);
+                    shutdown.timer.as_mut().poll(cx)
                 }
-
-                // sleep for 1 second and then check again
-                if t1.as_mut().poll(cx).is_ready() {
-                    *t1 = Box::pin(sleep(Duration::from_secs(1)));
-                    let _ = t1.as_mut().poll(cx);
-                }
-
-                Poll::Pending
             }
             // actively poll stream and handle worker command
             WorkerState::Available => loop {
-                match self.check_readiness(cx) {
+                match this.check_readiness(cx) {
                     Ok(true) => {}
                     Ok(false) => {
                         trace!("Worker is unavailable");
-                        self.availability.set(false);
-                        self.state = WorkerState::Unavailable;
+                        this.availability.set(false);
+                        this.state = WorkerState::Unavailable;
                         return self.poll(cx);
                     }
                     Err((token, idx)) => {
-                        self.restart_service(token, idx);
-                        self.availability.set(false);
+                        this.restart_service(token, idx);
+                        this.availability.set(false);
                         return self.poll(cx);
                     }
                 }
 
-                match ready!(Pin::new(&mut self.rx).poll_recv(cx)) {
+                match ready!(Pin::new(&mut this.rx).poll_recv(cx)) {
                     // handle incoming io stream
                     Some(WorkerCommand(msg)) => {
-                        let guard = self.conns.get();
-                        let _ = self.services[msg.token.0].service.call((guard, msg.io));
+                        let guard = this.conns.get();
+                        let _ = this.services[msg.token.0].service.call((guard, msg.io));
                     }
                     None => return Poll::Ready(()),
                 };
