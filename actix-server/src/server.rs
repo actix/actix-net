@@ -37,6 +37,11 @@ pub struct Server {
 }
 
 impl Server {
+    /// Start server building process
+    pub fn build() -> ServerBuilder {
+        ServerBuilder::default()
+    }
+
     pub(crate) fn new(mut builder: ServerBuilder) -> Self {
         let sockets = mem::take(&mut builder.sockets)
             .into_iter()
@@ -280,11 +285,6 @@ pub struct ServerHandle(
 impl ServerHandle {
     pub(crate) fn new(tx: UnboundedSender<ServerCommand>) -> Self {
         ServerHandle(tx, None)
-    }
-
-    /// Start server building process
-    pub fn build() -> ServerBuilder {
-        ServerBuilder::default()
     }
 
     pub(crate) fn worker_faulted(&self, idx: usize) {

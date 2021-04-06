@@ -9,17 +9,18 @@
 //! Start typing. When you press enter the typed line will be echoed back. The server will log
 //! the length of each line it echos and the total size of data sent when the connection is closed.
 
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    env, io,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
-use std::{env, io};
 
 use actix_rt::net::TcpStream;
-use actix_server::ServerHandle;
+use actix_server::Server;
 use actix_service::pipeline_factory;
 use bytes::BytesMut;
-use futures_util::future::ok;
 use log::{error, info};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -36,7 +37,7 @@ async fn main() -> io::Result<()> {
     // Bind socket address and start worker(s). By default, the server uses the number of available
     // logical CPU cores as the worker count. For this reason, the closure passed to bind needs
     // to return a service *factory*; so it can be created once per worker.
-    ServerHandle::build()
+    Server::build()
         .bind("echo", addr, move || {
             let count = Arc::clone(&count);
             let num2 = Arc::clone(&count);
@@ -79,7 +80,7 @@ async fn main() -> io::Result<()> {
             .and_then(move |(_, size)| {
                 let num = num2.load(Ordering::SeqCst);
                 info!("[{}] total bytes read: {}", num, size);
-                ok(size)
+                async move { Ok(size) }
             })
         })?
         .workers(1)

@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
 use std::{net, thread, time};
 
-use actix_server::ServerHandle;
+use actix_server::Server;
 use actix_service::fn_service;
 use actix_utils::future::ok;
 use futures_util::future::lazy;
@@ -23,7 +23,7 @@ fn test_bind() {
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
-            let server = ServerHandle::build()
+            let server = Server::build()
                 .workers(1)
                 .disable_signals()
                 .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
@@ -50,7 +50,7 @@ fn test_listen() {
         let lst = net::TcpListener::bind(addr).unwrap();
 
         actix_rt::System::new().block_on(async {
-            let server = ServerHandle::build()
+            let server = Server::build()
                 .disable_signals()
                 .workers(1)
                 .listen("test", lst, move || {
@@ -87,7 +87,7 @@ fn test_start() {
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
-            let server = ServerHandle::build()
+            let server = Server::build()
                 .backlog(100)
                 .disable_signals()
                 .bind("test", addr, move || {
@@ -155,7 +155,7 @@ fn test_configure() {
     let h = thread::spawn(move || {
         let num = num2.clone();
         actix_rt::System::new().block_on(async {
-            let server = ServerHandle::build()
+            let server = Server::build()
                 .disable_signals()
                 .configure(move |cfg| {
                     let num = num.clone();
@@ -215,7 +215,7 @@ async fn test_max_concurrent_connections() {
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
-            let server = ServerHandle::build()
+            let server = Server::build()
                 // Set a relative higher backlog.
                 .backlog(12)
                 // max connection for a worker is 3.
@@ -311,7 +311,7 @@ async fn test_service_restart() {
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
-            let server = ServerHandle::build()
+            let server = Server::build()
                 .backlog(1)
                 .disable_signals()
                 .configure(move |cfg| {
@@ -387,7 +387,7 @@ async fn test_service_restart() {
     let h = thread::spawn(move || {
         let num = num.clone();
         actix_rt::System::new().block_on(async {
-            let server = ServerHandle::build()
+            let server = Server::build()
                 .backlog(1)
                 .disable_signals()
                 .bind("addr1", addr1, move || {
