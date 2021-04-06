@@ -166,17 +166,14 @@ impl Accept {
         loop {
             if let Err(e) = self.poll.poll(&mut events, None) {
                 match e.kind() {
-                    std::io::ErrorKind::Interrupted => {
-                        continue;
-                    }
-                    _ => {
-                        panic!("Poll error: {}", e);
-                    }
+                    std::io::ErrorKind::Interrupted => continue,
+                    _ => panic!("Poll error: {}", e),
                 }
             }
 
             for event in events.iter() {
                 let token = event.token();
+
                 match token {
                     // This is a loop because interests for command from previous version was
                     // a loop that would try to drain the command channel. It's yet unknown
@@ -217,10 +214,12 @@ impl Accept {
                             }
                             Some(WakerInterest::Resume) => {
                                 drop(guard);
-                                sockets.iter_mut().for_each(|(token, info)| {
-                                    self.register_logged(token, info);
-                                });
-                                self.set_pause(false);
+                                if self.pause() {
+                                    sockets.iter_mut().for_each(|(token, info)| {
+                                        self.register_logged(token, info);
+                                    });
+                                    self.set_pause(false);
+                                }
                             }
                             Some(WakerInterest::Stop) => {
                                 if !self.pause() {
@@ -267,32 +266,12 @@ impl Accept {
             });
     }
 
-    #[cfg(not(target_os = "windows"))]
-    fn register(&self, token: usize, info: &mut ServerSocketInfo) -> io::Result<()> {
-        self.poll
+    fn register_logged(&self, token: usize, info: &mut ServerSocketInfo) {
+        match self
+            .poll
             .registry()
             .register(&mut info.lst, MioToken(token), Interest::READABLE)
-    }
-
-    #[cfg(target_os = "windows")]
-    fn register(&self, token: usize, info: &mut ServerSocketInfo) -> io::Result<()> {
-        // On windows, calling register without deregister cause an error.
-        // See https://github.com/actix/actix-web/issues/905
-        // Calling reregister seems to fix the issue.
-        self.poll
-            .registry()
-            .register(&mut info.lst, mio::Token(token), Interest::READABLE)
-            .or_else(|_| {
-                self.poll.registry().reregister(
-                    &mut info.lst,
-                    mio::Token(token),
-                    Interest::READABLE,
-                )
-            })
-    }
-
-    fn register_logged(&self, token: usize, info: &mut ServerSocketInfo) {
-        match self.register(token, info) {
+        {
             Ok(_) => info!("Resume accepting connections on {}", info.addr),
             Err(e) => error!("Can not register server socket {}", e),
         }
