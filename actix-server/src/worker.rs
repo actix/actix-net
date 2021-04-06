@@ -256,7 +256,7 @@ impl ServerWorker {
                             shutdown_timeout: config.shutdown_timeout,
                         };
 
-                        local.block_on(&rt, worker)
+                        local.block_on(&rt, async { worker.await });
                     }
                     Err(e) => factory_tx.send(Some(e)).unwrap(),
                 }

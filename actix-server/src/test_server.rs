@@ -35,7 +35,6 @@ pub struct TestServerRuntime {
     addr: net::SocketAddr,
     host: String,
     port: u16,
-    system: System,
     handle: ServerHandle,
 }
 
@@ -51,18 +50,17 @@ impl TestServer {
         thread::spawn(move || {
             System::new().block_on(async {
                 let server = factory(Server::build()).workers(1).disable_signals().run();
-                tx.send((server.handle(), System::current())).unwrap();
+                tx.send(server.handle()).unwrap();
 
                 server.await
             })
         });
-        let (handle, system) = rx.recv().unwrap();
+        let handle = rx.recv().unwrap();
 
         TestServerRuntime {
             addr: "127.0.0.1:0".parse().unwrap(),
             host: "127.0.0.1".to_string(),
             port: 0,
-            system,
             handle,
         }
     }
@@ -85,14 +83,13 @@ impl TestServer {
                     .disable_signals()
                     .run();
 
-                tx.send((server.handle(), System::current(), local_addr))
-                    .unwrap();
+                tx.send((server.handle(), local_addr)).unwrap();
 
                 server.await
             })
         });
 
-        let (handle, system, addr) = rx.recv().unwrap();
+        let (handle, addr) = rx.recv().unwrap();
 
         let host = format!("{}", addr.ip());
         let port = addr.port();
@@ -101,7 +98,6 @@ impl TestServer {
             addr,
             host,
             port,
-            system,
             handle,
         }
     }
@@ -136,7 +132,6 @@ impl TestServerRuntime {
     /// Stop http server
     fn stop(&mut self) {
         let _ = self.handle.stop(false);
-        self.system.stop();
     }
 
     /// Connect to server, return tokio TcpStream
