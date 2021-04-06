@@ -1,6 +1,12 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Server can start regardless what runtime it's in. [#266]
+* Remove `Future` impl for `ServerBuilder`. [#266]
+* Rename `Server` to `ServerHandle`. `ServerHandle` must be explicitly constructed with `Server::handle` API. [#266]
+* Add `Server` type that can be `await` for blocking until server stop. [#266]
+
+[#266]: https://github.com/actix/actix-net/pull/266
 
 
 ## 2.0.0-beta.4 - 2021-04-01

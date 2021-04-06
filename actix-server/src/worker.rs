@@ -188,11 +188,11 @@ impl ServerWorker {
         availability: WorkerAvailability,
         config: ServerWorkerConfig,
     ) -> io::Result<WorkerHandle> {
+        assert!(!availability.available());
+
         let (tx1, rx) = unbounded_channel();
         let (tx2, rx2) = unbounded_channel();
         let avail = availability.clone();
-
-        availability.set(false);
 
         // Try to get actix system when have one.
         let system = System::try_current();
@@ -208,16 +208,7 @@ impl ServerWorker {
                     System::set_current(system);
                 }
 
-                let mut wrk = ServerWorker {
-                    rx,
-                    rx2,
-                    services: Vec::new(),
-                    availability,
-                    conns: Counter::new(config.max_concurrent_connections),
-                    factories,
-                    state: Default::default(),
-                    shutdown_timeout: config.shutdown_timeout,
-                };
+                let mut services = Vec::new();
 
                 // use a custom tokio runtime builder to change the settings of runtime.
                 let local = tokio::task::LocalSet::new();
@@ -227,7 +218,7 @@ impl ServerWorker {
                     .build()
                     .and_then(|rt| {
                         local.block_on(&rt, async {
-                            for (idx, factory) in wrk.factories.iter().enumerate() {
+                            for (idx, factory) in factories.iter().enumerate() {
                                 let service = factory.create().await.map_err(|_| {
                                     io::Error::new(
                                         io::ErrorKind::Other,
@@ -236,8 +227,8 @@ impl ServerWorker {
                                 })?;
 
                                 for (token, service) in service {
-                                    assert_eq!(token.0, wrk.services.len());
-                                    wrk.services.push(WorkerService {
+                                    assert_eq!(token.0, services.len());
+                                    services.push(WorkerService {
                                         factory: idx,
                                         service,
                                         status: WorkerServiceStatus::Unavailable,
@@ -253,7 +244,19 @@ impl ServerWorker {
                 match res {
                     Ok(rt) => {
                         factory_tx.send(None).unwrap();
-                        local.block_on(&rt, wrk)
+
+                        let worker = ServerWorker {
+                            rx,
+                            rx2,
+                            services,
+                            availability,
+                            conns: Counter::new(config.max_concurrent_connections),
+                            factories,
+                            state: Default::default(),
+                            shutdown_timeout: config.shutdown_timeout,
+                        };
+
+                        local.block_on(&rt, worker)
                     }
                     Err(e) => factory_tx.send(Some(e)).unwrap(),
                 }
