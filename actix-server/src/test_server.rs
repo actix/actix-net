@@ -1,5 +1,5 @@
 use std::sync::mpsc;
-use std::{net, thread};
+use std::{io, net, thread};
 
 use actix_rt::{net::TcpStream, System};
 
@@ -36,6 +36,7 @@ pub struct TestServerRuntime {
     host: String,
     port: u16,
     handle: ServerHandle,
+    join_handle: Option<thread::JoinHandle<io::Result<()>>>,
 }
 
 impl TestServer {
@@ -47,7 +48,7 @@ impl TestServer {
         let (tx, rx) = mpsc::channel();
 
         // run server in separate thread
-        thread::spawn(move || {
+        let join_handle = thread::spawn(move || {
             System::new().block_on(async {
                 let server = factory(Server::build()).workers(1).disable_signals().run();
                 tx.send(server.handle()).unwrap();
@@ -62,6 +63,7 @@ impl TestServer {
             host: "127.0.0.1".to_string(),
             port: 0,
             handle,
+            join_handle: Some(join_handle),
         }
     }
 
@@ -70,7 +72,7 @@ impl TestServer {
         let (tx, rx) = mpsc::channel();
 
         // run server in separate thread
-        thread::spawn(move || {
+        let join_handle = thread::spawn(move || {
             let sys = System::new();
             let tcp = net::TcpListener::bind("127.0.0.1:0").unwrap();
             let local_addr = tcp.local_addr().unwrap();
@@ -99,6 +101,7 @@ impl TestServer {
             host,
             port,
             handle,
+            join_handle: Some(join_handle),
         }
     }
 
@@ -132,6 +135,7 @@ impl TestServerRuntime {
     /// Stop http server
     fn stop(&mut self) {
         let _ = self.handle.stop(false);
+        self.join_handle.take().unwrap().join().unwrap().unwrap();
     }
 
     /// Connect to server, return tokio TcpStream
