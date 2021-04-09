@@ -393,7 +393,7 @@ impl Accept {
     }
 
     fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
-        loop {
+        while !self.backpressure {
             let info = sockets
                 .get_mut(token)
                 .expect("ServerSocketInfo is removed from Slab");
