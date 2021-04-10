@@ -12,16 +12,7 @@ pub(crate) use {
 use std::{fmt, io};
 
 use actix_rt::net::TcpStream;
-use mio::event::Source;
-use mio::{Interest, Registry, Token};
-
-#[cfg(windows)]
-use std::os::windows::io::{FromRawSocket, IntoRawSocket};
-#[cfg(unix)]
-use {
-    actix_rt::net::UnixStream,
-    std::os::unix::io::{FromRawFd, IntoRawFd},
-};
+use mio::{event::Source, Interest, Registry, Token};
 
 pub(crate) enum MioListener {
     Tcp(MioTcpListener),
@@ -164,47 +155,60 @@ pub trait FromStream: Sized {
     fn from_mio(sock: MioStream) -> io::Result<Self>;
 }
 
-// FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
-#[cfg(unix)]
-impl FromStream for TcpStream {
-    fn from_mio(sock: MioStream) -> io::Result<Self> {
-        match sock {
-            MioStream::Tcp(mio) => {
-                let raw = IntoRawFd::into_raw_fd(mio);
-                // SAFETY: This is a in place conversion from mio stream to tokio stream.
-                TcpStream::from_std(unsafe { FromRawFd::from_raw_fd(raw) })
-            }
-            MioStream::Uds(_) => {
-                panic!("Should not happen, bug in server impl");
-            }
-        }
-    }
-}
-
-// FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
 #[cfg(windows)]
-impl FromStream for TcpStream {
-    fn from_mio(sock: MioStream) -> io::Result<Self> {
-        match sock {
-            MioStream::Tcp(mio) => {
-                let raw = IntoRawSocket::into_raw_socket(mio);
-                // SAFETY: This is a in place conversion from mio stream to tokio stream.
-                TcpStream::from_std(unsafe { FromRawSocket::from_raw_socket(raw) })
+mod win_impl {
+    use super::*;
+
+    use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+
+    // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
+    impl FromStream for TcpStream {
+        fn from_mio(sock: MioStream) -> io::Result<Self> {
+            match sock {
+                MioStream::Tcp(mio) => {
+                    let raw = IntoRawSocket::into_raw_socket(mio);
+                    // SAFETY: This is a in place conversion from mio stream to tokio stream.
+                    TcpStream::from_std(unsafe { FromRawSocket::from_raw_socket(raw) })
+                }
             }
         }
     }
 }
 
-// FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
 #[cfg(unix)]
-impl FromStream for UnixStream {
-    fn from_mio(sock: MioStream) -> io::Result<Self> {
-        match sock {
-            MioStream::Tcp(_) => panic!("Should not happen, bug in server impl"),
-            MioStream::Uds(mio) => {
-                let raw = IntoRawFd::into_raw_fd(mio);
-                // SAFETY: This is a in place conversion from mio stream to tokio stream.
-                UnixStream::from_std(unsafe { FromRawFd::from_raw_fd(raw) })
+mod unix_impl {
+    use super::*;
+
+    use std::os::unix::io::{FromRawFd, IntoRawFd};
+
+    use actix_rt::net::UnixStream;
+
+    // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
+    impl FromStream for TcpStream {
+        fn from_mio(sock: MioStream) -> io::Result<Self> {
+            match sock {
+                MioStream::Tcp(mio) => {
+                    let raw = IntoRawFd::into_raw_fd(mio);
+                    // SAFETY: This is a in place conversion from mio stream to tokio stream.
+                    TcpStream::from_std(unsafe { FromRawFd::from_raw_fd(raw) })
+                }
+                MioStream::Uds(_) => {
+                    panic!("Should not happen, bug in server impl");
+                }
+            }
+        }
+    }
+
+    // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
+    impl FromStream for UnixStream {
+        fn from_mio(sock: MioStream) -> io::Result<Self> {
+            match sock {
+                MioStream::Tcp(_) => panic!("Should not happen, bug in server impl"),
+                MioStream::Uds(mio) => {
+                    let raw = IntoRawFd::into_raw_fd(mio);
+                    // SAFETY: This is a in place conversion from mio stream to tokio stream.
+                    UnixStream::from_std(unsafe { FromRawFd::from_raw_fd(raw) })
+                }
             }
         }
     }
