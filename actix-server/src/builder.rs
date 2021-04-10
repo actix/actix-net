@@ -19,7 +19,10 @@ use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandle};
+use crate::worker::{
+    ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandleAccept,
+    WorkerHandleServer,
+};
 use crate::{join_all, Token};
 
 /// Server builder
@@ -27,7 +30,7 @@ pub struct ServerBuilder {
     threads: usize,
     token: Token,
     backlog: u32,
-    handles: Vec<(usize, WorkerHandle)>,
+    handles: Vec<(usize, WorkerHandleServer)>,
     services: Vec<Box<dyn InternalServiceFactory>>,
     sockets: Vec<(Token, String, MioListener)>,
     accept: AcceptLoop,
@@ -280,10 +283,11 @@ impl ServerBuilder {
             // start workers
             let handles = (0..self.threads)
                 .map(|idx| {
-                    let handle = self.start_worker(idx, self.accept.waker_owned());
-                    self.handles.push((idx, handle.clone()));
+                    let (handle_accept, handle_server) =
+                        self.start_worker(idx, self.accept.waker_owned());
+                    self.handles.push((idx, handle_server));
 
-                    handle
+                    handle_accept
                 })
                 .collect();
 
@@ -311,7 +315,11 @@ impl ServerBuilder {
         }
     }
 
-    fn start_worker(&self, idx: usize, waker: WakerQueue) -> WorkerHandle {
+    fn start_worker(
+        &self,
+        idx: usize,
+        waker: WakerQueue,
+    ) -> (WorkerHandleAccept, WorkerHandleServer) {
         let avail = WorkerAvailability::new(waker);
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
 
@@ -437,9 +445,10 @@ impl ServerBuilder {
                         break;
                     }
 
-                    let handle = self.start_worker(new_idx, self.accept.waker_owned());
-                    self.handles.push((new_idx, handle.clone()));
-                    self.accept.wake(WakerInterest::Worker(handle));
+                    let (handle_accept, handle_server) =
+                        self.start_worker(new_idx, self.accept.waker_owned());
+                    self.handles.push((new_idx, handle_server));
+                    self.accept.wake(WakerInterest::Worker(handle_accept));
                 }
             }
         }
