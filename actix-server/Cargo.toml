@@ -17,18 +17,17 @@ edition = "2018"
 name = "actix_server"
 path = "src/lib.rs"
 
-[features]
-default = []
-
 [dependencies]
 actix-rt = { version = "2.0.0", default-features = false }
 actix-service = "2.0.0-beta.5"
 actix-utils = "3.0.0-beta.4"
 
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
+futures-util = { version = "0.3.7", default-features = false }
 log = "0.4"
-mio = { version = "0.7.6", features = ["os-poll", "net"] }
+mio = { version = "0.7.11", features = ["os-poll", "net", "os-util"] }
 num_cpus = "1.13"
+rtrb = ""
 slab = "0.4"
 tokio = { version = "1.2", features = ["sync"] }
 

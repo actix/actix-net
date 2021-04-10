@@ -323,7 +323,7 @@ impl ServerBuilder {
         let avail = WorkerAvailability::new(waker);
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
 
-        ServerWorker::start(idx, services, avail, self.worker_config)
+        ServerWorker::start(idx, self.backlog, services, avail, self.worker_config)
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) {
@@ -384,7 +384,7 @@ impl ServerBuilder {
                 if !self.handles.is_empty() && graceful {
                     let iter = self
                         .handles
-                        .iter()
+                        .iter_mut()
                         .map(move |worker| worker.1.stop(graceful))
                         .collect();
 

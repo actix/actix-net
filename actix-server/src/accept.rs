@@ -408,9 +408,7 @@ impl Accept {
 
     fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
         loop {
-            let info = sockets
-                .get_mut(token)
-                .expect("ServerSocketInfo is removed from Slab");
+            let info = &mut sockets[token];
 
             match info.lst.accept() {
                 Ok(io) => {

@@ -13,7 +13,6 @@ use std::{fmt, io};
 
 use actix_rt::net::TcpStream;
 use mio::event::Source;
-use mio::net::TcpStream as MioTcpStream;
 use mio::{Interest, Registry, Token};
 
 #[cfg(windows)]
@@ -21,7 +20,6 @@ use std::os::windows::io::{FromRawSocket, IntoRawSocket};
 #[cfg(unix)]
 use {
     actix_rt::net::UnixStream,
-    mio::net::{SocketAddr as MioSocketAddr, UnixStream as MioUnixStream},
     std::os::unix::io::{FromRawFd, IntoRawFd},
 };
 
@@ -131,7 +129,7 @@ impl fmt::Display for MioListener {
 pub(crate) enum SocketAddr {
     Tcp(StdSocketAddr),
     #[cfg(unix)]
-    Uds(MioSocketAddr),
+    Uds(mio::net::SocketAddr),
 }
 
 impl fmt::Display for SocketAddr {
@@ -156,9 +154,9 @@ impl fmt::Debug for SocketAddr {
 
 #[derive(Debug)]
 pub enum MioStream {
-    Tcp(MioTcpStream),
+    Tcp(mio::net::TcpStream),
     #[cfg(unix)]
-    Uds(MioUnixStream),
+    Uds(mio::net::UnixStream),
 }
 
 /// helper trait for converting mio stream to tokio stream.

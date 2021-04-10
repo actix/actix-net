@@ -11,6 +11,7 @@ mod server;
 mod service;
 mod signals;
 mod socket;
+mod spsc;
 mod test_server;
 mod waker_queue;
 mod worker;
