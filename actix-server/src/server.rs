@@ -19,14 +19,14 @@ use crate::builder::ServerBuilder;
 use crate::service::InternalServiceFactory;
 use crate::signals::{Signal, Signals};
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandle};
+use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandleServer};
 
 /// When awaited or spawned would listen to signal and message from [ServerHandle](ServerHandle).
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Server {
     cmd_tx: UnboundedSender<ServerCommand>,
     cmd_rx: UnboundedReceiver<ServerCommand>,
-    handles: Vec<(usize, WorkerHandle)>,
+    handles: Vec<(usize, WorkerHandleServer)>,
     services: Vec<Box<dyn InternalServiceFactory>>,
     notify: Vec<oneshot::Sender<()>>,
     exit: bool,
@@ -216,9 +216,9 @@ impl Server {
                     );
 
                     match res {
-                        Ok(handle) => {
-                            self.handles.push((new_idx, handle.clone()));
-                            self.waker_queue.wake(WakerInterest::Worker(handle));
+                        Ok((handle_accept, handle_server)) => {
+                            self.handles.push((new_idx, handle_server));
+                            self.waker_queue.wake(WakerInterest::Worker(handle_accept));
                         }
                         Err(e) => error!("Can not start worker: {:?}", e),
                     }

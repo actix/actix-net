@@ -6,7 +6,7 @@ use std::{
 
 use mio::{Registry, Token as MioToken, Waker};
 
-use crate::worker::WorkerHandle;
+use crate::worker::WorkerHandleAccept;
 
 /// Waker token for `mio::Poll` instance.
 pub(crate) const WAKER_TOKEN: MioToken = MioToken(usize::MAX);
@@ -80,6 +80,6 @@ pub(crate) enum WakerInterest {
     Stop,
     /// `Worker` is an interest happen after a worker runs into faulted state(This is determined
     /// by if work can be sent to it successfully).`Accept` would be waked up and add the new
-    /// `WorkerHandle`.
-    Worker(WorkerHandle),
+    /// `WorkerHandleAccept`.
+    Worker(WorkerHandleAccept),
 }

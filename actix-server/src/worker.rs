@@ -28,11 +28,9 @@ use crate::socket::MioStream;
 use crate::waker_queue::{WakerInterest, WakerQueue};
 use crate::Token;
 
-pub(crate) struct WorkerCommand(Conn);
-
-/// Stop worker message. Returns `true` on successful shutdown
-/// and `false` if some connections still alive.
-pub(crate) struct StopCommand {
+/// Stop worker message. Returns `true` on successful graceful shutdown.
+/// and `false` if some connections still alive when shutdown execute.
+struct Stop {
     graceful: bool,
     tx: oneshot::Sender<bool>,
 }
@@ -43,42 +41,55 @@ pub(crate) struct Conn {
     pub token: Token,
 }
 
-// a handle to worker that can send message to worker and share the availability of worker to other
-// thread.
-#[derive(Clone)]
-pub(crate) struct WorkerHandle {
+fn handle_pair(
+    idx: usize,
+    tx1: UnboundedSender<Conn>,
+    tx2: UnboundedSender<Stop>,
+    avail: WorkerAvailability,
+) -> (WorkerHandleAccept, WorkerHandleServer) {
+    let accept = WorkerHandleAccept {
+        idx,
+        tx: tx1,
+        avail,
+    };
+
+    let server = WorkerHandleServer { idx, tx: tx2 };
+
+    (accept, server)
+}
+
+/// Handle to worker that can send connection message to worker and share the
+/// availability of worker to other thread.
+///
+/// Held by [Accept](crate::accept::Accept).
+pub(crate) struct WorkerHandleAccept {
     pub idx: usize,
-    tx1: UnboundedSender<WorkerCommand>,
-    tx2: UnboundedSender<StopCommand>,
+    tx: UnboundedSender<Conn>,
     avail: WorkerAvailability,
 }
 
-impl WorkerHandle {
-    pub fn new(
-        idx: usize,
-        tx1: UnboundedSender<WorkerCommand>,
-        tx2: UnboundedSender<StopCommand>,
-        avail: WorkerAvailability,
-    ) -> Self {
-        WorkerHandle {
-            idx,
-            tx1,
-            tx2,
-            avail,
-        }
+impl WorkerHandleAccept {
+    pub(crate) fn send(&self, msg: Conn) -> Result<(), Conn> {
+        self.tx.send(msg).map_err(|msg| msg.0)
     }
 
-    pub fn send(&self, msg: Conn) -> Result<(), Conn> {
-        self.tx1.send(WorkerCommand(msg)).map_err(|msg| msg.0 .0)
-    }
-
-    pub fn available(&self) -> bool {
+    pub(crate) fn available(&self) -> bool {
         self.avail.available()
     }
+}
 
-    pub fn stop(&self, graceful: bool) -> oneshot::Receiver<bool> {
+/// Handle to worker than can send stop message to worker.
+///
+/// Held by [ServerBuilder](crate::builder::ServerBuilder).
+pub(crate) struct WorkerHandleServer {
+    pub idx: usize,
+    tx: UnboundedSender<Stop>,
+}
+
+impl WorkerHandleServer {
+    pub(crate) fn stop(&self, graceful: bool) -> oneshot::Receiver<bool> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.tx2.send(StopCommand { graceful, tx });
+        let _ = self.tx.send(Stop { graceful, tx });
         rx
     }
 }
@@ -114,8 +125,8 @@ impl WorkerAvailability {
 ///
 /// Worker accepts Socket objects via unbounded channel and starts stream processing.
 pub(crate) struct ServerWorker {
-    rx: UnboundedReceiver<WorkerCommand>,
-    rx2: UnboundedReceiver<StopCommand>,
+    rx: UnboundedReceiver<Conn>,
+    rx2: UnboundedReceiver<Stop>,
     services: Vec<WorkerService>,
     availability: WorkerAvailability,
     conns: Counter,
@@ -187,7 +198,7 @@ impl ServerWorker {
         factories: Vec<Box<dyn InternalServiceFactory>>,
         availability: WorkerAvailability,
         config: ServerWorkerConfig,
-    ) -> io::Result<WorkerHandle> {
+    ) -> io::Result<(WorkerHandleAccept, WorkerHandleServer)> {
         assert!(!availability.available());
 
         let (tx1, rx) = unbounded_channel();
@@ -267,7 +278,7 @@ impl ServerWorker {
             .recv()
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
             .map(Err)
-            .unwrap_or_else(|| Ok(WorkerHandle::new(idx, tx1, tx2, avail)))
+            .unwrap_or_else(|| Ok(handle_pair(idx, tx1, tx2, avail)))
     }
 
     fn restart_service(&mut self, token: Token, factory_id: usize) {
@@ -373,8 +384,7 @@ impl Future for ServerWorker {
         let this = self.as_mut().get_mut();
 
         // `StopWorker` message handler
-        if let Poll::Ready(Some(StopCommand { graceful, tx })) =
-            Pin::new(&mut this.rx2).poll_recv(cx)
+        if let Poll::Ready(Some(Stop { graceful, tx })) = Pin::new(&mut this.rx2).poll_recv(cx)
         {
             this.availability.set(false);
             let num = this.conns.total();
@@ -483,7 +493,7 @@ impl Future for ServerWorker {
 
                 match ready!(Pin::new(&mut this.rx).poll_recv(cx)) {
                     // handle incoming io stream
-                    Some(WorkerCommand(msg)) => {
+                    Some(msg) => {
                         let guard = this.conns.get();
                         let _ = this.services[msg.token.0].service.call((guard, msg.io));
                     }

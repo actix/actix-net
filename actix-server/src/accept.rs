@@ -9,7 +9,9 @@ use crate::builder::ServerBuilder;
 use crate::server::ServerHandle;
 use crate::socket::{MioListener, SocketAddr};
 use crate::waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN};
-use crate::worker::{Conn, ServerWorker, WorkerAvailability, WorkerHandle};
+use crate::worker::{
+    Conn, ServerWorker, WorkerAvailability, WorkerHandleAccept, WorkerHandleServer,
+};
 use crate::Token;
 
 const DUR_ON_ERR: Duration = Duration::from_millis(500);
@@ -32,7 +34,7 @@ struct ServerSocketInfo {
 pub(crate) struct Accept {
     poll: Poll,
     waker_queue: WakerQueue,
-    handles: Vec<WorkerHandle>,
+    handles: Vec<WorkerHandleAccept>,
     srv: ServerHandle,
     next: usize,
     backpressure: bool,
@@ -58,7 +60,7 @@ impl Accept {
     pub(crate) fn start(
         sockets: Vec<(Token, MioListener)>,
         builder: &ServerBuilder,
-    ) -> io::Result<(WakerQueue, Vec<(usize, WorkerHandle)>)> {
+    ) -> io::Result<(WakerQueue, Vec<(usize, WorkerHandleServer)>)> {
         let server_handle = ServerHandle::new(builder.cmd_tx.clone());
 
         // construct poll instance and it's waker
@@ -66,15 +68,14 @@ impl Accept {
         let waker_queue = WakerQueue::new(poll.registry())?;
 
         // construct workers and collect handles.
-        let (handles, handles_clone) = (0..builder.threads)
+        let (handles_accept, handles_server) = (0..builder.threads)
             .map(|idx| {
                 // start workers
                 let availability = WorkerAvailability::new(waker_queue.clone());
                 let factories = builder.services.iter().map(|v| v.clone_factory()).collect();
-                let handle =
+                let (handle_accept, handle_server) =
                     ServerWorker::start(idx, factories, availability, builder.worker_config)?;
-                let handle_clone = (idx, handle.clone());
-                Ok((handle, handle_clone))
+                Ok((handle_accept, (idx, handle_server)))
             })
             .collect::<Result<Vec<_>, io::Error>>()?
             .into_iter()
@@ -82,8 +83,13 @@ impl Accept {
 
         let wake_queue_clone = waker_queue.clone();
 
-        let (mut accept, sockets) =
-            Accept::new_with_sockets(poll, wake_queue_clone, sockets, handles, server_handle)?;
+        let (mut accept, sockets) = Accept::new_with_sockets(
+            poll,
+            wake_queue_clone,
+            sockets,
+            handles_accept,
+            server_handle,
+        )?;
 
         // Accept runs in its own thread.
         thread::Builder::new()
@@ -92,14 +98,14 @@ impl Accept {
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
         // return waker and worker handle clones to server builder.
-        Ok((waker_queue, handles_clone))
+        Ok((waker_queue, handles_server))
     }
 
     fn new_with_sockets(
         poll: Poll,
         waker_queue: WakerQueue,
         socks: Vec<(Token, MioListener)>,
-        handles: Vec<WorkerHandle>,
+        handles: Vec<WorkerHandleAccept>,
         srv: ServerHandle,
     ) -> io::Result<(Accept, Slab<ServerSocketInfo>)> {
         let mut sockets = Slab::new();
@@ -393,7 +399,7 @@ impl Accept {
     }
 
     fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
-        while !self.backpressure {
+        loop {
             let info = sockets
                 .get_mut(token)
                 .expect("ServerSocketInfo is removed from Slab");
