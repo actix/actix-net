@@ -22,7 +22,7 @@ use tokio::sync::oneshot;
 
 use crate::service::{BoxedServerService, InternalServiceFactory};
 use crate::socket::MioStream;
-use crate::spsc::{channel, Receiver, Sender};
+use crate::spsc;
 use crate::waker_queue::{WakerInterest, WakerQueue};
 use crate::{join_all, Token};
 
@@ -41,17 +41,17 @@ pub(crate) struct Conn {
 
 fn handle_pair(
     idx: usize,
-    tx1: Sender<Conn>,
-    tx2: Sender<Stop>,
+    tx_accept: spsc::Sender<Conn>,
+    tx_server: spsc::Sender<Stop>,
     avail: WorkerAvailability,
 ) -> (WorkerHandleAccept, WorkerHandleServer) {
     let accept = WorkerHandleAccept {
         idx,
-        tx: tx1,
+        tx: tx_accept,
         avail,
     };
 
-    let server = WorkerHandleServer { idx, tx: tx2 };
+    let server = WorkerHandleServer { idx, tx: tx_server };
 
     (accept, server)
 }
@@ -62,7 +62,7 @@ fn handle_pair(
 /// Held by [Accept](crate::accept::Accept).
 pub(crate) struct WorkerHandleAccept {
     pub idx: usize,
-    tx: Sender<Conn>,
+    tx: spsc::Sender<Conn>,
     avail: WorkerAvailability,
 }
 
@@ -81,7 +81,7 @@ impl WorkerHandleAccept {
 /// Held by [ServerBuilder](crate::builder::ServerBuilder).
 pub(crate) struct WorkerHandleServer {
     pub idx: usize,
-    tx: Sender<Stop>,
+    tx: spsc::Sender<Stop>,
 }
 
 impl WorkerHandleServer {
@@ -123,8 +123,8 @@ impl WorkerAvailability {
 ///
 /// Worker accepts Socket objects via unbounded channel and starts stream processing.
 pub(crate) struct ServerWorker {
-    rx: Receiver<Conn>,
-    rx2: Receiver<Stop>,
+    rx_accept: spsc::Receiver<Conn>,
+    rx_server: spsc::Receiver<Stop>,
     services: Vec<WorkerService>,
     availability: WorkerAvailability,
     conns: Counter,
@@ -198,8 +198,8 @@ impl ServerWorker {
         availability: WorkerAvailability,
         config: ServerWorkerConfig,
     ) -> (WorkerHandleAccept, WorkerHandleServer) {
-        let (tx1, rx) = channel(backlog as _);
-        let (tx2, rx2) = channel(1);
+        let (tx_accept, rx_accept) = spsc::channel(backlog as _);
+        let (tx_server, rx_server) = spsc::channel(1);
         let avail = availability.clone();
 
         // every worker runs in it's own arbiter.
@@ -214,8 +214,8 @@ impl ServerWorker {
         .spawn(async move {
             availability.set(false);
             let mut wrk = ServerWorker {
-                rx,
-                rx2,
+                rx_accept,
+                rx_server,
                 services: Vec::new(),
                 availability,
                 conns: Counter::new(config.max_concurrent_connections),
@@ -264,7 +264,7 @@ impl ServerWorker {
             });
         });
 
-        handle_pair(idx, tx1, tx2, avail)
+        handle_pair(idx, tx_accept, tx_server, avail)
     }
 
     fn restart_service(&mut self, token: Token, factory_id: usize) {
@@ -370,7 +370,7 @@ impl Future for ServerWorker {
         let this = self.as_mut().get_mut();
 
         // `StopWorker` message handler
-        if let Poll::Ready(Stop { graceful, tx }) = this.rx2.poll_recv_unpin(cx) {
+        if let Poll::Ready(Stop { graceful, tx }) = this.rx_server.poll_recv_unpin(cx) {
             this.availability.set(false);
             let num = this.conns.total();
             if num == 0 {
@@ -465,7 +465,7 @@ impl Future for ServerWorker {
             WorkerState::Available => loop {
                 match this.check_readiness(cx) {
                     Ok(true) => {
-                        let msg = ready!(this.rx.poll_recv_unpin(cx));
+                        let msg = ready!(this.rx_accept.poll_recv_unpin(cx));
                         // handle incoming io stream
                         let guard = this.conns.get();
                         let _ = this.services[msg.token.0].service.call((guard, msg.io));

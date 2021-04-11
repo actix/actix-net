@@ -3,7 +3,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures_util::task::AtomicWaker;
+use futures_core::task::__internal::AtomicWaker;
 use rtrb::{Consumer, Producer, PushError, RingBuffer};
 
 pub fn channel<T>(cap: usize) -> (Sender<T>, Receiver<T>) {
@@ -50,5 +50,25 @@ impl<T> Receiver<T> {
                 Poll::Pending
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use actix_utils::future::poll_fn;
+
+    #[actix_rt::test]
+    async fn test_send() {
+        let (mut tx, mut rx) = channel::<usize>(1);
+
+        let res = poll_fn(|cx| Poll::Ready(rx.poll_recv_unpin(cx))).await;
+        assert!(res.is_pending());
+
+        tx.send(996).unwrap();
+
+        let res = poll_fn(|cx| rx.poll_recv_unpin(cx)).await;
+        assert_eq!(res, 996);
     }
 }
