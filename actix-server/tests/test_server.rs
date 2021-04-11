@@ -475,11 +475,17 @@ async fn test_worker_restart() {
             let mut stream = stream.into_std().unwrap();
             use std::io::Write;
             let str = counter.to_string();
-            stream.write_all(str.as_bytes()).unwrap();
+            let buf = str.as_bytes();
 
+            let mut written = 0;
+
+            while written < buf.len() {
+                if let Ok(n) = stream.write(&buf[written..]) {
+                    written += n;
+                }
+            }
             stream.flush().unwrap();
-
-            stream.shutdown(net::Shutdown::Both).unwrap();
+            stream.shutdown(net::Shutdown::Write).unwrap();
 
             // force worker 2 to restart service once.
             if counter == 2 {
@@ -498,7 +504,6 @@ async fn test_worker_restart() {
         let counter = counter.clone();
         actix_rt::System::new().block_on(async {
             let server = Server::build()
-                .backlog(1)
                 .disable_signals()
                 .bind("addr", addr, move || TestServiceFactory(counter.clone()))
                 .unwrap()
@@ -537,12 +542,11 @@ async fn test_worker_restart() {
 
     // worker 2 restarting and work goes to worker 1.
     let mut stream = TcpStream::connect(addr).await.unwrap();
+
     let n = stream.read(&mut buf).await.unwrap();
     let id = String::from_utf8_lossy(&buf[0..n]);
     assert_eq!("1", id);
     stream.shutdown().await.unwrap();
-
-    sleep(Duration::from_secs(3)).await;
 
     // worker 2 restarted but worker 1 was still the next to accept connection.
     let mut stream = TcpStream::connect(addr).await.unwrap();
