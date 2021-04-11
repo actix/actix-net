@@ -437,7 +437,6 @@ async fn test_service_restart() {
     let _ = h.join().unwrap();
 }
 
-#[cfg(unix)]
 #[actix_rt::test]
 async fn test_worker_restart() {
     use actix_service::{Service, ServiceFactory};
@@ -456,8 +455,6 @@ async fn test_worker_restart() {
 
         fn new_service(&self, _: Self::Config) -> Self::Future {
             let counter = self.0.fetch_add(1, Ordering::Relaxed);
-
-            println!("counter is {}", counter);
 
             Box::pin(async move { Ok(TestService(counter)) })
         }
