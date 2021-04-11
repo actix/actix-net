@@ -475,7 +475,7 @@ async fn test_worker_restart() {
             let mut stream = stream.into_std().unwrap();
             use std::io::Write;
             let str = counter.to_string();
-            stream.write(str.as_bytes()).unwrap();
+            stream.write_all(str.as_bytes()).unwrap();
 
             stream.flush().unwrap();
 
@@ -534,8 +534,6 @@ async fn test_worker_restart() {
     let id = String::from_utf8_lossy(&buf[0..n]);
     assert_eq!("1", id);
     stream.shutdown().await.unwrap();
-
-    sleep(Duration::from_secs(3)).await;
 
     // worker 2 restarting and work goes to worker 1.
     let mut stream = TcpStream::connect(addr).await.unwrap();
