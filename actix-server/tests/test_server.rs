@@ -438,7 +438,7 @@ async fn test_service_restart() {
 }
 
 #[actix_rt::test]
-async fn test_worker_restart() {
+async fn worker_restart() {
     use actix_service::{Service, ServiceFactory};
     use futures_core::future::LocalBoxFuture;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -540,7 +540,8 @@ async fn test_worker_restart() {
     assert_eq!("1", id);
     stream.shutdown().await.unwrap();
 
-    sleep(Duration::from_secs(5)).await;
+    // TODO: Remove sleep if it can pass CI.
+    sleep(Duration::from_secs(3)).await;
 
     // worker 2 restarting and work goes to worker 1.
     let mut stream = TcpStream::connect(addr).await.unwrap();
@@ -550,12 +551,18 @@ async fn test_worker_restart() {
     assert_eq!("1", id);
     stream.shutdown().await.unwrap();
 
+    // TODO: Remove sleep if it can pass CI.
+    sleep(Duration::from_secs(3)).await;
+
     // worker 2 restarted but worker 1 was still the next to accept connection.
     let mut stream = TcpStream::connect(addr).await.unwrap();
     let n = stream.read(&mut buf).await.unwrap();
     let id = String::from_utf8_lossy(&buf[0..n]);
     assert_eq!("1", id);
     stream.shutdown().await.unwrap();
+
+    // TODO: Remove sleep if it can pass CI.
+    sleep(Duration::from_secs(3)).await;
 
     // worker 2 accept connection again but it's id is 3.
     let mut stream = TcpStream::connect(addr).await.unwrap();
