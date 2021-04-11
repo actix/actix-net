@@ -540,6 +540,8 @@ async fn test_worker_restart() {
     assert_eq!("1", id);
     stream.shutdown().await.unwrap();
 
+    sleep(Duration::from_secs(5)).await;
+
     // worker 2 restarting and work goes to worker 1.
     let mut stream = TcpStream::connect(addr).await.unwrap();
 
