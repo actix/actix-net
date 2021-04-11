@@ -479,6 +479,8 @@ async fn test_worker_restart() {
 
             stream.flush().unwrap();
 
+            stream.shutdown(net::Shutdown::Both).unwrap();
+
             // force worker 2 to restart service once.
             if counter == 2 {
                 panic!("panic on purpose")
@@ -532,6 +534,8 @@ async fn test_worker_restart() {
     let id = String::from_utf8_lossy(&buf[0..n]);
     assert_eq!("1", id);
     stream.shutdown().await.unwrap();
+
+    sleep(Duration::from_secs(3)).await;
 
     // worker 2 restarting and work goes to worker 1.
     let mut stream = TcpStream::connect(addr).await.unwrap();
