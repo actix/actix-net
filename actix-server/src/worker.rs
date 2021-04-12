@@ -200,10 +200,10 @@ impl ServerWorker {
         config: ServerWorkerConfig,
     ) -> io::Result<(WorkerHandleAccept, WorkerHandleServer)> {
         assert!(!availability.available());
+        let avail = availability.clone();
 
         let (tx1, rx) = unbounded_channel();
         let (tx2, rx2) = unbounded_channel();
-        let avail = availability.clone();
 
         // Try to get actix system when have one.
         let system = System::try_current();

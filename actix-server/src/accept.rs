@@ -60,7 +60,7 @@ impl Accept {
     pub(crate) fn start(
         sockets: Vec<(Token, MioListener)>,
         builder: &ServerBuilder,
-    ) -> io::Result<(WakerQueue, Vec<(usize, WorkerHandleServer)>)> {
+    ) -> io::Result<(WakerQueue, Vec<WorkerHandleServer>)> {
         let server_handle = ServerHandle::new(builder.cmd_tx.clone());
 
         // construct poll instance and it's waker
@@ -73,9 +73,8 @@ impl Accept {
                 // start workers
                 let availability = WorkerAvailability::new(waker_queue.clone());
                 let factories = builder.services.iter().map(|v| v.clone_factory()).collect();
-                let (handle_accept, handle_server) =
-                    ServerWorker::start(idx, factories, availability, builder.worker_config)?;
-                Ok((handle_accept, (idx, handle_server)))
+
+                ServerWorker::start(idx, factories, availability, builder.worker_config)
             })
             .collect::<Result<Vec<_>, io::Error>>()?
             .into_iter()
