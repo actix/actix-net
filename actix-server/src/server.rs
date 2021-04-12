@@ -58,6 +58,10 @@ impl Server {
 
         // construct signals future.
         let signals = if !builder.no_signals {
+            // Check tokio runtime.
+            tokio::runtime::Handle::try_current()
+                .map(|_|())
+                .expect("there is no reactor running. Please enable ServerBuilder::disable_signals when start server in non tokio 1.x runtime.");
             Some(Signals::new())
         } else {
             None
