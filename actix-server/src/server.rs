@@ -127,10 +127,6 @@ impl Server {
                     _ => None,
                 }
             }
-            ServerCommand::Notify(tx) => {
-                self.notify.push(tx);
-                None
-            }
             ServerCommand::Stop {
                 graceful,
                 completion,
@@ -272,19 +268,14 @@ pub(crate) enum ServerCommand {
         graceful: bool,
         completion: Option<oneshot::Sender<()>>,
     },
-    /// Notify of server stop
-    Notify(oneshot::Sender<()>),
 }
 
-#[derive(Debug)]
-pub struct ServerHandle(
-    UnboundedSender<ServerCommand>,
-    Option<oneshot::Receiver<()>>,
-);
+#[derive(Clone, Debug)]
+pub struct ServerHandle(UnboundedSender<ServerCommand>);
 
 impl ServerHandle {
     pub(crate) fn new(tx: UnboundedSender<ServerCommand>) -> Self {
-        ServerHandle(tx, None)
+        ServerHandle(tx)
     }
 
     pub(crate) fn worker_faulted(&self, idx: usize) {
@@ -324,29 +315,5 @@ impl ServerHandle {
         async {
             let _ = rx.await;
         }
-    }
-}
-
-impl Clone for ServerHandle {
-    fn clone(&self) -> Self {
-        Self(self.0.clone(), None)
-    }
-}
-
-impl Future for ServerHandle {
-    type Output = io::Result<()>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-
-        if this.1.is_none() {
-            let (tx, rx) = oneshot::channel();
-            if this.0.send(ServerCommand::Notify(tx)).is_err() {
-                return Poll::Ready(Ok(()));
-            }
-            this.1 = Some(rx);
-        }
-
-        Pin::new(this.1.as_mut().unwrap()).poll(cx).map(|_| Ok(()))
     }
 }
