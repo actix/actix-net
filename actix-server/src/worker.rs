@@ -135,6 +135,13 @@ pub(crate) struct ServerWorker {
     shutdown_timeout: Duration,
 }
 
+/// Set worker to unavailable when dropping.
+impl Drop for ServerWorker {
+    fn drop(&mut self) {
+        self.rx.close();
+    }
+}
+
 struct WorkerService {
     factory: usize,
     status: WorkerServiceStatus,

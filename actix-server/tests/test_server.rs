@@ -517,6 +517,8 @@ async fn worker_restart() {
 
     let (server, sys) = rx.recv().unwrap();
 
+    sleep(Duration::from_secs(3)).await;
+
     let mut buf = [0; 8];
 
     // worker 1 would not restart and return it's id consistently.
@@ -545,7 +547,6 @@ async fn worker_restart() {
 
     // worker 2 restarting and work goes to worker 1.
     let mut stream = TcpStream::connect(addr).await.unwrap();
-
     let n = stream.read(&mut buf).await.unwrap();
     let id = String::from_utf8_lossy(&buf[0..n]);
     assert_eq!("1", id);
