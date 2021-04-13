@@ -127,10 +127,10 @@ impl WorkerAvailability {
 pub(crate) struct ServerWorker {
     rx: UnboundedReceiver<Conn>,
     rx2: UnboundedReceiver<Stop>,
-    services: Vec<WorkerService>,
+    services: Box<[WorkerService]>,
     availability: WorkerAvailability,
     conns: Counter,
-    factories: Vec<Box<dyn InternalServiceFactory>>,
+    factories: Box<[Box<dyn InternalServiceFactory>]>,
     state: WorkerState,
     shutdown_timeout: Duration,
 }
@@ -196,7 +196,7 @@ impl ServerWorker {
     /// Start server worker in sync.
     pub(crate) fn start(
         idx: usize,
-        factories: Vec<Box<dyn InternalServiceFactory>>,
+        factories: Box<[Box<dyn InternalServiceFactory>]>,
         avail: WorkerAvailability,
         config: ServerWorkerConfig,
     ) -> io::Result<(WorkerHandleAccept, WorkerHandleServer)> {
@@ -217,7 +217,7 @@ impl ServerWorker {
     /// Start server worker in async.
     pub(crate) fn start_non_blocking(
         idx: usize,
-        factories: Vec<Box<dyn InternalServiceFactory>>,
+        factories: Box<[Box<dyn InternalServiceFactory>]>,
         avail: WorkerAvailability,
         config: ServerWorkerConfig,
     ) -> impl Future<Output = io::Result<(WorkerHandleAccept, WorkerHandleServer)>> {
@@ -239,7 +239,7 @@ impl ServerWorker {
 
     fn _start<F>(
         idx: usize,
-        factories: Vec<Box<dyn InternalServiceFactory>>,
+        factories: Box<[Box<dyn InternalServiceFactory>]>,
         availability: WorkerAvailability,
         config: ServerWorkerConfig,
         f: F,
@@ -304,7 +304,7 @@ impl ServerWorker {
                         let worker = ServerWorker {
                             rx,
                             rx2,
-                            services,
+                            services: services.into_boxed_slice(),
                             availability,
                             conns: Counter::new(config.max_concurrent_connections),
                             factories,
