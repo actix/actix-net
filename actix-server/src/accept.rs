@@ -113,7 +113,7 @@ impl Availability {
         } else if idx < 128 * 4 {
             (3, idx - 128 * 3)
         } else {
-            unreachable!("Max WorkerHandle count is 512")
+            panic!("Max WorkerHandle count is 512")
         };
 
         if avail {
