@@ -119,7 +119,11 @@ impl Availability {
         if avail {
             self.0[offset] |= 1 << idx as u128;
         } else {
-            self.0[offset] ^= 1 << idx as u128;
+            let shift = 1 << idx as u128;
+
+            debug_assert_ne!(self.0[offset] & shift, 0);
+
+            self.0[offset] ^= shift;
         }
     }
 
@@ -519,6 +523,8 @@ mod test {
         aval.set_available(idx, true);
         assert!(aval.available());
 
+        aval.set_available(idx, true);
+
         aval.set_available(idx, false);
         assert!(!aval.available());
     }
@@ -557,6 +563,13 @@ mod test {
     fn overflow() {
         let mut aval = Availability::default();
         single(&mut aval, 512);
+    }
+
+    #[test]
+    #[should_panic]
+    fn double_set_unavailable() {
+        let mut aval = Availability::default();
+        aval.set_available(233, false);
     }
 
     #[test]
