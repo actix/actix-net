@@ -195,23 +195,12 @@ impl Accept {
             });
         }
 
-        let accept = Accept::new(poll, waker, handles, srv);
-
-        (accept, sockets)
-    }
-
-    fn new(
-        poll: Poll,
-        waker: WakerQueue,
-        handles: Vec<WorkerHandleAccept>,
-        srv: Server,
-    ) -> Self {
         let mut avail = Availability::default();
 
         // Assume all handles are avail at construct time.
         avail.set_available_all(&handles);
 
-        Self {
+        let accept = Accept {
             poll,
             waker,
             handles,
@@ -219,7 +208,9 @@ impl Accept {
             next: 0,
             avail,
             backpressure: false,
-        }
+        };
+
+        (accept, sockets)
     }
 
     fn poll_with(&mut self, mut sockets: Slab<ServerSocketInfo>) {
@@ -228,12 +219,8 @@ impl Accept {
         loop {
             if let Err(e) = self.poll.poll(&mut events, None) {
                 match e.kind() {
-                    std::io::ErrorKind::Interrupted => {
-                        continue;
-                    }
-                    _ => {
-                        panic!("Poll error: {}", e);
-                    }
+                    std::io::ErrorKind::Interrupted => continue,
+                    _ => panic!("Poll error: {}", e),
                 }
             }
 
@@ -412,9 +399,9 @@ impl Accept {
             }
         } else {
             while self.avail.available() {
-                let next = self.next;
-                let idx = self.handles[next].idx;
-                if self.handles[next].available() {
+                let next = self.next();
+                let idx = next.idx;
+                if next.available() {
                     self.avail.set_available(idx, true);
                     match self.send_connection(sockets, conn) {
                         Ok(_) => return,
@@ -439,7 +426,7 @@ impl Accept {
         sockets: &mut Slab<ServerSocketInfo>,
         conn: Conn,
     ) -> Result<(), Conn> {
-        match self.handles[self.next].send(conn) {
+        match self.next().send(conn) {
             Ok(_) => {
                 self.set_next();
                 Ok(())
@@ -502,6 +489,10 @@ impl Accept {
                 }
             };
         }
+    }
+
+    fn next(&self) -> &WorkerHandleAccept {
+        &self.handles[self.next]
     }
 
     /// Set next worker handle that would accept connection.
