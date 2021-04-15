@@ -381,45 +381,29 @@ impl ServerBuilder {
                 let notify = std::mem::take(&mut self.notify);
 
                 // stop workers
-                if !self.handles.is_empty() && graceful {
-                    let iter = self
-                        .handles
-                        .iter()
-                        .map(move |worker| worker.1.stop(graceful))
-                        .collect();
+                let stop = self
+                    .handles
+                    .iter()
+                    .map(move |worker| worker.1.stop(graceful))
+                    .collect();
 
-                    let fut = join_all(iter);
-
-                    rt::spawn(async move {
-                        let _ = fut.await;
-                        if let Some(tx) = completion {
-                            let _ = tx.send(());
-                        }
-                        for tx in notify {
-                            let _ = tx.send(());
-                        }
-                        if exit {
-                            rt::spawn(async {
-                                sleep(Duration::from_millis(300)).await;
-                                System::current().stop();
-                            });
-                        }
-                    });
-                } else {
-                    // we need to stop system if server was spawned
-                    if self.exit {
-                        rt::spawn(async {
-                            sleep(Duration::from_millis(300)).await;
-                            System::current().stop();
-                        });
+                rt::spawn(async move {
+                    if graceful {
+                        let _ = join_all(stop).await;
                     }
+
                     if let Some(tx) = completion {
                         let _ = tx.send(());
                     }
                     for tx in notify {
                         let _ = tx.send(());
                     }
-                }
+
+                    if exit {
+                        sleep(Duration::from_millis(300)).await;
+                        System::current().stop();
+                    }
+                });
             }
             ServerCommand::WorkerFaulted(idx) => {
                 let mut found = false;
