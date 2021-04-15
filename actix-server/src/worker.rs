@@ -125,7 +125,7 @@ impl WorkerAvailability {
 ///
 /// Worker accepts Socket objects via unbounded channel and starts stream processing.
 pub(crate) struct ServerWorker {
-    // UnboundedReceiver<Conn> should always the first field.
+    // UnboundedReceiver<Conn> should always be the first field.
     // It must be dropped as soon as ServerWorker dropping.
     rx: UnboundedReceiver<Conn>,
     rx2: UnboundedReceiver<Stop>,
@@ -372,7 +372,7 @@ impl Default for WorkerState {
 
 impl Drop for ServerWorker {
     fn drop(&mut self) {
-        // Stop Arbiter Self runs on on drop.
+        // Stop the Arbiter ServerWorker runs on on drop.
         Arbiter::current().stop();
     }
 }
