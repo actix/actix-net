@@ -222,10 +222,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::{
-        future::{ready, Ready},
-        time::Duration,
-    };
+    use core::time::Duration;
+
+    use actix_utils::future::{ready, Ready};
 
     use super::*;
     use crate::Service;
