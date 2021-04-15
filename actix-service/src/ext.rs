@@ -1,8 +1,12 @@
 use crate::{
-    map::Map, map_err::MapErr, transform_err::TransformMapInitErr, Service, ServiceFactory,
-    Transform,
+    and_then::{AndThenService, AndThenServiceFactory},
+    map::Map,
+    map_err::MapErr,
+    transform_err::TransformMapInitErr,
+    IntoService, IntoServiceFactory, Service, ServiceFactory, Transform,
 };
 
+/// An extension trait for [`Service`]s that provides a variety of convenient adapters.
 pub trait ServiceExt<Req>: Service<Req> {
     /// Map this service's output to a different type, returning a new service
     /// of the resulting type.
@@ -36,10 +40,27 @@ pub trait ServiceExt<Req>: Service<Req> {
     {
         MapErr::new(self, f)
     }
+
+    /// Call another service after call to this one has resolved successfully.
+    ///
+    /// This function can be used to chain two services together and ensure that the second service
+    /// isn't called until call to the fist service have finished. Result of the call to the first
+    /// service is used as an input parameter for the second service's call.
+    ///
+    /// Note that this function consumes the receiving service and returns a wrapped version of it.
+    fn and_then<I, S1>(self, service: I) -> AndThenService<Self, S1, Req>
+    where
+        Self: Sized,
+        I: IntoService<S1, Self::Response>,
+        S1: Service<Self::Response, Error = Self::Error>,
+    {
+        AndThenService::new(self, service.into_service())
+    }
 }
 
 impl<S, Req> ServiceExt<Req> for S where S: Service<Req> {}
 
+/// An extension trait for [`ServiceFactory`]s that provides a variety of convenient adapters.
 pub trait ServiceFactoryExt<Req>: ServiceFactory<Req> {
     /// Map this service's output to a different type, returning a new service
     /// of the resulting type.
@@ -68,10 +89,27 @@ pub trait ServiceFactoryExt<Req>: ServiceFactory<Req> {
     {
         crate::map_init_err::MapInitErr::new(self, f)
     }
+
+    /// Call another service after call to this one has resolved successfully.
+    fn and_then<I, SF1>(self, factory: I) -> AndThenServiceFactory<Self, SF1, Req>
+    where
+        Self: Sized,
+        Self::Config: Clone,
+        I: IntoServiceFactory<SF1, Self::Response>,
+        SF1: ServiceFactory<
+            Self::Response,
+            Config = Self::Config,
+            Error = Self::Error,
+            InitError = Self::InitError,
+        >,
+    {
+        AndThenServiceFactory::new(self, factory.into_factory())
+    }
 }
 
 impl<SF, Req> ServiceFactoryExt<Req> for SF where SF: ServiceFactory<Req> {}
 
+/// An extension trait for [`Transform`]s that provides a variety of convenient adapters.
 pub trait TransformExt<S, Req>: Transform<S, Req> {
     /// Return a new `Transform` whose init error is mapped to to a different type.
     fn map_init_err<F, E>(self, f: F) -> TransformMapInitErr<Self, S, Req, F, E>

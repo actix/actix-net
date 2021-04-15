@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Removed pipeline and related structs/functions. [#???].
+
+[#???]: https://github.com/actix/actix-net/pull/???
 
 
 ## 2.0.0-beta.5 - 2021-03-15

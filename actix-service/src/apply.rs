@@ -214,7 +214,11 @@ mod tests {
     use futures_util::future::lazy;
 
     use super::*;
-    use crate::{ok, pipeline, pipeline_factory, Ready, Service, ServiceFactory};
+    use crate::{
+        ok,
+        pipeline::{pipeline, pipeline_factory},
+        Ready, Service, ServiceFactory,
+    };
 
     #[derive(Clone)]
     struct Srv;

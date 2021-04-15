@@ -1,3 +1,6 @@
+// TODO: see if pipeline is necessary
+#![allow(dead_code)]
+
 use core::{
     marker::PhantomData,
     task::{Context, Poll},
@@ -11,7 +14,7 @@ use crate::then::{ThenService, ThenServiceFactory};
 use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
 /// Construct new pipeline with one service in pipeline chain.
-pub fn pipeline<I, S, Req>(service: I) -> Pipeline<S, Req>
+pub(crate) fn pipeline<I, S, Req>(service: I) -> Pipeline<S, Req>
 where
     I: IntoService<S, Req>,
     S: Service<Req>,
@@ -23,7 +26,7 @@ where
 }
 
 /// Construct new pipeline factory with one service factory.
-pub fn pipeline_factory<I, SF, Req>(factory: I) -> PipelineFactory<SF, Req>
+pub(crate) fn pipeline_factory<I, SF, Req>(factory: I) -> PipelineFactory<SF, Req>
 where
     I: IntoServiceFactory<SF, Req>,
     SF: ServiceFactory<Req>,
@@ -35,7 +38,7 @@ where
 }
 
 /// Pipeline service - pipeline allows to compose multiple service into one service.
-pub struct Pipeline<S, Req> {
+pub(crate) struct Pipeline<S, Req> {
     service: S,
     _phantom: PhantomData<Req>,
 }
@@ -157,7 +160,7 @@ impl<S: Service<Req>, Req> Service<Req> for Pipeline<S, Req> {
 }
 
 /// Pipeline factory
-pub struct PipelineFactory<SF, Req> {
+pub(crate) struct PipelineFactory<SF, Req> {
     factory: SF,
     _phantom: PhantomData<Req>,
 }
