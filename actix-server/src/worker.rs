@@ -272,6 +272,7 @@ impl ServerWorker {
                     .enable_all()
                     .max_blocking_threads(config.max_blocking_threads)
                     .build();
+
                 let res = rt.and_then(|rt| {
                     let fut = async {
                         for (idx, factory) in factories.iter().enumerate() {
@@ -312,7 +313,11 @@ impl ServerWorker {
                             shutdown_timeout: config.shutdown_timeout,
                         };
 
-                        local.block_on(&rt, async { worker.await });
+                        let handle = local.spawn_local(worker);
+
+                        local.block_on(&rt, async {
+                            let _ = handle.await;
+                        });
                     }
                     Err(e) => f(Some(e)),
                 }

@@ -227,7 +227,6 @@ impl Accept {
     }
 
     /// Return true to notify `Accept::poll_with` to return.
-    #[cold]
     fn handle_waker(&mut self, sockets: &mut Slab<ServerSocketInfo>) -> bool {
         // This is a loop because interests for command from previous version was
         // a loop that would try to drain the command channel. It's yet unknown
@@ -460,9 +459,7 @@ impl Accept {
 
     fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
         loop {
-            let info = sockets
-                .get_mut(token)
-                .expect("ServerSocketInfo is removed from Slab");
+            let info = &mut sockets[token];
 
             match info.lst.accept() {
                 Ok(io) => {
@@ -492,11 +489,13 @@ impl Accept {
         }
     }
 
+    #[inline(always)]
     fn next(&self) -> &WorkerHandleAccept {
         &self.handles[self.next]
     }
 
     /// Set next worker handle that would accept connection.
+    #[inline(always)]
     fn set_next(&mut self) {
         self.next = (self.next + 1) % self.handles.len();
     }

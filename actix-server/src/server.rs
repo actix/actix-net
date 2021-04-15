@@ -101,6 +101,38 @@ impl Server {
 }
 
 impl ServerInner {
+    fn handle_signal(&mut self, signal: Signal) -> Option<BoxFuture<'static, ()>> {
+        // Signals support
+        // Handle `SIGINT`, `SIGTERM`, `SIGQUIT` signals and stop actix system
+        match signal {
+            Signal::Int => {
+                info!("SIGINT received, exiting");
+                self.exit = true;
+                self.handle_cmd(ServerCommand::Stop {
+                    graceful: false,
+                    completion: None,
+                })
+            }
+            Signal::Term => {
+                info!("SIGTERM received, stopping");
+                self.exit = true;
+                self.handle_cmd(ServerCommand::Stop {
+                    graceful: true,
+                    completion: None,
+                })
+            }
+            Signal::Quit => {
+                info!("SIGQUIT received, exiting");
+                self.exit = true;
+                self.handle_cmd(ServerCommand::Stop {
+                    graceful: false,
+                    completion: None,
+                })
+            }
+            _ => None,
+        }
+    }
+
     fn handle_cmd(&mut self, item: ServerCommand) -> Option<BoxFuture<'static, ()>> {
         match item {
             ServerCommand::Pause(tx) => {
@@ -113,37 +145,6 @@ impl ServerInner {
                 let _ = tx.send(());
                 None
             }
-            ServerCommand::Signal(sig) => {
-                // Signals support
-                // Handle `SIGINT`, `SIGTERM`, `SIGQUIT` signals and stop actix system
-                match sig {
-                    Signal::Int => {
-                        info!("SIGINT received, exiting");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: false,
-                            completion: None,
-                        })
-                    }
-                    Signal::Term => {
-                        info!("SIGTERM received, stopping");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: true,
-                            completion: None,
-                        })
-                    }
-                    Signal::Quit => {
-                        info!("SIGQUIT received, exiting");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: false,
-                            completion: None,
-                        })
-                    }
-                    _ => None,
-                }
-            }
             ServerCommand::Stop {
                 graceful,
                 completion,
@@ -154,39 +155,29 @@ impl ServerInner {
                 self.waker_queue.wake(WakerInterest::Stop);
 
                 // stop workers
-                if !self.handles.is_empty() && graceful {
-                    let iter = self
-                        .handles
-                        .iter()
-                        .map(move |worker| worker.stop(graceful))
-                        .collect::<Vec<_>>();
+                let stop = self
+                    .handles
+                    .iter()
+                    .map(move |worker| worker.stop(graceful))
+                    .collect::<Vec<_>>();
 
-                    // TODO: this async block can return io::Error.
-                    Some(Box::pin(async move {
-                        for handle in iter {
+                // TODO: this async block can return io::Error.
+                Some(Box::pin(async move {
+                    if graceful {
+                        for handle in stop {
                             let _ = handle.await;
                         }
-                        if let Some(tx) = completion {
-                            let _ = tx.send(());
-                        }
-                        if exit {
-                            sleep(Duration::from_millis(300)).await;
-                            System::try_current().as_ref().map(System::stop);
-                        }
-                    }))
-                } else {
-                    // we need to stop system if server was spawned
-                    // TODO: this async block can return io::Error.
-                    Some(Box::pin(async move {
-                        if exit {
-                            sleep(Duration::from_millis(300)).await;
-                            System::try_current().as_ref().map(System::stop);
-                        }
-                        if let Some(tx) = completion {
-                            let _ = tx.send(());
-                        }
-                    }))
-                }
+                    }
+
+                    if let Some(tx) = completion {
+                        let _ = tx.send(());
+                    }
+
+                    if exit {
+                        sleep(Duration::from_millis(300)).await;
+                        System::try_current().as_ref().map(System::stop);
+                    }
+                }))
             }
             ServerCommand::WorkerFaulted(idx) => {
                 assert!(self.handles.iter().any(|handle| handle.idx == idx));
@@ -199,9 +190,8 @@ impl ServerInner {
                     .iter()
                     .map(|service| service.clone_factory())
                     .collect();
-                let res = ServerWorker::start(idx, factories, availability, self.worker_config);
 
-                match res {
+                match ServerWorker::start(idx, factories, availability, self.worker_config) {
                     Ok((handle_accept, handle_server)) => {
                         *self
                             .handles
@@ -229,7 +219,7 @@ impl Future for Server {
                 // poll signals first. remove it on resolve.
                 if let Some(ref mut signals) = inner.signals {
                     if let Poll::Ready(signal) = Pin::new(signals).poll(cx) {
-                        inner.on_stop_task = inner.handle_cmd(ServerCommand::Signal(signal));
+                        inner.on_stop_task = inner.handle_signal(signal);
                         inner.signals = None;
                     }
                 }
@@ -258,7 +248,6 @@ pub(crate) enum ServerCommand {
     WorkerFaulted(usize),
     Pause(oneshot::Sender<()>),
     Resume(oneshot::Sender<()>),
-    Signal(Signal),
     /// Whether to try and shut down gracefully
     Stop {
         graceful: bool,
