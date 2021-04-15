@@ -53,8 +53,14 @@ use self::ready::{err, ok, ready, Ready};
 /// async fn(Request) -> Result<Response, Err>
 /// ```
 ///
-/// The `Service` trait just generalizes this form where each parameter is described as an
-/// associated type on the trait. Services can also have mutable state that influence computation.
+/// The `Service` trait just generalizes this form. Requests are defined as a generic type parameter
+/// and responses and other details are defined as associated types on the trait impl. Notice that
+/// this design means that services can receive many request types and converge them to a single
+/// response type.
+///
+/// Services can also have mutable state that influence computation by using a `Cell`, `RefCell`
+/// or `Mutex`. Services intentionally do not take `&mut self` to reduce over-head in the
+/// common cases.
 ///
 /// `Service` provides a symmetric and uniform API; the same abstractions can be used to represent
 /// both clients and servers. Services describe only _transformation_ operations which encourage
@@ -64,8 +70,7 @@ use self::ready::{err, ok, ready, Ready};
 /// ```ignore
 /// struct MyService;
 ///
-/// impl Service for MyService {
-///      type Request = u8;
+/// impl Service<u8> for MyService {
 ///      type Response = u64;
 ///      type Error = MyError;
 ///      type Future = Pin<Box<Future<Output=Result<Self::Response, Self::Error>>>>;
@@ -81,6 +86,9 @@ use self::ready::{err, ok, ready, Ready};
 ///
 /// ```ignore
 /// async fn my_service(req: u8) -> Result<u64, MyError>;
+///
+/// let svc = fn_service(my_service)
+/// svc.call(123)
 /// ```
 pub trait Service<Req> {
     /// Responses given by the service.
@@ -144,7 +152,7 @@ pub trait ServiceFactory<Req> {
     /// Errors potentially raised while building a service.
     type InitError;
 
-    /// The future of the `Service` instance.
+    /// The future of the `Service` instance.g
     type Future: Future<Output = Result<Self::Service, Self::InitError>>;
 
     /// Create and return a new service asynchronously.
