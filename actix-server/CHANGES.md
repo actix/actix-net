@@ -1,6 +1,10 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Server shutdown would notify all workers to exit regardless if shutdown is graceful.
+  This would make all worker shutdown immediately in force shutdown case. [#333]
+  
+[#333]: https://github.com/actix/actix-net/pull/333
 
 
 ## 2.0.0-beta.4 - 2021-04-01
