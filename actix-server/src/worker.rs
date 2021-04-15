@@ -422,6 +422,12 @@ impl Default for WorkerState {
     }
 }
 
+impl Drop for ServerWorker {
+    fn drop(&mut self) {
+        Arbiter::current().stop();
+    }
+}
+
 impl Future for ServerWorker {
     type Output = ();
 
