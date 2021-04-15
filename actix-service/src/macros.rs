@@ -1,6 +1,6 @@
-/// A boilerplate implementation of [`Service::poll_ready`] that always signals readiness.
+/// An implementation of [`poll_ready`]() that always signals readiness.
 ///
-/// [`Service::poll_ready`]: crate::Service::poll_ready
+/// [`poll_ready`]: crate::Service::poll_ready
 ///
 /// # Examples
 /// ```no_run
@@ -34,12 +34,12 @@ macro_rules! always_ready {
     };
 }
 
-/// A boilerplate implementation of [`Service::poll_ready`] that forwards readiness checks to a
+/// An implementation of [`poll_ready`] that forwards readiness checks to a
 /// named struct field.
 ///
 /// Tuple structs are not supported.
 ///
-/// [`Service::poll_ready`]: crate::Service::poll_ready
+/// [`poll_ready`]: crate::Service::poll_ready
 ///
 /// # Examples
 /// ```no_run

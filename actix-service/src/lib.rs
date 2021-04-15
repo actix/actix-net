@@ -2,6 +2,7 @@
 
 #![no_std]
 #![deny(rust_2018_idioms, nonstandard_style)]
+#![warn(missing_docs)]
 #![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
@@ -59,7 +60,7 @@ use self::ready::{err, ok, ready, Ready};
 /// response type.
 ///
 /// Services can also have mutable state that influence computation by using a `Cell`, `RefCell`
-/// or `Mutex`. Services intentionally do not take `&mut self` to reduce over-head in the
+/// or `Mutex`. Services intentionally do not take `&mut self` to reduce overhead in the
 /// common cases.
 ///
 /// `Service` provides a symmetric and uniform API; the same abstractions can be used to represent
