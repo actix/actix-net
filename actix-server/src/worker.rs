@@ -368,6 +368,12 @@ impl Default for WorkerState {
     }
 }
 
+impl Drop for ServerWorker {
+    fn drop(&mut self) {
+        Arbiter::current().stop();
+    }
+}
+
 impl Future for ServerWorker {
     type Output = ();
 
@@ -451,14 +457,12 @@ impl Future for ServerWorker {
                     if let WorkerState::Shutdown(shutdown) = mem::take(&mut this.state) {
                         let _ = shutdown.tx.send(true);
                     }
-                    Arbiter::current().stop();
                     Poll::Ready(())
                 } else if shutdown.start_from.elapsed() >= this.shutdown_timeout {
                     // Timeout forceful shutdown.
                     if let WorkerState::Shutdown(shutdown) = mem::take(&mut this.state) {
                         let _ = shutdown.tx.send(false);
                     }
-                    Arbiter::current().stop();
                     Poll::Ready(())
                 } else {
                     // Reset timer and wait for 1 second.
