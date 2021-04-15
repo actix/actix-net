@@ -21,11 +21,10 @@ where
     ApplyTransform::new(t, factory.into_factory())
 }
 
-/// The `Transform` trait defines the interface of a service factory that wraps inner service
-/// during construction.
+/// Defines the interface of a service factory that wraps inner service during construction.
 ///
-/// Transform(middleware) wraps inner service and runs during inbound and/or outbound processing in
-/// the request/response lifecycle. It may modify request and/or response.
+/// Transformers wrap an inner service and runs during inbound and/or outbound processing in the
+/// service lifecycle. It may modify request and/or response.
 ///
 /// For example, a timeout service wrapper:
 ///
