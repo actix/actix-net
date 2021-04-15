@@ -27,7 +27,7 @@ where
 /// Transform(middleware) wraps inner service and runs during inbound and/or outbound processing in
 /// the request/response lifecycle. It may modify request and/or response.
 ///
-/// For example, timeout transform:
+/// For example, a timeout service wrapper:
 ///
 /// ```ignore
 /// pub struct Timeout<S> {
@@ -35,11 +35,7 @@ where
 ///     timeout: Duration,
 /// }
 ///
-/// impl<S> Service for Timeout<S>
-/// where
-///     S: Service,
-/// {
-///     type Request = S::Request;
+/// impl<S: Service<Req>, Req> Service<Req> for Timeout<S> {
 ///     type Response = S::Response;
 ///     type Error = TimeoutError<S::Error>;
 ///     type Future = TimeoutServiceResponse<S>;
@@ -55,26 +51,22 @@ where
 /// }
 /// ```
 ///
-/// Timeout service in above example is decoupled from underlying service implementation and could
-/// be applied to any service.
+/// This wrapper service is decoupled from the underlying service implementation and could be
+/// applied to any service.
 ///
-/// The `Transform` trait defines the interface of a Service factory. `Transform` is often
+/// The `Transform` trait defines the interface of a service wrapper. `Transform` is often
 /// implemented for middleware, defining how to construct a middleware Service. A Service that is
 /// constructed by the factory takes the Service that follows it during execution as a parameter,
 /// assuming ownership of the next Service.
 ///
-/// Factory for `Timeout` middleware from the above example could look like this:
+/// A transform for the `Timeout` middleware could look like this:
 ///
 /// ```ignore
 /// pub struct TimeoutTransform {
 ///     timeout: Duration,
 /// }
 ///
-/// impl<S> Transform<S> for TimeoutTransform
-/// where
-///     S: Service,
-/// {
-///     type Request = S::Request;
+/// impl<S: Service<Req>, Req> Transform<S, Req> for TimeoutTransform {
 ///     type Response = S::Response;
 ///     type Error = TimeoutError<S::Error>;
 ///     type InitError = S::Error;
@@ -82,7 +74,7 @@ where
 ///     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 ///
 ///     fn new_transform(&self, service: S) -> Self::Future {
-///         ready(Ok(TimeoutService {
+///         ready(Ok(Timeout {
 ///             service,
 ///             timeout: self.timeout,
 ///         }))
@@ -224,6 +216,56 @@ where
                 self.poll(cx)
             }
             ApplyTransformFutureStateProj::B { fut } => fut.poll(cx),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::time::Duration;
+
+    use actix_utils::future::{ready, Ready};
+
+    use super::*;
+    use crate::Service;
+
+    // pseudo-doctest for Transform trait
+    pub struct TimeoutTransform {
+        timeout: Duration,
+    }
+
+    // pseudo-doctest for Transform trait
+    impl<S: Service<Req>, Req> Transform<S, Req> for TimeoutTransform {
+        type Response = S::Response;
+        type Error = S::Error;
+        type InitError = S::Error;
+        type Transform = Timeout<S>;
+        type Future = Ready<Result<Self::Transform, Self::InitError>>;
+
+        fn new_transform(&self, service: S) -> Self::Future {
+            ready(Ok(Timeout {
+                service,
+                _timeout: self.timeout,
+            }))
+        }
+    }
+
+    // pseudo-doctest for Transform trait
+    pub struct Timeout<S> {
+        service: S,
+        _timeout: Duration,
+    }
+
+    // pseudo-doctest for Transform trait
+    impl<S: Service<Req>, Req> Service<Req> for Timeout<S> {
+        type Response = S::Response;
+        type Error = S::Error;
+        type Future = S::Future;
+
+        crate::forward_ready!(service);
+
+        fn call(&self, req: Req) -> Self::Future {
+            self.service.call(req)
         }
     }
 }

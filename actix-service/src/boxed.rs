@@ -3,26 +3,30 @@
 use alloc::{boxed::Box, rc::Rc};
 use core::{future::Future, pin::Pin};
 
+use paste::paste;
+
 use crate::{Service, ServiceFactory};
 
-/// A boxed future without a Send bound or lifetime parameters.
+/// A boxed future with no send bound or lifetime parameters.
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T>>>;
 
 macro_rules! service_object {
     ($name: ident, $type: tt, $fn_name: ident) => {
-        /// Type alias for service trait object.
-        pub type $name<Req, Res, Err> = $type<
-            dyn Service<Req, Response = Res, Error = Err, Future = BoxFuture<Result<Res, Err>>>,
-        >;
+        paste! {
+            #[doc = "Type alias for service trait object using `" $type "`."]
+            pub type $name<Req, Res, Err> = $type<
+                dyn Service<Req, Response = Res, Error = Err, Future = BoxFuture<Result<Res, Err>>>,
+            >;
 
-        /// Create service trait object.
-        pub fn $fn_name<S, Req>(service: S) -> $name<Req, S::Response, S::Error>
-        where
-            S: Service<Req> + 'static,
-            Req: 'static,
-            S::Future: 'static,
-        {
-            $type::new(ServiceWrapper::new(service))
+            #[doc = "Wraps service as a trait object using [`" $name "`]."]
+            pub fn $fn_name<S, Req>(service: S) -> $name<Req, S::Response, S::Error>
+            where
+                S: Service<Req> + 'static,
+                Req: 'static,
+                S::Future: 'static,
+            {
+                $type::new(ServiceWrapper::new(service))
+            }
         }
     };
 }
@@ -56,10 +60,10 @@ where
     }
 }
 
-/// Wrapper for a service factory trait object that will produce a boxed trait object service.
+/// Wrapper for a service factory that will map it's services to boxed trait object services.
 pub struct BoxServiceFactory<Cfg, Req, Res, Err, InitErr>(Inner<Cfg, Req, Res, Err, InitErr>);
 
-/// Create service factory trait object.
+/// Wraps a service factory that returns service trait objects.
 pub fn factory<SF, Req>(
     factory: SF,
 ) -> BoxServiceFactory<SF::Config, Req, SF::Response, SF::Error, SF::InitError>
