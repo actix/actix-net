@@ -38,7 +38,6 @@ pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
 pub use self::ext::{ServiceExt, ServiceFactoryExt, TransformExt};
 pub use self::fn_service::{fn_factory, fn_factory_with_config, fn_service};
 pub use self::map_config::{map_config, unit_config};
-pub use self::pipeline::{pipeline, pipeline_factory, Pipeline, PipelineFactory};
 pub use self::transform::{apply, ApplyTransform, Transform};
 
 #[allow(unused_imports)]
