@@ -116,14 +116,11 @@ impl Availability {
             panic!("Max WorkerHandle count is 512")
         };
 
+        let off = 1 << idx as u128;
         if avail {
-            self.0[offset] |= 1 << idx as u128;
+            self.0[offset] |= off;
         } else {
-            let shift = 1 << idx as u128;
-
-            debug_assert_ne!(self.0[offset] & shift, 0);
-
-            self.0[offset] ^= shift;
+            self.0[offset] &= !off
         }
     }
 
@@ -527,6 +524,9 @@ mod test {
 
         aval.set_available(idx, false);
         assert!(!aval.available());
+
+        aval.set_available(idx, false);
+        assert!(!aval.available());
     }
 
     fn multi(aval: &mut Availability, mut idx: Vec<usize>) {
@@ -563,13 +563,6 @@ mod test {
     fn overflow() {
         let mut aval = Availability::default();
         single(&mut aval, 512);
-    }
-
-    #[test]
-    #[should_panic]
-    fn double_set_unavailable() {
-        let mut aval = Availability::default();
-        aval.set_available(233, false);
     }
 
     #[test]
