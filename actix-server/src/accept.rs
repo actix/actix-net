@@ -116,12 +116,11 @@ impl Availability {
             panic!("Max WorkerHandle count is 512")
         };
 
+        let off = 1 << idx as u128;
         if avail {
-            self.0[offset] |= 1 << idx as u128;
+            self.0[offset] |= off;
         } else {
-            let shift = 1 << idx as u128;
-
-            self.0[offset] &= ~shift
+            self.0[offset] &= !off
         }
     }
 
