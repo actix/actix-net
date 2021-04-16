@@ -238,11 +238,11 @@ impl Accept {
                         match guard.pop_front() {
                             // worker notify it becomes available. we may want to recover
                             // from backpressure.
-                            Some(WakerInterest::WorkerAvailable) => {
+                            Some(WakerInterest::WorkerAvailable(idx)) => {
                                 drop(guard);
                                 // Assume all worker are avail as no worker index returned.
-                                self.avail.set_available_all(&self.handles);
                                 self.maybe_backpressure(&mut sockets, false);
+                                self.avail.set_available(idx, true);
                             }
                             // a new worker thread is made and it's handle would be added to Accept
                             Some(WakerInterest::Worker(handle)) => {

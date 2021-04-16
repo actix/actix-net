@@ -96,13 +96,15 @@ impl WorkerHandleServer {
 
 #[derive(Clone)]
 pub(crate) struct WorkerAvailability {
+    idx: usize,
     waker: WakerQueue,
     available: Arc<AtomicBool>,
 }
 
 impl WorkerAvailability {
-    pub fn new(waker: WakerQueue) -> Self {
+    pub fn new(idx: usize, waker: WakerQueue) -> Self {
         WorkerAvailability {
+            idx,
             waker,
             available: Arc::new(AtomicBool::new(false)),
         }
@@ -116,7 +118,7 @@ impl WorkerAvailability {
         let old = self.available.swap(val, Ordering::Release);
         // notify the accept on switched to available.
         if !old && val {
-            self.waker.wake(WakerInterest::WorkerAvailable);
+            self.waker.wake(WakerInterest::WorkerAvailable(self.idx));
         }
     }
 }
