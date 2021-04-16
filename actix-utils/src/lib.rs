@@ -1,4 +1,4 @@
-//! Various utilities for the Actix ecosystem.
+//! Various utilities used in the Actix ecosystem.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![warn(missing_docs)]

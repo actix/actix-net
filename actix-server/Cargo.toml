@@ -23,7 +23,7 @@ default = []
 [dependencies]
 actix-rt = { version = "2.0.0", default-features = false }
 actix-service = "2.0.0"
-actix-utils = "3.0.0-beta.4"
+actix-utils = "3.0.0"
 
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 log = "0.4"
