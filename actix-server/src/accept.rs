@@ -240,7 +240,6 @@ impl Accept {
                             // from backpressure.
                             Some(WakerInterest::WorkerAvailable(idx)) => {
                                 drop(guard);
-                                // Assume all worker are avail as no worker index returned.
                                 self.maybe_backpressure(&mut sockets, false);
                                 self.avail.set_available(idx, true);
                             }
