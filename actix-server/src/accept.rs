@@ -121,9 +121,7 @@ impl Availability {
         } else {
             let shift = 1 << idx as u128;
 
-            if self.0[offset] & shift != 0 {
-                self.0[offset] ^= shift;
-            }
+            self.0[offset] &= ~shift
         }
     }
 
