@@ -56,7 +56,7 @@ pub enum Resolver {
 /// An interface for custom async DNS resolvers.
 ///
 /// # Usage
-/// ```rust
+/// ```
 /// use std::net::SocketAddr;
 ///
 /// use actix_tls::connect::{Resolve, Resolver};
