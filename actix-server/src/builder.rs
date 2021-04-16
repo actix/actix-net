@@ -320,7 +320,7 @@ impl ServerBuilder {
         idx: usize,
         waker: WakerQueue,
     ) -> (WorkerHandleAccept, WorkerHandleServer) {
-        let avail = WorkerAvailability::new(waker);
+        let avail = WorkerAvailability::new(idx, waker);
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
 
         ServerWorker::start(idx, services, avail, self.worker_config)

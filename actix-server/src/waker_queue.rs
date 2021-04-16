@@ -72,7 +72,7 @@ impl WakerQueue {
 pub(crate) enum WakerInterest {
     /// `WorkerAvailable` is an interest from `Worker` notifying `Accept` there is a worker
     /// available and can accept new tasks.
-    WorkerAvailable,
+    WorkerAvailable(usize),
     /// `Pause`, `Resume`, `Stop` Interest are from `ServerBuilder` future. It listens to
     /// `ServerCommand` and notify `Accept` to do exactly these tasks.
     Pause,
