@@ -1,7 +1,7 @@
 //! See [`Service`] docs for information on this crate's foundational trait.
 
 #![no_std]
-#![deny(rust_2018_idioms, nonstandard_style)]
+#![deny(rust_2018_idioms, nonstandard_style, future_incompatible)]
 #![warn(missing_docs)]
 #![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]

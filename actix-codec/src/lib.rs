@@ -7,7 +7,7 @@
 //! [`Sink`]: futures_sink::Sink
 //! [`Stream`]: futures_core::Stream
 
-#![deny(rust_2018_idioms, nonstandard_style)]
+#![deny(rust_2018_idioms, nonstandard_style, future_incompatible)]
 #![warn(missing_docs)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
