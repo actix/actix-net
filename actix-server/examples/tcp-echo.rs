@@ -19,14 +19,14 @@ use std::{
 
 use actix_rt::net::TcpStream;
 use actix_server::Server;
-use actix_service::pipeline_factory;
+use actix_service::{fn_service, ServiceFactoryExt as _};
 use bytes::BytesMut;
 use log::{error, info};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    env::set_var("RUST_LOG", "actix=trace,basic=trace");
+    env::set_var("RUST_LOG", "info");
     env_logger::init();
 
     let count = Arc::new(AtomicUsize::new(0));
@@ -42,7 +42,7 @@ async fn main() -> io::Result<()> {
             let count = Arc::clone(&count);
             let num2 = Arc::clone(&count);
 
-            pipeline_factory(move |mut stream: TcpStream| {
+            fn_service(move |mut stream: TcpStream| {
                 let count = Arc::clone(&count);
 
                 async move {

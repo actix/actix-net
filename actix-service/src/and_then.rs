@@ -11,11 +11,11 @@ use pin_project_lite::pin_project;
 
 use super::{Service, ServiceFactory};
 
-/// Service for the `and_then` combinator, chaining a computation onto the end
-/// of another service which completes successfully.
+/// Service for the `and_then` combinator, chaining a computation onto the end of another service
+/// which completes successfully.
 ///
 /// This is created by the `Pipeline::and_then` method.
-pub(crate) struct AndThenService<A, B, Req>(Rc<(A, B)>, PhantomData<Req>);
+pub struct AndThenService<A, B, Req>(Rc<(A, B)>, PhantomData<Req>);
 
 impl<A, B, Req> AndThenService<A, B, Req> {
     /// Create new `AndThen` combinator
@@ -64,7 +64,7 @@ where
 }
 
 pin_project! {
-    pub(crate) struct AndThenServiceResponse<A, B, Req>
+    pub struct AndThenServiceResponse<A, B, Req>
     where
         A: Service<Req>,
         B: Service<A::Response, Error = A::Error>,
@@ -117,7 +117,7 @@ where
 }
 
 /// `.and_then()` service factory combinator
-pub(crate) struct AndThenServiceFactory<A, B, Req>
+pub struct AndThenServiceFactory<A, B, Req>
 where
     A: ServiceFactory<Req>,
     A::Config: Clone,
@@ -200,7 +200,7 @@ where
 }
 
 pin_project! {
-    pub(crate) struct AndThenServiceFactoryResponse<A, B, Req>
+    pub struct AndThenServiceFactoryResponse<A, B, Req>
     where
         A: ServiceFactory<Req>,
         B: ServiceFactory<A::Response>,
@@ -272,7 +272,9 @@ mod tests {
     use futures_util::future::lazy;
 
     use crate::{
-        fn_factory, ok, pipeline, pipeline_factory, ready, Ready, Service, ServiceFactory,
+        fn_factory, ok,
+        pipeline::{pipeline, pipeline_factory},
+        ready, Ready, Service, ServiceFactory,
     };
 
     struct Srv1(Rc<Cell<usize>>);

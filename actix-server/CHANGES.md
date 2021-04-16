@@ -5,8 +5,11 @@
 * Remove `Future` impl for `ServerBuilder`. [#266]
 * Rename `Server` to `ServerHandle`. `ServerHandle` must be explicitly constructed with `Server::handle` API. [#266]
 * Add `Server`(new type) that can be `await` for blocking until server stop. [#266]
+* Server shutdown would notify all workers to exit regardless if shutdown is graceful.
+  This would make all worker shutdown immediately in force shutdown case. [#333]
 
 [#266]: https://github.com/actix/actix-net/pull/266
+[#333]: https://github.com/actix/actix-net/pull/333
 
 
 ## 2.0.0-beta.4 - 2021-04-01
