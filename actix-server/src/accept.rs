@@ -128,7 +128,7 @@ impl Availability {
     /// This would result in a re-check on all workers' availability.
     fn set_available_all(&mut self, handles: &[WorkerHandleAccept]) {
         handles.iter().for_each(|handle| {
-            self.set_available(handle.idx, true);
+            self.set_available(handle.idx(), true);
         })
     }
 }
@@ -248,7 +248,7 @@ impl Accept {
                                 drop(guard);
                                 // maybe we want to recover from a backpressure.
                                 self.maybe_backpressure(&mut sockets, false);
-                                self.avail.set_available(handle.idx, true);
+                                self.avail.set_available(handle.idx(), true);
                                 self.handles.push(handle);
                             }
                             // got timer interest and it's time to try register socket(s) again
@@ -400,7 +400,7 @@ impl Accept {
         } else {
             while self.avail.available() {
                 let next = self.next();
-                let idx = next.idx;
+                let idx = next.idx();
                 if next.available() {
                     self.avail.set_available(idx, true);
                     match self.send_connection(sockets, conn) {
@@ -503,7 +503,7 @@ impl Accept {
     /// Remove next worker handle that fail to accept connection.
     fn remove_next(&mut self) {
         let handle = self.handles.swap_remove(self.next);
-        let idx = handle.idx;
+        let idx = handle.idx();
         // A message is sent to `ServerBuilder` future to notify it a new worker
         // should be made.
         self.srv.worker_faulted(idx);
