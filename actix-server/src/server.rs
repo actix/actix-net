@@ -184,7 +184,7 @@ impl ServerInner {
 
                 error!("Worker {} has died, restarting", idx);
 
-                let availability = WorkerAvailability::new(self.waker_queue.clone());
+                let availability = WorkerAvailability::new(idx, self.waker_queue.clone());
                 let factories = self
                     .services
                     .iter()

@@ -118,7 +118,7 @@ impl Accept {
         let (handles_accept, handles_server) = (0..builder.threads)
             .map(|idx| {
                 // start workers
-                let availability = WorkerAvailability::new(waker_queue.clone());
+                let availability = WorkerAvailability::new(idx, waker_queue.clone());
                 let factories = builder.services.iter().map(|v| v.clone_factory()).collect();
 
                 ServerWorker::start(idx, factories, availability, builder.worker_config)
@@ -237,17 +237,18 @@ impl Accept {
                 // from backpressure.
                 Some(WakerInterest::WorkerAvailable(idx)) => {
                     drop(guard);
-                    self.maybe_backpressure(sockets, false);
+
                     self.avail.set_available(idx, true);
+                    self.maybe_backpressure(sockets, false);
                 }
                 // a new worker thread is made and it's handle would be added to Accept
                 Some(WakerInterest::Worker(handle)) => {
                     drop(guard);
+
+                    self.avail.set_available(handle.idx(), true);
+                    self.handles.push(handle);
                     // maybe we want to recover from a backpressure.
                     self.maybe_backpressure(sockets, false);
-
-                    self.avail.set_available(handle.idx, true);
-                    self.handles.push(handle);
                 }
                 Some(WakerInterest::Pause) => {
                     drop(guard);
