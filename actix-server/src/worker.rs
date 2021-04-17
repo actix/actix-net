@@ -272,11 +272,6 @@ impl ServerWorker {
         thread::Builder::new()
             .name(format!("actix-server-worker-{}", idx))
             .spawn(move || {
-                // Conditionally setup actix system.
-                if let Some(system) = system {
-                    System::set_current(system);
-                }
-
                 // Prepare service construct future.
                 let fut = async {
                     let mut services = Vec::new();
@@ -301,8 +296,8 @@ impl ServerWorker {
                 // All future runs in a LocalSet for being able to run !Send future.
                 let local = tokio::task::LocalSet::new();
 
-                match rt_handle {
-                    Ok(handle) => {
+                match (rt_handle, system) {
+                    (Ok(handle), None) => {
                         // Use existing tokio runtime with handle.
                         let res = handle.block_on(local.run_until(fut));
 
@@ -330,7 +325,12 @@ impl ServerWorker {
                             Err(e) => f(Some(e)),
                         }
                     }
-                    Err(_) => {
+                    (_, system) => {
+                        // Conditionally setup actix system.
+                        if let Some(system) = system {
+                            System::set_current(system);
+                        }
+
                         // No existing tokio runtime found. Start new runtime.
                         let rt = tokio::runtime::Builder::new_current_thread()
                             .enable_all()
