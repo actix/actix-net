@@ -55,6 +55,20 @@ impl Server {
             })
             .collect();
 
+        // Give log information on what runtime will be used.
+        let is_tokio = tokio::runtime::Handle::try_current().is_ok();
+        let is_actix = actix_rt::System::try_current().is_some();
+
+        if is_tokio && !is_actix {
+            info!("Tokio runtime found. Starting in existing tokio runtime");
+        } else if is_actix {
+            info!("Actix runtime found. Starting in actix runtime");
+        } else {
+            info!(
+                "Actix/Tokio runtime not found. Starting in new tokio current-thread runtime"
+            );
+        }
+
         // start accept thread. return waker_queue and worker handles.
         match Accept::start(sockets, &builder) {
             Ok((waker_queue, handles)) => {
