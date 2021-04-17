@@ -47,11 +47,7 @@ fn handle_pair(
     tx2: UnboundedSender<Stop>,
     avail: WorkerAvailability,
 ) -> (WorkerHandleAccept, WorkerHandleServer) {
-    let accept = WorkerHandleAccept {
-        idx,
-        tx: tx1,
-        avail,
-    };
+    let accept = WorkerHandleAccept { tx: tx1, avail };
 
     let server = WorkerHandleServer { idx, tx: tx2 };
 
@@ -63,16 +59,22 @@ fn handle_pair(
 ///
 /// Held by [Accept](crate::accept::Accept).
 pub(crate) struct WorkerHandleAccept {
-    pub idx: usize,
     tx: UnboundedSender<Conn>,
     avail: WorkerAvailability,
 }
 
 impl WorkerHandleAccept {
+    #[inline(always)]
+    pub(crate) fn idx(&self) -> usize {
+        self.avail.idx
+    }
+
+    #[inline(always)]
     pub(crate) fn send(&self, msg: Conn) -> Result<(), Conn> {
         self.tx.send(msg).map_err(|msg| msg.0)
     }
 
+    #[inline(always)]
     pub(crate) fn available(&self) -> bool {
         self.avail.available()
     }
@@ -96,27 +98,34 @@ impl WorkerHandleServer {
 
 #[derive(Clone)]
 pub(crate) struct WorkerAvailability {
+    idx: usize,
     waker: WakerQueue,
     available: Arc<AtomicBool>,
 }
 
 impl WorkerAvailability {
-    pub fn new(waker: WakerQueue) -> Self {
+    pub fn new(idx: usize, waker: WakerQueue) -> Self {
         WorkerAvailability {
+            idx,
             waker,
             available: Arc::new(AtomicBool::new(false)),
         }
     }
 
+    #[inline(always)]
     pub fn available(&self) -> bool {
         self.available.load(Ordering::Acquire)
     }
 
     pub fn set(&self, val: bool) {
-        let old = self.available.swap(val, Ordering::Release);
-        // notify the accept on switched to available.
+        // Ordering:
+        //
+        // There could be multiple set calls happen in one <ServerWorker as Future>::poll.
+        // Order is important between them.
+        let old = self.available.swap(val, Ordering::AcqRel);
+        // Notify the accept on switched to available.
         if !old && val {
-            self.waker.wake(WakerInterest::WorkerAvailable);
+            self.waker.wake(WakerInterest::WorkerAvailable(self.idx));
         }
     }
 }
@@ -455,6 +464,15 @@ struct Shutdown {
 impl Default for WorkerState {
     fn default() -> Self {
         Self::Unavailable
+    }
+}
+
+impl Drop for ServerWorker {
+    fn drop(&mut self) {
+        // Set availability to true so if accept try to send connection to this worker
+        // it would find worker is gone and remove it.
+        // This is helpful when worker is dropped unexpected.
+        self.availability.set(true);
     }
 }
 

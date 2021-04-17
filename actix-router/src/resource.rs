@@ -581,10 +581,7 @@ impl ResourceDef {
         mut for_prefix: bool,
     ) -> (String, Vec<PatternElement>, bool, usize) {
         if pattern.find('{').is_none() {
-            // TODO: MSRV: 1.45
-            #[allow(clippy::manual_strip)]
-            return if pattern.ends_with('*') {
-                let path = &pattern[..pattern.len() - 1];
+            return if let Some(path) = pattern.strip_suffix('*') {
                 let re = String::from("^") + path + "(.*)";
                 (re, vec![PatternElement::Str(String::from(path))], true, 0)
             } else {

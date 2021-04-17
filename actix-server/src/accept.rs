@@ -73,14 +73,11 @@ impl Availability {
             panic!("Max WorkerHandle count is 512")
         };
 
+        let off = 1 << idx as u128;
         if avail {
-            self.0[offset] |= 1 << idx as u128;
+            self.0[offset] |= off;
         } else {
-            let shift = 1 << idx as u128;
-
-            debug_assert_ne!(self.0[offset] & shift, 0);
-
-            self.0[offset] ^= shift;
+            self.0[offset] &= !off
         }
     }
 
@@ -88,7 +85,7 @@ impl Availability {
     /// This would result in a re-check on all workers' availability.
     fn set_available_all(&mut self, handles: &[WorkerHandleAccept]) {
         handles.iter().for_each(|handle| {
-            self.set_available(handle.idx, true);
+            self.set_available(handle.idx(), true);
         })
     }
 }
@@ -238,12 +235,10 @@ impl Accept {
             match guard.pop_front() {
                 // worker notify it becomes available. we may want to recover
                 // from backpressure.
-                Some(WakerInterest::WorkerAvailable) => {
+                Some(WakerInterest::WorkerAvailable(idx)) => {
                     drop(guard);
                     self.maybe_backpressure(sockets, false);
-
-                    // Assume all worker are avail as no worker index returned.
-                    self.avail.set_available_all(&self.handles);
+                    self.avail.set_available(idx, true);
                 }
                 // a new worker thread is made and it's handle would be added to Accept
                 Some(WakerInterest::Worker(handle)) => {
@@ -406,7 +401,7 @@ impl Accept {
         } else {
             while self.avail.available() {
                 let next = self.next();
-                let idx = next.idx;
+                let idx = next.idx();
                 if next.available() {
                     self.avail.set_available(idx, true);
                     match self.send_connection(sockets, conn) {
@@ -503,7 +498,7 @@ impl Accept {
     /// Remove next worker handle that fail to accept connection.
     fn remove_next(&mut self) {
         let handle = self.handles.swap_remove(self.next);
-        let idx = handle.idx;
+        let idx = handle.idx();
         // A message is sent to `ServerBuilder` future to notify it a new worker
         // should be made.
         self.srv.worker_faulted(idx);
@@ -520,6 +515,9 @@ mod test {
         assert!(aval.available());
 
         aval.set_available(idx, true);
+
+        aval.set_available(idx, false);
+        assert!(!aval.available());
 
         aval.set_available(idx, false);
         assert!(!aval.available());
@@ -559,13 +557,6 @@ mod test {
     fn overflow() {
         let mut aval = Availability::default();
         single(&mut aval, 512);
-    }
-
-    #[test]
-    #[should_panic]
-    fn double_set_unavailable() {
-        let mut aval = Availability::default();
-        aval.set_available(233, false);
     }
 
     #[test]
