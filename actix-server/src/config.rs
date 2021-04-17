@@ -14,7 +14,6 @@ use log::error;
 use crate::builder::bind_addr;
 use crate::service::{BoxedServerService, InternalServiceFactory, StreamService};
 use crate::socket::{MioStream, MioTcpListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
-use crate::Token;
 
 pub struct ServiceConfig {
     pub(crate) services: Vec<(String, MioTcpListener)>,
@@ -81,9 +80,9 @@ impl ServiceConfig {
 
 pub(super) struct ConfiguredService {
     rt: Box<dyn ServiceRuntimeConfiguration>,
-    names: HashMap<Token, (String, StdSocketAddr)>,
-    topics: HashMap<String, Token>,
-    services: Vec<Token>,
+    names: HashMap<usize, (String, StdSocketAddr)>,
+    topics: HashMap<String, usize>,
+    services: Vec<usize>,
 }
 
 impl ConfiguredService {
@@ -96,7 +95,7 @@ impl ConfiguredService {
         }
     }
 
-    pub(super) fn stream(&mut self, token: Token, name: String, addr: StdSocketAddr) {
+    pub(super) fn stream(&mut self, token: usize, name: String, addr: StdSocketAddr) {
         self.names.insert(token, (name.clone(), addr));
         self.topics.insert(name, token);
         self.services.push(token);
@@ -104,8 +103,8 @@ impl ConfiguredService {
 }
 
 impl InternalServiceFactory for ConfiguredService {
-    fn name(&self, token: Token) -> &str {
-        &self.names[&token].0
+    fn name(&self, idx: usize) -> &str {
+        &self.names[&idx].0
     }
 
     fn clone_factory(&self) -> Box<dyn InternalServiceFactory> {
@@ -117,7 +116,7 @@ impl InternalServiceFactory for ConfiguredService {
         })
     }
 
-    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>> {
+    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(usize, BoxedServerService)>, ()>> {
         // configure services
         let mut rt = ServiceRuntime::new(self.topics.clone());
         self.rt.configure(&mut rt);
@@ -185,13 +184,13 @@ fn not_configured(_: &mut ServiceRuntime) {
 }
 
 pub struct ServiceRuntime {
-    names: HashMap<String, Token>,
-    services: HashMap<Token, BoxedNewService>,
+    names: HashMap<String, usize>,
+    services: HashMap<usize, BoxedNewService>,
     onstart: Vec<LocalBoxFuture<'static, ()>>,
 }
 
 impl ServiceRuntime {
-    fn new(names: HashMap<String, Token>) -> Self {
+    fn new(names: HashMap<String, usize>) -> Self {
         ServiceRuntime {
             names,
             services: HashMap::new(),

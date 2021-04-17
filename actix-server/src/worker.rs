@@ -23,10 +23,10 @@ use tokio::sync::{
     oneshot,
 };
 
+use crate::join_all;
 use crate::service::{BoxedServerService, InternalServiceFactory};
 use crate::socket::MioStream;
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::{join_all, Token};
 
 /// Stop worker message. Returns `true` on successful graceful shutdown.
 /// and `false` if some connections still alive when shutdown execute.
@@ -38,7 +38,7 @@ pub(crate) struct Stop {
 #[derive(Debug)]
 pub(crate) struct Conn {
     pub io: MioStream,
-    pub token: Token,
+    pub token: usize,
 }
 
 fn handle_pair(
@@ -249,8 +249,8 @@ impl ServerWorker {
                     Ok(res) => res
                         .into_iter()
                         .flatten()
-                        .fold(Vec::new(), |mut services, (factory, token, service)| {
-                            assert_eq!(token.0, services.len());
+                        .fold(Vec::new(), |mut services, (factory, idx, service)| {
+                            assert_eq!(idx, services.len());
                             services.push(WorkerService {
                                 factory,
                                 service,
@@ -283,13 +283,13 @@ impl ServerWorker {
         handle_pair(idx, tx1, tx2, avail)
     }
 
-    fn restart_service(&mut self, token: Token, factory_id: usize) {
+    fn restart_service(&mut self, idx: usize, factory_id: usize) {
         let factory = &self.factories[factory_id];
-        trace!("Service {:?} failed, restarting", factory.name(token));
-        self.services[token.0].status = WorkerServiceStatus::Restarting;
+        trace!("Service {:?} failed, restarting", factory.name(idx));
+        self.services[idx].status = WorkerServiceStatus::Restarting;
         self.state = WorkerState::Restarting(Restart {
             factory_id,
-            token,
+            idx,
             fut: factory.create(),
         });
     }
@@ -307,7 +307,7 @@ impl ServerWorker {
             });
     }
 
-    fn check_readiness(&mut self, cx: &mut Context<'_>) -> Result<bool, (Token, usize)> {
+    fn check_readiness(&mut self, cx: &mut Context<'_>) -> Result<bool, (usize, usize)> {
         let mut ready = self.conns.available(cx);
         for (idx, srv) in self.services.iter_mut().enumerate() {
             if srv.status == WorkerServiceStatus::Available
@@ -318,7 +318,7 @@ impl ServerWorker {
                         if srv.status == WorkerServiceStatus::Unavailable {
                             trace!(
                                 "Service {:?} is available",
-                                self.factories[srv.factory].name(Token(idx))
+                                self.factories[srv.factory].name(idx)
                             );
                             srv.status = WorkerServiceStatus::Available;
                         }
@@ -329,7 +329,7 @@ impl ServerWorker {
                         if srv.status == WorkerServiceStatus::Available {
                             trace!(
                                 "Service {:?} is unavailable",
-                                self.factories[srv.factory].name(Token(idx))
+                                self.factories[srv.factory].name(idx)
                             );
                             srv.status = WorkerServiceStatus::Unavailable;
                         }
@@ -337,10 +337,10 @@ impl ServerWorker {
                     Poll::Ready(Err(_)) => {
                         error!(
                             "Service {:?} readiness check returned error, restarting",
-                            self.factories[srv.factory].name(Token(idx))
+                            self.factories[srv.factory].name(idx)
                         );
                         srv.status = WorkerServiceStatus::Failed;
-                        return Err((Token(idx), srv.factory));
+                        return Err((idx, srv.factory));
                     }
                 }
             }
@@ -359,8 +359,8 @@ enum WorkerState {
 
 struct Restart {
     factory_id: usize,
-    token: Token,
-    fut: LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>>,
+    idx: usize,
+    fut: LocalBoxFuture<'static, Result<Vec<(usize, BoxedServerService)>, ()>>,
 }
 
 // Shutdown keep states necessary for server shutdown:
@@ -438,7 +438,7 @@ impl Future for ServerWorker {
             },
             WorkerState::Restarting(ref mut restart) => {
                 let factory_id = restart.factory_id;
-                let token = restart.token;
+                let token = restart.idx;
 
                 let service = ready!(restart.fut.as_mut().poll(cx))
                     .unwrap_or_else(|_| {
@@ -459,7 +459,7 @@ impl Future for ServerWorker {
                     this.factories[factory_id].name(token)
                 );
 
-                this.services[token.0].created(service);
+                this.services[token].created(service);
                 this.state = WorkerState::Unavailable;
 
                 self.poll(cx)
@@ -508,7 +508,7 @@ impl Future for ServerWorker {
                     // handle incoming io stream
                     Some(msg) => {
                         let guard = this.conns.get();
-                        let _ = this.services[msg.token.0].service.call((guard, msg.io));
+                        let _ = this.services[msg.token].service.call((guard, msg.io));
                     }
                     None => return Poll::Ready(()),
                 };

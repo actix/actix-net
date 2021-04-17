@@ -1,14 +1,14 @@
 [package]
 name = "actix-utils"
-version = "3.0.0-beta.4"
+version = "3.0.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
 ]
-description = "Utilities for the Actix ecosystem"
+description = "Various utilities used in the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
-repository = "https://github.com/actix/actix-net.git"
 categories = ["network-programming", "asynchronous"]
+repository = "https://github.com/actix/actix-net"
 license = "MIT OR Apache-2.0"
 edition = "2018"
 

@@ -11,7 +11,6 @@ use futures_core::future::LocalBoxFuture;
 use log::error;
 
 use crate::socket::{FromStream, MioStream};
-use crate::Token;
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
     type Factory: BaseServiceFactory<Stream, Config = ()>;
@@ -20,11 +19,11 @@ pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
 }
 
 pub(crate) trait InternalServiceFactory: Send {
-    fn name(&self, token: Token) -> &str;
+    fn name(&self, token: usize) -> &str;
 
     fn clone_factory(&self) -> Box<dyn InternalServiceFactory>;
 
-    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>>;
+    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(usize, BoxedServerService)>, ()>>;
 }
 
 pub(crate) type BoxedServerService = Box<
@@ -86,7 +85,7 @@ where
 pub(crate) struct StreamNewService<F: ServiceFactory<Io>, Io: FromStream> {
     name: String,
     inner: F,
-    token: Token,
+    token: usize,
     addr: SocketAddr,
     _t: PhantomData<Io>,
 }
@@ -98,7 +97,7 @@ where
 {
     pub(crate) fn create(
         name: String,
-        token: Token,
+        token: usize,
         inner: F,
         addr: SocketAddr,
     ) -> Box<dyn InternalServiceFactory> {
@@ -117,7 +116,7 @@ where
     F: ServiceFactory<Io>,
     Io: FromStream + Send + 'static,
 {
-    fn name(&self, _: Token) -> &str {
+    fn name(&self, _: usize) -> &str {
         &self.name
     }
 
@@ -131,7 +130,7 @@ where
         })
     }
 
-    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>> {
+    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(usize, BoxedServerService)>, ()>> {
         let token = self.token;
         let fut = self.inner.create().new_service(());
         Box::pin(async move {
