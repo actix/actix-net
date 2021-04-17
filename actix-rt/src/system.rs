@@ -148,24 +148,27 @@ impl System {
     /// Send an async task to [System] and spawn running it.
     /// Returned [JoinHandle](crate::task::JoinHandle) can be used to await for the task's output.
     ///
-    /// # Error
+    /// # Panics
+    /// Panics if no system is registered on the current thread.
+    ///
+    /// # Errors
     /// [actix_rt::spawn](crate::spawn) can not be used inside `System::spawn`.
     pub fn spawn<T>(task: T) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
+        let (tx, rx) = oneshot::channel();
+
+        CURRENT.with(|cell| match *cell.borrow() {
+            Some(ref sys) => sys.arbiter_handle.spawn(async {
+                let res = tokio::spawn(task).await;
+                let _ = tx.send(res);
+            }),
+            None => panic!("System is not running"),
+        });
+
         tokio::spawn(async {
-            let (tx, rx) = oneshot::channel();
-
-            CURRENT.with(|cell| match *cell.borrow() {
-                Some(ref sys) => sys.arbiter_handle.spawn(async {
-                    let res = tokio::spawn(task).await;
-                    let _ = tx.send(res);
-                }),
-                None => panic!("System is not running"),
-            });
-
             // unwrap would be caught by tokio and output as JoinError
             rx.await.unwrap().unwrap()
         })
