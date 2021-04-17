@@ -252,18 +252,16 @@ impl Accept {
                 // from backpressure.
                 Some(WakerInterest::WorkerAvailable(idx)) => {
                     drop(guard);
-                    self.maybe_backpressure(sockets, false);
                     self.avail.set_available(idx, true);
-                    self.accept_all(sockets);
+                    self.maybe_backpressure(sockets, false);
                 }
                 // a new worker thread is made and it's handle would be added to Accept
                 Some(WakerInterest::Worker(handle)) => {
                     drop(guard);
-                    // maybe we want to recover from a backpressure.
-                    self.maybe_backpressure(sockets, false);
                     self.avail.set_available(handle.idx(), true);
                     self.handles.push(handle);
-                    self.accept_all(sockets);
+                    // maybe we want to recover from a backpressure.
+                    self.maybe_backpressure(sockets, false);
                 }
                 // got timer interest and it's time to try register socket(s) again
                 Some(WakerInterest::Timer) => {
@@ -391,6 +389,14 @@ impl Accept {
                         self.register_logged(info);
                     }
                 });
+
+            // Try to drain sockets backlog on recovery of backpressure.
+            // This is necessary for not hang listeners.
+            //
+            // In Accept::accept method listener does not always read to WouldBlock state.
+            if !self.backpressure {
+                self.accept_all(sockets);
+            }
         }
     }
 
@@ -425,12 +431,12 @@ impl Accept {
         }
     }
 
-    fn send_conn(&mut self, sockets: &mut [ServerSocketInfo], mut conn: Conn) {
+    fn accept_one(&mut self, sockets: &mut [ServerSocketInfo], mut conn: Conn) {
         loop {
             let next = self.next();
             let idx = next.idx();
             if next.available() {
-                self.avail.set_available(idx, true);
+                // self.avail.set_available(idx, true);
                 match self.send_connection(sockets, conn) {
                     Ok(_) => return,
                     Err(c) => conn = c,
@@ -463,7 +469,7 @@ impl Accept {
             match info.lst.accept() {
                 Ok(io) => {
                     let conn = Conn { io, token };
-                    self.send_conn(sockets, conn);
+                    self.accept_one(sockets, conn);
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return,
                 Err(ref e) if connection_error(e) => continue,
