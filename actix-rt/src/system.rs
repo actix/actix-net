@@ -157,10 +157,15 @@ impl System {
     {
         tokio::spawn(async {
             let (tx, rx) = oneshot::channel();
-            System::current().arbiter().spawn(async move {
-                let res = tokio::spawn(task).await;
-                let _ = tx.send(res);
+
+            CURRENT.with(|cell| match *cell.borrow() {
+                Some(ref sys) => sys.arbiter_handle.spawn(async {
+                    let res = tokio::spawn(task).await;
+                    let _ = tx.send(res);
+                }),
+                None => panic!("System is not running"),
             });
+
             // unwrap would be caught by tokio and output as JoinError
             rx.await.unwrap().unwrap()
         })
