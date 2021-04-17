@@ -298,3 +298,48 @@ fn try_current_no_system() {
 fn try_current_with_system() {
     System::new().block_on(async { assert!(System::try_current().is_some()) });
 }
+
+#[test]
+fn system_spawn() {
+    System::new().block_on(async {
+        // Test detached with dropped handle
+        let num = Arc::new(AtomicBool::new(false));
+        let num_clone = num.clone();
+        System::spawn(async move {
+            actix_rt::time::sleep(Duration::from_millis(500)).await;
+            num_clone.store(true, Ordering::SeqCst);
+        });
+
+        let now = Instant::now();
+        while !num.load(Ordering::SeqCst) {
+            actix_rt::time::sleep(Duration::from_millis(500)).await;
+            if now.elapsed() > Duration::from_secs(10) {
+                panic!("System::spawn deadlocked")
+            }
+        }
+
+        // test join handle await
+        let num = Arc::new(AtomicBool::new(false));
+        let num_clone = num.clone();
+        System::spawn(async move {
+            actix_rt::task::yield_now().await;
+            num_clone.store(true, Ordering::SeqCst);
+            actix_rt::task::yield_now().await;
+        })
+        .await
+        .unwrap();
+
+        assert!(num.load(Ordering::SeqCst));
+
+        // test extra actix_rt::spawn
+        let res = System::spawn(async move {
+            actix_rt::task::yield_now().await;
+            actix_rt::spawn(async {
+                actix_rt::task::yield_now().await;
+            });
+        })
+        .await;
+
+        assert!(res.is_err())
+    });
+}

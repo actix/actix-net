@@ -11,6 +11,7 @@ use std::{
 use futures_core::ready;
 use tokio::sync::{mpsc, oneshot};
 
+use crate::task::JoinHandle;
 use crate::{arbiter::ArbiterHandle, runtime::default_tokio_runtime, Arbiter, Runtime};
 
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -142,6 +143,27 @@ impl System {
     /// Stop the system with a given exit code.
     pub fn stop_with_code(&self, code: i32) {
         let _ = self.sys_tx.send(SystemCommand::Exit(code));
+    }
+
+    /// Send an async task to [System] and spawn running it.
+    /// Returned [JoinHandle](crate::task::JoinHandle) can be used to await for the task's output.
+    ///
+    /// # Error
+    /// [actix_rt::spawn](crate::spawn) can not be used inside `System::spawn`.
+    pub fn spawn<T>(task: T) -> JoinHandle<T::Output>
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
+        tokio::spawn(async {
+            let (tx, rx) = oneshot::channel();
+            System::current().arbiter().spawn(async move {
+                let res = tokio::spawn(task).await;
+                let _ = tx.send(res);
+            });
+            // unwrap would be caught by tokio and output as JoinError
+            rx.await.unwrap().unwrap()
+        })
     }
 
     pub(crate) fn tx(&self) -> &mpsc::UnboundedSender<SystemCommand> {
