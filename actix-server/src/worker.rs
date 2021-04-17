@@ -224,6 +224,7 @@ impl ServerWorker {
             .unwrap_or_else(|| Ok(handle_pair(idx, tx1, tx2, avail)))
     }
 
+    // TODO: Use start_non_blocking when restarting worker.
     #[allow(dead_code)]
     /// Start server worker in async.
     pub(crate) fn start_non_blocking(
