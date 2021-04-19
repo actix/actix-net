@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::Index;
 
 use serde::de;
@@ -5,10 +6,16 @@ use serde::de;
 use crate::de::PathDeserializer;
 use crate::{Resource, ResourcePath};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) enum PathItem {
-    Static(&'static str),
+    Static(Cow<'static, str>),
     Segment(u16, u16),
+}
+
+impl Default for PathItem {
+    fn default() -> Self {
+        Self::Static(Cow::Borrowed(""))
+    }
 }
 
 /// Resource path match information
@@ -18,7 +25,7 @@ pub(crate) enum PathItem {
 pub struct Path<T> {
     path: T,
     pub(crate) skip: u16,
-    pub(crate) segments: Vec<(&'static str, PathItem)>,
+    pub(crate) segments: Vec<(Cow<'static, str>, PathItem)>,
 }
 
 impl<T: Default> Default for Path<T> {
@@ -95,18 +102,24 @@ impl<T: ResourcePath> Path<T> {
         self.skip += n;
     }
 
-    pub(crate) fn add(&mut self, name: &'static str, value: PathItem) {
+    pub(crate) fn add(&mut self, name: impl Into<Cow<'static, str>>, value: PathItem) {
         match value {
-            PathItem::Static(s) => self.segments.push((name, PathItem::Static(s))),
-            PathItem::Segment(begin, end) => self
-                .segments
-                .push((name, PathItem::Segment(self.skip + begin, self.skip + end))),
+            PathItem::Static(s) => self.segments.push((name.into(), PathItem::Static(s))),
+            PathItem::Segment(begin, end) => self.segments.push((
+                name.into(),
+                PathItem::Segment(self.skip + begin, self.skip + end),
+            )),
         }
     }
 
     #[doc(hidden)]
-    pub fn add_static(&mut self, name: &'static str, value: &'static str) {
-        self.segments.push((name, PathItem::Static(value)));
+    pub fn add_static(
+        &mut self,
+        name: impl Into<Cow<'static, str>>,
+        value: impl Into<Cow<'static, str>>,
+    ) {
+        let value: Cow<'static, str> = value.into();
+        self.segments.push((name.into(), PathItem::Static(value)));
     }
 
     /// Check if there are any matched patterns

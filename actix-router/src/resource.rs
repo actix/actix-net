@@ -1,3 +1,4 @@
+use std::array::IntoIter;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -274,8 +275,7 @@ impl ResourceDef {
             PatternType::Dynamic(ref re, ref names, len) => {
                 let mut idx = 0;
                 let mut pos = 0;
-                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] =
-                    [PathItem::Static(""); MAX_DYNAMIC_SEGMENTS];
+                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                 if let Some(captures) = re.captures(path.path()) {
                     for (no, name) in names.iter().enumerate() {
@@ -294,8 +294,11 @@ impl ResourceDef {
                 } else {
                     return false;
                 }
-                for idx in 0..idx {
-                    path.add(names[idx], segments[idx]);
+                for (idx, segment) in IntoIter::new(segments)
+                    .enumerate()
+                    .take_while(|(i, _)| *i != idx)
+                {
+                    path.add(names[idx], segment);
                 }
                 path.skip((pos + len) as u16);
                 true
@@ -305,8 +308,7 @@ impl ResourceDef {
                     let (ref pattern, ref names, len) = params[idx];
                     let mut idx = 0;
                     let mut pos = 0;
-                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] =
-                        [PathItem::Static(""); MAX_DYNAMIC_SEGMENTS];
+                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                     if let Some(captures) = pattern.captures(path.path()) {
                         for (no, name) in names.iter().enumerate() {
@@ -326,8 +328,11 @@ impl ResourceDef {
                     } else {
                         return false;
                     }
-                    for idx in 0..idx {
-                        path.add(names[idx], segments[idx]);
+                    for (idx, segment) in IntoIter::new(segments)
+                        .enumerate()
+                        .take_while(|(i, _)| *i != idx)
+                    {
+                        path.add(names[idx], segment);
                     }
                     path.skip((pos + len) as u16);
                     true
@@ -387,8 +392,7 @@ impl ResourceDef {
             PatternType::Dynamic(ref re, ref names, len) => {
                 let mut idx = 0;
                 let mut pos = 0;
-                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] =
-                    [PathItem::Static(""); MAX_DYNAMIC_SEGMENTS];
+                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                 if let Some(captures) = re.captures(res.resource_path().path()) {
                     for (no, name) in names.iter().enumerate() {
@@ -413,8 +417,11 @@ impl ResourceDef {
                 }
 
                 let path = res.resource_path();
-                for idx in 0..idx {
-                    path.add(names[idx], segments[idx]);
+                for (idx, segment) in IntoIter::new(segments)
+                    .enumerate()
+                    .take_while(|(i, _)| *i != idx)
+                {
+                    path.add(names[idx], segment);
                 }
                 path.skip((pos + len) as u16);
                 true
@@ -425,8 +432,7 @@ impl ResourceDef {
                     let (ref pattern, ref names, len) = params[idx];
                     let mut idx = 0;
                     let mut pos = 0;
-                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] =
-                        [PathItem::Static(""); MAX_DYNAMIC_SEGMENTS];
+                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                     if let Some(captures) = pattern.captures(path) {
                         for (no, name) in names.iter().enumerate() {
@@ -452,8 +458,11 @@ impl ResourceDef {
                     }
 
                     let path = res.resource_path();
-                    for idx in 0..idx {
-                        path.add(names[idx], segments[idx]);
+                    for (idx, segment) in IntoIter::new(segments)
+                        .enumerate()
+                        .take_while(|(i, _)| *i != idx)
+                    {
+                        path.add(names[idx], segment);
                     }
                     path.skip((pos + len) as u16);
                     true
