@@ -7,13 +7,16 @@ use actix_service::{
     fn_service, IntoServiceFactory as IntoBaseServiceFactory,
     ServiceFactory as BaseServiceFactory,
 };
-use actix_utils::{counter::CounterGuard, future::ready};
+use actix_utils::future::ready;
 use futures_core::future::LocalBoxFuture;
 use log::error;
 
-use crate::builder::bind_addr;
-use crate::service::{BoxedServerService, InternalServiceFactory, StreamService};
-use crate::socket::{MioStream, MioTcpListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
+use crate::{
+    builder::bind_addr,
+    service::{BoxedServerService, InternalServiceFactory, StreamService},
+    socket::{MioStream, MioTcpListener, StdSocketAddr, StdTcpListener, ToSocketAddrs},
+    worker::WorkerCounterGuard,
+};
 
 pub struct ServiceConfig {
     pub(crate) services: Vec<(String, MioTcpListener)>,
@@ -242,7 +245,7 @@ impl ServiceRuntime {
 
 type BoxedNewService = Box<
     dyn BaseServiceFactory<
-        (CounterGuard, MioStream),
+        (WorkerCounterGuard, MioStream),
         Response = (),
         Error = (),
         InitError = (),
@@ -256,7 +259,7 @@ struct ServiceFactory<T> {
     inner: T,
 }
 
-impl<T> BaseServiceFactory<(CounterGuard, MioStream)> for ServiceFactory<T>
+impl<T> BaseServiceFactory<(WorkerCounterGuard, MioStream)> for ServiceFactory<T>
 where
     T: BaseServiceFactory<TcpStream, Config = ()>,
     T::Future: 'static,

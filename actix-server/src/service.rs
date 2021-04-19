@@ -3,14 +3,12 @@ use std::net::SocketAddr;
 use std::task::{Context, Poll};
 
 use actix_service::{Service, ServiceFactory as BaseServiceFactory};
-use actix_utils::{
-    counter::CounterGuard,
-    future::{ready, Ready},
-};
+use actix_utils::future::{ready, Ready};
 use futures_core::future::LocalBoxFuture;
 use log::error;
 
 use crate::socket::{FromStream, MioStream};
+use crate::worker::WorkerCounterGuard;
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
     type Factory: BaseServiceFactory<Stream, Config = ()>;
@@ -28,7 +26,7 @@ pub(crate) trait InternalServiceFactory: Send {
 
 pub(crate) type BoxedServerService = Box<
     dyn Service<
-        (CounterGuard, MioStream),
+        (WorkerCounterGuard, MioStream),
         Response = (),
         Error = (),
         Future = Ready<Result<(), ()>>,
@@ -49,7 +47,7 @@ impl<S, I> StreamService<S, I> {
     }
 }
 
-impl<S, I> Service<(CounterGuard, MioStream)> for StreamService<S, I>
+impl<S, I> Service<(WorkerCounterGuard, MioStream)> for StreamService<S, I>
 where
     S: Service<I>,
     S::Future: 'static,
@@ -64,7 +62,7 @@ where
         self.service.poll_ready(ctx).map_err(|_| ())
     }
 
-    fn call(&self, (guard, req): (CounterGuard, MioStream)) -> Self::Future {
+    fn call(&self, (guard, req): (WorkerCounterGuard, MioStream)) -> Self::Future {
         ready(match FromStream::from_mio(req) {
             Ok(stream) => {
                 let f = self.service.call(stream);

@@ -22,10 +22,7 @@ use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{
-    ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandleAccept,
-    WorkerHandleServer,
-};
+use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleAccept, WorkerHandleServer};
 
 /// Server builder
 pub struct ServerBuilder {
@@ -320,12 +317,11 @@ impl ServerBuilder {
     fn start_worker(
         &self,
         idx: usize,
-        waker: WakerQueue,
+        waker_queue: WakerQueue,
     ) -> (WorkerHandleAccept, WorkerHandleServer) {
-        let avail = WorkerAvailability::new(idx, waker);
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
 
-        ServerWorker::start(idx, services, avail, self.worker_config)
+        ServerWorker::start(idx, services, waker_queue, self.worker_config)
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) {
