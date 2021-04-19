@@ -72,12 +72,14 @@ impl Counter {
         }
     }
 
-    /// Increment counter it by 1 and return true when hitting limit
+    /// Increment counter it by 1 and return false when hitting limit
+    #[inline(always)]
     pub(crate) fn incr(&self) -> bool {
         self.counter.fetch_add(1, Ordering::Relaxed) != self.limit
     }
 
     /// Decrement counter it by 1 and return true when hitting limit
+    #[inline(always)]
     pub(crate) fn derc(&self) -> bool {
         self.counter.fetch_sub(1, Ordering::Relaxed) == self.limit
     }
@@ -109,6 +111,7 @@ impl WorkerCounter {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn guard(&self) -> WorkerCounterGuard {
         WorkerCounterGuard(self.clone())
     }
@@ -151,7 +154,7 @@ impl WorkerHandleAccept {
     }
 
     #[inline(always)]
-    pub(crate) fn available(&self) -> bool {
+    pub(crate) fn incr_counter(&self) -> bool {
         self.counter.incr()
     }
 }
@@ -536,8 +539,8 @@ impl Future for ServerWorker {
                     }
                 }
 
+                // handle incoming io stream
                 match ready!(Pin::new(&mut this.rx).poll_recv(cx)) {
-                    // handle incoming io stream
                     Some(msg) => {
                         let guard = this.counter.guard();
                         let _ = this.services[msg.token].service.call((guard, msg.io));
