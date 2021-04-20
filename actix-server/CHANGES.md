@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.5 - 2021-04-20
 * Server shutdown would notify all workers to exit regardless if shutdown is graceful.
   This would make all worker shutdown immediately in force shutdown case. [#333]
   
