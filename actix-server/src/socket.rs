@@ -80,7 +80,7 @@ pub enum Stream {
 
 /// helper trait for converting mio stream to tokio stream.
 pub trait FromStream: Sized {
-    fn from_stream(stream: Stream) -> Self;
+    fn from_stream(stream: Stream) -> io::Result<Self>;
 }
 
 #[cfg(windows)]
@@ -88,9 +88,12 @@ mod win_impl {
     use super::*;
 
     impl FromStream for TcpStream {
-        fn from_stream(stream: Stream) -> Self {
+        fn from_stream(stream: Stream) -> io::Result<Self> {
             match stream {
-                Stream::Tcp(stream) => stream,
+                Stream::Tcp(stream) => {
+                    let stream = stream.into_std()?;
+                    TcpStream::from_std(stream)
+                }
             }
         }
     }
@@ -100,10 +103,15 @@ mod win_impl {
 mod unix_impl {
     use super::*;
 
+    use actix_rt::net::UnixStream;
+
     impl FromStream for TcpStream {
-        fn from_stream(stream: Stream) -> Self {
+        fn from_stream(stream: Stream) -> io::Result<Self> {
             match stream {
-                Stream::Tcp(stream) => stream,
+                Stream::Tcp(stream) => {
+                    let stream = stream.into_std()?;
+                    TcpStream::from_std(stream)
+                }
                 Stream::Uds(_) => {
                     panic!("Should not happen, bug in server impl");
                 }
@@ -111,11 +119,14 @@ mod unix_impl {
         }
     }
 
-    impl FromStream for actix_rt::net::UnixStream {
-        fn from_stream(stream: Stream) -> Self {
+    impl FromStream for UnixStream {
+        fn from_stream(stream: Stream) -> io::Result<Self> {
             match stream {
                 Stream::Tcp(_) => panic!("Should not happen, bug in server impl"),
-                Stream::Uds(stream) => stream,
+                Stream::Uds(stream) => {
+                    let stream = stream.into_std()?;
+                    UnixStream::from_std(stream)
+                }
             }
         }
     }

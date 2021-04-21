@@ -100,36 +100,48 @@ impl Accept {
     fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         let len = self.sockets.len();
         let mut idx = 0;
-        while idx < len {
-            'socket: loop {
-                if !self.avail.available() {
-                    return Poll::Pending;
+
+        // Only accept when there is worker available.
+        while self.avail.available() {
+            // use manual indexing so Accept::accept_one can reborrow self.
+            let socket = &mut self.sockets[idx];
+
+            match socket.lst.poll_accept(cx) {
+                Poll::Ready(Ok(io)) => {
+                    let conn = Conn {
+                        io,
+                        token: socket.token,
+                    };
+                    self.accept_one(conn);
                 }
+                // error type that can continue to next connection.
+                Poll::Ready(Err(ref e)) if connection_error(e) => continue,
+                // error type that should be handled as delayed wakeup.
+                Poll::Ready(Err(ref e)) => {
+                    error!("Error accepting connection: {}", e);
 
-                let socket = &mut self.sockets[idx];
+                    // use a sleep timer to wake up Accept after 500 ms.
+                    // This delay is used for not busy loop on errors.
+                    // Therefore the timing is not important and can be overwritten
+                    // by next socket having a similar error.
+                    let deadline = Instant::now() + Duration::from_millis(500);
+                    self.timeout.as_mut().reset(deadline);
+                    let _ = self.timeout.as_mut().poll(cx);
 
-                match socket.lst.poll_accept(cx) {
-                    Poll::Ready(Ok(io)) => {
-                        let conn = Conn {
-                            io,
-                            token: socket.token,
-                        };
-                        self.accept_one(conn);
+                    // increment index and handle next socket
+                    idx += 1;
+                    if idx == len {
+                        break;
                     }
-                    Poll::Ready(Err(ref e)) if connection_error(e) => continue 'socket,
-                    Poll::Ready(Err(ref e)) => {
-                        error!("Error accepting connection: {}", e);
-
-                        let deadline = Instant::now() + Duration::from_millis(500);
-                        self.timeout.as_mut().reset(deadline);
-                        let _ = self.timeout.as_mut().poll(cx);
-
-                        break 'socket;
+                }
+                Poll::Pending => {
+                    // increment index and handle next socket
+                    idx += 1;
+                    if idx == len {
+                        break;
                     }
-                    Poll::Pending => break 'socket,
-                };
-            }
-            idx += 1;
+                }
+            };
         }
 
         Poll::Pending
