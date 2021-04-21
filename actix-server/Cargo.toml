@@ -7,8 +7,7 @@ authors = [
 ]
 description = "General purpose TCP server built for the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
-homepage = "https://actix.rs"
-repository = "https://github.com/actix/actix-net.git"
+repository = "https://github.com/actix/actix-net"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
