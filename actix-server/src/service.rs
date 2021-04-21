@@ -7,7 +7,7 @@ use actix_utils::future::{ready, Ready};
 use futures_core::future::LocalBoxFuture;
 use log::error;
 
-use crate::socket::{FromStream, MioStream};
+use crate::socket::{FromStream, Stream};
 use crate::worker::WorkerCounterGuard;
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
@@ -26,7 +26,7 @@ pub(crate) trait InternalServiceFactory: Send {
 
 pub(crate) type BoxedServerService = Box<
     dyn Service<
-        (WorkerCounterGuard, MioStream),
+        (WorkerCounterGuard, Stream),
         Response = (),
         Error = (),
         Future = Ready<Result<(), ()>>,
@@ -47,7 +47,7 @@ impl<S, I> StreamService<S, I> {
     }
 }
 
-impl<S, I> Service<(WorkerCounterGuard, MioStream)> for StreamService<S, I>
+impl<S, I> Service<(WorkerCounterGuard, Stream)> for StreamService<S, I>
 where
     S: Service<I>,
     S::Future: 'static,
@@ -62,7 +62,7 @@ where
         self.service.poll_ready(ctx).map_err(|_| ())
     }
 
-    fn call(&self, (guard, req): (WorkerCounterGuard, MioStream)) -> Self::Future {
+    fn call(&self, (guard, req): (WorkerCounterGuard, Stream)) -> Self::Future {
         ready(match FromStream::from_mio(req) {
             Ok(stream) => {
                 let f = self.service.call(stream);

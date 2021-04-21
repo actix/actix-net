@@ -14,12 +14,12 @@ use log::error;
 use crate::{
     builder::bind_addr,
     service::{BoxedServerService, InternalServiceFactory, StreamService},
-    socket::{MioStream, MioTcpListener, StdSocketAddr, StdTcpListener, ToSocketAddrs},
+    socket::{StdSocketAddr, StdTcpListener, Stream, TcpListener, ToSocketAddrs},
     worker::WorkerCounterGuard,
 };
 
 pub struct ServiceConfig {
-    pub(crate) services: Vec<(String, MioTcpListener)>,
+    pub(crate) services: Vec<(String, TcpListener)>,
     pub(crate) apply: Option<Box<dyn ServiceRuntimeConfiguration>>,
     pub(crate) threads: usize,
     pub(crate) backlog: u32,
@@ -59,7 +59,8 @@ impl ServiceConfig {
 
     /// Add new service to server
     pub fn listen<N: AsRef<str>>(&mut self, name: N, lst: StdTcpListener) -> &mut Self {
-        self._listen(name, MioTcpListener::from_std(lst))
+        // TODO: Handle unwrap
+        self._listen(name, TcpListener::from_std(lst).unwrap())
     }
 
     /// Register service configuration function. This function get called
@@ -72,7 +73,7 @@ impl ServiceConfig {
         Ok(())
     }
 
-    fn _listen<N: AsRef<str>>(&mut self, name: N, lst: MioTcpListener) -> &mut Self {
+    fn _listen<N: AsRef<str>>(&mut self, name: N, lst: TcpListener) -> &mut Self {
         if self.apply.is_none() {
             self.apply = Some(Box::new(not_configured));
         }
@@ -245,7 +246,7 @@ impl ServiceRuntime {
 
 type BoxedNewService = Box<
     dyn BaseServiceFactory<
-        (WorkerCounterGuard, MioStream),
+        (WorkerCounterGuard, Stream),
         Response = (),
         Error = (),
         InitError = (),
@@ -259,7 +260,7 @@ struct ServiceFactory<T> {
     inner: T,
 }
 
-impl<T> BaseServiceFactory<(WorkerCounterGuard, MioStream)> for ServiceFactory<T>
+impl<T> BaseServiceFactory<(WorkerCounterGuard, Stream)> for ServiceFactory<T>
 where
     T: BaseServiceFactory<TcpStream, Config = ()>,
     T::Future: 'static,

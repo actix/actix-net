@@ -23,10 +23,9 @@ use tokio::sync::{
     oneshot,
 };
 
-use crate::join_all;
 use crate::service::{BoxedServerService, InternalServiceFactory};
-use crate::socket::MioStream;
-use crate::waker_queue::{WakerInterest, WakerQueue};
+use crate::socket::Stream;
+use crate::{accept::Interest, join_all};
 
 /// Stop worker message. Returns `true` on successful graceful shutdown.
 /// and `false` if some connections still alive when shutdown execute.
@@ -37,7 +36,7 @@ pub(crate) struct Stop {
 
 #[derive(Debug)]
 pub(crate) struct Conn {
-    pub io: MioStream,
+    pub io: Stream,
     pub token: usize,
 }
 
@@ -91,7 +90,7 @@ impl Counter {
 
 pub(crate) struct WorkerCounter {
     idx: usize,
-    inner: Rc<(WakerQueue, Counter)>,
+    inner: Rc<(UnboundedSender<Interest>, Counter)>,
 }
 
 impl Clone for WorkerCounter {
@@ -104,10 +103,14 @@ impl Clone for WorkerCounter {
 }
 
 impl WorkerCounter {
-    pub(crate) fn new(idx: usize, waker_queue: WakerQueue, counter: Counter) -> Self {
+    pub(crate) fn new(
+        idx: usize,
+        accept_tx: UnboundedSender<Interest>,
+        counter: Counter,
+    ) -> Self {
         Self {
             idx,
-            inner: Rc::new((waker_queue, counter)),
+            inner: Rc::new((accept_tx, counter)),
         }
     }
 
@@ -125,9 +128,9 @@ pub(crate) struct WorkerCounterGuard(WorkerCounter);
 
 impl Drop for WorkerCounterGuard {
     fn drop(&mut self) {
-        let (waker_queue, counter) = &*self.0.inner;
+        let (accept_tx, counter) = &*self.0.inner;
         if counter.derc() {
-            waker_queue.wake(WakerInterest::WorkerAvailable(self.0.idx));
+            let _ = accept_tx.send(Interest::WorkerIndex(self.0.idx));
         }
     }
 }
@@ -251,7 +254,7 @@ impl ServerWorker {
     pub(crate) fn start(
         idx: usize,
         factories: Vec<Box<dyn InternalServiceFactory>>,
-        waker_queue: WakerQueue,
+        accept_tx: UnboundedSender<Interest>,
         config: ServerWorkerConfig,
     ) -> (WorkerHandleAccept, WorkerHandleServer) {
         let (tx1, rx) = unbounded_channel();
@@ -315,7 +318,7 @@ impl ServerWorker {
                     rx,
                     rx2,
                     services,
-                    counter: WorkerCounter::new(idx, waker_queue, counter_clone),
+                    counter: WorkerCounter::new(idx, accept_tx, counter_clone),
                     factories: factories.into_boxed_slice(),
                     state: Default::default(),
                     shutdown_timeout: config.shutdown_timeout,

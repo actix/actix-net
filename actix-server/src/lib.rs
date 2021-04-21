@@ -12,7 +12,6 @@ mod service;
 mod signals;
 mod socket;
 mod test_server;
-mod waker_queue;
 mod worker;
 
 pub use self::builder::ServerBuilder;

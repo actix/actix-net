@@ -102,7 +102,7 @@ impl TestServer {
     /// Get first available unused local address
     pub fn unused_addr() -> net::SocketAddr {
         let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-        let socket = mio::net::TcpSocket::new_v4().unwrap();
+        let socket = actix_rt::net::TcpSocket::new_v4().unwrap();
         socket.bind(addr).unwrap();
         socket.set_reuseaddr(true).unwrap();
         let tcp = socket.listen(1024).unwrap();

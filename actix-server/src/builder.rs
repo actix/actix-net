@@ -9,19 +9,18 @@ use std::{
 use actix_rt::{self as rt, net::TcpStream, time::sleep, System};
 use log::{error, info};
 use tokio::sync::{
-    mpsc::{unbounded_channel, UnboundedReceiver},
+    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
 
-use crate::accept::AcceptLoop;
+use crate::accept::{Accept, Interest};
 use crate::config::{ConfiguredService, ServiceConfig};
 use crate::join_all;
 use crate::server::{Server, ServerCommand};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
-use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
-use crate::socket::{MioTcpListener, MioTcpSocket};
-use crate::waker_queue::{WakerInterest, WakerQueue};
+use crate::socket::{Listener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
+use crate::socket::{TcpListener, TcpSocket};
 use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleAccept, WorkerHandleServer};
 
 /// Server builder
@@ -31,8 +30,8 @@ pub struct ServerBuilder {
     backlog: u32,
     handles: Vec<(usize, WorkerHandleServer)>,
     services: Vec<Box<dyn InternalServiceFactory>>,
-    sockets: Vec<(usize, String, MioListener)>,
-    accept: AcceptLoop,
+    sockets: Vec<(usize, String, Listener)>,
+    accept: Option<UnboundedSender<Interest>>,
     exit: bool,
     no_signals: bool,
     cmd: UnboundedReceiver<ServerCommand>,
@@ -59,7 +58,7 @@ impl ServerBuilder {
             handles: Vec::new(),
             services: Vec::new(),
             sockets: Vec::new(),
-            accept: AcceptLoop::new(server.clone()),
+            accept: None,
             backlog: 2048,
             exit: false,
             no_signals: false,
@@ -165,7 +164,7 @@ impl ServerBuilder {
             for (name, lst) in cfg.services {
                 let token = self.next_token();
                 srv.stream(token, name.clone(), lst.local_addr()?);
-                self.sockets.push((token, name, MioListener::Tcp(lst)));
+                self.sockets.push((token, name, Listener::Tcp(lst)));
             }
             self.services.push(Box::new(srv));
         }
@@ -191,7 +190,7 @@ impl ServerBuilder {
                 lst.local_addr()?,
             ));
             self.sockets
-                .push((token, name.as_ref().to_string(), MioListener::Tcp(lst)));
+                .push((token, name.as_ref().to_string(), Listener::Tcp(lst)));
         }
         Ok(self)
     }
@@ -241,7 +240,7 @@ impl ServerBuilder {
             addr,
         ));
         self.sockets
-            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
+            .push((token, name.as_ref().to_string(), Listener::from(lst)));
         Ok(self)
     }
 
@@ -267,7 +266,7 @@ impl ServerBuilder {
         ));
 
         self.sockets
-            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
+            .push((token, name.as_ref().to_string(), Listener::from(lst)));
 
         Ok(self)
     }
@@ -279,11 +278,14 @@ impl ServerBuilder {
         } else {
             info!("Starting {} workers", self.threads);
 
+            let (tx, rx) = unbounded_channel();
+
+            self.accept = Some(tx);
+
             // start workers
             let handles = (0..self.threads)
                 .map(|idx| {
-                    let (handle_accept, handle_server) =
-                        self.start_worker(idx, self.accept.waker_owned());
+                    let (handle_accept, handle_server) = self.start_worker(idx);
                     self.handles.push((idx, handle_server));
 
                     handle_accept
@@ -294,13 +296,13 @@ impl ServerBuilder {
             for sock in &self.sockets {
                 info!("Starting \"{}\" service on {}", sock.1, sock.2);
             }
-            self.accept.start(
-                mem::take(&mut self.sockets)
-                    .into_iter()
-                    .map(|t| (t.0, t.2))
-                    .collect(),
-                handles,
-            );
+
+            let sockets = mem::take(&mut self.sockets)
+                .into_iter()
+                .map(|t| (t.0, t.2))
+                .collect();
+
+            Accept::start(sockets, rx, self.server.clone(), handles);
 
             // handle signals
             if !self.no_signals {
@@ -314,24 +316,20 @@ impl ServerBuilder {
         }
     }
 
-    fn start_worker(
-        &self,
-        idx: usize,
-        waker_queue: WakerQueue,
-    ) -> (WorkerHandleAccept, WorkerHandleServer) {
+    fn start_worker(&self, idx: usize) -> (WorkerHandleAccept, WorkerHandleServer) {
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
-
-        ServerWorker::start(idx, services, waker_queue, self.worker_config)
+        let accept_tx = self.accept.as_ref().cloned().unwrap();
+        ServerWorker::start(idx, services, accept_tx, self.worker_config)
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) {
         match item {
             ServerCommand::Pause(tx) => {
-                self.accept.wake(WakerInterest::Pause);
+                let _ = self.accept.as_ref().unwrap().send(Interest::Pause);
                 let _ = tx.send(());
             }
             ServerCommand::Resume(tx) => {
-                self.accept.wake(WakerInterest::Resume);
+                let _ = self.accept.as_ref().unwrap().send(Interest::Resume);
                 let _ = tx.send(());
             }
             ServerCommand::Signal(sig) => {
@@ -375,7 +373,7 @@ impl ServerBuilder {
                 let exit = self.exit;
 
                 // stop accept thread
-                self.accept.wake(WakerInterest::Stop);
+                let _ = self.accept.as_ref().unwrap().send(Interest::Stop);
                 let notify = std::mem::take(&mut self.notify);
 
                 // stop workers
@@ -427,10 +425,13 @@ impl ServerBuilder {
                         break;
                     }
 
-                    let (handle_accept, handle_server) =
-                        self.start_worker(new_idx, self.accept.waker_owned());
+                    let (handle_accept, handle_server) = self.start_worker(new_idx);
                     self.handles.push((new_idx, handle_server));
-                    self.accept.wake(WakerInterest::Worker(handle_accept));
+                    let _ = self
+                        .accept
+                        .as_ref()
+                        .unwrap()
+                        .send(Interest::Worker(handle_accept));
                 }
             }
         }
@@ -459,7 +460,7 @@ impl Future for ServerBuilder {
 pub(super) fn bind_addr<S: ToSocketAddrs>(
     addr: S,
     backlog: u32,
-) -> io::Result<Vec<MioTcpListener>> {
+) -> io::Result<Vec<TcpListener>> {
     let mut err = None;
     let mut succ = false;
     let mut sockets = Vec::new();
@@ -487,10 +488,10 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
     }
 }
 
-fn create_tcp_listener(addr: StdSocketAddr, backlog: u32) -> io::Result<MioTcpListener> {
+fn create_tcp_listener(addr: StdSocketAddr, backlog: u32) -> io::Result<TcpListener> {
     let socket = match addr {
-        StdSocketAddr::V4(_) => MioTcpSocket::new_v4()?,
-        StdSocketAddr::V6(_) => MioTcpSocket::new_v6()?,
+        StdSocketAddr::V4(_) => TcpSocket::new_v4()?,
+        StdSocketAddr::V6(_) => TcpSocket::new_v6()?,
     };
 
     socket.set_reuseaddr(true)?;

@@ -27,7 +27,6 @@ actix-utils = "3.0.0"
 
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 log = "0.4"
-mio = { version = "0.7.6", features = ["os-poll", "net"] }
 num_cpus = "1.13"
 tokio = { version = "1.2", features = ["sync"] }
 
