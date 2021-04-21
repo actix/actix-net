@@ -73,7 +73,7 @@ impl fmt::Display for Listener {
 
 #[derive(Debug)]
 pub enum Stream {
-    Tcp(actix_rt::net::TcpStream),
+    Tcp(TcpStream),
     #[cfg(unix)]
     Uds(actix_rt::net::UnixStream),
 }
@@ -87,13 +87,10 @@ pub trait FromStream: Sized {
 mod win_impl {
     use super::*;
 
-    use std::os::windows::io::{FromRawSocket, IntoRawSocket};
-
-    // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
     impl FromStream for TcpStream {
         fn from_stream(stream: Stream) -> Self {
             match stream {
-                MioStream::Tcp(stream) => stream,
+                Stream::Tcp(stream) => stream,
             }
         }
     }
@@ -103,7 +100,6 @@ mod win_impl {
 mod unix_impl {
     use super::*;
 
-    // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
     impl FromStream for TcpStream {
         fn from_stream(stream: Stream) -> Self {
             match stream {
@@ -115,7 +111,6 @@ mod unix_impl {
         }
     }
 
-    // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
     impl FromStream for actix_rt::net::UnixStream {
         fn from_stream(stream: Stream) -> Self {
             match stream {
@@ -125,40 +120,3 @@ mod unix_impl {
         }
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn socket_addr() {
-//         let addr = SocketAddr::Tcp("127.0.0.1:8080".parse().unwrap());
-//         assert!(format!("{:?}", addr).contains("127.0.0.1:8080"));
-//         assert_eq!(format!("{}", addr), "127.0.0.1:8080");
-
-//         let addr: StdSocketAddr = "127.0.0.1:0".parse().unwrap();
-//         let socket = MioTcpSocket::new_v4().unwrap();
-//         socket.set_reuseaddr(true).unwrap();
-//         socket.bind(addr).unwrap();
-//         let tcp = socket.listen(128).unwrap();
-//         let lst = Listener::Tcp(tcp);
-//         assert!(format!("{:?}", lst).contains("TcpListener"));
-//         assert!(format!("{}", lst).contains("127.0.0.1"));
-//     }
-
-//     #[test]
-//     #[cfg(unix)]
-//     fn uds() {
-//         let _ = std::fs::remove_file("/tmp/sock.xxxxx");
-//         if let Ok(socket) = MioUnixListener::bind("/tmp/sock.xxxxx") {
-//             let addr = socket.local_addr().expect("Couldn't get local address");
-//             let a = SocketAddr::Uds(addr);
-//             assert!(format!("{:?}", a).contains("/tmp/sock.xxxxx"));
-//             assert!(format!("{}", a).contains("/tmp/sock.xxxxx"));
-
-//             let lst = Listener::Uds(socket);
-//             assert!(format!("{:?}", lst).contains("/tmp/sock.xxxxx"));
-//             assert!(format!("{}", lst).contains("/tmp/sock.xxxxx"));
-//         }
-//     }
-// }

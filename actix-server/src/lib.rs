@@ -1,5 +1,6 @@
 //! General purpose TCP server.
 
+#![forbid(unsafe_code)]
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
