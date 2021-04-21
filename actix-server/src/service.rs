@@ -5,7 +5,6 @@ use std::task::{Context, Poll};
 use actix_service::{Service, ServiceFactory as BaseServiceFactory};
 use actix_utils::future::{ready, Ready};
 use futures_core::future::LocalBoxFuture;
-use log::error;
 
 use crate::socket::{FromStream, Stream};
 use crate::worker::WorkerCounterGuard;
@@ -63,20 +62,15 @@ where
     }
 
     fn call(&self, (guard, req): (WorkerCounterGuard, Stream)) -> Self::Future {
-        ready(match FromStream::from_mio(req) {
-            Ok(stream) => {
-                let f = self.service.call(stream);
-                actix_rt::spawn(async move {
-                    let _ = f.await;
-                    drop(guard);
-                });
-                Ok(())
-            }
-            Err(e) => {
-                error!("Can not convert to an async tcp stream: {}", e);
-                Err(())
-            }
-        })
+        let stream = FromStream::from_stream(req);
+
+        let f = self.service.call(stream);
+        actix_rt::spawn(async move {
+            let _ = f.await;
+            drop(guard);
+        });
+
+        ready(Ok(()))
     }
 }
 

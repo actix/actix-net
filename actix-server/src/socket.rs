@@ -80,7 +80,7 @@ pub enum Stream {
 
 /// helper trait for converting mio stream to tokio stream.
 pub trait FromStream: Sized {
-    fn from_mio(stream: Stream) -> io::Result<Self>;
+    fn from_stream(stream: Stream) -> Self;
 }
 
 #[cfg(windows)]
@@ -91,9 +91,9 @@ mod win_impl {
 
     // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
     impl FromStream for TcpStream {
-        fn from_mio(stream: MioStream) -> io::Result<Self> {
+        fn from_stream(stream: Stream) -> Self {
             match stream {
-                MioStream::Tcp(stream) => Ok(stream),
+                MioStream::Tcp(stream) => stream,
             }
         }
     }
@@ -105,9 +105,9 @@ mod unix_impl {
 
     // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
     impl FromStream for TcpStream {
-        fn from_mio(stream: Stream) -> io::Result<Self> {
+        fn from_stream(stream: Stream) -> Self {
             match stream {
-                Stream::Tcp(stream) => Ok(stream),
+                Stream::Tcp(stream) => stream,
                 Stream::Uds(_) => {
                     panic!("Should not happen, bug in server impl");
                 }
@@ -117,10 +117,10 @@ mod unix_impl {
 
     // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
     impl FromStream for actix_rt::net::UnixStream {
-        fn from_mio(stream: Stream) -> io::Result<Self> {
+        fn from_stream(stream: Stream) -> Self {
             match stream {
                 Stream::Tcp(_) => panic!("Should not happen, bug in server impl"),
-                Stream::Uds(stream) => Ok(stream),
+                Stream::Uds(stream) => stream,
             }
         }
     }

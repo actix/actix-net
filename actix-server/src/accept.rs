@@ -190,10 +190,7 @@ impl Future for Accept {
                     this.avail.set_available(handle.idx(), true);
                     this.handles.push(handle);
                 }
-                Interest::Pause => {
-                    this.paused = true;
-                    break;
-                }
+                Interest::Pause => this.paused = true,
                 Interest::Resume => this.paused = false,
                 Interest::Stop => return Poll::Ready(()),
             }
