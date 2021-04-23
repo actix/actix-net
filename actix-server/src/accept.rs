@@ -1,16 +1,16 @@
-use std::time::Duration;
 use std::{io, thread};
-
-use actix_rt::{
-    time::{sleep, Instant},
-    System,
+use std::{
+    task::{self, Context},
+    time::Duration,
 };
+
+use actix_rt::{time::Instant, System};
 use log::{error, info};
 use mio::{Interest, Poll, Token as MioToken};
 
 use crate::server::Server;
 use crate::socket::{MioListener, SocketAddr};
-use crate::waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN};
+use crate::waker::{self, WakerInterest, WakerRx, WakerTx, WAKER_TOKEN};
 use crate::worker::{Conn, WorkerHandleAccept};
 
 struct ServerSocketInfo {
@@ -28,35 +28,39 @@ struct ServerSocketInfo {
 
 /// Accept loop would live with `ServerBuilder`.
 ///
-/// It's tasked with construct `Poll` instance and `WakerQueue` which would be distributed to
-/// `Accept` and `Worker`.
+/// It's tasked with construct `Poll` instance and `WakerTx`
+/// which would be distributed to `Worker`.
 ///
-/// It would also listen to `ServerCommand` and push interests to `WakerQueue`.
+/// `WakerRx` is passed to `Accept` for recieving `WakerInterest`.
+///
+/// It would also listen to `ServerCommand` and push `WakerInterest` to `Accept`.
 pub(crate) struct AcceptLoop {
     srv: Option<Server>,
     poll: Option<Poll>,
-    waker: WakerQueue,
+    waker_tx: WakerTx,
+    waker_rx: Option<WakerRx>,
 }
 
 impl AcceptLoop {
     pub fn new(srv: Server) -> Self {
         let poll = Poll::new().unwrap_or_else(|e| panic!("Can not create `mio::Poll`: {}", e));
-        let waker = WakerQueue::new(poll.registry())
-            .unwrap_or_else(|e| panic!("Can not create `mio::Waker`: {}", e));
+
+        let (waker_tx, waker_rx) = waker::waker_channel();
 
         Self {
             srv: Some(srv),
             poll: Some(poll),
-            waker,
+            waker_tx,
+            waker_rx: Some(waker_rx),
         }
     }
 
-    pub(crate) fn waker_owned(&self) -> WakerQueue {
-        self.waker.clone()
+    pub(crate) fn waker_tx(&self) -> WakerTx {
+        self.waker_tx.clone()
     }
 
-    pub fn wake(&self, i: WakerInterest) {
-        self.waker.wake(i);
+    pub(crate) fn wake(&self, interest: WakerInterest) {
+        let _ = self.waker_tx.wake(interest);
     }
 
     pub(crate) fn start(
@@ -66,16 +70,16 @@ impl AcceptLoop {
     ) {
         let srv = self.srv.take().expect("Can not re-use AcceptInfo");
         let poll = self.poll.take().unwrap();
-        let waker = self.waker.clone();
+        let wake_rx = self.waker_rx.take().unwrap();
 
-        Accept::start(poll, waker, socks, srv, handles);
+        Accept::start(poll, wake_rx, socks, srv, handles);
     }
 }
 
 /// poll instance of the server.
 struct Accept {
     poll: Poll,
-    waker: WakerQueue,
+    waker_rx: WakerRx,
     handles: Vec<WorkerHandleAccept>,
     srv: Server,
     next: usize,
@@ -159,7 +163,7 @@ fn connection_error(e: &io::Error) -> bool {
 impl Accept {
     pub(crate) fn start(
         poll: Poll,
-        waker: WakerQueue,
+        waker_rx: WakerRx,
         socks: Vec<(usize, MioListener)>,
         srv: Server,
         handles: Vec<WorkerHandleAccept>,
@@ -172,16 +176,20 @@ impl Accept {
             .spawn(move || {
                 System::set_current(sys);
                 let (mut accept, mut sockets) =
-                    Accept::new_with_sockets(poll, waker, socks, handles, srv);
+                    Accept::new_with_sockets(poll, waker_rx, socks, handles, srv);
 
-                accept.poll_with(&mut sockets);
+                // Construct Context from waker.
+                let waker = waker::from_registry(accept.poll.registry()).unwrap().into();
+                let cx = &mut Context::from_waker(&waker);
+
+                accept.poll_with(&mut sockets, cx);
             })
             .unwrap();
     }
 
     fn new_with_sockets(
         poll: Poll,
-        waker: WakerQueue,
+        waker_rx: WakerRx,
         socks: Vec<(usize, MioListener)>,
         handles: Vec<WorkerHandleAccept>,
         srv: Server,
@@ -212,7 +220,7 @@ impl Accept {
 
         let accept = Accept {
             poll,
-            waker,
+            waker_rx,
             handles,
             srv,
             next: 0,
@@ -223,8 +231,15 @@ impl Accept {
         (accept, sockets)
     }
 
-    fn poll_with(&mut self, sockets: &mut [ServerSocketInfo]) {
+    fn poll_with(&mut self, sockets: &mut [ServerSocketInfo], cx: &mut Context<'_>) {
         let mut events = mio::Events::with_capacity(128);
+
+        // poll waker channel once and register the context/waker.
+        let exit = self.poll_waker(sockets, cx);
+        if exit {
+            info!("Accept is stopped.");
+            return;
+        }
 
         loop {
             if let Err(e) = self.poll.poll(&mut events, None) {
@@ -238,7 +253,7 @@ impl Accept {
                 let token = event.token();
                 match token {
                     WAKER_TOKEN => {
-                        let exit = self.handle_waker(sockets);
+                        let exit = self.poll_waker(sockets, cx);
                         if exit {
                             info!("Accept is stopped.");
                             return;
@@ -253,19 +268,13 @@ impl Accept {
         }
     }
 
-    fn handle_waker(&mut self, sockets: &mut [ServerSocketInfo]) -> bool {
+    fn poll_waker(&mut self, sockets: &mut [ServerSocketInfo], cx: &mut Context<'_>) -> bool {
         // This is a loop because interests for command from previous version was
         // a loop that would try to drain the command channel. It's yet unknown
         // if it's necessary/good practice to actively drain the waker queue.
-        loop {
-            // take guard with every iteration so no new interest can be added
-            // until the current task is done.
-            let mut guard = self.waker.guard();
-            match guard.pop_front() {
-                // worker notify it becomes available.
-                Some(WakerInterest::WorkerAvailable(idx)) => {
-                    drop(guard);
-
+        while let task::Poll::Ready(Some(msg)) = self.waker_rx.poll_recv(cx) {
+            match msg {
+                WakerInterest::WorkerAvailable(idx) => {
                     self.avail.set_available(idx, true);
 
                     if !self.paused {
@@ -273,9 +282,7 @@ impl Accept {
                     }
                 }
                 // a new worker thread is made and it's handle would be added to Accept
-                Some(WakerInterest::Worker(handle)) => {
-                    drop(guard);
-
+                WakerInterest::Worker(handle) => {
                     self.avail.set_available(handle.idx(), true);
                     self.handles.push(handle);
 
@@ -283,65 +290,34 @@ impl Accept {
                         self.accept_all(sockets);
                     }
                 }
-                // got timer interest and it's time to try register socket(s) again
-                Some(WakerInterest::Timer) => {
-                    drop(guard);
-
-                    self.process_timer(sockets)
+                WakerInterest::Pause => {
+                    if !self.paused {
+                        self.paused = true;
+                        self.deregister_all(sockets);
+                    }
                 }
-                Some(WakerInterest::Pause) => {
-                    drop(guard);
+                WakerInterest::Resume => {
+                    if self.paused {
+                        self.paused = false;
 
-                    self.paused = true;
+                        sockets.iter_mut().for_each(|info| {
+                            self.register_logged(info);
+                        });
 
-                    self.deregister_all(sockets);
+                        self.accept_all(sockets);
+                    }
                 }
-                Some(WakerInterest::Resume) => {
-                    drop(guard);
-
-                    self.paused = false;
-
-                    sockets.iter_mut().for_each(|info| {
-                        self.register_logged(info);
-                    });
-
-                    self.accept_all(sockets);
-                }
-                Some(WakerInterest::Stop) => {
-                    self.deregister_all(sockets);
+                WakerInterest::Stop => {
+                    if !self.paused {
+                        self.deregister_all(sockets);
+                    }
 
                     return true;
                 }
-                // waker queue is drained
-                None => {
-                    // Reset the WakerQueue before break so it does not grow infinitely
-                    WakerQueue::reset(&mut guard);
-
-                    return false;
-                }
             }
         }
-    }
 
-    fn process_timer(&self, sockets: &mut [ServerSocketInfo]) {
-        let now = Instant::now();
-        sockets
-            .iter_mut()
-            // Only sockets that had an associated timeout were deregistered.
-            .filter(|info| info.timeout.is_some())
-            .for_each(|info| {
-                let inst = info.timeout.take().unwrap();
-
-                if now < inst {
-                    info.timeout = Some(inst);
-                } else if !self.paused {
-                    self.register_logged(info);
-                }
-
-                // Drop the timeout if server is paused and socket timeout is expired.
-                // When server recovers from pause it will register all sockets without
-                // a timeout value so this socket register will be delayed till then.
-            });
+        false
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -481,13 +457,6 @@ impl Accept {
                     // the poll would need it mark which socket and when it's
                     // listener should be registered
                     info.timeout = Some(Instant::now() + Duration::from_millis(500));
-
-                    // after the sleep a Timer interest is sent to Accept Poll
-                    let waker = self.waker.clone();
-                    System::current().arbiter().spawn(async move {
-                        sleep(Duration::from_millis(510)).await;
-                        waker.wake(WakerInterest::Timer);
-                    });
 
                     return;
                 }

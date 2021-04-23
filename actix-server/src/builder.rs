@@ -21,7 +21,7 @@ use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
-use crate::waker_queue::{WakerInterest, WakerQueue};
+use crate::waker::WakerInterest;
 use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleAccept, WorkerHandleServer};
 
 /// Server builder
@@ -282,8 +282,7 @@ impl ServerBuilder {
             // start workers
             let handles = (0..self.threads)
                 .map(|idx| {
-                    let (handle_accept, handle_server) =
-                        self.start_worker(idx, self.accept.waker_owned());
+                    let (handle_accept, handle_server) = self.start_worker(idx);
                     self.handles.push((idx, handle_server));
 
                     handle_accept
@@ -314,14 +313,10 @@ impl ServerBuilder {
         }
     }
 
-    fn start_worker(
-        &self,
-        idx: usize,
-        waker_queue: WakerQueue,
-    ) -> (WorkerHandleAccept, WorkerHandleServer) {
+    fn start_worker(&self, idx: usize) -> (WorkerHandleAccept, WorkerHandleServer) {
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
-
-        ServerWorker::start(idx, services, waker_queue, self.worker_config)
+        let waker_tx = self.accept.waker_tx();
+        ServerWorker::start(idx, services, waker_tx, self.worker_config)
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) {
@@ -427,8 +422,7 @@ impl ServerBuilder {
                         break;
                     }
 
-                    let (handle_accept, handle_server) =
-                        self.start_worker(new_idx, self.accept.waker_owned());
+                    let (handle_accept, handle_server) = self.start_worker(new_idx);
                     self.handles.push((new_idx, handle_server));
                     self.accept.wake(WakerInterest::Worker(handle_accept));
                 }
