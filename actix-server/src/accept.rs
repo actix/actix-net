@@ -179,7 +179,7 @@ impl Accept {
                     Accept::new_with_sockets(poll, waker_rx, socks, handles, srv);
 
                 // Construct Context from waker.
-                let waker = waker::from_registry(accept.poll.registry()).unwrap().into();
+                let waker = waker::from_registry(accept.poll.registry()).unwrap();
                 let cx = &mut Context::from_waker(&waker);
 
                 accept.poll_with(&mut sockets, cx);
@@ -272,9 +272,9 @@ impl Accept {
         // This is a loop because interests for command from previous version was
         // a loop that would try to drain the command channel. It's yet unknown
         // if it's necessary/good practice to actively drain the waker queue.
-        while let task::Poll::Ready(Some(msg)) = self.waker_rx.poll_recv(cx) {
+        while let task::Poll::Ready(msg) = self.waker_rx.poll_recv(cx) {
             match msg {
-                WakerInterest::WorkerAvailable(idx) => {
+                Some(WakerInterest::WorkerAvailable(idx)) => {
                     self.avail.set_available(idx, true);
 
                     if !self.paused {
@@ -282,7 +282,7 @@ impl Accept {
                     }
                 }
                 // a new worker thread is made and it's handle would be added to Accept
-                WakerInterest::Worker(handle) => {
+                Some(WakerInterest::Worker(handle)) => {
                     self.avail.set_available(handle.idx(), true);
                     self.handles.push(handle);
 
@@ -290,13 +290,13 @@ impl Accept {
                         self.accept_all(sockets);
                     }
                 }
-                WakerInterest::Pause => {
+                Some(WakerInterest::Pause) => {
                     if !self.paused {
                         self.paused = true;
                         self.deregister_all(sockets);
                     }
                 }
-                WakerInterest::Resume => {
+                Some(WakerInterest::Resume) => {
                     if self.paused {
                         self.paused = false;
 
@@ -307,7 +307,7 @@ impl Accept {
                         self.accept_all(sockets);
                     }
                 }
-                WakerInterest::Stop => {
+                Some(WakerInterest::Stop) | None => {
                     if !self.paused {
                         self.deregister_all(sockets);
                     }

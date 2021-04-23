@@ -29,6 +29,7 @@ pub(crate) enum WakerInterest {
     /// `WorkerHandleAccept`.
     Worker(WorkerHandleAccept),
 }
+
 /// Wrapper type for mio::Waker in order to impl std::task::Wake trait.
 struct _Waker(mio::Waker);
 
@@ -54,7 +55,7 @@ impl Clone for WakerTx {
 }
 
 impl WakerTx {
-    /// Send WakerInterest through channel and panic on error.
+    /// Send WakerInterest through channel and panic on error(shutdown).
     pub(crate) fn wake(&self, interest: WakerInterest) {
         self.0
             .send(interest)
