@@ -57,9 +57,10 @@ impl Clone for WakerTx {
 impl WakerTx {
     /// Send WakerInterest through channel and panic on error(shutdown).
     pub(crate) fn wake(&self, interest: WakerInterest) {
-        self.0
-            .send(interest)
-            .unwrap_or_else(|e| panic!("Can not send WakerInterest: {}", e));
+        // ingore result. tokio UnboundedSender only fail when the channel
+        // is closed. In that case the Accept thread is gone and no further
+        // wake up is needed/possible.
+        let _ = self.0.send(interest);
     }
 }
 

@@ -9,14 +9,11 @@ use log::{error, info};
 use mio::{Interest, Poll, Token as MioToken};
 
 use crate::server::Server;
-use crate::socket::{MioListener, SocketAddr};
+use crate::socket::MioListener;
 use crate::waker::{self, WakerInterest, WakerRx, WakerTx, WAKER_TOKEN};
 use crate::worker::{Conn, WorkerHandleAccept};
 
 struct ServerSocketInfo {
-    /// Address of socket. Mainly used for logging.
-    addr: SocketAddr,
-
     token: usize,
 
     lst: MioListener,
@@ -171,12 +168,42 @@ impl Accept {
         // Accept runs in its own thread and would want to spawn additional futures to current
         // actix system.
         let sys = System::current();
+
         thread::Builder::new()
             .name("actix-server accept loop".to_owned())
             .spawn(move || {
                 System::set_current(sys);
-                let (mut accept, mut sockets) =
-                    Accept::new_with_sockets(poll, waker_rx, socks, handles, srv);
+
+                let mut sockets = socks
+                    .into_iter()
+                    .map(|(token, mut lst)| {
+                        // Start listening for incoming connections
+                        poll.registry()
+                            .register(&mut lst, MioToken(token), Interest::READABLE)
+                            .unwrap_or_else(|e| panic!("Can not register io: {}", e));
+
+                        ServerSocketInfo {
+                            token,
+                            lst,
+                            timeout: None,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                let mut avail = Availability::default();
+
+                // Assume all handles are avail at construct time.
+                avail.set_available_all(&handles);
+
+                let mut accept = Accept {
+                    poll,
+                    waker_rx,
+                    handles,
+                    srv,
+                    next: 0,
+                    avail,
+                    paused: false,
+                };
 
                 // Construct Context from waker.
                 let waker = waker::from_registry(accept.poll.registry()).unwrap();
@@ -185,50 +212,6 @@ impl Accept {
                 accept.poll_with(&mut sockets, cx);
             })
             .unwrap();
-    }
-
-    fn new_with_sockets(
-        poll: Poll,
-        waker_rx: WakerRx,
-        socks: Vec<(usize, MioListener)>,
-        handles: Vec<WorkerHandleAccept>,
-        srv: Server,
-    ) -> (Accept, Vec<ServerSocketInfo>) {
-        let sockets = socks
-            .into_iter()
-            .map(|(token, mut lst)| {
-                let addr = lst.local_addr();
-
-                // Start listening for incoming connections
-                poll.registry()
-                    .register(&mut lst, MioToken(token), Interest::READABLE)
-                    .unwrap_or_else(|e| panic!("Can not register io: {}", e));
-
-                ServerSocketInfo {
-                    addr,
-                    token,
-                    lst,
-                    timeout: None,
-                }
-            })
-            .collect();
-
-        let mut avail = Availability::default();
-
-        // Assume all handles are avail at construct time.
-        avail.set_available_all(&handles);
-
-        let accept = Accept {
-            poll,
-            waker_rx,
-            handles,
-            srv,
-            next: 0,
-            avail,
-            paused: false,
-        };
-
-        (accept, sockets)
     }
 
     fn poll_with(&mut self, sockets: &mut [ServerSocketInfo], cx: &mut Context<'_>) {
@@ -346,14 +329,14 @@ impl Accept {
 
     fn register_logged(&self, info: &mut ServerSocketInfo) {
         match self.register(info) {
-            Ok(_) => info!("Resume accepting connections on {}", info.addr),
+            Ok(_) => info!("Resume accepting connections on {}", info.lst.local_addr()),
             Err(e) => error!("Can not register server socket {}", e),
         }
     }
 
     fn deregister_logged(&self, info: &mut ServerSocketInfo) {
         match self.poll.registry().deregister(&mut info.lst) {
-            Ok(_) => info!("Paused accepting connections on {}", info.addr),
+            Ok(_) => info!("Paused accepting connections on {}", info.lst.local_addr()),
             Err(e) => {
                 error!("Can not deregister server socket {}", e)
             }
