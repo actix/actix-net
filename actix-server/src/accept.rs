@@ -244,7 +244,6 @@ impl Accept {
                         }
                     }
                     _ => {
-                        println!("polling event");
                         let token = usize::from(token);
                         self.accept(token);
                     }
@@ -342,8 +341,8 @@ impl Accept {
         let next = self.next();
         match next.send(conn) {
             Ok(_) => {
-                // Increment counter of WorkerHandle.
-                // Set worker to unavailable with it hit max (Return false).
+                // Increment counter of worker handle.
+                // Set it to unavailable with it hit max (Return false).
                 if !next.incr_counter() {
                     let idx = next.idx();
                     self.avail.set_available(idx, false);
@@ -357,7 +356,7 @@ impl Accept {
                 self.remove_next();
 
                 if self.handles.is_empty() {
-                    error!("No workers");
+                    error!("No worker available. Dropping connection.");
                     // All workers are gone and Conn is nowhere to be sent.
                     // Treat this situation as Ok and drop Conn.
                     return Ok(());

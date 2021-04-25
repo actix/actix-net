@@ -12,7 +12,7 @@ use crate::worker::WorkerHandleAccept;
 /// Waker token for `mio::Poll` instance.
 pub(crate) const WAKER_TOKEN: Token = Token(usize::MAX);
 
-/// Types of interests we would look into when `Accept`'s `Poll` is waked up by waker.
+/// Types of interests we would look into when `Accept`'s `Poll` is waked up by WakerTx.
 ///
 /// These interests should not be confused with `mio::Interest` and mostly not I/O related
 pub(crate) enum WakerInterest {
@@ -55,11 +55,11 @@ impl Clone for WakerTx {
 }
 
 impl WakerTx {
-    /// Send WakerInterest through channel and panic on error(shutdown).
     pub(crate) fn wake(&self, interest: WakerInterest) {
-        // ingore result. tokio UnboundedSender only fail when the channel
-        // is closed. In that case the Accept thread is gone and no further
-        // wake up is needed/possible.
+        // ingore result. tokio UnboundedSender::send only fail when the
+        // channel is closed.
+        // In that case the Accept thread is gone and no further wake up
+        // is needed/possible.
         let _ = self.0.send(interest);
     }
 }
@@ -82,7 +82,7 @@ impl DerefMut for WakerRx {
 }
 
 pub(crate) fn from_registry(registry: &Registry) -> std::io::Result<Waker> {
-    mio::Waker::new(registry, WAKER_TOKEN).map(|waker| Arc::new(_Waker(waker)).into())
+    mio::Waker::new(registry, WAKER_TOKEN).map(|waker| Waker::from(Arc::new(_Waker(waker))))
 }
 
 pub(crate) fn waker_channel() -> (WakerTx, WakerRx) {
