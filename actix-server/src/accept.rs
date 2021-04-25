@@ -259,7 +259,13 @@ impl Accept {
         while let task::Poll::Ready(msg) = self.waker_rx.poll_recv(cx) {
             match msg {
                 Some(WakerInterest::WorkerAvailable(idx)) => {
-                    self.avail.set_available(idx, true);
+                    // Check if Accept have handle with the same index.
+                    // If not this worker is restarting and it's handle is not arrived yet.
+                    // (Happen in WakerInterest::Worker variant)
+                    let have_handle = self.handles.iter().any(|handle| handle.idx() == idx);
+                    if have_handle {
+                        self.avail.set_available(idx, true);
+                    }
 
                     if !self.paused {
                         self.accept_all();
@@ -380,7 +386,6 @@ impl Accept {
                     Err(c) => conn = c,
                 }
             } else {
-                self.avail.set_available(idx, false);
                 self.set_next();
 
                 if !self.avail.available() {
