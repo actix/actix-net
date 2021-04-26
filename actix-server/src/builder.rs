@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use actix_rt::{self as rt, net::TcpStream, time::sleep, System};
+use actix_rt::{net::TcpStream, time::sleep, System};
 use futures_core::future::BoxFuture;
 use log::{error, info};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
@@ -313,7 +313,7 @@ impl ServerBuilder {
 
             // start http server actor
             let server = self.server.clone();
-            rt::spawn(self);
+            actix_rt::spawn(self);
             server
         }
     }
@@ -331,10 +331,7 @@ impl ServerBuilder {
         F: Fn() -> Fut + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.on_stop = Box::new(move || {
-            let fut = func();
-            Box::pin(async move { fut.await })
-        });
+        self.on_stop = Box::new(move || Box::pin(func()));
         self
     }
 
@@ -401,6 +398,7 @@ impl ServerBuilder {
 
                 // stop accept thread
                 self.accept.wake(WakerInterest::Stop);
+
                 let notify = std::mem::take(&mut self.notify);
 
                 // take the on_stop future.
@@ -415,7 +413,7 @@ impl ServerBuilder {
                     .map(move |worker| worker.1.stop(graceful))
                     .collect();
 
-                rt::spawn(async move {
+                actix_rt::spawn(async move {
                     on_stop().await;
 
                     if graceful {
