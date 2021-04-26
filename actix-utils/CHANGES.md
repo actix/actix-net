@@ -3,6 +3,26 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.0 - 2021-04-16
+* No significant changes from `3.0.0-beta.4`.
+
+
+## 3.0.0-beta.4 - 2021-04-01
+* Add `future::Either` type. [#305]
+
+[#305]: https://github.com/actix/actix-net/pull/305
+
+
+## 3.0.0-beta.3 - 2021-04-01
+* Moved `mpsc` to own crate `local-channel`. [#301]
+* Moved `task::LocalWaker` to own crate `local-waker`. [#301]
+* Remove `timeout` module. [#301]
+* Remove `dispatcher` module. [#301]
+* Expose `future` mod with `ready` and `poll_fn` helpers. [#301]
+
+[#301]: https://github.com/actix/actix-net/pull/301
+
+
 ## 3.0.0-beta.2 - 2021-02-06
 * Update `actix-rt` to `2.0.0`. [#273]
 

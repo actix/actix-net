@@ -19,5 +19,5 @@ syn = { version = "^1", features = ["full"] }
 [dev-dependencies]
 actix-rt = "2.0.0"
 
-futures-util = { version = "0.3", default-features = false }
+futures-util = { version = "0.3.7", default-features = false }
 trybuild = "1"

@@ -9,10 +9,9 @@ use core::{
 use futures_core::ready;
 use pin_project_lite::pin_project;
 
-use crate::transform_err::TransformMapInitErr;
 use crate::{IntoServiceFactory, Service, ServiceFactory};
 
-/// Apply transform to a service.
+/// Apply a [`Transform`] to a [`Service`].
 pub fn apply<T, S, I, Req>(t: T, factory: I) -> ApplyTransform<T, S, Req>
 where
     I: IntoServiceFactory<S, Req>,
@@ -22,14 +21,12 @@ where
     ApplyTransform::new(t, factory.into_factory())
 }
 
-/// The `Transform` trait defines the interface of a service factory that wraps inner service
-/// during construction.
+/// Defines the interface of a service factory that wraps inner service during construction.
 ///
-/// Transform(middleware) wraps inner service and runs during
-/// inbound and/or outbound processing in the request/response lifecycle.
-/// It may modify request and/or response.
+/// Transformers wrap an inner service and runs during inbound and/or outbound processing in the
+/// service lifecycle. It may modify request and/or response.
 ///
-/// For example, timeout transform:
+/// For example, a timeout service wrapper:
 ///
 /// ```ignore
 /// pub struct Timeout<S> {
@@ -37,11 +34,7 @@ where
 ///     timeout: Duration,
 /// }
 ///
-/// impl<S> Service for Timeout<S>
-/// where
-///     S: Service,
-/// {
-///     type Request = S::Request;
+/// impl<S: Service<Req>, Req> Service<Req> for Timeout<S> {
 ///     type Response = S::Response;
 ///     type Error = TimeoutError<S::Error>;
 ///     type Future = TimeoutServiceResponse<S>;
@@ -51,33 +44,28 @@ where
 ///     fn call(&self, req: S::Request) -> Self::Future {
 ///         TimeoutServiceResponse {
 ///             fut: self.service.call(req),
-///             sleep: Delay::new(clock::now() + self.timeout),
+///             sleep: Sleep::new(clock::now() + self.timeout),
 ///         }
 ///     }
 /// }
 /// ```
 ///
-/// Timeout service in above example is decoupled from underlying service implementation
-/// and could be applied to any service.
+/// This wrapper service is decoupled from the underlying service implementation and could be
+/// applied to any service.
 ///
-/// The `Transform` trait defines the interface of a Service factory. `Transform`
-/// is often implemented for middleware, defining how to construct a
-/// middleware Service. A Service that is constructed by the factory takes
-/// the Service that follows it during execution as a parameter, assuming
-/// ownership of the next Service.
+/// The `Transform` trait defines the interface of a service wrapper. `Transform` is often
+/// implemented for middleware, defining how to construct a middleware Service. A Service that is
+/// constructed by the factory takes the Service that follows it during execution as a parameter,
+/// assuming ownership of the next Service.
 ///
-/// Factory for `Timeout` middleware from the above example could look like this:
+/// A transform for the `Timeout` middleware could look like this:
 ///
 /// ```ignore
 /// pub struct TimeoutTransform {
 ///     timeout: Duration,
 /// }
 ///
-/// impl<S> Transform<S> for TimeoutTransform
-/// where
-///     S: Service,
-/// {
-///     type Request = S::Request;
+/// impl<S: Service<Req>, Req> Transform<S, Req> for TimeoutTransform {
 ///     type Response = S::Response;
 ///     type Error = TimeoutError<S::Error>;
 ///     type InitError = S::Error;
@@ -85,15 +73,15 @@ where
 ///     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 ///
 ///     fn new_transform(&self, service: S) -> Self::Future {
-///         ok(TimeoutService {
+///         ready(Ok(Timeout {
 ///             service,
 ///             timeout: self.timeout,
-///         })
+///         }))
 ///     }
 /// }
 /// ```
 pub trait Transform<S, Req> {
-    /// Responses given by the service.
+    /// Responses produced by the service.
     type Response;
 
     /// Errors produced by the service.
@@ -110,16 +98,6 @@ pub trait Transform<S, Req> {
 
     /// Creates and returns a new Transform component, asynchronously
     fn new_transform(&self, service: S) -> Self::Future;
-
-    /// Map this transform's factory error to a different error,
-    /// returning a new transform service factory.
-    fn map_init_err<F, E>(self, f: F) -> TransformMapInitErr<Self, S, Req, F, E>
-    where
-        Self: Sized,
-        F: Fn(Self::InitError) -> E + Clone,
-    {
-        TransformMapInitErr::new(self, f)
-    }
 }
 
 impl<T, S, Req> Transform<S, Req> for Rc<T>
@@ -152,7 +130,7 @@ where
     }
 }
 
-/// `Apply` transform to new service
+/// Apply a [`Transform`] to a [`Service`].
 pub struct ApplyTransform<T, S, Req>(Rc<(T, S)>, PhantomData<Req>);
 
 impl<T, S, Req> ApplyTransform<T, S, Req>
@@ -237,6 +215,56 @@ where
                 self.poll(cx)
             }
             ApplyTransformFutureStateProj::B { fut } => fut.poll(cx),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::time::Duration;
+
+    use actix_utils::future::{ready, Ready};
+
+    use super::*;
+    use crate::Service;
+
+    // pseudo-doctest for Transform trait
+    pub struct TimeoutTransform {
+        timeout: Duration,
+    }
+
+    // pseudo-doctest for Transform trait
+    impl<S: Service<Req>, Req> Transform<S, Req> for TimeoutTransform {
+        type Response = S::Response;
+        type Error = S::Error;
+        type InitError = S::Error;
+        type Transform = Timeout<S>;
+        type Future = Ready<Result<Self::Transform, Self::InitError>>;
+
+        fn new_transform(&self, service: S) -> Self::Future {
+            ready(Ok(Timeout {
+                service,
+                _timeout: self.timeout,
+            }))
+        }
+    }
+
+    // pseudo-doctest for Transform trait
+    pub struct Timeout<S> {
+        service: S,
+        _timeout: Duration,
+    }
+
+    // pseudo-doctest for Transform trait
+    impl<S: Service<Req>, Req> Service<Req> for Timeout<S> {
+        type Response = S::Response;
+        type Error = S::Error;
+        type Future = S::Future;
+
+        crate::forward_ready!(service);
+
+        fn call(&self, req: Req) -> Self::Future {
+            self.service.call(req)
         }
     }
 }

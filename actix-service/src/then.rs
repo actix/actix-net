@@ -246,7 +246,11 @@ mod tests {
 
     use futures_util::future::lazy;
 
-    use crate::{err, ok, pipeline, pipeline_factory, ready, Ready, Service, ServiceFactory};
+    use crate::{
+        err, ok,
+        pipeline::{pipeline, pipeline_factory},
+        ready, Ready, Service, ServiceFactory,
+    };
 
     #[derive(Clone)]
     struct Srv1(Rc<Cell<usize>>);

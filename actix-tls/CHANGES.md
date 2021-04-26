@@ -3,6 +3,30 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.0-beta.5 - 2021-03-29
+* Changed `connect::ssl::rustls::RustlsConnectorService` to return error when `DNSNameRef` 
+  generation failed instead of panic. [#296]
+* Remove `connect::ssl::openssl::OpensslConnectServiceFactory`. [#297]
+* Remove `connect::ssl::openssl::OpensslConnectService`. [#297]
+* Add `connect::ssl::native_tls` module for native tls support. [#295]
+* Rename `accept::{nativetls => native_tls}`. [#295]
+* Remove `connect::TcpConnectService` type. service caller expect a `TcpStream` should use 
+  `connect::ConnectService` instead and call `Connection<T, TcpStream>::into_parts`. [#299]
+
+[#295]: https://github.com/actix/actix-net/pull/295
+[#296]: https://github.com/actix/actix-net/pull/296
+[#297]: https://github.com/actix/actix-net/pull/297
+[#299]: https://github.com/actix/actix-net/pull/299
+
+
+## 3.0.0-beta.4 - 2021-02-24
+* Rename `accept::openssl::{SslStream => TlsStream}`.
+* Add `connect::Connect::set_local_addr` to attach local `IpAddr`. [#282]
+* `connector::TcpConnector` service will try to bind to local_addr of `IpAddr` when given. [#282]
+
+[#282]: https://github.com/actix/actix-net/pull/282
+
+
 ## 3.0.0-beta.3 - 2021-02-06
 * Remove `trust-dns-proto` and `trust-dns-resolver`. [#248]
 * Use `std::net::ToSocketAddrs` as simple and basic default resolver. [#248]

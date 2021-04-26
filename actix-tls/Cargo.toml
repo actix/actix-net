@@ -1,6 +1,6 @@
 [package]
 name = "actix-tls"
-version = "3.0.0-beta.3"
+version = "3.0.0-beta.5"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "TLS acceptor and connector services for Actix ecosystem"
 keywords = ["network", "tls", "ssl", "async", "transport"]
@@ -41,9 +41,9 @@ uri = ["http"]
 
 [dependencies]
 actix-codec = "0.4.0-beta.1"
-actix-rt = { version = "2.0.0", default-features = false }
-actix-service = "2.0.0-beta.4"
-actix-utils = "3.0.0-beta.2"
+actix-rt = { version = "2.2.0", default-features = false }
+actix-service = "2.0.0"
+actix-utils = "3.0.0"
 
 derive_more = "0.99.5"
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
@@ -52,7 +52,7 @@ log = "0.4"
 tokio-util = { version = "0.6.3", default-features = false }
 
 # openssl
-tls-openssl = { package = "openssl", version = "0.10", optional = true }
+tls-openssl = { package = "openssl", version = "0.10.9", optional = true }
 tokio-openssl = { version = "0.6", optional = true }
 
 # rustls
@@ -63,8 +63,8 @@ webpki-roots = { version = "0.21", optional = true }
 tokio-native-tls = { version = "0.3", optional = true }
 
 [dev-dependencies]
-actix-rt = "2.0.0"
-actix-server = "2.0.0-beta.3"
+actix-rt = "2.2.0"
+actix-server = "2.0.0-beta.5"
 bytes = "1"
 env_logger = "0.8"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
@@ -72,5 +72,5 @@ log = "0.4"
 trust-dns-resolver = "0.20.0"
 
 [[example]]
-name = "basic"
+name = "tcp-rustls"
 required-features = ["accept", "rustls"]

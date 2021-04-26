@@ -1,12 +1,12 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::Duration;
-use std::{io, mem};
+use std::{
+    future::Future,
+    io, mem,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
-use actix_rt::net::TcpStream;
-use actix_rt::time::{sleep_until, Instant};
-use actix_rt::{self as rt, System};
+use actix_rt::{self as rt, net::TcpStream, time::sleep, System};
 use log::{error, info};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use tokio::sync::oneshot;
@@ -19,7 +19,10 @@ use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{self, ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandle};
+use crate::worker::{
+    ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandleAccept,
+    WorkerHandleServer,
+};
 use crate::{join_all, Token};
 use futures_core::future::LocalBoxFuture;
 
@@ -28,7 +31,7 @@ pub struct ServerBuilder {
     threads: usize,
     token: Token,
     backlog: u32,
-    handles: Vec<(usize, WorkerHandle)>,
+    handles: Vec<(usize, WorkerHandleServer)>,
     services: Vec<Box<dyn InternalServiceFactory>>,
     sockets: Vec<(Token, String, MioListener)>,
     accept: AcceptLoop,
@@ -120,18 +123,18 @@ impl ServerBuilder {
     /// reached for each worker.
     ///
     /// By default max connections is set to a 25k per worker.
-    pub fn maxconn(self, num: usize) -> Self {
-        worker::max_concurrent_connections(num);
+    pub fn maxconn(mut self, num: usize) -> Self {
+        self.worker_config.max_concurrent_connections(num);
         self
     }
 
-    /// Stop actix system.
+    /// Stop Actix system.
     pub fn system_exit(mut self) -> Self {
         self.exit = true;
         self
     }
 
-    /// Disable signal handling
+    /// Disable signal handling.
     pub fn disable_signals(mut self) -> Self {
         self.no_signals = true;
         self
@@ -139,9 +142,8 @@ impl ServerBuilder {
 
     /// Timeout for graceful workers shutdown in seconds.
     ///
-    /// After receiving a stop signal, workers have this much time to finish
-    /// serving requests. Workers still alive after the timeout are force
-    /// dropped.
+    /// After receiving a stop signal, workers have this much time to finish serving requests.
+    /// Workers still alive after the timeout are force dropped.
     ///
     /// By default shutdown timeout sets to 30 seconds.
     pub fn shutdown_timeout(mut self, sec: u64) -> Self {
@@ -150,11 +152,10 @@ impl ServerBuilder {
         self
     }
 
-    /// Execute external configuration as part of the server building
-    /// process.
+    /// Execute external configuration as part of the server building process.
     ///
-    /// This function is useful for moving parts of configuration to a
-    /// different module or even library.
+    /// This function is useful for moving parts of configuration to a different module or
+    /// even library.
     pub fn configure<F>(mut self, f: F) -> io::Result<ServerBuilder>
     where
         F: Fn(&mut ServiceConfig) -> io::Result<()>,
@@ -271,6 +272,7 @@ impl ServerBuilder {
 
         self.sockets
             .push((token, name.as_ref().to_string(), MioListener::from(lst)));
+
         Ok(self)
     }
 
@@ -284,10 +286,11 @@ impl ServerBuilder {
             // start workers
             let handles = (0..self.threads)
                 .map(|idx| {
-                    let handle = self.start_worker(idx, self.accept.waker_owned());
-                    self.handles.push((idx, handle.clone()));
+                    let (handle_accept, handle_server) =
+                        self.start_worker(idx, self.accept.waker_owned());
+                    self.handles.push((idx, handle_server));
 
-                    handle
+                    handle_accept
                 })
                 .collect();
 
@@ -402,41 +405,18 @@ impl ServerBuilder {
                 std::mem::swap(&mut self.on_stop, &mut on_stop);
 
                 // stop workers
-                if !self.handles.is_empty() && graceful {
-                    let iter = self
-                        .handles
-                        .iter()
-                        .map(move |worker| worker.1.stop(graceful))
-                        .collect();
+                let stop = self
+                    .handles
+                    .iter()
+                    .map(move |worker| worker.1.stop(graceful))
+                    .collect();
 
-                    let fut = join_all(iter);
-
-                    rt::spawn(async move {
-                        on_stop().await;
-
-                        let _ = fut.await;
-                        if let Some(tx) = completion {
-                            let _ = tx.send(());
-                        }
-                        for tx in notify {
-                            let _ = tx.send(());
-                        }
-                        if exit {
-                            rt::spawn(async {
-                                sleep_until(Instant::now() + Duration::from_millis(300)).await;
-                                System::current().stop();
-                            });
-                        }
-                    });
-                // we need to stop system if server was spawned
-                } else {
-                    rt::spawn(async move {
-                        on_stop().await;
-                        if exit {
-                            sleep_until(Instant::now() + Duration::from_millis(300)).await;
-                            System::current().stop();
-                        }
-                    });
+                rt::spawn(async move {
+                    on_stop().await;  
+                  
+                    if graceful {
+                        let _ = join_all(stop).await;
+                    }
 
                     if let Some(tx) = completion {
                         let _ = tx.send(());
@@ -444,7 +424,12 @@ impl ServerBuilder {
                     for tx in notify {
                         let _ = tx.send(());
                     }
-                }
+
+                    if exit {
+                        sleep(Duration::from_millis(300)).await;
+                        System::current().stop();
+                    }
+                });
             }
             ServerCommand::WorkerFaulted(idx) => {
                 let mut found = false;
@@ -470,9 +455,10 @@ impl ServerBuilder {
                         break;
                     }
 
-                    let handle = self.start_worker(new_idx, self.accept.waker_owned());
-                    self.handles.push((new_idx, handle.clone()));
-                    self.accept.wake(WakerInterest::Worker(handle));
+                    let (handle_accept, handle_server) =
+                        self.start_worker(new_idx, self.accept.waker_owned());
+                    self.handles.push((new_idx, handle_server));
+                    self.accept.wake(WakerInterest::Worker(handle_accept));
                 }
             }
         }

@@ -2,12 +2,12 @@ use std::{
     collections::VecDeque,
     future::Future,
     io,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
     pin::Pin,
     task::{Context, Poll},
 };
 
-use actix_rt::net::TcpStream;
+use actix_rt::net::{TcpSocket, TcpStream};
 use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::{error, trace};
@@ -54,9 +54,14 @@ impl<T: Address> Service<Connect<T>> for TcpConnector {
 
     fn call(&self, req: Connect<T>) -> Self::Future {
         let port = req.port();
-        let Connect { req, addr, .. } = req;
+        let Connect {
+            req,
+            addr,
+            local_addr,
+            ..
+        } = req;
 
-        TcpConnectorResponse::new(req, port, addr)
+        TcpConnectorResponse::new(req, port, local_addr, addr)
     }
 }
 
@@ -65,14 +70,20 @@ pub enum TcpConnectorResponse<T> {
     Response {
         req: Option<T>,
         port: u16,
+        local_addr: Option<IpAddr>,
         addrs: Option<VecDeque<SocketAddr>>,
-        stream: Option<ReusableBoxFuture<Result<TcpStream, io::Error>>>,
+        stream: ReusableBoxFuture<Result<TcpStream, io::Error>>,
     },
     Error(Option<ConnectError>),
 }
 
 impl<T: Address> TcpConnectorResponse<T> {
-    pub(crate) fn new(req: T, port: u16, addr: ConnectAddrs) -> TcpConnectorResponse<T> {
+    pub(crate) fn new(
+        req: T,
+        port: u16,
+        local_addr: Option<IpAddr>,
+        addr: ConnectAddrs,
+    ) -> TcpConnectorResponse<T> {
         if addr.is_none() {
             error!("TCP connector: unresolved connection address");
             return TcpConnectorResponse::Error(Some(ConnectError::Unresolved));
@@ -90,18 +101,24 @@ impl<T: Address> TcpConnectorResponse<T> {
             ConnectAddrs::One(addr) => TcpConnectorResponse::Response {
                 req: Some(req),
                 port,
+                local_addr,
                 addrs: None,
-                stream: Some(ReusableBoxFuture::new(TcpStream::connect(addr))),
+                stream: ReusableBoxFuture::new(connect(addr, local_addr)),
             },
 
             // when resolver returns multiple socket addr for request they would be popped from
             // front end of queue and returns with the first successful tcp connection.
-            ConnectAddrs::Multi(addrs) => TcpConnectorResponse::Response {
-                req: Some(req),
-                port,
-                addrs: Some(addrs),
-                stream: None,
-            },
+            ConnectAddrs::Multi(mut addrs) => {
+                let addr = addrs.pop_front().unwrap();
+
+                TcpConnectorResponse::Response {
+                    req: Some(req),
+                    port,
+                    local_addr,
+                    addrs: Some(addrs),
+                    stream: ReusableBoxFuture::new(connect(addr, local_addr)),
+                }
+            }
         }
     }
 }
@@ -116,43 +133,62 @@ impl<T: Address> Future for TcpConnectorResponse<T> {
             TcpConnectorResponse::Response {
                 req,
                 port,
+                local_addr,
                 addrs,
                 stream,
             } => loop {
-                if let Some(new) = stream.as_mut() {
-                    match ready!(new.poll(cx)) {
-                        Ok(sock) => {
-                            let req = req.take().unwrap();
-                            trace!(
-                                "TCP connector: successfully connected to {:?} - {:?}",
-                                req.hostname(),
-                                sock.peer_addr()
-                            );
-                            return Poll::Ready(Ok(Connection::new(sock, req)));
-                        }
+                match ready!(stream.poll(cx)) {
+                    Ok(sock) => {
+                        let req = req.take().unwrap();
+                        trace!(
+                            "TCP connector: successfully connected to {:?} - {:?}",
+                            req.hostname(),
+                            sock.peer_addr()
+                        );
+                        return Poll::Ready(Ok(Connection::new(sock, req)));
+                    }
 
-                        Err(err) => {
-                            trace!(
-                                "TCP connector: failed to connect to {:?} port: {}",
-                                req.as_ref().unwrap().hostname(),
-                                port,
-                            );
+                    Err(err) => {
+                        trace!(
+                            "TCP connector: failed to connect to {:?} port: {}",
+                            req.as_ref().unwrap().hostname(),
+                            port,
+                        );
 
-                            if addrs.is_none() || addrs.as_ref().unwrap().is_empty() {
-                                return Poll::Ready(Err(ConnectError::Io(err)));
-                            }
+                        if let Some(addr) = addrs.as_mut().and_then(|addrs| addrs.pop_front()) {
+                            stream.set(connect(addr, *local_addr));
+                        } else {
+                            return Poll::Ready(Err(ConnectError::Io(err)));
                         }
                     }
                 }
-
-                // try to connect
-                let addr = addrs.as_mut().unwrap().pop_front().unwrap();
-
-                match stream {
-                    Some(rbf) => rbf.set(TcpStream::connect(addr)),
-                    None => *stream = Some(ReusableBoxFuture::new(TcpStream::connect(addr))),
-                }
             },
         }
+    }
+}
+
+async fn connect(addr: SocketAddr, local_addr: Option<IpAddr>) -> io::Result<TcpStream> {
+    // use local addr if connect asks for it.
+    match local_addr {
+        Some(ip_addr) => {
+            let socket = match ip_addr {
+                IpAddr::V4(ip_addr) => {
+                    let socket = TcpSocket::new_v4()?;
+                    let addr = SocketAddr::V4(SocketAddrV4::new(ip_addr, 0));
+                    socket.bind(addr)?;
+                    socket
+                }
+                IpAddr::V6(ip_addr) => {
+                    let socket = TcpSocket::new_v6()?;
+                    let addr = SocketAddr::V6(SocketAddrV6::new(ip_addr, 0, 0, 0));
+                    socket.bind(addr)?;
+                    socket
+                }
+            };
+
+            socket.connect(addr).await
+        }
+
+        None => TcpStream::connect(addr).await,
     }
 }

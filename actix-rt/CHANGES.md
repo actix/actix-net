@@ -3,6 +3,22 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 2.2.0 - 2021-03-29
+* **BREAKING** `ActixStream::{poll_read_ready, poll_write_ready}` methods now return
+  `Ready` object in ok variant. [#293]
+  * Breakage is acceptable since `ActixStream` was not intended to be public.
+
+[#293] https://github.com/actix/actix-net/pull/293
+
+
+## 2.1.0 - 2021-02-24
+* Add `ActixStream` extension trait to include readiness methods. [#276]
+* Re-export `tokio::net::TcpSocket` in `net` module [#282]
+
+[#276]: https://github.com/actix/actix-net/pull/276
+[#282]: https://github.com/actix/actix-net/pull/282
+
+
 ## 2.0.2 - 2021-02-06
 * Add `Arbiter::handle` to get a handle of an owned Arbiter. [#274]
 * Add `System::try_current` for situations where actix may or may not be running a System. [#275]
@@ -56,10 +72,7 @@
 
 
 ## 2.0.0-beta.1 - 2020-12-28
-### Added
 * Add `System::attach_to_tokio` method. [#173]
-
-### Changed
 * Update `tokio` dependency to `1.0`. [#236]
 * Rename `time` module `delay_for` to `sleep`, `delay_until` to `sleep_until`, `Delay` to `Sleep`
   to stay aligned with Tokio's naming. [#236]
@@ -67,27 +80,19 @@
   * These methods now accept `&self` when calling. [#236]
 * Remove `'static` lifetime requirement for `System::run` and `Builder::run`. [#236]
 * `Arbiter::spawn` now panics when `System` is not in scope. [#207]
-
-### Fixed
 * Fix work load issue by removing `PENDING` thread local. [#207]
 
 [#207]: https://github.com/actix/actix-net/pull/207
 [#236]: https://github.com/actix/actix-net/pull/236
 
-## [1.1.1] - 2020-04-30
 
-### Fixed
-
+## 1.1.1 - 2020-04-30
 * Fix memory leak due to [#94] (see [#129] for more detail)
 
 [#129]: https://github.com/actix/actix-net/issues/129
 
-## [1.1.0] - 2020-04-08
 
-**This version has been yanked.**
-
-### Added
-
+## 1.1.0 - 2020-04-08 (YANKED)
 * Expose `System::is_set` to check if current system has ben started [#99]
 * Add `Arbiter::is_running` to check if event loop is running [#124]
 * Add `Arbiter::local_join` associated function
@@ -97,96 +102,57 @@
 [#99]: https://github.com/actix/actix-net/pull/99
 [#124]: https://github.com/actix/actix-net/pull/124
 
-## [1.0.0] - 2019-12-11
 
+## 1.0.0 - 2019-12-11
 * Update dependencies
 
-## [1.0.0-alpha.3] - 2019-12-07
 
-### Fixed
-
+## 1.0.0-alpha.3 - 2019-12-07
+* Migrate to tokio 0.2
 * Fix compilation on non-unix platforms
 
-### Changed
 
-* Migrate to tokio 0.2
-
-
-## [1.0.0-alpha.2] - 2019-12-02
-
-Added
-
+## 1.0.0-alpha.2 - 2019-12-02
 * Export `main` and `test` attribute macros
-
 * Export `time` module (re-export of tokio-timer)
-
 * Export `net` module (re-export of tokio-net)
 
 
-## [1.0.0-alpha.1] - 2019-11-22
-
-### Changed
-
+## 1.0.0-alpha.1 - 2019-11-22
 * Migrate to std::future and tokio 0.2
 
 
-## [0.2.6] - 2019-11-14
-
-### Fixed
-
+## 0.2.6 - 2019-11-14
+* Allow to join arbiter's thread. #60
 * Fix arbiter's thread panic message.
 
-### Added
 
-* Allow to join arbiter's thread. #60
-
-
-## [0.2.5] - 2019-09-02
-
-### Added
-
+## 0.2.5 - 2019-09-02
 * Add arbiter specific storage
 
 
-## [0.2.4] - 2019-07-17
-
-### Changed
-
+## 0.2.4 - 2019-07-17
 * Avoid a copy of the Future when initializing the Box. #29
 
 
-## [0.2.3] - 2019-06-22
-
-### Added
-
-* Allow to start System using exsiting CurrentThread Handle #22
+## 0.2.3 - 2019-06-22
+* Allow to start System using existing CurrentThread Handle #22
 
 
-## [0.2.2] - 2019-03-28
-
-### Changed
-
+## 0.2.2 - 2019-03-28
 * Moved `blocking` module to `actix-threadpool` crate
 
 
-## [0.2.1] - 2019-03-11
-
-### Added
-
+## 0.2.1 - 2019-03-11
 * Added `blocking` module
-
-* Arbiter::exec_fn - execute fn on the arbiter's thread
-
-* Arbiter::exec - execute fn on the arbiter's thread and wait result
+* Added `Arbiter::exec_fn` - execute fn on the arbiter's thread
+* Added `Arbiter::exec` - execute fn on the arbiter's thread and wait result
 
 
-## [0.2.0] - 2019-03-06
-
+## 0.2.0 - 2019-03-06
 * `run` method returns `io::Result<()>`
-
 * Removed `Handle`
 
 
-## [0.1.0] - 2018-12-09
-
+## 0.1.0 - 2018-12-09
 * Initial release

@@ -29,23 +29,19 @@ use std::{
     },
 };
 
+use actix_rt::net::TcpStream;
 use actix_server::Server;
-use actix_service::pipeline_factory;
-use actix_tls::accept::rustls::Acceptor as RustlsAcceptor;
+use actix_service::ServiceFactoryExt as _;
+use actix_tls::accept::rustls::{Acceptor as RustlsAcceptor, TlsStream};
 use futures_util::future::ok;
 use log::info;
 use rustls::{
     internal::pemfile::certs, internal::pemfile::rsa_private_keys, NoClientAuth, ServerConfig,
 };
 
-#[derive(Debug)]
-struct ServiceState {
-    num: Arc<AtomicUsize>,
-}
-
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
-    env::set_var("RUST_LOG", "actix=trace,basic=trace");
+    env::set_var("RUST_LOG", "info");
     env_logger::init();
 
     let mut tls_config = ServerConfig::new(NoClientAuth::new());
@@ -72,11 +68,12 @@ async fn main() -> io::Result<()> {
             let count = Arc::clone(&count);
 
             // Set up TLS service factory
-            pipeline_factory(tls_acceptor.clone())
+            tls_acceptor
+                .clone()
                 .map_err(|err| println!("Rustls error: {:?}", err))
-                .and_then(move |stream| {
+                .and_then(move |stream: TlsStream<TcpStream>| {
                     let num = count.fetch_add(1, Ordering::Relaxed);
-                    info!("[{}] Got TLS connection: {:?}", num, stream);
+                    info!("[{}] Got TLS connection: {:?}", num, &*stream);
                     ok(())
                 })
         })?

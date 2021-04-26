@@ -92,10 +92,10 @@ impl TestServer {
         let port = addr.port();
 
         TestServerRuntime {
-            system,
             addr,
             host,
             port,
+            system,
         }
     }
 

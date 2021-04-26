@@ -7,9 +7,9 @@
 use core::marker::PhantomData;
 
 use actix_service::{
-    apply, dev::ApplyTransform, IntoServiceFactory, Service, ServiceFactory, Transform,
+    apply, ApplyTransform, IntoServiceFactory, Service, ServiceFactory, Transform,
 };
-use futures_util::future::{ok, Either, Ready};
+use actix_utils::future::{ok, Either, Ready};
 use tracing_futures::{Instrument, Instrumented};
 
 /// A `Service` implementation that automatically enters/exits tracing spans
@@ -48,9 +48,9 @@ where
             .clone()
             .map(|span| tracing::span!(parent: &span, tracing::Level::INFO, "future"))
         {
-            Either::Right(fut.instrument(span))
+            Either::right(fut.instrument(span))
         } else {
-            Either::Left(fut)
+            Either::left(fut)
         }
     }
 }

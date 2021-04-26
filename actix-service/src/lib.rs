@@ -1,7 +1,8 @@
 //! See [`Service`] docs for information on this crate's foundational trait.
 
 #![no_std]
-#![deny(rust_2018_idioms, nonstandard_style)]
+#![deny(rust_2018_idioms, nonstandard_style, future_incompatible)]
+#![warn(missing_docs)]
 #![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
@@ -21,6 +22,7 @@ mod apply_cfg;
 pub mod boxed;
 mod ext;
 mod fn_service;
+mod macros;
 mod map;
 mod map_config;
 mod map_err;
@@ -33,11 +35,10 @@ mod transform_err;
 
 pub use self::apply::{apply_fn, apply_fn_factory};
 pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
-pub use self::ext::{ServiceExt, ServiceFactoryExt};
+pub use self::ext::{ServiceExt, ServiceFactoryExt, TransformExt};
 pub use self::fn_service::{fn_factory, fn_factory_with_config, fn_service};
 pub use self::map_config::{map_config, unit_config};
-pub use self::pipeline::{pipeline, pipeline_factory, Pipeline, PipelineFactory};
-pub use self::transform::{apply, Transform};
+pub use self::transform::{apply, ApplyTransform, Transform};
 
 #[allow(unused_imports)]
 use self::ready::{err, ok, ready, Ready};
@@ -52,8 +53,14 @@ use self::ready::{err, ok, ready, Ready};
 /// async fn(Request) -> Result<Response, Err>
 /// ```
 ///
-/// The `Service` trait just generalizes this form where each parameter is described as an
-/// associated type on the trait. Services can also have mutable state that influence computation.
+/// The `Service` trait just generalizes this form. Requests are defined as a generic type parameter
+/// and responses and other details are defined as associated types on the trait impl. Notice that
+/// this design means that services can receive many request types and converge them to a single
+/// response type.
+///
+/// Services can also have mutable state that influence computation by using a `Cell`, `RefCell`
+/// or `Mutex`. Services intentionally do not take `&mut self` to reduce overhead in the
+/// common cases.
 ///
 /// `Service` provides a symmetric and uniform API; the same abstractions can be used to represent
 /// both clients and servers. Services describe only _transformation_ operations which encourage
@@ -63,11 +70,10 @@ use self::ready::{err, ok, ready, Ready};
 /// ```ignore
 /// struct MyService;
 ///
-/// impl Service for MyService {
-///      type Request = u8;
+/// impl Service<u8> for MyService {
 ///      type Response = u64;
 ///      type Error = MyError;
-///      type Future = Pin<Box<Future<Output=Result<Self::Response, Self::Error>>>>;
+///      type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 ///
 ///      fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> { ... }
 ///
@@ -76,10 +82,13 @@ use self::ready::{err, ok, ready, Ready};
 /// ```
 ///
 /// Sometimes it is not necessary to implement the Service trait. For example, the above service
-/// could be rewritten as a simple function and passed to [fn_service](fn_service()).
+/// could be rewritten as a simple function and passed to [`fn_service`](fn_service()).
 ///
 /// ```ignore
 /// async fn my_service(req: u8) -> Result<u64, MyError>;
+///
+/// let svc = fn_service(my_service)
+/// svc.call(123)
 /// ```
 pub trait Service<Req> {
     /// Responses given by the service.
@@ -93,40 +102,40 @@ pub trait Service<Req> {
 
     /// Returns `Ready` when the service is able to process requests.
     ///
-    /// If the service is at capacity, then `Pending` is returned and the task
-    /// is notified when the service becomes ready again. This function is
-    /// expected to be called while on a task.
+    /// If the service is at capacity, then `Pending` is returned and the task is notified when the
+    /// service becomes ready again. This function is expected to be called while on a task.
     ///
-    /// This is a **best effort** implementation. False positives are permitted.
-    /// It is permitted for the service to return `Ready` from a `poll_ready`
-    /// call and the next invocation of `call` results in an error.
+    /// This is a best effort implementation. False positives are permitted. It is permitted for
+    /// the service to return `Ready` from a `poll_ready` call and the next invocation of `call`
+    /// results in an error.
     ///
     /// # Notes
-    /// 1. `.poll_ready()` might be called on different task from actual service call.
-    /// 1. In case of chained services, `.poll_ready()` get called for all services at once.
+    /// 1. `poll_ready` might be called on a different task to `call`.
+    /// 1. In cases of chained services, `.poll_ready()` is called for all services at once.
     fn poll_ready(&self, ctx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>>;
 
     /// Process the request and return the response asynchronously.
     ///
-    /// This function is expected to be callable off task. As such,
-    /// implementations should take care to not call `poll_ready`. If the
-    /// service is at capacity and the request is unable to be handled, the
-    /// returned `Future` should resolve to an error.
+    /// This function is expected to be callable off-task. As such, implementations of `call` should
+    /// take care to not call `poll_ready`. If the service is at capacity and the request is unable
+    /// to be handled, the returned `Future` should resolve to an error.
     ///
-    /// Calling `call` without calling `poll_ready` is permitted. The
-    /// implementation must be resilient to this fact.
+    /// Invoking `call` without first invoking `poll_ready` is permitted. Implementations must be
+    /// resilient to this fact.
     fn call(&self, req: Req) -> Self::Future;
 }
 
 /// Factory for creating `Service`s.
 ///
-/// Acts as a service factory. This is useful for cases where new `Service`s
-/// must be produced. One case is a TCP server listener. The listener
-/// accepts new TCP streams, obtains a new `Service` using the
-/// `ServiceFactory` trait, and uses the new `Service` to process inbound
-/// requests on that new TCP stream.
+/// This is useful for cases where new `Service`s must be produced. One case is a TCP
+/// server listener: a listener accepts new connections, constructs a new `Service` for each using
+/// the `ServiceFactory` trait, and uses the new `Service` to process inbound requests on that new
+/// connection.
 ///
 /// `Config` is a service factory configuration type.
+///
+/// Simple factories may be able to use [`fn_factory`] or [`fn_factory_with_config`] to
+/// reduce boilerplate.
 pub trait ServiceFactory<Req> {
     /// Responses given by the created services.
     type Response;
@@ -143,14 +152,32 @@ pub trait ServiceFactory<Req> {
     /// Errors potentially raised while building a service.
     type InitError;
 
-    /// The future of the `Service` instance.
+    /// The future of the `Service` instance.g
     type Future: Future<Output = Result<Self::Service, Self::InitError>>;
 
     /// Create and return a new service asynchronously.
     fn new_service(&self, cfg: Self::Config) -> Self::Future;
 }
 
+// TODO: remove implement on mut reference.
 impl<'a, S, Req> Service<Req> for &'a mut S
+where
+    S: Service<Req> + 'a,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        (**self).poll_ready(ctx)
+    }
+
+    fn call(&self, request: Req) -> S::Future {
+        (**self).call(request)
+    }
+}
+
+impl<'a, S, Req> Service<Req> for &'a S
 where
     S: Service<Req> + 'a,
 {
@@ -184,24 +211,25 @@ where
     }
 }
 
-impl<S, Req> Service<Req> for RefCell<S>
+impl<S, Req> Service<Req> for Rc<S>
 where
-    S: Service<Req>,
+    S: Service<Req> + ?Sized,
 {
     type Response = S::Response;
     type Error = S::Error;
     type Future = S::Future;
 
     fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.borrow().poll_ready(ctx)
+        (**self).poll_ready(ctx)
     }
 
     fn call(&self, request: Req) -> S::Future {
-        self.borrow().call(request)
+        (**self).call(request)
     }
 }
 
-impl<S, Req> Service<Req> for Rc<RefCell<S>>
+/// This impl is deprecated since v2 because the `Service` trait now receives shared reference.
+impl<S, Req> Service<Req> for RefCell<S>
 where
     S: Service<Req>,
 {
@@ -293,45 +321,4 @@ where
     S: Service<Req>,
 {
     tp.into_service()
-}
-
-pub mod dev {
-    pub use crate::apply::{Apply, ApplyFactory};
-    pub use crate::fn_service::{
-        FnService, FnServiceConfig, FnServiceFactory, FnServiceNoConfig,
-    };
-    pub use crate::map::{Map, MapServiceFactory};
-    pub use crate::map_config::{MapConfig, UnitConfig};
-    pub use crate::map_err::{MapErr, MapErrServiceFactory};
-    pub use crate::map_init_err::MapInitErr;
-    pub use crate::transform::ApplyTransform;
-    pub use crate::transform_err::TransformMapInitErr;
-}
-
-#[macro_export]
-macro_rules! always_ready {
-    () => {
-        #[inline]
-        fn poll_ready(
-            &self,
-            _: &mut ::core::task::Context<'_>,
-        ) -> ::core::task::Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! forward_ready {
-    ($field:ident) => {
-        #[inline]
-        fn poll_ready(
-            &self,
-            cx: &mut ::core::task::Context<'_>,
-        ) -> ::core::task::Poll<Result<(), Self::Error>> {
-            self.$field
-                .poll_ready(cx)
-                .map_err(::core::convert::Into::into)
-        }
-    };
 }

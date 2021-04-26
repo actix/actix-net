@@ -1,13 +1,14 @@
 [package]
 name = "actix-utils"
-version = "3.0.0-beta.2"
-authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
-description = "Various network related services and utilities for the Actix ecosystem"
+version = "3.0.0"
+authors = [
+    "Nikolay Kim <fafhrd91@gmail.com>",
+    "Rob Ede <robjtede@icloud.com>",
+]
+description = "Various utilities used in the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
-homepage = "https://actix.rs"
-repository = "https://github.com/actix/actix-net.git"
-documentation = "https://docs.rs/actix-utils"
 categories = ["network-programming", "asynchronous"]
+repository = "https://github.com/actix/actix-net"
 license = "MIT OR Apache-2.0"
 edition = "2018"
 
@@ -16,14 +17,8 @@ name = "actix_utils"
 path = "src/lib.rs"
 
 [dependencies]
-actix-codec = "0.4.0-beta.1"
-actix-rt = { version = "2.0.0", default-features = false }
-actix-service = "2.0.0-beta.4"
-
-futures-core = { version = "0.3.7", default-features = false }
-futures-sink = { version = "0.3.7", default-features = false }
-log = "0.4"
-pin-project-lite = "0.2.0"
+pin-project-lite = "0.2"
+local-waker = "0.1"
 
 [dev-dependencies]
 actix-rt = "2.0.0"

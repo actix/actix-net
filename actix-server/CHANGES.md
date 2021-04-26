@@ -6,6 +6,19 @@
 [#230]: https://github.com/actix/actix-net/pull/230
 
 
+## 2.0.0-beta.5 - 2021-04-20
+* Server shutdown would notify all workers to exit regardless if shutdown is graceful.
+  This would make all worker shutdown immediately in force shutdown case. [#333]
+  
+[#333]: https://github.com/actix/actix-net/pull/333
+
+
+## 2.0.0-beta.4 - 2021-04-01
+* Prevent panic when `shutdown_timeout` is very large. [f9262db]
+
+[f9262db]: https://github.com/actix/actix-net/commit/f9262db
+
+
 ## 2.0.0-beta.3 - 2021-02-06
 * Hidden `ServerBuilder::start` method has been removed. Use `ServerBuilder::run`. [#246]
 * Add retry for EINTR signal (`io::Interrupted`) in `Accept`'s poll loop. [#264]

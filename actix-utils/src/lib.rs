@@ -1,12 +1,9 @@
-//! Various network related services and utilities for the Actix ecosystem.
+//! Various utilities used in the Actix ecosystem.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
-#![allow(clippy::type_complexity)]
+#![warn(missing_docs)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 pub mod counter;
-pub mod dispatcher;
-pub mod mpsc;
-pub mod task;
-pub mod timeout;
+pub mod future;
