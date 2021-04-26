@@ -7,6 +7,7 @@ use std::{
 };
 
 use actix_rt::{self as rt, net::TcpStream, time::sleep, System};
+use futures_core::future::BoxFuture;
 use log::{error, info};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use tokio::sync::oneshot;
@@ -24,7 +25,6 @@ use crate::worker::{
     WorkerHandleServer,
 };
 use crate::{join_all, Token};
-use futures_core::future::LocalBoxFuture;
 
 /// Server builder
 pub struct ServerBuilder {
@@ -39,7 +39,7 @@ pub struct ServerBuilder {
     no_signals: bool,
     cmd: UnboundedReceiver<ServerCommand>,
     server: Server,
-    on_stop: Box<dyn Fn() -> LocalBoxFuture<'static, ()>>,
+    on_stop: Box<dyn Fn() -> BoxFuture<'static, ()>>,
     notify: Vec<oneshot::Sender<()>>,
     worker_config: ServerWorkerConfig,
 }
@@ -329,7 +329,7 @@ impl ServerBuilder {
     pub fn on_stop<F, Fut>(mut self, func: F) -> Self
     where
         F: Fn() -> Fut + 'static,
-        Fut: Future<Output = ()> + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
     {
         self.on_stop = Box::new(move || {
             let fut = func();
@@ -338,8 +338,12 @@ impl ServerBuilder {
         self
     }
 
-    fn start_worker(&self, idx: usize, waker: WakerQueue) -> WorkerHandle {
-        let avail = WorkerAvailability::new(waker);
+    fn start_worker(
+        &self,
+        idx: usize,
+        waker: WakerQueue,
+    ) -> (WorkerHandleAccept, WorkerHandleServer) {
+        let avail = WorkerAvailability::new(idx, waker);
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
 
         ServerWorker::start(idx, services, avail, self.worker_config)
@@ -401,7 +405,7 @@ impl ServerBuilder {
 
                 // take the on_stop future.
                 let mut on_stop =
-                    Box::new(|| Box::pin(async {}) as LocalBoxFuture<'static, ()>) as _;
+                    Box::new(|| Box::pin(async {}) as BoxFuture<'static, ()>) as _;
                 std::mem::swap(&mut self.on_stop, &mut on_stop);
 
                 // stop workers
@@ -412,8 +416,8 @@ impl ServerBuilder {
                     .collect();
 
                 rt::spawn(async move {
-                    on_stop().await;  
-                  
+                    on_stop().await;
+
                     if graceful {
                         let _ = join_all(stop).await;
                     }

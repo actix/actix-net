@@ -577,3 +577,45 @@ async fn worker_restart() {
     let _ = server.stop(false);
     let _ = h.join().unwrap();
 }
+
+#[test]
+fn on_stop() {
+    let bool = std::sync::Arc::new(AtomicBool::new(false));
+
+    let addr = unused_addr();
+    let (tx, rx) = mpsc::channel();
+
+    let bool_clone = bool.clone();
+    let h = thread::spawn(move || {
+        let sys = actix_rt::System::new();
+        let lst = net::TcpListener::bind(addr).unwrap();
+        sys.block_on(async {
+            let server = Server::build()
+                .disable_signals()
+                .on_stop(move || {
+                    bool.store(true, Ordering::SeqCst);
+                    async {}
+                })
+                .listen("test", lst, move || {
+                    fn_service(|_| async { Ok::<_, ()>(()) })
+                })
+                .unwrap()
+                .run();
+            let _ = tx.send(server.clone());
+
+            server.await
+        })
+    });
+    let sys = rx.recv().unwrap();
+
+    thread::sleep(Duration::from_millis(500));
+
+    assert!(!bool_clone.load(Ordering::SeqCst));
+
+    assert!(net::TcpStream::connect(addr).is_ok());
+
+    let _ = sys.stop(true);
+    let _ = h.join();
+
+    assert!(bool_clone.load(Ordering::SeqCst));
+}
