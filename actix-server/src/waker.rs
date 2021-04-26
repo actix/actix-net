@@ -99,17 +99,19 @@ mod test {
 
     #[test]
     fn test_waker_channel() {
-        let poll = mio::Poll::new().unwrap();
+        let mut poll = mio::Poll::new().unwrap();
 
         let waker = from_registry(poll.registry()).unwrap();
-
         let cx = &mut Context::from_waker(&waker);
 
         let (tx, mut rx) = waker_channel();
-
         assert!(rx.poll_recv(cx).is_pending());
 
         tx.wake(super::WakerInterest::Stop);
+
+        let mut events = mio::Events::with_capacity(1);
+        poll.poll(&mut events, None).unwrap();
+        assert_eq!(events.iter().next().unwrap().token(), WAKER_TOKEN);
 
         match rx.poll_recv(cx) {
             Poll::Ready(Some(WakerInterest::Stop)) => {}
