@@ -67,7 +67,6 @@ fn test_listen() {
 
     let handle = rx.recv().unwrap();
 
-    thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
     let _ = handle.stop(true);
     let _ = h.join().unwrap();
@@ -138,7 +137,6 @@ fn test_start() {
     thread::sleep(Duration::from_millis(100));
     assert!(net::TcpStream::connect(addr).is_err());
 
-    thread::sleep(Duration::from_millis(100));
     sys.stop();
     let _ = h.join();
 }
@@ -184,7 +182,6 @@ fn test_configure() {
     });
 
     let (server, sys) = rx.recv().unwrap();
-    thread::sleep(Duration::from_millis(500));
 
     assert!(net::TcpStream::connect(addr1).is_ok());
     assert!(net::TcpStream::connect(addr2).is_ok());
