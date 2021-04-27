@@ -5,8 +5,6 @@ use std::{net, thread, time::Duration};
 use actix_rt::{net::TcpStream, time::sleep};
 use actix_server::Server;
 use actix_service::fn_service;
-use actix_utils::future::ok;
-use futures_util::future::lazy;
 
 fn unused_addr() -> net::SocketAddr {
     let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
@@ -27,7 +25,9 @@ fn test_bind() {
             let server = Server::build()
                 .workers(1)
                 .disable_signals()
-                .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
+                .bind("test", addr, move || {
+                    fn_service(|_| async { Ok::<_, ()>(()) })
+                })
                 .unwrap()
                 .run();
             tx.send(server.handle()).unwrap();

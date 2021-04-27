@@ -283,7 +283,7 @@ impl ServerWorker {
                             io::Error::new(io::ErrorKind::Other, "Can not start worker service")
                         })?;
 
-                        assert_eq!(token, services.len());
+                        assert_eq!(token.0, services.len());
                         services.push(WorkerService {
                             factory: idx,
                             service,
