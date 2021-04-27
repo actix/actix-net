@@ -38,7 +38,6 @@ fn test_bind() {
     });
     let (_, sys) = rx.recv().unwrap();
 
-    thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
     sys.stop();
     let _ = h.join();
@@ -65,7 +64,6 @@ fn test_listen() {
     });
     let sys = rx.recv().unwrap();
 
-    thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
     sys.stop();
     let _ = h.join();
@@ -137,7 +135,6 @@ fn test_start() {
     thread::sleep(Duration::from_millis(100));
     assert!(net::TcpStream::connect(addr).is_err());
 
-    thread::sleep(Duration::from_millis(100));
     sys.stop();
     let _ = h.join();
 }
@@ -183,7 +180,6 @@ fn test_configure() {
         let _ = sys.run();
     });
     let (_, sys) = rx.recv().unwrap();
-    thread::sleep(Duration::from_millis(500));
 
     assert!(net::TcpStream::connect(addr1).is_ok());
     assert!(net::TcpStream::connect(addr2).is_ok());
