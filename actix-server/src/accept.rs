@@ -7,7 +7,7 @@ use slab::Slab;
 
 use crate::builder::ServerBuilder;
 use crate::server::ServerHandle;
-use crate::socket::{MioListener, SocketAddr};
+use crate::socket::MioListener;
 use crate::waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN};
 use crate::worker::{
     Conn, ServerWorker, WorkerAvailability, WorkerHandleAccept, WorkerHandleServer,
@@ -17,9 +17,6 @@ use crate::Token;
 const DUR_ON_ERR: Duration = Duration::from_millis(500);
 
 struct ServerSocketInfo {
-    /// Address of socket. Mainly used for logging.
-    addr: SocketAddr,
-
     /// Beware this is the crate token for identify socket and should not be confused
     /// with `mio::Token`.
     token: Token,
@@ -154,8 +151,6 @@ impl Accept {
     ) -> io::Result<(Accept, Slab<ServerSocketInfo>)> {
         let mut sockets = Slab::new();
         for (hnd_token, mut lst) in socks.into_iter() {
-            let addr = lst.local_addr();
-
             let entry = sockets.vacant_entry();
             let token = entry.key();
 
@@ -164,7 +159,6 @@ impl Accept {
                 .register(&mut lst, MioToken(token), Interest::READABLE)?;
 
             entry.insert(ServerSocketInfo {
-                addr,
                 token: hnd_token,
                 lst,
                 timeout_deadline: None,
@@ -339,14 +333,14 @@ impl Accept {
 
     fn register_logged(&self, token: usize, info: &mut ServerSocketInfo) {
         match self.register(token, info) {
-            Ok(_) => info!("Resume accepting connections on {}", info.addr),
+            Ok(_) => info!("Resume accepting connections on {}", info.lst.local_addr()),
             Err(e) => error!("Can not register server socket {}", e),
         }
     }
 
     fn deregister_logged(&self, info: &mut ServerSocketInfo) {
         match self.poll.registry().deregister(&mut info.lst) {
-            Ok(_) => info!("Paused accepting connections on {}", info.addr),
+            Ok(_) => info!("Paused accepting connections on {}", info.lst.local_addr()),
             Err(e) => {
                 error!("Can not deregister server socket {}", e)
             }
