@@ -133,7 +133,7 @@ pub(crate) enum SocketAddr {
 impl fmt::Display for SocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            Self::Unknown => write!(f, "Unknown Socket Address"),
+            Self::Unknown => write!(f, "Unknown SocketAddr"),
             Self::Tcp(ref addr) => write!(f, "{}", addr),
             #[cfg(unix)]
             Self::Uds(ref addr) => write!(f, "{:?}", addr),
@@ -144,7 +144,7 @@ impl fmt::Display for SocketAddr {
 impl fmt::Debug for SocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            Self::Unknown => write!(f, "Unknown Socket Address"),
+            Self::Unknown => write!(f, "Unknown SocketAddr"),
             Self::Tcp(ref addr) => write!(f, "{:?}", addr),
             #[cfg(unix)]
             Self::Uds(ref addr) => write!(f, "{:?}", addr),
