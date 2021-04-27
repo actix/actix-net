@@ -36,7 +36,6 @@ fn test_bind() {
     });
     let handle = rx.recv().unwrap();
 
-    thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
     let _ = handle.stop(true);
     let _ = h.join().unwrap();

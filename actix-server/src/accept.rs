@@ -189,27 +189,25 @@ impl Accept {
 
         loop {
             match self.poll.poll(&mut events, self.timeout) {
-                Ok(_) => {
-                    for event in events.iter() {
-                        let token = event.token();
-                        match token {
-                            WAKER_TOKEN => {
-                                let should_return = self.handle_waker(&mut sockets);
-                                if should_return {
-                                    return;
-                                }
-                            }
-                            _ => {
-                                let token = usize::from(token);
-                                self.accept(&mut sockets, token)
-                            }
+                Ok(_) => {}
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                Err(e) => panic!("Poll error: {}", e),
+            }
+
+            for event in events.iter() {
+                let token = event.token();
+                match token {
+                    WAKER_TOKEN => {
+                        let should_return = self.handle_waker(&mut sockets);
+                        if should_return {
+                            return;
                         }
                     }
+                    _ => {
+                        let token = usize::from(token);
+                        self.accept(&mut sockets, token)
+                    }
                 }
-                Err(e) => match e.kind() {
-                    std::io::ErrorKind::Interrupted => {}
-                    _ => panic!("Poll error: {}", e),
-                },
             }
 
             // check for timeout and re-register sockets.

@@ -12,6 +12,7 @@ use std::{
 };
 
 use actix_rt::{
+    task::yield_now,
     time::{sleep, Instant, Sleep},
     System,
 };
@@ -304,8 +305,6 @@ impl ServerWorker {
 
                         match res {
                             Ok(services) => {
-                                f(None);
-
                                 let worker = ServerWorker {
                                     rx,
                                     rx2,
@@ -320,6 +319,8 @@ impl ServerWorker {
                                 let worker = local.spawn_local(worker);
 
                                 handle.block_on(local.run_until(async {
+                                    yield_now().await;
+                                    f(None);
                                     let _ = worker.await;
                                 }));
                             }
@@ -344,8 +345,6 @@ impl ServerWorker {
 
                         match res {
                             Ok((services, rt)) => {
-                                f(None);
-
                                 let worker = ServerWorker {
                                     rx,
                                     rx2,
@@ -360,6 +359,8 @@ impl ServerWorker {
                                 let handle = local.spawn_local(worker);
 
                                 local.block_on(&rt, async {
+                                    yield_now().await;
+                                    f(None);
                                     let _ = handle.await;
                                 });
                             }
