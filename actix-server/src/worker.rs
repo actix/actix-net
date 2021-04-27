@@ -279,18 +279,16 @@ impl ServerWorker {
                     let mut services = Vec::new();
 
                     for (idx, factory) in factories.iter().enumerate() {
-                        let service = factory.create().await.map_err(|_| {
+                        let (token, service) = factory.create().await.map_err(|_| {
                             io::Error::new(io::ErrorKind::Other, "Can not start worker service")
                         })?;
 
-                        for (token, service) in service {
-                            assert_eq!(token.0, services.len());
-                            services.push(WorkerService {
-                                factory: idx,
-                                service,
-                                status: WorkerServiceStatus::Unavailable,
-                            })
-                        }
+                        assert_eq!(token, services.len());
+                        services.push(WorkerService {
+                            factory: idx,
+                            service,
+                            status: WorkerServiceStatus::Unavailable,
+                        });
                     }
                     Ok::<_, io::Error>(services)
                 };
@@ -450,7 +448,7 @@ enum WorkerState {
 struct Restart {
     factory_id: usize,
     token: Token,
-    fut: LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>>,
+    fut: LocalBoxFuture<'static, Result<(Token, BoxedServerService), ()>>,
 }
 
 // Shutdown keep states necessary for server shutdown:
@@ -528,19 +526,15 @@ impl Future for ServerWorker {
                 let factory_id = restart.factory_id;
                 let token = restart.token;
 
-                let service = ready!(restart.fut.as_mut().poll(cx))
+                let (token_new, service) = ready!(restart.fut.as_mut().poll(cx))
                     .unwrap_or_else(|_| {
                         panic!(
                             "Can not restart {:?} service",
                             this.factories[factory_id].name(token)
                         )
-                    })
-                    .into_iter()
-                    // Find the same token from vector. There should be only one
-                    // So the first match would be enough.
-                    .find(|(t, _)| *t == token)
-                    .map(|(_, service)| service)
-                    .expect("No BoxedServerService found");
+                    });
+
+                assert_eq!(token, token_new);
 
                 trace!(
                     "Service {:?} has been restarted",

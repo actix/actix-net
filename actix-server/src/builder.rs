@@ -5,7 +5,6 @@ use actix_rt::net::TcpStream;
 use log::info;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-use crate::config::{ConfiguredService, ServiceConfig};
 use crate::server::{Server, ServerCommand};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::socket::{
@@ -128,32 +127,6 @@ impl ServerBuilder {
         self.worker_config
             .shutdown_timeout(Duration::from_secs(sec));
         self
-    }
-
-    /// Execute external configuration as part of the server building process.
-    ///
-    /// This function is useful for moving parts of configuration to a different module or
-    /// even library.
-    pub fn configure<F>(mut self, f: F) -> io::Result<ServerBuilder>
-    where
-        F: Fn(&mut ServiceConfig) -> io::Result<()>,
-    {
-        let mut cfg = ServiceConfig::new(self.threads, self.backlog);
-
-        f(&mut cfg)?;
-
-        if let Some(apply) = cfg.apply {
-            let mut srv = ConfiguredService::new(apply);
-            for (name, lst) in cfg.services {
-                let token = self.token.next();
-                srv.stream(token, name.clone(), lst.local_addr()?);
-                self.sockets.push((token, name, MioListener::Tcp(lst)));
-            }
-            self.services.push(Box::new(srv));
-        }
-        self.threads = cfg.threads;
-
-        Ok(self)
     }
 
     /// Add new service to the server.

@@ -6,7 +6,6 @@
 
 mod accept;
 mod builder;
-mod config;
 mod server;
 mod service;
 mod signals;
@@ -16,7 +15,6 @@ mod waker_queue;
 mod worker;
 
 pub use self::builder::ServerBuilder;
-pub use self::config::{ServiceConfig, ServiceRuntime};
 pub use self::server::{Server, ServerHandle};
 pub use self::service::ServiceFactory;
 pub use self::test_server::TestServer;

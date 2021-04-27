@@ -5,8 +5,11 @@
 * Remove `Future` impl for `ServerBuilder`. [#266]
 * Rename `Server` to `ServerHandle`. `ServerHandle` must be explicitly constructed with `Server::handle` API. [#266]
 * Add `Server`(new type) that can be `await` for blocking until server stop. [#266]
+* Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to this change. [#349]
+* Remove `ServerBuilder::configure` [#349]
 
 [#266]: https://github.com/actix/actix-net/pull/266
+[#349]: https://github.com/actix/actix-net/pull/349
 
 
 ## 2.0.0-beta.5 - 2021-04-20
