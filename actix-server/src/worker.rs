@@ -58,20 +58,23 @@ fn handle_pair(
     (accept, server)
 }
 
-/// counter: Arc<AtomicUsize> field is owned by Accept thread and ServerWorker thread.
+/// counter: Arc<AtomicUsize> field is owned by `Accept` thread and `ServerWorker` thread.
 ///
-/// Accept would increment the counter and ServerWorker would decrement it.
+/// `Accept` would increment the counter and `ServerWorker` would decrement it.
 ///
-/// Accept would mark ServerWorker as unable to accept work when the counter hitting limit.
-/// ServerWorker would wake up Accept with mio::Waker and notify it ServerWorker is able to
-/// accept more work.
+/// # Atomic Ordering:
 ///
-/// The atomic ordering of the two threads is not important.
+/// `Accept` always look into it's cached `Availability` field for `ServerWorker` state.
+/// It lazily increment counter after successful dispatching new work to `ServerWorker`.
+/// On reaching counter limit `Accept` update it's cached `Availability` and mark worker as
+/// unable to accept any work.
 ///
-/// Reason:
+/// `ServerWorker` always decrement the counter when every work received from `Accept` is done.
+/// On reaching counter limit worker would use `mio::Waker` and `WakerQueue` to wake up `Accept`
+/// and notify it to update cached `Availability` again to mark worker as able to accept work again.
 ///
-/// Accept always look into it's cached `Availability` field for ServerWorker state.
-///
+/// Hense a wake up would only happen after `Accept` increment it to limit.
+/// And a decrement to limit always wake up `Accept`.
 #[derive(Clone)]
 pub(crate) struct Counter {
     counter: Arc<AtomicUsize>,
