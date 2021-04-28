@@ -404,7 +404,7 @@ impl Accept {
             Ok(_) => {
                 // Increment counter of WorkerHandle.
                 // Set worker to unavailable with it hit max (Return false).
-                if !next.incr_counter() {
+                if !next.inc_counter() {
                     let idx = next.idx();
                     self.avail.set_available(idx, false);
                 }

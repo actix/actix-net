@@ -58,6 +58,20 @@ fn handle_pair(
     (accept, server)
 }
 
+/// counter: Arc<AtomicUsize> field is owned by Accept thread and ServerWorker thread.
+///
+/// Accept would increment the counter and ServerWorker would decrement it.
+///
+/// Accept would mark ServerWorker as unable to accept work when the counter hitting limit.
+/// ServerWorker would wake up Accept with mio::Waker and notify it ServerWorker is able to
+/// accept more work.
+///
+/// The atomic ordering of the two threads is not important.
+///
+/// Reason:
+///
+/// Accept always look into it's cached `Availability` field for ServerWorker state.
+///
 #[derive(Clone)]
 pub(crate) struct Counter {
     counter: Arc<AtomicUsize>,
@@ -72,15 +86,15 @@ impl Counter {
         }
     }
 
-    /// Increment counter it by 1 and return false when hitting limit
+    /// Increment counter by 1 and return true when hitting limit
     #[inline(always)]
-    pub(crate) fn incr(&self) -> bool {
+    pub(crate) fn inc(&self) -> bool {
         self.counter.fetch_add(1, Ordering::Relaxed) != self.limit
     }
 
-    /// Decrement counter it by 1 and return true when hitting limit
+    /// Decrement counter by 1 and return true if crossing limit.
     #[inline(always)]
-    pub(crate) fn derc(&self) -> bool {
+    pub(crate) fn dec(&self) -> bool {
         self.counter.fetch_sub(1, Ordering::Relaxed) == self.limit
     }
 
@@ -126,7 +140,7 @@ pub(crate) struct WorkerCounterGuard(WorkerCounter);
 impl Drop for WorkerCounterGuard {
     fn drop(&mut self) {
         let (waker_queue, counter) = &*self.0.inner;
-        if counter.derc() {
+        if counter.dec() {
             waker_queue.wake(WakerInterest::WorkerAvailable(self.0.idx));
         }
     }
@@ -154,8 +168,8 @@ impl WorkerHandleAccept {
     }
 
     #[inline(always)]
-    pub(crate) fn incr_counter(&self) -> bool {
-        self.counter.incr()
+    pub(crate) fn inc_counter(&self) -> bool {
+        self.counter.inc()
     }
 }
 
