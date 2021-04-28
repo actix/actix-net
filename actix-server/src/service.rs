@@ -21,7 +21,7 @@ pub(crate) trait InternalServiceFactory: Send {
 
     fn clone_factory(&self) -> Box<dyn InternalServiceFactory>;
 
-    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(usize, BoxedServerService)>, ()>>;
+    fn create(&self) -> LocalBoxFuture<'static, Result<(usize, BoxedServerService), ()>>;
 }
 
 pub(crate) type BoxedServerService = Box<
@@ -128,14 +128,14 @@ where
         })
     }
 
-    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(usize, BoxedServerService)>, ()>> {
+    fn create(&self) -> LocalBoxFuture<'static, Result<(usize, BoxedServerService), ()>> {
         let token = self.token;
         let fut = self.inner.create().new_service(());
         Box::pin(async move {
             match fut.await {
                 Ok(inner) => {
                     let service = Box::new(StreamService::new(inner)) as _;
-                    Ok(vec![(token, service)])
+                    Ok((token, service))
                 }
                 Err(_) => Err(()),
             }

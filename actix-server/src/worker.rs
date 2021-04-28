@@ -275,11 +275,7 @@ impl ServerWorker {
                 .enumerate()
                 .map(|(idx, factory)| {
                     let fut = factory.create();
-                    async move {
-                        fut.await.map(|r| {
-                            r.into_iter().map(|(t, s)| (idx, t, s)).collect::<Vec<_>>()
-                        })
-                    }
+                    async move { fut.await.map(|(t, s)| (idx, t, s)) }
                 })
                 .collect::<Vec<_>>();
 
@@ -292,9 +288,8 @@ impl ServerWorker {
                 let services = match res {
                     Ok(res) => res
                         .into_iter()
-                        .flatten()
-                        .fold(Vec::new(), |mut services, (factory, idx, service)| {
-                            assert_eq!(idx, services.len());
+                        .fold(Vec::new(), |mut services, (factory, token, service)| {
+                            assert_eq!(token, services.len());
                             services.push(WorkerService {
                                 factory,
                                 service,
@@ -332,7 +327,7 @@ impl ServerWorker {
         self.services[idx].status = WorkerServiceStatus::Restarting;
         self.state = WorkerState::Restarting(Restart {
             factory_id,
-            idx,
+            token: idx,
             fut: factory.create(),
         });
     }
@@ -402,8 +397,8 @@ enum WorkerState {
 
 struct Restart {
     factory_id: usize,
-    idx: usize,
-    fut: LocalBoxFuture<'static, Result<Vec<(usize, BoxedServerService)>, ()>>,
+    token: usize,
+    fut: LocalBoxFuture<'static, Result<(usize, BoxedServerService), ()>>,
 }
 
 // Shutdown keep states necessary for server shutdown:
@@ -475,21 +470,17 @@ impl Future for ServerWorker {
             },
             WorkerState::Restarting(ref mut restart) => {
                 let factory_id = restart.factory_id;
-                let token = restart.idx;
+                let token = restart.token;
 
-                let service = ready!(restart.fut.as_mut().poll(cx))
+                let (token_new, service) = ready!(restart.fut.as_mut().poll(cx))
                     .unwrap_or_else(|_| {
                         panic!(
                             "Can not restart {:?} service",
                             this.factories[factory_id].name(token)
                         )
-                    })
-                    .into_iter()
-                    // Find the same token from vector. There should be only one
-                    // So the first match would be enough.
-                    .find(|(t, _)| *t == token)
-                    .map(|(_, service)| service)
-                    .expect("No BoxedServerService found");
+                    });
+
+                assert_eq!(token, token_new);
 
                 trace!(
                     "Service {:?} has been restarted",

@@ -1,6 +1,10 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to this change. [#349]
+* Remove `ServerBuilder::configure` [#349]
+
+[#349]: https://github.com/actix/actix-net/pull/349
 
 
 ## 2.0.0-beta.5 - 2021-04-20

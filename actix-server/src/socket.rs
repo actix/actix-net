@@ -23,9 +23,15 @@ pub(crate) enum MioListener {
 impl MioListener {
     pub(crate) fn local_addr(&self) -> SocketAddr {
         match *self {
-            MioListener::Tcp(ref lst) => SocketAddr::Tcp(lst.local_addr().unwrap()),
+            MioListener::Tcp(ref lst) => lst
+                .local_addr()
+                .map(SocketAddr::Tcp)
+                .unwrap_or(SocketAddr::Unknown),
             #[cfg(unix)]
-            MioListener::Uds(ref lst) => SocketAddr::Uds(lst.local_addr().unwrap()),
+            MioListener::Uds(ref lst) => lst
+                .local_addr()
+                .map(SocketAddr::Uds)
+                .unwrap_or(SocketAddr::Unknown),
         }
     }
 
@@ -110,14 +116,15 @@ impl fmt::Debug for MioListener {
 impl fmt::Display for MioListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            MioListener::Tcp(ref lst) => write!(f, "{}", lst.local_addr().ok().unwrap()),
+            MioListener::Tcp(ref lst) => write!(f, "{:?}", lst),
             #[cfg(unix)]
-            MioListener::Uds(ref lst) => write!(f, "{:?}", lst.local_addr().ok().unwrap()),
+            MioListener::Uds(ref lst) => write!(f, "{:?}", lst),
         }
     }
 }
 
 pub(crate) enum SocketAddr {
+    Unknown,
     Tcp(StdSocketAddr),
     #[cfg(unix)]
     Uds(mio::net::SocketAddr),
@@ -126,9 +133,10 @@ pub(crate) enum SocketAddr {
 impl fmt::Display for SocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            SocketAddr::Tcp(ref addr) => write!(f, "{}", addr),
+            Self::Unknown => write!(f, "Unknown SocketAddr"),
+            Self::Tcp(ref addr) => write!(f, "{}", addr),
             #[cfg(unix)]
-            SocketAddr::Uds(ref addr) => write!(f, "{:?}", addr),
+            Self::Uds(ref addr) => write!(f, "{:?}", addr),
         }
     }
 }
@@ -136,9 +144,10 @@ impl fmt::Display for SocketAddr {
 impl fmt::Debug for SocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            SocketAddr::Tcp(ref addr) => write!(f, "{:?}", addr),
+            Self::Unknown => write!(f, "Unknown SocketAddr"),
+            Self::Tcp(ref addr) => write!(f, "{:?}", addr),
             #[cfg(unix)]
-            SocketAddr::Uds(ref addr) => write!(f, "{:?}", addr),
+            Self::Uds(ref addr) => write!(f, "{:?}", addr),
         }
     }
 }
