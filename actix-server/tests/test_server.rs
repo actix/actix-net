@@ -99,12 +99,12 @@ fn test_start() {
                 .unwrap()
                 .run();
 
-            let _ = tx.send((server.handle(), actix_rt::System::current()));
+            let _ = tx.send(server.handle());
             let _ = server.await;
         });
     });
 
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     let mut buf = [1u8; 4];
     let mut conn = net::TcpStream::connect(addr).unwrap();
@@ -137,7 +137,6 @@ fn test_start() {
     thread::sleep(Duration::from_millis(100));
     assert!(net::TcpStream::connect(addr).is_err());
 
-    sys.stop();
     let _ = h.join();
 }
 
@@ -182,13 +181,13 @@ async fn test_max_concurrent_connections() {
                 })?
                 .run();
 
-            let _ = tx.send((server.handle(), actix_rt::System::current()));
+            let _ = tx.send(server.handle());
 
             server.await
         })
     });
 
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     let mut conns = vec![];
 
@@ -209,7 +208,6 @@ async fn test_max_concurrent_connections() {
 
     srv.stop(false).await;
 
-    sys.stop();
     let _ = h.join().unwrap();
 }
 
