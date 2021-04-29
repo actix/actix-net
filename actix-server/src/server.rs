@@ -204,7 +204,12 @@ impl ServerInner {
                     .map(|service| service.clone_factory())
                     .collect();
 
-                match ServerWorker::start(idx, factories, self.waker_queue.clone(), self.worker_config) {
+                match ServerWorker::start(
+                    idx,
+                    factories,
+                    self.waker_queue.clone(),
+                    self.worker_config,
+                ) {
                     Ok((handle_accept, handle_server)) => {
                         *self
                             .handles
