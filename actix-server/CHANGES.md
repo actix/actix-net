@@ -2,8 +2,11 @@
 
 ## Unreleased - 2021-xx-xx
 * Added ServerBuilder::on_stop to run an async closure before Server shutdown [#230]
+* Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to this change. [#349]
+* Remove `ServerBuilder::configure` [#349]
 
 [#230]: https://github.com/actix/actix-net/pull/230
+[#349]: https://github.com/actix/actix-net/pull/349
 
 
 ## 2.0.0-beta.5 - 2021-04-20

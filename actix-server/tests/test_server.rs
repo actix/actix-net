@@ -142,57 +142,6 @@ fn test_start() {
     let _ = h.join();
 }
 
-#[test]
-fn test_configure() {
-    let addr1 = unused_addr();
-    let addr2 = unused_addr();
-    let addr3 = unused_addr();
-    let (tx, rx) = mpsc::channel();
-    let num = Arc::new(AtomicUsize::new(0));
-    let num2 = num.clone();
-
-    let h = thread::spawn(move || {
-        let num = num2.clone();
-        let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
-            Server::build()
-                .disable_signals()
-                .configure(move |cfg| {
-                    let num = num.clone();
-                    let lst = net::TcpListener::bind(addr3).unwrap();
-                    cfg.bind("addr1", addr1)
-                        .unwrap()
-                        .bind("addr2", addr2)
-                        .unwrap()
-                        .listen("addr3", lst)
-                        .apply(move |rt| {
-                            let num = num.clone();
-                            rt.service("addr1", fn_service(|_| ok::<_, ()>(())));
-                            rt.service("addr3", fn_service(|_| ok::<_, ()>(())));
-                            rt.on_start(lazy(move |_| {
-                                let _ = num.fetch_add(1, Ordering::Relaxed);
-                            }))
-                        })
-                })
-                .unwrap()
-                .workers(1)
-                .run()
-        }));
-
-        let _ = tx.send((srv, actix_rt::System::current()));
-        let _ = sys.run();
-    });
-    let (_, sys) = rx.recv().unwrap();
-    thread::sleep(Duration::from_millis(500));
-
-    assert!(net::TcpStream::connect(addr1).is_ok());
-    assert!(net::TcpStream::connect(addr2).is_ok());
-    assert!(net::TcpStream::connect(addr3).is_ok());
-    assert_eq!(num.load(Ordering::Relaxed), 1);
-    sys.stop();
-    let _ = h.join();
-}
-
 #[actix_rt::test]
 async fn test_max_concurrent_connections() {
     // Note:
@@ -295,81 +244,6 @@ async fn test_service_restart() {
             Box::pin(async { Ok(()) })
         }
     }
-
-    let addr1 = unused_addr();
-    let addr2 = unused_addr();
-    let (tx, rx) = mpsc::channel();
-    let num = Arc::new(AtomicUsize::new(0));
-    let num2 = Arc::new(AtomicUsize::new(0));
-
-    let num_clone = num.clone();
-    let num2_clone = num2.clone();
-
-    let h = thread::spawn(move || {
-        actix_rt::System::new().block_on(async {
-            let server = Server::build()
-                .backlog(1)
-                .disable_signals()
-                .configure(move |cfg| {
-                    let num = num.clone();
-                    let num2 = num2.clone();
-                    cfg.bind("addr1", addr1)
-                        .unwrap()
-                        .bind("addr2", addr2)
-                        .unwrap()
-                        .apply(move |rt| {
-                            let num = num.clone();
-                            let num2 = num2.clone();
-                            rt.service(
-                                "addr1",
-                                fn_factory(move || {
-                                    let num = num.clone();
-                                    async move { Ok::<_, ()>(TestService(num)) }
-                                }),
-                            );
-                            rt.service(
-                                "addr2",
-                                fn_factory(move || {
-                                    let num2 = num2.clone();
-                                    async move { Ok::<_, ()>(TestService(num2)) }
-                                }),
-                            );
-                        })
-                })
-                .unwrap()
-                .workers(1)
-                .run();
-
-            let _ = tx.send((server.clone(), actix_rt::System::current()));
-            server.await
-        })
-    });
-
-    let (server, sys) = rx.recv().unwrap();
-
-    for _ in 0..5 {
-        TcpStream::connect(addr1)
-            .await
-            .unwrap()
-            .shutdown()
-            .await
-            .unwrap();
-        TcpStream::connect(addr2)
-            .await
-            .unwrap()
-            .shutdown()
-            .await
-            .unwrap();
-    }
-
-    sleep(Duration::from_secs(3)).await;
-
-    assert!(num_clone.load(Ordering::SeqCst) > 5);
-    assert!(num2_clone.load(Ordering::SeqCst) > 5);
-
-    sys.stop();
-    let _ = server.stop(false);
-    let _ = h.join().unwrap();
 
     let addr1 = unused_addr();
     let addr2 = unused_addr();
