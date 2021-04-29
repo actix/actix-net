@@ -3,28 +3,23 @@ use std::{io, thread};
 
 use log::{error, info};
 use mio::{Interest, Poll, Token as MioToken};
-use slab::Slab;
 
 use crate::builder::ServerBuilder;
 use crate::server::ServerHandle;
 use crate::socket::MioListener;
 use crate::waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN};
-use crate::worker::{
-    Conn, ServerWorker, WorkerAvailability, WorkerHandleAccept, WorkerHandleServer,
-};
-use crate::Token;
+use crate::worker::{Conn, ServerWorker, WorkerHandleAccept, WorkerHandleServer};
 
 const DUR_ON_ERR: Duration = Duration::from_millis(500);
 
 struct ServerSocketInfo {
-    /// Beware this is the crate token for identify socket and should not be confused
-    /// with `mio::Token`.
-    token: Token,
+    token: usize,
 
     lst: MioListener,
 
-    // mark the deadline when this socket's listener should be registered again
-    timeout_deadline: Option<Instant>,
+    /// Timeout is used to mark the deadline when this socket's listener should be registered again
+    /// after an error.
+    timeout: Option<Instant>,
 }
 
 /// poll instance of the server.
@@ -35,10 +30,9 @@ pub(crate) struct Accept {
     srv: ServerHandle,
     next: usize,
     avail: Availability,
-    backpressure: bool,
-    // poll time out duration.
-    // use the smallest duration from sockets timeout_deadline.
+    // use the smallest duration from sockets timeout.
     timeout: Option<Duration>,
+    paused: bool,
 }
 
 /// Array of u128 with every bit as marker for a worker handle's availability.
@@ -52,23 +46,22 @@ impl Default for Availability {
 
 impl Availability {
     /// Check if any worker handle is available
+    #[inline(always)]
     fn available(&self) -> bool {
         self.0.iter().any(|a| *a != 0)
     }
 
+    /// Check if worker handle is available by index
+    #[inline(always)]
+    fn get_available(&self, idx: usize) -> bool {
+        let (offset, idx) = Self::offset(idx);
+
+        self.0[offset] & (1 << idx as u128) != 0
+    }
+
     /// Set worker handle available state by index.
     fn set_available(&mut self, idx: usize, avail: bool) {
-        let (offset, idx) = if idx < 128 {
-            (0, idx)
-        } else if idx < 128 * 2 {
-            (1, idx - 128)
-        } else if idx < 128 * 3 {
-            (2, idx - 128 * 2)
-        } else if idx < 128 * 4 {
-            (3, idx - 128 * 3)
-        } else {
-            panic!("Max WorkerHandle count is 512")
-        };
+        let (offset, idx) = Self::offset(idx);
 
         let off = 1 << idx as u128;
         if avail {
@@ -84,6 +77,21 @@ impl Availability {
         handles.iter().for_each(|handle| {
             self.set_available(handle.idx(), true);
         })
+    }
+
+    /// Get offset and adjusted index of given worker handle index.
+    fn offset(idx: usize) -> (usize, usize) {
+        if idx < 128 {
+            (0, idx)
+        } else if idx < 128 * 2 {
+            (1, idx - 128)
+        } else if idx < 128 * 3 {
+            (2, idx - 128 * 2)
+        } else if idx < 128 * 4 {
+            (3, idx - 128 * 3)
+        } else {
+            panic!("Max WorkerHandle count is 512")
+        }
     }
 }
 
@@ -102,7 +110,7 @@ fn connection_error(e: &io::Error) -> bool {
 
 impl Accept {
     pub(crate) fn start(
-        sockets: Vec<(Token, MioListener)>,
+        sockets: Vec<(usize, MioListener)>,
         builder: &ServerBuilder,
     ) -> io::Result<(WakerQueue, Vec<WorkerHandleServer>)> {
         let server_handle = ServerHandle::new(builder.cmd_tx.clone());
@@ -115,16 +123,15 @@ impl Accept {
         let (handles_accept, handles_server) = (0..builder.threads)
             .map(|idx| {
                 // start workers
-                let availability = WorkerAvailability::new(idx, waker_queue.clone());
                 let factories = builder.services.iter().map(|v| v.clone_factory()).collect();
 
-                ServerWorker::start(idx, factories, availability, builder.worker_config)
+                ServerWorker::start(idx, factories, waker_queue.clone(), builder.worker_config)
             })
             .collect::<Result<Vec<_>, io::Error>>()?
             .into_iter()
             .unzip();
 
-        let (mut accept, sockets) = Accept::new_with_sockets(
+        let (mut accept, mut sockets) = Accept::new_with_sockets(
             poll,
             waker_queue.clone(),
             sockets,
@@ -135,7 +142,7 @@ impl Accept {
         // Accept runs in its own thread.
         thread::Builder::new()
             .name("actix-server acceptor".to_owned())
-            .spawn(move || accept.poll_with(sockets))
+            .spawn(move || accept.poll_with(&mut sockets))
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
         // return waker and worker handle clones to server builder.
@@ -145,25 +152,24 @@ impl Accept {
     fn new_with_sockets(
         poll: Poll,
         waker_queue: WakerQueue,
-        socks: Vec<(Token, MioListener)>,
+        socks: Vec<(usize, MioListener)>,
         handles: Vec<WorkerHandleAccept>,
         srv: ServerHandle,
-    ) -> io::Result<(Accept, Slab<ServerSocketInfo>)> {
-        let mut sockets = Slab::new();
-        for (hnd_token, mut lst) in socks.into_iter() {
-            let entry = sockets.vacant_entry();
-            let token = entry.key();
+    ) -> io::Result<(Accept, Box<[ServerSocketInfo]>)> {
+        let sockets = socks
+            .into_iter()
+            .map(|(token, mut lst)| {
+                // Start listening for incoming connections
+                poll.registry()
+                    .register(&mut lst, MioToken(token), Interest::READABLE)?;
 
-            // Start listening for incoming connections
-            poll.registry()
-                .register(&mut lst, MioToken(token), Interest::READABLE)?;
-
-            entry.insert(ServerSocketInfo {
-                token: hnd_token,
-                lst,
-                timeout_deadline: None,
-            });
-        }
+                Ok(ServerSocketInfo {
+                    token,
+                    lst,
+                    timeout: None,
+                })
+            })
+            .collect::<Result<_, io::Error>>()?;
 
         let mut avail = Availability::default();
 
@@ -177,46 +183,47 @@ impl Accept {
             srv,
             next: 0,
             avail,
-            backpressure: false,
             timeout: None,
+            paused: false,
         };
 
         Ok((accept, sockets))
     }
 
-    fn poll_with(&mut self, mut sockets: Slab<ServerSocketInfo>) {
+    fn poll_with(&mut self, sockets: &mut [ServerSocketInfo]) {
         let mut events = mio::Events::with_capacity(128);
 
         loop {
-            match self.poll.poll(&mut events, self.timeout) {
-                Ok(_) => {}
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
-                Err(e) => panic!("Poll error: {}", e),
+            if let Err(e) = self.poll.poll(&mut events, None) {
+                match e.kind() {
+                    io::ErrorKind::Interrupted => continue,
+                    _ => panic!("Poll error: {}", e),
+                }
             }
 
             for event in events.iter() {
                 let token = event.token();
                 match token {
                     WAKER_TOKEN => {
-                        let should_return = self.handle_waker(&mut sockets);
-                        if should_return {
+                        let exit = self.handle_waker(sockets);
+                        if exit {
+                            info!("Accept is stopped.");
                             return;
                         }
                     }
                     _ => {
                         let token = usize::from(token);
-                        self.accept(&mut sockets, token)
+                        self.accept(sockets, token);
                     }
                 }
             }
 
             // check for timeout and re-register sockets.
-            self.process_timeout(&mut sockets);
+            self.process_timeout(sockets);
         }
     }
 
-    /// Return true to notify `Accept::poll_with` to return.
-    fn handle_waker(&mut self, sockets: &mut Slab<ServerSocketInfo>) -> bool {
+    fn handle_waker(&mut self, sockets: &mut [ServerSocketInfo]) -> bool {
         // This is a loop because interests for command from previous version was
         // a loop that would try to drain the command channel. It's yet unknown
         // if it's necessary/good practice to actively drain the waker queue.
@@ -231,7 +238,10 @@ impl Accept {
                     drop(guard);
 
                     self.avail.set_available(idx, true);
-                    self.maybe_backpressure(sockets, false);
+
+                    if !self.paused {
+                        self.accept_all(sockets);
+                    }
                 }
                 // a new worker thread is made and it's handle would be added to Accept
                 Some(WakerInterest::Worker(handle)) => {
@@ -239,55 +249,67 @@ impl Accept {
 
                     self.avail.set_available(handle.idx(), true);
                     self.handles.push(handle);
-                    // maybe we want to recover from a backpressure.
-                    self.maybe_backpressure(sockets, false);
+
+                    if !self.paused {
+                        self.accept_all(sockets);
+                    }
                 }
                 Some(WakerInterest::Pause) => {
                     drop(guard);
+
+                    self.paused = true;
+
                     self.deregister_all(sockets);
                 }
                 Some(WakerInterest::Resume) => {
                     drop(guard);
-                    sockets.iter_mut().for_each(|(token, info)| {
-                        self.register_logged(token, info);
+
+                    self.paused = false;
+
+                    sockets.iter_mut().for_each(|info| {
+                        self.register_logged(info);
                     });
+
+                    self.accept_all(sockets);
                 }
                 Some(WakerInterest::Stop) => {
                     self.deregister_all(sockets);
+
                     return true;
                 }
                 // waker queue is drained
                 None => {
                     // Reset the WakerQueue before break so it does not grow infinitely
                     WakerQueue::reset(&mut guard);
+
                     return false;
                 }
             }
         }
     }
 
-    fn process_timeout(&mut self, sockets: &mut Slab<ServerSocketInfo>) {
+    fn process_timeout(&mut self, sockets: &mut [ServerSocketInfo]) {
         // Take old timeout as it's no use after each iteration.
         if self.timeout.take().is_some() {
             let now = Instant::now();
             sockets
                 .iter_mut()
                 // Only sockets that had an associated timeout were deregistered.
-                .filter(|(_, info)| info.timeout_deadline.is_some())
-                .for_each(|(token, info)| {
-                    let inst = info.timeout_deadline.take().unwrap();
+                .filter(|info| info.timeout.is_some())
+                .for_each(|info| {
+                    let inst = info.timeout.take().unwrap();
 
                     if now < inst {
                         // still timed out. try set new timeout.
-                        info.timeout_deadline = Some(inst);
+                        info.timeout = Some(inst);
                         self.set_timeout(inst - now);
-                    } else if !self.backpressure {
+                    } else if !self.paused {
                         // timeout expired register socket again.
-                        self.register_logged(token, info);
+                        self.register_logged(info);
                     }
 
-                    // Drop the timeout if server is in backpressure and socket timeout is expired.
-                    // When server recovers from backpressure it will register all sockets without
+                    // Drop the timeout if server is paused and socket timeout is expired.
+                    // When server recovers from pause it will register all sockets without
                     // a timeout value so this socket register will be delayed till then.
                 });
         }
@@ -306,31 +328,31 @@ impl Accept {
     }
 
     #[cfg(not(target_os = "windows"))]
-    fn register(&self, token: usize, info: &mut ServerSocketInfo) -> io::Result<()> {
+    fn register(&self, info: &mut ServerSocketInfo) -> io::Result<()> {
+        let token = MioToken(info.token);
         self.poll
             .registry()
-            .register(&mut info.lst, MioToken(token), Interest::READABLE)
+            .register(&mut info.lst, token, Interest::READABLE)
     }
 
     #[cfg(target_os = "windows")]
-    fn register(&self, token: usize, info: &mut ServerSocketInfo) -> io::Result<()> {
+    fn register(&self, info: &mut ServerSocketInfo) -> io::Result<()> {
         // On windows, calling register without deregister cause an error.
         // See https://github.com/actix/actix-web/issues/905
         // Calling reregister seems to fix the issue.
+        let token = MioToken(info.token);
         self.poll
             .registry()
-            .register(&mut info.lst, mio::Token(token), Interest::READABLE)
+            .register(&mut info.lst, token, Interest::READABLE)
             .or_else(|_| {
-                self.poll.registry().reregister(
-                    &mut info.lst,
-                    mio::Token(token),
-                    Interest::READABLE,
-                )
+                self.poll
+                    .registry()
+                    .reregister(&mut info.lst, token, Interest::READABLE)
             })
     }
 
-    fn register_logged(&self, token: usize, info: &mut ServerSocketInfo) {
-        match self.register(token, info) {
+    fn register_logged(&self, info: &mut ServerSocketInfo) {
+        match self.register(info) {
             Ok(_) => info!("Resume accepting connections on {}", info.lst.local_addr()),
             Err(e) => error!("Can not register server socket {}", e),
         }
@@ -345,7 +367,7 @@ impl Accept {
         }
     }
 
-    fn deregister_all(&self, sockets: &mut Slab<ServerSocketInfo>) {
+    fn deregister_all(&self, sockets: &mut [ServerSocketInfo]) {
         // This is a best effort implementation with following limitation:
         //
         // Every ServerSocketInfo with associate timeout will be skipped and it's timeout
@@ -358,70 +380,23 @@ impl Accept {
             .iter_mut()
             // Take all timeout.
             // This is to prevent Accept::process_timer method re-register a socket afterwards.
-            .map(|(_, info)| (info.timeout_deadline.take(), info))
+            .map(|info| (info.timeout.take(), info))
             // Socket info with a timeout is already deregistered so skip them.
             .filter(|(timeout, _)| timeout.is_none())
             .for_each(|(_, info)| self.deregister_logged(info));
     }
 
-    fn maybe_backpressure(&mut self, sockets: &mut Slab<ServerSocketInfo>, on: bool) {
-        // Only operate when server is in a different backpressure than the given flag.
-        if self.backpressure != on {
-            self.backpressure = on;
-            sockets
-                .iter_mut()
-                // Only operate on sockets without associated timeout.
-                // Sockets with it should be handled by `accept` and `process_timer` methods.
-                // They are already deregistered or need to be reregister in the future.
-                .filter(|(_, info)| info.timeout_deadline.is_none())
-                .for_each(|(token, info)| {
-                    if on {
-                        self.deregister_logged(info);
-                    } else {
-                        self.register_logged(token, info);
-                    }
-                });
-        }
-    }
-
-    fn accept_one(&mut self, sockets: &mut Slab<ServerSocketInfo>, mut conn: Conn) {
-        if self.backpressure {
-            // send_connection would remove fault worker from handles.
-            // worst case here is conn get dropped after all handles are gone.
-            while let Err(c) = self.send_connection(sockets, conn) {
-                conn = c
-            }
-        } else {
-            while self.avail.available() {
-                let next = self.next();
-                let idx = next.idx();
-                if next.available() {
-                    self.avail.set_available(idx, true);
-                    match self.send_connection(sockets, conn) {
-                        Ok(_) => return,
-                        Err(c) => conn = c,
-                    }
-                } else {
-                    self.avail.set_available(idx, false);
-                    self.set_next();
-                }
-            }
-
-            // Sending Conn failed due to either all workers are in error or not available.
-            // Enter backpressure state and try again.
-            self.maybe_backpressure(sockets, true);
-            self.accept_one(sockets, conn);
-        }
-    }
-
     // Send connection to worker and handle error.
-    fn send_connection(
-        &mut self,
-        sockets: &mut Slab<ServerSocketInfo>,
-        conn: Conn,
-    ) -> Result<(), Conn> {
-        match self.next().send(conn) {
+    fn send_connection(&mut self, conn: Conn) -> Result<(), Conn> {
+        let next = self.next();
+        match next.send(conn) {
             Ok(_) => {
+                // Increment counter of WorkerHandle.
+                // Set worker to unavailable with it hit max (Return false).
+                if !next.inc_counter() {
+                    let idx = next.idx();
+                    self.avail.set_available(idx, false);
+                }
                 self.set_next();
                 Ok(())
             }
@@ -432,7 +407,6 @@ impl Accept {
 
                 if self.handles.is_empty() {
                     error!("No workers");
-                    self.maybe_backpressure(sockets, true);
                     // All workers are gone and Conn is nowhere to be sent.
                     // Treat this situation as Ok and drop Conn.
                     return Ok(());
@@ -445,17 +419,38 @@ impl Accept {
         }
     }
 
-    fn accept(&mut self, sockets: &mut Slab<ServerSocketInfo>, token: usize) {
+    fn accept_one(&mut self, mut conn: Conn) {
         loop {
+            let next = self.next();
+            let idx = next.idx();
+
+            if self.avail.get_available(idx) {
+                match self.send_connection(conn) {
+                    Ok(_) => return,
+                    Err(c) => conn = c,
+                }
+            } else {
+                self.avail.set_available(idx, false);
+                self.set_next();
+
+                if !self.avail.available() {
+                    while let Err(c) = self.send_connection(conn) {
+                        conn = c;
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    fn accept(&mut self, sockets: &mut [ServerSocketInfo], token: usize) {
+        while self.avail.available() {
             let info = &mut sockets[token];
 
             match info.lst.accept() {
                 Ok(io) => {
-                    let msg = Conn {
-                        io,
-                        token: info.token,
-                    };
-                    self.accept_one(sockets, msg);
+                    let conn = Conn { io, token };
+                    self.accept_one(conn);
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => return,
                 Err(ref e) if connection_error(e) => continue,
@@ -468,13 +463,22 @@ impl Accept {
                     // sleep after error. write the timeout deadline to socket info
                     // as later the poll would need it mark which socket and when
                     // it's listener should be registered again.
-                    info.timeout_deadline = Some(Instant::now() + DUR_ON_ERR);
+                    info.timeout = Some(Instant::now() + DUR_ON_ERR);
                     self.set_timeout(DUR_ON_ERR);
 
                     return;
                 }
             };
         }
+    }
+
+    fn accept_all(&mut self, sockets: &mut [ServerSocketInfo]) {
+        sockets
+            .iter_mut()
+            .map(|info| info.token)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|idx| self.accept(sockets, idx))
     }
 
     #[inline(always)]

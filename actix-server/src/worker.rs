@@ -2,8 +2,9 @@ use std::{
     future::Future,
     io, mem,
     pin::Pin,
+    rc::Rc,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicUsize, Ordering},
         Arc,
     },
     task::{Context, Poll},
@@ -16,7 +17,6 @@ use actix_rt::{
     time::{sleep, Instant, Sleep},
     System,
 };
-use actix_utils::counter::Counter;
 use futures_core::{future::LocalBoxFuture, ready};
 use log::{error, info, trace};
 use tokio::sync::{
@@ -27,7 +27,6 @@ use tokio::sync::{
 use crate::service::{BoxedServerService, InternalServiceFactory};
 use crate::socket::MioStream;
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::Token;
 
 /// Stop worker message. Returns `true` on successful graceful shutdown.
 /// and `false` if some connections still alive when shutdown execute.
@@ -39,20 +38,115 @@ struct Stop {
 #[derive(Debug)]
 pub(crate) struct Conn {
     pub io: MioStream,
-    pub token: Token,
+    pub token: usize,
 }
 
 fn handle_pair(
     idx: usize,
     tx1: UnboundedSender<Conn>,
     tx2: UnboundedSender<Stop>,
-    avail: WorkerAvailability,
+    counter: Counter,
 ) -> (WorkerHandleAccept, WorkerHandleServer) {
-    let accept = WorkerHandleAccept { tx: tx1, avail };
+    let accept = WorkerHandleAccept {
+        idx,
+        tx: tx1,
+        counter,
+    };
 
     let server = WorkerHandleServer { idx, tx: tx2 };
 
     (accept, server)
+}
+
+/// counter: Arc<AtomicUsize> field is owned by `Accept` thread and `ServerWorker` thread.
+///
+/// `Accept` would increment the counter and `ServerWorker` would decrement it.
+///
+/// # Atomic Ordering:
+///
+/// `Accept` always look into it's cached `Availability` field for `ServerWorker` state.
+/// It lazily increment counter after successful dispatching new work to `ServerWorker`.
+/// On reaching counter limit `Accept` update it's cached `Availability` and mark worker as
+/// unable to accept any work.
+///
+/// `ServerWorker` always decrement the counter when every work received from `Accept` is done.
+/// On reaching counter limit worker would use `mio::Waker` and `WakerQueue` to wake up `Accept`
+/// and notify it to update cached `Availability` again to mark worker as able to accept work again.
+///
+/// Hense a wake up would only happen after `Accept` increment it to limit.
+/// And a decrement to limit always wake up `Accept`.
+#[derive(Clone)]
+pub(crate) struct Counter {
+    counter: Arc<AtomicUsize>,
+    limit: usize,
+}
+
+impl Counter {
+    pub(crate) fn new(limit: usize) -> Self {
+        Self {
+            counter: Arc::new(AtomicUsize::new(1)),
+            limit,
+        }
+    }
+
+    /// Increment counter by 1 and return true when hitting limit
+    #[inline(always)]
+    pub(crate) fn inc(&self) -> bool {
+        self.counter.fetch_add(1, Ordering::Relaxed) != self.limit
+    }
+
+    /// Decrement counter by 1 and return true if crossing limit.
+    #[inline(always)]
+    pub(crate) fn dec(&self) -> bool {
+        self.counter.fetch_sub(1, Ordering::Relaxed) == self.limit
+    }
+
+    pub(crate) fn total(&self) -> usize {
+        self.counter.load(Ordering::SeqCst) - 1
+    }
+}
+
+pub(crate) struct WorkerCounter {
+    idx: usize,
+    inner: Rc<(WakerQueue, Counter)>,
+}
+
+impl Clone for WorkerCounter {
+    fn clone(&self) -> Self {
+        Self {
+            idx: self.idx,
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl WorkerCounter {
+    pub(crate) fn new(idx: usize, waker_queue: WakerQueue, counter: Counter) -> Self {
+        Self {
+            idx,
+            inner: Rc::new((waker_queue, counter)),
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn guard(&self) -> WorkerCounterGuard {
+        WorkerCounterGuard(self.clone())
+    }
+
+    fn total(&self) -> usize {
+        self.inner.1.total()
+    }
+}
+
+pub(crate) struct WorkerCounterGuard(WorkerCounter);
+
+impl Drop for WorkerCounterGuard {
+    fn drop(&mut self) {
+        let (waker_queue, counter) = &*self.0.inner;
+        if counter.dec() {
+            waker_queue.wake(WakerInterest::WorkerAvailable(self.0.idx));
+        }
+    }
 }
 
 /// Handle to worker that can send connection message to worker and share the
@@ -60,14 +154,15 @@ fn handle_pair(
 ///
 /// Held by [Accept](crate::accept::Accept).
 pub(crate) struct WorkerHandleAccept {
+    idx: usize,
     tx: UnboundedSender<Conn>,
-    avail: WorkerAvailability,
+    counter: Counter,
 }
 
 impl WorkerHandleAccept {
     #[inline(always)]
     pub(crate) fn idx(&self) -> usize {
-        self.avail.idx
+        self.idx
     }
 
     #[inline(always)]
@@ -76,8 +171,8 @@ impl WorkerHandleAccept {
     }
 
     #[inline(always)]
-    pub(crate) fn available(&self) -> bool {
-        self.avail.available()
+    pub(crate) fn inc_counter(&self) -> bool {
+        self.counter.inc()
     }
 }
 
@@ -97,40 +192,6 @@ impl WorkerHandleServer {
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct WorkerAvailability {
-    idx: usize,
-    waker: WakerQueue,
-    available: Arc<AtomicBool>,
-}
-
-impl WorkerAvailability {
-    pub fn new(idx: usize, waker: WakerQueue) -> Self {
-        WorkerAvailability {
-            idx,
-            waker,
-            available: Arc::new(AtomicBool::new(false)),
-        }
-    }
-
-    #[inline(always)]
-    pub fn available(&self) -> bool {
-        self.available.load(Ordering::Acquire)
-    }
-
-    pub fn set(&self, val: bool) {
-        // Ordering:
-        //
-        // There could be multiple set calls happen in one <ServerWorker as Future>::poll.
-        // Order is important between them.
-        let old = self.available.swap(val, Ordering::AcqRel);
-        // Notify the accept on switched to available.
-        if !old && val {
-            self.waker.wake(WakerInterest::WorkerAvailable(self.idx));
-        }
-    }
-}
-
 /// Service worker.
 ///
 /// Worker accepts Socket objects via unbounded channel and starts stream processing.
@@ -139,9 +200,8 @@ pub(crate) struct ServerWorker {
     // It must be dropped as soon as ServerWorker dropping.
     rx: UnboundedReceiver<Conn>,
     rx2: UnboundedReceiver<Stop>,
+    counter: WorkerCounter,
     services: Box<[WorkerService]>,
-    availability: WorkerAvailability,
-    conns: Counter,
     factories: Box<[Box<dyn InternalServiceFactory>]>,
     state: WorkerState,
     shutdown_timeout: Duration,
@@ -209,20 +269,29 @@ impl ServerWorker {
     pub(crate) fn start(
         idx: usize,
         factories: Box<[Box<dyn InternalServiceFactory>]>,
-        avail: WorkerAvailability,
+        waker_queue: WakerQueue,
         config: ServerWorkerConfig,
     ) -> io::Result<(WorkerHandleAccept, WorkerHandleServer)> {
+        let counter = Counter::new(config.max_concurrent_connections);
+
+        let counter_clone = counter.clone();
+
         let (factory_tx, factory_rx) = std::sync::mpsc::sync_channel(1);
 
-        let (tx1, tx2) = Self::_start(idx, factories, avail.clone(), config, move |err| {
-            factory_tx.send(err).unwrap()
-        })?;
+        let (tx1, tx2) = Self::_start(
+            idx,
+            factories,
+            waker_queue,
+            counter_clone,
+            config,
+            move |err| factory_tx.send(err).unwrap(),
+        )?;
 
         factory_rx
             .recv()
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
             .map(Err)
-            .unwrap_or_else(|| Ok(handle_pair(idx, tx1, tx2, avail)))
+            .unwrap_or_else(|| Ok(handle_pair(idx, tx1, tx2, counter)))
     }
 
     // TODO: Use start_non_blocking when restarting worker.
@@ -231,14 +300,23 @@ impl ServerWorker {
     pub(crate) fn start_non_blocking(
         idx: usize,
         factories: Box<[Box<dyn InternalServiceFactory>]>,
-        avail: WorkerAvailability,
+        waker_queue: WakerQueue,
         config: ServerWorkerConfig,
     ) -> impl Future<Output = io::Result<(WorkerHandleAccept, WorkerHandleServer)>> {
+        let counter = Counter::new(config.max_concurrent_connections);
+
+        let counter_clone = counter.clone();
+
         let (factory_tx, factory_rx) = oneshot::channel();
 
-        let res = Self::_start(idx, factories, avail.clone(), config, move |err| {
-            factory_tx.send(err).unwrap()
-        });
+        let res = Self::_start(
+            idx,
+            factories,
+            waker_queue,
+            counter_clone,
+            config,
+            move |err| factory_tx.send(err).unwrap(),
+        );
 
         async move {
             let (tx1, tx2) = res?;
@@ -246,22 +324,21 @@ impl ServerWorker {
                 .await
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
                 .map(Err)
-                .unwrap_or_else(|| Ok(handle_pair(idx, tx1, tx2, avail)))
+                .unwrap_or_else(|| Ok(handle_pair(idx, tx1, tx2, counter)))
         }
     }
 
     fn _start<F>(
         idx: usize,
         factories: Box<[Box<dyn InternalServiceFactory>]>,
-        availability: WorkerAvailability,
+        waker_queue: WakerQueue,
+        counter: Counter,
         config: ServerWorkerConfig,
         f: F,
     ) -> io::Result<(UnboundedSender<Conn>, UnboundedSender<Stop>)>
     where
         F: FnOnce(Option<io::Error>) + Send + 'static,
     {
-        assert!(!availability.available());
-
         // Try to get actix system.
         let system = System::try_current();
 
@@ -283,14 +360,14 @@ impl ServerWorker {
                             io::Error::new(io::ErrorKind::Other, "Can not start worker service")
                         })?;
 
-                        assert_eq!(token.0, services.len());
+                        assert_eq!(token, services.len());
                         services.push(WorkerService {
                             factory: idx,
                             service,
                             status: WorkerServiceStatus::Unavailable,
                         });
                     }
-                    Ok::<_, io::Error>(services)
+                    Ok::<_, io::Error>(services.into_boxed_slice())
                 };
 
                 // All future runs in a LocalSet for being able to run !Send future.
@@ -306,9 +383,8 @@ impl ServerWorker {
                                 let worker = ServerWorker {
                                     rx,
                                     rx2,
-                                    services: services.into_boxed_slice(),
-                                    availability,
-                                    conns: Counter::new(config.max_concurrent_connections),
+                                    services,
+                                    counter: WorkerCounter::new(idx, waker_queue, counter),
                                     factories,
                                     state: Default::default(),
                                     shutdown_timeout: config.shutdown_timeout,
@@ -346,9 +422,8 @@ impl ServerWorker {
                                 let worker = ServerWorker {
                                     rx,
                                     rx2,
-                                    services: services.into_boxed_slice(),
-                                    availability,
-                                    conns: Counter::new(config.max_concurrent_connections),
+                                    services,
+                                    counter: WorkerCounter::new(idx, waker_queue, counter),
                                     factories,
                                     state: Default::default(),
                                     shutdown_timeout: config.shutdown_timeout,
@@ -371,13 +446,13 @@ impl ServerWorker {
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 
-    fn restart_service(&mut self, token: Token, factory_id: usize) {
+    fn restart_service(&mut self, idx: usize, factory_id: usize) {
         let factory = &self.factories[factory_id];
-        trace!("Service {:?} failed, restarting", factory.name(token));
-        self.services[token.0].status = WorkerServiceStatus::Restarting;
+        trace!("Service {:?} failed, restarting", factory.name(idx));
+        self.services[idx].status = WorkerServiceStatus::Restarting;
         self.state = WorkerState::Restarting(Restart {
             factory_id,
-            token,
+            token: idx,
             fut: factory.create(),
         });
     }
@@ -395,8 +470,8 @@ impl ServerWorker {
             });
     }
 
-    fn check_readiness(&mut self, cx: &mut Context<'_>) -> Result<bool, (Token, usize)> {
-        let mut ready = self.conns.available(cx);
+    fn check_readiness(&mut self, cx: &mut Context<'_>) -> Result<bool, (usize, usize)> {
+        let mut ready = true;
         for (idx, srv) in self.services.iter_mut().enumerate() {
             if srv.status == WorkerServiceStatus::Available
                 || srv.status == WorkerServiceStatus::Unavailable
@@ -406,7 +481,7 @@ impl ServerWorker {
                         if srv.status == WorkerServiceStatus::Unavailable {
                             trace!(
                                 "Service {:?} is available",
-                                self.factories[srv.factory].name(Token(idx))
+                                self.factories[srv.factory].name(idx)
                             );
                             srv.status = WorkerServiceStatus::Available;
                         }
@@ -417,7 +492,7 @@ impl ServerWorker {
                         if srv.status == WorkerServiceStatus::Available {
                             trace!(
                                 "Service {:?} is unavailable",
-                                self.factories[srv.factory].name(Token(idx))
+                                self.factories[srv.factory].name(idx)
                             );
                             srv.status = WorkerServiceStatus::Unavailable;
                         }
@@ -425,10 +500,10 @@ impl ServerWorker {
                     Poll::Ready(Err(_)) => {
                         error!(
                             "Service {:?} readiness check returned error, restarting",
-                            self.factories[srv.factory].name(Token(idx))
+                            self.factories[srv.factory].name(idx)
                         );
                         srv.status = WorkerServiceStatus::Failed;
-                        return Err((Token(idx), srv.factory));
+                        return Err((idx, srv.factory));
                     }
                 }
             }
@@ -447,8 +522,8 @@ enum WorkerState {
 
 struct Restart {
     factory_id: usize,
-    token: Token,
-    fut: LocalBoxFuture<'static, Result<(Token, BoxedServerService), ()>>,
+    token: usize,
+    fut: LocalBoxFuture<'static, Result<(usize, BoxedServerService), ()>>,
 }
 
 // Shutdown keep states necessary for server shutdown:
@@ -467,15 +542,6 @@ impl Default for WorkerState {
     }
 }
 
-impl Drop for ServerWorker {
-    fn drop(&mut self) {
-        // Set availability to true so if accept try to send connection to this worker
-        // it would find worker is gone and remove it.
-        // This is helpful when worker is dropped unexpected.
-        self.availability.set(true);
-    }
-}
-
 impl Future for ServerWorker {
     type Output = ();
 
@@ -485,8 +551,7 @@ impl Future for ServerWorker {
         // `StopWorker` message handler
         if let Poll::Ready(Some(Stop { graceful, tx })) = Pin::new(&mut this.rx2).poll_recv(cx)
         {
-            this.availability.set(false);
-            let num = this.conns.total();
+            let num = this.counter.total();
             if num == 0 {
                 info!("Shutting down worker, 0 connections");
                 let _ = tx.send(true);
@@ -513,7 +578,6 @@ impl Future for ServerWorker {
             WorkerState::Unavailable => match this.check_readiness(cx) {
                 Ok(true) => {
                     this.state = WorkerState::Available;
-                    this.availability.set(true);
                     self.poll(cx)
                 }
                 Ok(false) => Poll::Pending,
@@ -541,7 +605,7 @@ impl Future for ServerWorker {
                     this.factories[factory_id].name(token)
                 );
 
-                this.services[token.0].created(service);
+                this.services[token].created(service);
                 this.state = WorkerState::Unavailable;
 
                 self.poll(cx)
@@ -550,7 +614,7 @@ impl Future for ServerWorker {
                 // Wait for 1 second.
                 ready!(shutdown.timer.as_mut().poll(cx));
 
-                if this.conns.total() == 0 {
+                if this.counter.total() == 0 {
                     // Graceful shutdown.
                     if let WorkerState::Shutdown(shutdown) = mem::take(&mut this.state) {
                         let _ = shutdown.tx.send(true);
@@ -575,22 +639,20 @@ impl Future for ServerWorker {
                     Ok(true) => {}
                     Ok(false) => {
                         trace!("Worker is unavailable");
-                        this.availability.set(false);
                         this.state = WorkerState::Unavailable;
                         return self.poll(cx);
                     }
                     Err((token, idx)) => {
                         this.restart_service(token, idx);
-                        this.availability.set(false);
                         return self.poll(cx);
                     }
                 }
 
+                // handle incoming io stream
                 match ready!(Pin::new(&mut this.rx).poll_recv(cx)) {
-                    // handle incoming io stream
                     Some(msg) => {
-                        let guard = this.conns.get();
-                        let _ = this.services[msg.token.0].service.call((guard, msg.io));
+                        let guard = this.counter.guard();
+                        let _ = this.services[msg.token].service.call((guard, msg.io));
                     }
                     None => return Poll::Ready(()),
                 };

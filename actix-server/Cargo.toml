@@ -28,7 +28,6 @@ futures-core = { version = "0.3.7", default-features = false, features = ["alloc
 log = "0.4"
 mio = { version = "0.7.6", features = ["os-poll", "net"] }
 num_cpus = "1.13"
-slab = "0.4"
 tokio = { version = "1.4", features = ["sync"] }
 
 [dev-dependencies]
@@ -38,4 +37,4 @@ actix-rt = "2.0.0"
 bytes = "1"
 env_logger = "0.8"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
-tokio = { version = "1", features = ["io-util", "macros", "rt-multi-thread"] }
+tokio = { version = "1.4", features = ["io-util", "macros", "rt-multi-thread"] }

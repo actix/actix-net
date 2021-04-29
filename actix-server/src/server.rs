@@ -19,7 +19,7 @@ use crate::builder::ServerBuilder;
 use crate::service::InternalServiceFactory;
 use crate::signals::{Signal, Signals};
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandleServer};
+use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleServer};
 
 /// When awaited or spawned would listen to signal and message from [ServerHandle](ServerHandle).
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -198,14 +198,13 @@ impl ServerInner {
 
                 error!("Worker {} has died, restarting", idx);
 
-                let availability = WorkerAvailability::new(idx, self.waker_queue.clone());
                 let factories = self
                     .services
                     .iter()
                     .map(|service| service.clone_factory())
                     .collect();
 
-                match ServerWorker::start(idx, factories, availability, self.worker_config) {
+                match ServerWorker::start(idx, factories, self.waker_queue.clone(), self.worker_config) {
                     Ok((handle_accept, handle_server)) => {
                         *self
                             .handles

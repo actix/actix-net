@@ -11,15 +11,14 @@ use crate::socket::{
     MioListener, MioTcpListener, MioTcpSocket, StdSocketAddr, StdTcpListener, ToSocketAddrs,
 };
 use crate::worker::ServerWorkerConfig;
-use crate::Token;
 
 /// Server builder
 pub struct ServerBuilder {
     pub(super) threads: usize,
-    token: Token,
+    token: usize,
     backlog: u32,
     pub(super) services: Vec<Box<dyn InternalServiceFactory>>,
-    pub(super) sockets: Vec<(Token, String, MioListener)>,
+    pub(super) sockets: Vec<(usize, String, MioListener)>,
     pub(super) exit: bool,
     pub(super) no_signals: bool,
     pub(super) cmd_tx: UnboundedSender<ServerCommand>,
@@ -39,7 +38,7 @@ impl ServerBuilder {
         let (tx, rx) = unbounded_channel();
         ServerBuilder {
             threads: num_cpus::get(),
-            token: Token::default(),
+            token: 0,
             services: Vec::new(),
             sockets: Vec::new(),
             backlog: 2048,
@@ -138,7 +137,7 @@ impl ServerBuilder {
         let sockets = bind_addr(addr, self.backlog)?;
 
         for lst in sockets {
-            let token = self.token.next();
+            let token = self.next_token();
             self.services.push(StreamNewService::create(
                 name.as_ref().to_string(),
                 token,
@@ -187,7 +186,7 @@ impl ServerBuilder {
     {
         use std::net::{IpAddr, Ipv4Addr};
         lst.set_nonblocking(true)?;
-        let token = self.token.next();
+        let token = self.next_token();
         let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         self.services.push(StreamNewService::create(
             name.as_ref().to_string(),
@@ -213,7 +212,7 @@ impl ServerBuilder {
         lst.set_nonblocking(true)?;
         let addr = lst.local_addr()?;
 
-        let token = self.token.next();
+        let token = self.next_token();
         self.services.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
@@ -235,6 +234,12 @@ impl ServerBuilder {
             info!("Starting {} workers", self.threads);
             Server::new(self)
         }
+    }
+
+    pub(crate) fn next_token(&mut self) -> usize {
+        let token = self.token;
+        self.token += 1;
+        token
     }
 }
 
