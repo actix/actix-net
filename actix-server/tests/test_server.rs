@@ -28,8 +28,7 @@ fn test_bind() {
                 .workers(1)
                 .disable_signals()
                 .shutdown_timeout(3600)
-                .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
-                .unwrap()
+                .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))?
                 .run();
 
             let _ = tx.send(srv.clone());
@@ -51,15 +50,14 @@ fn test_listen() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let lst = net::TcpListener::bind(addr).unwrap();
-
         actix_rt::System::new().block_on(async {
+            let lst = net::TcpListener::bind(addr).unwrap();
+
             let srv = Server::build()
                 .disable_signals()
                 .shutdown_timeout(3600)
                 .workers(1)
-                .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
-                .unwrap()
+                .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))?
                 .run();
 
             let _ = tx.send(srv.clone());
