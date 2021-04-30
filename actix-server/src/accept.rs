@@ -196,7 +196,7 @@ impl Accept {
         loop {
             if let Err(e) = self.poll.poll(&mut events, None) {
                 match e.kind() {
-                    io::ErrorKind::Interrupted => continue,
+                    io::ErrorKind::Interrupted => {}
                     _ => panic!("Poll error: {}", e),
                 }
             }
@@ -257,23 +257,29 @@ impl Accept {
                 Some(WakerInterest::Pause) => {
                     drop(guard);
 
-                    self.paused = true;
+                    if !self.paused {
+                        self.paused = true;
 
-                    self.deregister_all(sockets);
+                        self.deregister_all(sockets);
+                    }
                 }
                 Some(WakerInterest::Resume) => {
                     drop(guard);
 
-                    self.paused = false;
+                    if self.paused {
+                        self.paused = false;
 
-                    sockets.iter_mut().for_each(|info| {
-                        self.register_logged(info);
-                    });
+                        sockets.iter_mut().for_each(|info| {
+                            self.register_logged(info);
+                        });
 
-                    self.accept_all(sockets);
+                        self.accept_all(sockets);
+                    }
                 }
                 Some(WakerInterest::Stop) => {
-                    self.deregister_all(sockets);
+                    if !self.paused {
+                        self.deregister_all(sockets);
+                    }
 
                     return true;
                 }
