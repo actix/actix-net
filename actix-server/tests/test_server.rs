@@ -67,6 +67,8 @@ fn test_listen() {
 
     let srv = rx.recv().unwrap();
 
+    thread::sleep(Duration::from_millis(500));
+
     net::TcpStream::connect(addr).unwrap();
 
     let _ = srv.stop(true);
