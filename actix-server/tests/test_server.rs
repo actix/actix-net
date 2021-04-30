@@ -27,6 +27,7 @@ fn test_bind() {
             let srv = Server::build()
                 .workers(1)
                 .disable_signals()
+                .shutdown_timeout(3600)
                 .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
                 .run();
@@ -55,6 +56,7 @@ fn test_listen() {
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
                 .disable_signals()
+                .shutdown_timeout(3600)
                 .workers(1)
                 .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
