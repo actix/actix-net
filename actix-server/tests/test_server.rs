@@ -23,25 +23,25 @@ fn test_bind() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
-            Server::build()
+        actix_rt::System::new().block_on(async {
+            let srv = Server::build()
                 .workers(1)
                 .disable_signals()
                 .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
-                .run()
-        }));
+                .run();
 
-        let _ = tx.send((srv, actix_rt::System::current()));
-        let _ = sys.run();
+            let _ = tx.send(srv.clone());
+            srv.await
+        })
     });
-    let (_, sys) = rx.recv().unwrap();
 
-    thread::sleep(Duration::from_millis(500));
-    assert!(net::TcpStream::connect(addr).is_ok());
-    sys.stop();
-    let _ = h.join();
+    let srv = rx.recv().unwrap();
+
+    net::TcpStream::connect(addr).unwrap();
+
+    let _ = srv.stop(true);
+    h.join().unwrap().unwrap();
 }
 
 #[test]
@@ -50,25 +50,27 @@ fn test_listen() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
         let lst = net::TcpListener::bind(addr).unwrap();
-        sys.block_on(async {
-            Server::build()
+
+        actix_rt::System::new().block_on(async {
+            let srv = Server::build()
                 .disable_signals()
                 .workers(1)
                 .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
                 .unwrap()
                 .run();
-            let _ = tx.send(actix_rt::System::current());
-        });
-        let _ = sys.run();
-    });
-    let sys = rx.recv().unwrap();
 
-    thread::sleep(Duration::from_millis(500));
-    assert!(net::TcpStream::connect(addr).is_ok());
-    sys.stop();
-    let _ = h.join();
+            let _ = tx.send(srv.clone());
+            srv.await
+        })
+    });
+
+    let srv = rx.recv().unwrap();
+
+    net::TcpStream::connect(addr).unwrap();
+
+    let _ = srv.stop(true);
+    h.join().unwrap().unwrap();
 }
 
 #[test]
