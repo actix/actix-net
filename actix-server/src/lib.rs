@@ -14,13 +14,14 @@ mod test_server;
 mod waker_queue;
 mod worker;
 
+pub use self::accept::Acceptable;
 pub use self::builder::ServerBuilder;
 pub use self::server::Server;
 pub use self::service::ServiceFactory;
 pub use self::test_server::TestServer;
 
 #[doc(hidden)]
-pub use self::socket::FromStream;
+pub use self::socket::FromConnection;
 
 use std::future::Future;
 use std::pin::Pin;

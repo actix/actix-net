@@ -6,32 +6,32 @@ use std::{
     time::Duration,
 };
 
-use actix_rt::{self as rt, net::TcpStream, time::sleep, System};
+use actix_rt::{net::TcpStream, time::sleep, System};
 use log::{error, info};
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver},
     oneshot,
 };
 
-use crate::accept::AcceptLoop;
-use crate::join_all;
+use crate::accept::{AcceptLoop, Acceptable, AcceptorStop};
 use crate::server::{Server, ServerCommand};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
-use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
-use crate::socket::{MioTcpListener, MioTcpSocket};
-use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleAccept, WorkerHandleServer};
+use crate::socket::{
+    FromConnection, MioListener, MioTcpListener, MioTcpSocket, StdSocketAddr, StdTcpListener,
+    ToSocketAddrs,
+};
+use crate::waker_queue::WakerInterest;
+use crate::worker::{ServerWorkerConfig, Worker, WorkerHandleAccept};
 
 /// Server builder
-pub struct ServerBuilder {
+pub struct ServerBuilder<A: Acceptable = MioListener> {
     threads: usize,
     token: usize,
     backlog: u32,
-    handles: Vec<(usize, WorkerHandleServer)>,
-    services: Vec<Box<dyn InternalServiceFactory>>,
-    sockets: Vec<(usize, String, MioListener)>,
-    accept: AcceptLoop,
+    services: Vec<Box<dyn InternalServiceFactory<A::Connection>>>,
+    sockets: Vec<(usize, String, A)>,
+    accept: AcceptLoop<A>,
     exit: bool,
     no_signals: bool,
     cmd: UnboundedReceiver<ServerCommand>,
@@ -46,16 +46,18 @@ impl Default for ServerBuilder {
     }
 }
 
-impl ServerBuilder {
+impl<A> ServerBuilder<A>
+where
+    A: Acceptable + Send + Unpin + 'static,
+{
     /// Create new Server builder instance
-    pub fn new() -> ServerBuilder {
+    pub fn new() -> Self {
         let (tx, rx) = unbounded_channel();
         let server = Server::new(tx);
 
-        ServerBuilder {
+        Self {
             threads: num_cpus::get(),
             token: 0,
-            handles: Vec::new(),
             services: Vec::new(),
             sockets: Vec::new(),
             accept: AcceptLoop::new(server.clone()),
@@ -86,7 +88,7 @@ impl ServerBuilder {
     /// # Examples:
     /// ```
     /// # use actix_server::ServerBuilder;
-    /// let builder = ServerBuilder::new()
+    /// let builder = ServerBuilder::default()
     ///     .workers(4) // server has 4 worker thread.
     ///     .worker_max_blocking_threads(4); // every worker has 4 max blocking threads.
     /// ```
@@ -147,154 +149,49 @@ impl ServerBuilder {
         self
     }
 
-    /// Add new service to the server.
-    pub fn bind<F, U, N: AsRef<str>>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
-    where
-        F: ServiceFactory<TcpStream>,
-        U: ToSocketAddrs,
-    {
-        let sockets = bind_addr(addr, self.backlog)?;
-
-        for lst in sockets {
-            let token = self.next_token();
-            self.services.push(StreamNewService::create(
-                name.as_ref().to_string(),
-                token,
-                factory.clone(),
-                lst.local_addr()?,
-            ));
-            self.sockets
-                .push((token, name.as_ref().to_string(), MioListener::Tcp(lst)));
-        }
-        Ok(self)
+    fn next_token(&mut self) -> usize {
+        let token = self.token;
+        self.token += 1;
+        token
     }
 
-    /// Add new unix domain service to the server.
-    #[cfg(unix)]
-    pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
-    where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
-        N: AsRef<str>,
-        U: AsRef<std::path::Path>,
-    {
-        // The path must not exist when we try to bind.
-        // Try to remove it to avoid bind error.
-        if let Err(e) = std::fs::remove_file(addr.as_ref()) {
-            // NotFound is expected and not an issue. Anything else is.
-            if e.kind() != std::io::ErrorKind::NotFound {
-                return Err(e);
-            }
-        }
-
-        let lst = crate::socket::StdUnixListener::bind(addr)?;
-        self.listen_uds(name, lst, factory)
-    }
-
-    /// Add new unix domain service to the server.
-    /// Useful when running as a systemd service and
-    /// a socket FD can be acquired using the systemd crate.
-    #[cfg(unix)]
-    pub fn listen_uds<F, N: AsRef<str>>(
-        mut self,
-        name: N,
-        lst: crate::socket::StdUnixListener,
-        factory: F,
-    ) -> io::Result<Self>
-    where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
-    {
-        use std::net::{IpAddr, Ipv4Addr};
-        lst.set_nonblocking(true)?;
-        let token = self.next_token();
-        let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-        self.services.push(StreamNewService::create(
-            name.as_ref().to_string(),
-            token,
-            factory,
-            addr,
-        ));
-        self.sockets
-            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
-        Ok(self)
-    }
-
-    /// Add new service to the server.
-    pub fn listen<F, N: AsRef<str>>(
-        mut self,
-        name: N,
-        lst: StdTcpListener,
-        factory: F,
-    ) -> io::Result<Self>
-    where
-        F: ServiceFactory<TcpStream>,
-    {
-        lst.set_nonblocking(true)?;
-        let addr = lst.local_addr()?;
-
-        let token = self.next_token();
-        self.services.push(StreamNewService::create(
-            name.as_ref().to_string(),
-            token,
-            factory,
-            addr,
-        ));
-
-        self.sockets
-            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
-
-        Ok(self)
-    }
-
-    /// Starts processing incoming connections and return server controller.
-    pub fn run(mut self) -> Server {
-        if self.sockets.is_empty() {
-            panic!("Server should have at least one bound socket");
-        } else {
-            info!("Starting {} workers", self.threads);
-
-            // start workers
-            let handles = (0..self.threads)
-                .map(|idx| {
-                    let (handle_accept, handle_server) =
-                        self.start_worker(idx, self.accept.waker_owned());
-                    self.handles.push((idx, handle_server));
-
-                    handle_accept
-                })
-                .collect();
-
-            // start accept thread
-            for sock in &self.sockets {
-                info!("Starting \"{}\" service on {}", sock.1, sock.2);
-            }
-            self.accept.start(
-                mem::take(&mut self.sockets)
-                    .into_iter()
-                    .map(|t| (t.0, t.2))
-                    .collect(),
-                handles,
-            );
-
-            // handle signals
-            if !self.no_signals {
-                Signals::start(self.server.clone());
-            }
-
-            // start http server actor
-            let server = self.server.clone();
-            rt::spawn(self);
-            server
-        }
-    }
-
-    fn start_worker(
-        &self,
-        idx: usize,
-        waker_queue: WakerQueue,
-    ) -> (WorkerHandleAccept, WorkerHandleServer) {
+    fn start_worker(&self, idx: usize) -> WorkerHandleAccept<A::Connection> {
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
+        let config = self.worker_config;
+        let waker_queue = self.accept.waker_owned();
+        Worker::start(idx, services, waker_queue, config)
+    }
 
-        ServerWorker::start(idx, services, waker_queue, self.worker_config)
+    fn handle_signal(&mut self, sig: Signal) {
+        // Signals support
+        // Handle `SIGINT`, `SIGTERM`, `SIGQUIT` signals and stop actix system
+        match sig {
+            Signal::Int => {
+                info!("SIGINT received, exiting");
+                self.exit = true;
+                self.handle_cmd(ServerCommand::Stop {
+                    graceful: false,
+                    completion: None,
+                })
+            }
+            Signal::Term => {
+                info!("SIGTERM received, stopping");
+                self.exit = true;
+                self.handle_cmd(ServerCommand::Stop {
+                    graceful: true,
+                    completion: None,
+                })
+            }
+            Signal::Quit => {
+                info!("SIGQUIT received, exiting");
+                self.exit = true;
+                self.handle_cmd(ServerCommand::Stop {
+                    graceful: false,
+                    completion: None,
+                })
+            }
+            _ => (),
+        }
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) {
@@ -307,37 +204,7 @@ impl ServerBuilder {
                 self.accept.wake(WakerInterest::Resume);
                 let _ = tx.send(());
             }
-            ServerCommand::Signal(sig) => {
-                // Signals support
-                // Handle `SIGINT`, `SIGTERM`, `SIGQUIT` signals and stop actix system
-                match sig {
-                    Signal::Int => {
-                        info!("SIGINT received, exiting");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: false,
-                            completion: None,
-                        })
-                    }
-                    Signal::Term => {
-                        info!("SIGTERM received, stopping");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: true,
-                            completion: None,
-                        })
-                    }
-                    Signal::Quit => {
-                        info!("SIGQUIT received, exiting");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: false,
-                            completion: None,
-                        })
-                    }
-                    _ => (),
-                }
-            }
+            ServerCommand::Signal(sig) => self.handle_signal(sig),
             ServerCommand::Notify(tx) => {
                 self.notify.push(tx);
             }
@@ -348,19 +215,14 @@ impl ServerBuilder {
                 let exit = self.exit;
 
                 // stop accept thread
-                self.accept.wake(WakerInterest::Stop);
+                let (stop, rx) = AcceptorStop::new(graceful);
+
+                self.accept.wake(WakerInterest::Stop(stop));
                 let notify = std::mem::take(&mut self.notify);
 
-                // stop workers
-                let stop = self
-                    .handles
-                    .iter()
-                    .map(move |worker| worker.1.stop(graceful))
-                    .collect();
-
-                rt::spawn(async move {
-                    if graceful {
-                        let _ = join_all(stop).await;
+                actix_rt::spawn(async move {
+                    for rx in rx.await.unwrap_or_else(|_| Vec::new()) {
+                        let _ = rx.await;
                     }
 
                     if let Some(tx) = completion {
@@ -377,52 +239,171 @@ impl ServerBuilder {
                 });
             }
             ServerCommand::WorkerFaulted(idx) => {
-                let mut found = false;
-                for i in 0..self.handles.len() {
-                    if self.handles[i].0 == idx {
-                        self.handles.swap_remove(i);
-                        found = true;
-                        break;
-                    }
-                }
+                error!("Worker has died {:?}, restarting", idx);
 
-                if found {
-                    error!("Worker has died {:?}, restarting", idx);
-
-                    let mut new_idx = self.handles.len();
-                    'found: loop {
-                        for i in 0..self.handles.len() {
-                            if self.handles[i].0 == new_idx {
-                                new_idx += 1;
-                                continue 'found;
-                            }
-                        }
-                        break;
-                    }
-
-                    let (handle_accept, handle_server) =
-                        self.start_worker(new_idx, self.accept.waker_owned());
-                    self.handles.push((new_idx, handle_server));
-                    self.accept.wake(WakerInterest::Worker(handle_accept));
-                }
+                let handle = self.start_worker(idx);
+                self.accept.wake(WakerInterest::Worker(handle));
             }
         }
     }
 
-    fn next_token(&mut self) -> usize {
-        let token = self.token;
-        self.token += 1;
-        token
+    /// Starts processing incoming connections and return server controller.
+    pub fn run(mut self) -> Server {
+        if self.sockets.is_empty() {
+            panic!("Server should have at least one bound socket");
+        } else {
+            info!("Starting {} workers", self.threads);
+
+            // start workers
+            let handles = (0..self.threads)
+                .map(|idx| self.start_worker(idx))
+                .collect();
+
+            // start accept thread
+            for sock in &self.sockets {
+                info!("Starting \"{}\" service on {:?}", sock.1, sock.2);
+            }
+            self.accept.start(
+                mem::take(&mut self.sockets)
+                    .into_iter()
+                    .map(|t| (t.0, t.2))
+                    .collect(),
+                handles,
+            );
+
+            // handle signals
+            if !self.no_signals {
+                Signals::start(self.server.clone());
+            }
+
+            // start http server actor
+            let server = self.server.clone();
+            actix_rt::spawn(self);
+            server
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn bind_acceptable<F, Io>(
+        mut self,
+        name: &str,
+        addr: StdSocketAddr,
+        lst: A,
+        factory: F,
+    ) -> Self
+    where
+        F: ServiceFactory<Io, A::Connection>,
+        Io: FromConnection<A::Connection> + Send + 'static,
+    {
+        let token = self.next_token();
+        self.services.push(StreamNewService::create(
+            name.to_string(),
+            token,
+            factory,
+            addr,
+        ));
+
+        self.sockets.push((token, name.to_string(), lst));
+
+        self
     }
 }
 
-impl Future for ServerBuilder {
+impl ServerBuilder {
+    /// Add new service to the server.
+    pub fn bind<F, U, N>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
+    where
+        F: ServiceFactory<TcpStream>,
+        N: AsRef<str>,
+        U: ToSocketAddrs,
+    {
+        let sockets = bind_addr(addr, self.backlog)?;
+
+        for lst in sockets {
+            let addr = lst.local_addr()?;
+            let lst = MioListener::Tcp(lst);
+
+            self = self.bind_acceptable(name.as_ref(), addr, lst, factory.clone());
+        }
+
+        Ok(self)
+    }
+
+    /// Add new service to the server.
+    pub fn listen<F, N: AsRef<str>>(
+        self,
+        name: N,
+        lst: StdTcpListener,
+        factory: F,
+    ) -> io::Result<Self>
+    where
+        F: ServiceFactory<TcpStream>,
+    {
+        lst.set_nonblocking(true)?;
+
+        let addr = lst.local_addr()?;
+        let lst = MioListener::from(lst);
+
+        Ok(self.bind_acceptable(name.as_ref(), addr, lst, factory))
+    }
+}
+
+#[cfg(unix)]
+impl ServerBuilder {
+    /// Add new unix domain service to the server.
+    pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
+    where
+        F: ServiceFactory<actix_rt::net::UnixStream>,
+        N: AsRef<str>,
+        U: AsRef<std::path::Path>,
+    {
+        // The path must not exist when we try to bind.
+        // Try to remove it to avoid bind error.
+        if let Err(e) = std::fs::remove_file(addr.as_ref()) {
+            // NotFound is expected and not an issue. Anything else is.
+            if e.kind() != io::ErrorKind::NotFound {
+                return Err(e);
+            }
+        }
+
+        let lst = crate::socket::StdUnixListener::bind(addr)?;
+        self.listen_uds(name, lst, factory)
+    }
+
+    /// Add new unix domain service to the server.
+    /// Useful when running as a systemd service and
+    /// a socket FD can be acquired using the systemd crate.
+    pub fn listen_uds<F, N>(
+        self,
+        name: N,
+        lst: crate::socket::StdUnixListener,
+        factory: F,
+    ) -> io::Result<Self>
+    where
+        F: ServiceFactory<actix_rt::net::UnixStream>,
+        N: AsRef<str>,
+    {
+        lst.set_nonblocking(true)?;
+
+        let addr = "127.0.0.1:8080".parse().unwrap();
+
+        let lst = MioListener::from(lst);
+
+        Ok(self.bind_acceptable(name.as_ref(), addr, lst, factory))
+    }
+}
+
+impl<A: Acceptable> Future for ServerBuilder<A>
+where
+    A: Acceptable + Send + Unpin + 'static,
+{
     type Output = ();
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
         loop {
-            match Pin::new(&mut self.cmd).poll_recv(cx) {
-                Poll::Ready(Some(it)) => self.as_mut().get_mut().handle_cmd(it),
+            match Pin::new(&mut this.cmd).poll_recv(cx) {
+                Poll::Ready(Some(it)) => this.handle_cmd(it),
                 _ => return Poll::Pending,
             }
         }

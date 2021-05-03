@@ -16,8 +16,13 @@ edition = "2018"
 name = "actix_server"
 path = "src/lib.rs"
 
-[features]
-default = []
+[[example]]
+name = "mio_tcp"
+path = "examples/mio-tcp.rs"
+
+[[example]]
+name = "tcp_echo"
+path = "examples/tcp-echo.rs"
 
 [dependencies]
 actix-rt = { version = "2.0.0", default-features = false }
@@ -38,3 +43,6 @@ bytes = "1"
 env_logger = "0.8"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
 tokio = { version = "1", features = ["io-util"] }
+
+[target.'cfg(_loom)'.dependencies]
+loom = "0.4.1"
