@@ -123,7 +123,7 @@ mod win_impl {
     // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
     impl FromConnection<MioTcpStream> for TcpStream {
         fn from_conn(conn: MioTcpStream) -> io::Result<Self> {
-            let raw = IntoRawSocket::into_raw_socket(mio);
+            let raw = IntoRawSocket::into_raw_socket(conn);
             // SAFETY: This is a in place conversion from mio stream to tokio stream.
             TcpStream::from_std(unsafe { FromRawSocket::from_raw_socket(raw) })
         }
