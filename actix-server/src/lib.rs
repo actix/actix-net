@@ -14,7 +14,7 @@ mod test_server;
 mod waker_queue;
 mod worker;
 
-pub use self::accept::Acceptable;
+pub use self::accept::{AcceptContext, Acceptable};
 pub use self::builder::ServerBuilder;
 pub use self::server::Server;
 pub use self::service::ServiceFactory;

@@ -7,7 +7,7 @@ use loom::thread;
 mod acceptable;
 mod availability;
 
-pub use acceptable::Acceptable;
+pub use acceptable::{AcceptContext, Acceptable};
 
 use std::{io, time::Duration};
 
@@ -78,7 +78,7 @@ where
 struct Accept<A: Acceptable> {
     poll: Poll,
     source: Box<[Source<A>]>,
-    waker: WakerQueue<A::Connection>,
+    context: AcceptContext<'static, A::Connection>,
     handles: Vec<WorkerHandleAccept<A::Connection>>,
     srv: Server,
     next: usize,
@@ -143,7 +143,7 @@ where
         // actix system.
         let sys = System::current();
         thread::Builder::new()
-            .name("actix-server acceptor".to_owned())
+            .name("actix-server accept".to_owned())
             .spawn(move || {
                 System::set_current(sys);
                 let source = source
@@ -168,10 +168,12 @@ where
                     avail.set_available(handle.idx(), true);
                 });
 
+                let context = AcceptContext::new(waker);
+
                 let accept = Accept {
                     poll,
                     source,
-                    waker,
+                    context,
                     handles,
                     srv,
                     next: 0,
@@ -221,7 +223,7 @@ where
         loop {
             // take guard with every iteration so no new interest can be added
             // until the current task is done.
-            let mut guard = self.waker.guard();
+            let mut guard = self.context.waker().guard();
             match guard.pop_front() {
                 // worker notify it becomes available.
                 Some(WakerInterest::WorkerAvailable(idx)) => {
@@ -363,8 +365,8 @@ where
     fn accept(&mut self, token: usize) {
         while self.avail.available() {
             let source = &mut self.source[token];
-
-            match source.acceptable.accept() {
+            let cx = &mut self.context;
+            match source.acceptable.accept(cx) {
                 Ok(Some(io)) => {
                     let conn = Conn { token, io };
                     self.accept_one(conn);
@@ -384,7 +386,7 @@ where
                     source.timeout = Some(Instant::now() + Duration::from_millis(500));
 
                     // after the sleep a Timer interest is sent to Accept Poll
-                    let waker = self.waker.clone();
+                    let waker = self.context.waker().clone();
                     System::current().arbiter().spawn(async move {
                         sleep(Duration::from_millis(510)).await;
                         waker.wake(WakerInterest::Timer);

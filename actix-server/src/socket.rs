@@ -15,13 +15,16 @@ use actix_rt::net::TcpStream;
 use mio::net::TcpStream as MioTcpStream;
 use mio::{event::Source, Interest, Registry, Token};
 
-use crate::accept::Acceptable;
+use crate::accept::{AcceptContext, Acceptable};
 
 /// impl Acceptable trait for [mio::net::TcpListener] so it can be managed by server and it's [mio::Poll] instance.
 impl Acceptable for MioTcpListener {
     type Connection = MioTcpStream;
 
-    fn accept(&mut self) -> io::Result<Option<Self::Connection>> {
+    fn accept(
+        &mut self,
+        _: &mut AcceptContext<'_, Self::Connection>,
+    ) -> io::Result<Option<Self::Connection>> {
         Self::accept(self).map(|stream| Some(stream.0))
     }
 
@@ -49,7 +52,10 @@ impl From<StdTcpListener> for MioListener {
 impl Acceptable for MioListener {
     type Connection = MioStream;
 
-    fn accept(&mut self) -> io::Result<Option<Self::Connection>> {
+    fn accept(
+        &mut self,
+        _: &mut AcceptContext<'_, Self::Connection>,
+    ) -> io::Result<Option<Self::Connection>> {
         match *self {
             MioListener::Tcp(ref mut lst) => {
                 MioTcpListener::accept(lst).map(|stream| Some(MioStream::Tcp(stream.0)))
@@ -157,7 +163,10 @@ mod unix_impl {
     impl Acceptable for MioUnixListener {
         type Connection = MioUnixStream;
 
-        fn accept(&mut self) -> io::Result<Option<Self::Connection>> {
+        fn accept(
+            &mut self,
+            _: &mut AcceptContext<'_, Self::Connection>,
+        ) -> io::Result<Option<Self::Connection>> {
             Self::accept(self).map(|stream| Some(stream.0))
         }
 
