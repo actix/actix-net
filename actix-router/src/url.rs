@@ -31,7 +31,7 @@ fn set_bit(array: &mut [u8], ch: u8) {
 }
 
 thread_local! {
-    static DEFAULT_QUOTER: Quoter = Quoter::new(b"@:", b"/+");
+    static DEFAULT_QUOTER: Quoter = Quoter::new(b"@:", b"%/+");
 }
 
 #[derive(Default, Clone, Debug)]
@@ -216,12 +216,12 @@ mod tests {
         let url = Uri::try_from("/user/qwe%25/test").unwrap();
         let mut path = Path::new(Url::new(url));
         assert!(re.match_path(&mut path));
-        assert_eq!(path.get("id").unwrap(), "qwe%");
+        assert_eq!(path.get("id").unwrap(), "qwe%25");
 
         let url = Uri::try_from("/user/qwe%25rty/test").unwrap();
         let mut path = Path::new(Url::new(url));
         assert!(re.match_path(&mut path));
-        assert_eq!(path.get("id").unwrap(), "qwe%rty");
+        assert_eq!(path.get("id").unwrap(), "qwe%25rty");
     }
 
     #[test]
