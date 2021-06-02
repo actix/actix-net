@@ -41,7 +41,7 @@ where
 ///
 ///     actix_service::forward_ready!(service);
 ///
-///     fn call(&self, req: S::Request) -> Self::Future {
+///     fn call(&self, req: Req) -> Self::Future {
 ///         TimeoutServiceResponse {
 ///             fut: self.service.call(req),
 ///             sleep: Sleep::new(clock::now() + self.timeout),
