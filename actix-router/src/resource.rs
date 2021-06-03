@@ -817,6 +817,32 @@ mod tests {
         assert!(re.is_match("/user/2345/sdg"));
     }
 
+    #[test]
+    fn test_newline() {
+        let re = ResourceDef::new("/user/a\nb");
+        assert!(re.is_match("/user/a\nb"));
+        assert!(!re.is_match("/user/a\nb/profile"));
+
+        let re = ResourceDef::new("/a{x}b/test/a{y}b");
+        let mut path = Path::new("/a\nb/test/a\nb");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("x").unwrap(), "\n");
+        assert_eq!(path.get("y").unwrap(), "\n");
+
+        let re = ResourceDef::new("/user/*");
+        assert!(re.is_match("/user/a\nb/"));
+
+        let re = ResourceDef::new("/user/{id}*");
+        let mut path = Path::new("/user/a\nb/a\nb");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("id").unwrap(), "a\nb/a\nb");
+
+        let re = ResourceDef::new("/user/{id:.*}");
+        let mut path = Path::new("/user/a\nb/a\nb");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("id").unwrap(), "a\nb/a\nb");
+    }
+
     #[cfg(feature = "http")]
     #[test]
     fn test_parse_urlencoded_param() {
