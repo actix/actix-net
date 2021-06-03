@@ -260,6 +260,16 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_utf8() {
+        let invalid_utf8 = percent_encode((0x80..=0xff).collect::<Vec<_>>().as_slice());
+        let uri = Uri::try_from(format!("/{}", invalid_utf8)).unwrap();
+        let path = Path::new(Url::new(uri));
+
+        // We should always get a valid utf8 string
+        assert!(String::from_utf8(path.path().as_bytes().to_owned()).is_ok());
+    }
+
+    #[test]
     fn test_from_hex() {
         let hex = b"0123456789abcdefABCDEF";
 
