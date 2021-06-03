@@ -170,11 +170,7 @@ impl Quoter {
             idx += 1;
         }
 
-        cloned.map(|data| {
-            // SAFETY: we get data from http::Uri, which does UTF-8 checks already
-            // this code only decodes valid pct encoded values
-            unsafe { String::from_utf8_unchecked(data) }
-        })
+        cloned.map(|data| String::from_utf8_lossy(&data).into_owned())
     }
 }
 
