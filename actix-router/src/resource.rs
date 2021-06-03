@@ -10,6 +10,8 @@ use crate::{IntoPattern, Resource, ResourcePath};
 
 const MAX_DYNAMIC_SEGMENTS: usize = 16;
 
+const REGEX_FLAGS: &str = "(?s-m)";
+
 /// ResourceDef describes an entry in resources table
 ///
 /// Resource definition can contain only 16 dynamic segments
@@ -571,7 +573,7 @@ impl ResourceDef {
     ) -> (String, Vec<PatternElement>, bool, usize) {
         if pattern.find('{').is_none() {
             return if let Some(path) = pattern.strip_suffix('*') {
-                let re = String::from("^") + path + "(.*)";
+                let re = format!("{}^{}(.*)", REGEX_FLAGS, path);
                 (re, vec![PatternElement::Str(String::from(path))], true, 0)
             } else {
                 (
@@ -584,7 +586,7 @@ impl ResourceDef {
         }
 
         let mut elements = Vec::new();
-        let mut re = String::from("^");
+        let mut re = format!("{}^", REGEX_FLAGS);
         let mut dyn_elements = 0;
 
         while let Some(idx) = pattern.find('{') {
