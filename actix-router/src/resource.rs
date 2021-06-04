@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::mem;
 
 use regex::{escape, Regex, RegexSet};
 
@@ -272,17 +273,14 @@ impl ResourceDef {
                 true
             }
             PatternType::Dynamic(ref re, ref names, len) => {
-                let mut idx = 0;
                 let mut pos = 0;
-                let mut segments: [Option<PathItem>; MAX_DYNAMIC_SEGMENTS] = Default::default();
+                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                 if let Some(captures) = re.captures(path.path()) {
                     for (no, name) in names.iter().enumerate() {
                         if let Some(m) = captures.name(&name) {
-                            idx += 1;
                             pos = m.end();
-                            segments[no] =
-                                Some(PathItem::Segment(m.start() as u16, m.end() as u16));
+                            segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
                         } else {
                             log::error!(
                                 "Dynamic path match but not all segments found: {}",
@@ -294,12 +292,8 @@ impl ResourceDef {
                 } else {
                     return false;
                 }
-                for (idx, segment) in segments
-                    .iter_mut()
-                    .enumerate()
-                    .take_while(|(i, _)| *i != idx)
-                {
-                    path.add(names[idx], segment.take().unwrap());
+                for i in 0..names.len() {
+                    path.add(names[i], mem::take(&mut segments[i]));
                 }
                 path.skip((pos + len) as u16);
                 true
@@ -307,18 +301,15 @@ impl ResourceDef {
             PatternType::DynamicSet(ref re, ref params) => {
                 if let Some(idx) = re.matches(path.path()).into_iter().next() {
                     let (ref pattern, ref names, len) = params[idx];
-                    let mut idx = 0;
                     let mut pos = 0;
-                    let mut segments: [Option<PathItem>; MAX_DYNAMIC_SEGMENTS] =
-                        Default::default();
+                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                     if let Some(captures) = pattern.captures(path.path()) {
                         for (no, name) in names.iter().enumerate() {
                             if let Some(m) = captures.name(&name) {
-                                idx += 1;
                                 pos = m.end();
                                 segments[no] =
-                                    Some(PathItem::Segment(m.start() as u16, m.end() as u16));
+                                    PathItem::Segment(m.start() as u16, m.end() as u16);
                             } else {
                                 log::error!(
                                     "Dynamic path match but not all segments found: {}",
@@ -330,12 +321,8 @@ impl ResourceDef {
                     } else {
                         return false;
                     }
-                    for (idx, segment) in segments
-                        .iter_mut()
-                        .enumerate()
-                        .take_while(|(i, _)| *i != idx)
-                    {
-                        path.add(names[idx], segment.take().unwrap());
+                    for i in 0..names.len() {
+                        path.add(names[i], mem::take(&mut segments[i]));
                     }
                     path.skip((pos + len) as u16);
                     true
@@ -393,17 +380,14 @@ impl ResourceDef {
                 true
             }
             PatternType::Dynamic(ref re, ref names, len) => {
-                let mut idx = 0;
                 let mut pos = 0;
-                let mut segments: [Option<PathItem>; MAX_DYNAMIC_SEGMENTS] = Default::default();
+                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                 if let Some(captures) = re.captures(res.resource_path().path()) {
                     for (no, name) in names.iter().enumerate() {
                         if let Some(m) = captures.name(&name) {
-                            idx += 1;
                             pos = m.end();
-                            segments[no] =
-                                Some(PathItem::Segment(m.start() as u16, m.end() as u16));
+                            segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
                         } else {
                             log::error!(
                                 "Dynamic path match but not all segments found: {}",
@@ -421,12 +405,8 @@ impl ResourceDef {
                 }
 
                 let path = res.resource_path();
-                for (idx, segment) in segments
-                    .iter_mut()
-                    .enumerate()
-                    .take_while(|(i, _)| *i != idx)
-                {
-                    path.add(names[idx], segment.take().unwrap());
+                for i in 0..names.len() {
+                    path.add(names[i], mem::take(&mut segments[i]));
                 }
                 path.skip((pos + len) as u16);
                 true
@@ -435,18 +415,15 @@ impl ResourceDef {
                 let path = res.resource_path().path();
                 if let Some(idx) = re.matches(path).into_iter().next() {
                     let (ref pattern, ref names, len) = params[idx];
-                    let mut idx = 0;
                     let mut pos = 0;
-                    let mut segments: [Option<PathItem>; MAX_DYNAMIC_SEGMENTS] =
-                        Default::default();
+                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                     if let Some(captures) = pattern.captures(path) {
                         for (no, name) in names.iter().enumerate() {
                             if let Some(m) = captures.name(&name) {
-                                idx += 1;
                                 pos = m.end();
                                 segments[no] =
-                                    Some(PathItem::Segment(m.start() as u16, m.end() as u16));
+                                    PathItem::Segment(m.start() as u16, m.end() as u16);
                             } else {
                                 log::error!(
                                     "Dynamic path match but not all segments found: {}",
@@ -464,12 +441,8 @@ impl ResourceDef {
                     }
 
                     let path = res.resource_path();
-                    for (idx, segment) in segments
-                        .iter_mut()
-                        .enumerate()
-                        .take_while(|(i, _)| *i != idx)
-                    {
-                        path.add(names[idx], segment.take().unwrap());
+                    for i in 0..names.len() {
+                        path.add(names[i], mem::take(&mut segments[i]));
                     }
                     path.skip((pos + len) as u16);
                     true
