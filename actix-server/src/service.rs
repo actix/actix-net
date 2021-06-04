@@ -3,15 +3,12 @@ use std::net::SocketAddr;
 use std::task::{Context, Poll};
 
 use actix_service::{Service, ServiceFactory as BaseServiceFactory};
-use actix_utils::{
-    counter::CounterGuard,
-    future::{ready, Ready},
-};
+use actix_utils::future::{ready, Ready};
 use futures_core::future::LocalBoxFuture;
 use log::error;
 
 use crate::socket::{FromStream, MioStream};
-use crate::Token;
+use crate::worker::WorkerCounterGuard;
 
 pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
     type Factory: BaseServiceFactory<Stream, Config = ()>;
@@ -20,16 +17,16 @@ pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
 }
 
 pub(crate) trait InternalServiceFactory: Send {
-    fn name(&self, token: Token) -> &str;
+    fn name(&self, token: usize) -> &str;
 
     fn clone_factory(&self) -> Box<dyn InternalServiceFactory>;
 
-    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>>;
+    fn create(&self) -> LocalBoxFuture<'static, Result<(usize, BoxedServerService), ()>>;
 }
 
 pub(crate) type BoxedServerService = Box<
     dyn Service<
-        (CounterGuard, MioStream),
+        (WorkerCounterGuard, MioStream),
         Response = (),
         Error = (),
         Future = Ready<Result<(), ()>>,
@@ -50,7 +47,7 @@ impl<S, I> StreamService<S, I> {
     }
 }
 
-impl<S, I> Service<(CounterGuard, MioStream)> for StreamService<S, I>
+impl<S, I> Service<(WorkerCounterGuard, MioStream)> for StreamService<S, I>
 where
     S: Service<I>,
     S::Future: 'static,
@@ -65,7 +62,7 @@ where
         self.service.poll_ready(ctx).map_err(|_| ())
     }
 
-    fn call(&self, (guard, req): (CounterGuard, MioStream)) -> Self::Future {
+    fn call(&self, (guard, req): (WorkerCounterGuard, MioStream)) -> Self::Future {
         ready(match FromStream::from_mio(req) {
             Ok(stream) => {
                 let f = self.service.call(stream);
@@ -86,7 +83,7 @@ where
 pub(crate) struct StreamNewService<F: ServiceFactory<Io>, Io: FromStream> {
     name: String,
     inner: F,
-    token: Token,
+    token: usize,
     addr: SocketAddr,
     _t: PhantomData<Io>,
 }
@@ -98,7 +95,7 @@ where
 {
     pub(crate) fn create(
         name: String,
-        token: Token,
+        token: usize,
         inner: F,
         addr: SocketAddr,
     ) -> Box<dyn InternalServiceFactory> {
@@ -117,7 +114,7 @@ where
     F: ServiceFactory<Io>,
     Io: FromStream + Send + 'static,
 {
-    fn name(&self, _: Token) -> &str {
+    fn name(&self, _: usize) -> &str {
         &self.name
     }
 
@@ -131,14 +128,14 @@ where
         })
     }
 
-    fn create(&self) -> LocalBoxFuture<'static, Result<Vec<(Token, BoxedServerService)>, ()>> {
+    fn create(&self) -> LocalBoxFuture<'static, Result<(usize, BoxedServerService), ()>> {
         let token = self.token;
         let fut = self.inner.create().new_service(());
         Box::pin(async move {
             match fut.await {
                 Ok(inner) => {
                     let service = Box::new(StreamService::new(inner)) as _;
-                    Ok(vec![(token, service)])
+                    Ok((token, service))
                 }
                 Err(_) => Err(()),
             }

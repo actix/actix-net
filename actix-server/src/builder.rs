@@ -8,31 +8,29 @@ use std::{
 
 use actix_rt::{self as rt, net::TcpStream, time::sleep, System};
 use log::{error, info};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
-use tokio::sync::oneshot;
+use tokio::sync::{
+    mpsc::{unbounded_channel, UnboundedReceiver},
+    oneshot,
+};
 
 use crate::accept::AcceptLoop;
-use crate::config::{ConfiguredService, ServiceConfig};
+use crate::join_all;
 use crate::server::{Server, ServerCommand};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
 use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{
-    ServerWorker, ServerWorkerConfig, WorkerAvailability, WorkerHandleAccept,
-    WorkerHandleServer,
-};
-use crate::{join_all, Token};
+use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleAccept, WorkerHandleServer};
 
 /// Server builder
 pub struct ServerBuilder {
     threads: usize,
-    token: Token,
+    token: usize,
     backlog: u32,
     handles: Vec<(usize, WorkerHandleServer)>,
     services: Vec<Box<dyn InternalServiceFactory>>,
-    sockets: Vec<(Token, String, MioListener)>,
+    sockets: Vec<(usize, String, MioListener)>,
     accept: AcceptLoop,
     exit: bool,
     no_signals: bool,
@@ -56,7 +54,7 @@ impl ServerBuilder {
 
         ServerBuilder {
             threads: num_cpus::get(),
-            token: Token::default(),
+            token: 0,
             handles: Vec::new(),
             services: Vec::new(),
             sockets: Vec::new(),
@@ -149,32 +147,6 @@ impl ServerBuilder {
         self
     }
 
-    /// Execute external configuration as part of the server building process.
-    ///
-    /// This function is useful for moving parts of configuration to a different module or
-    /// even library.
-    pub fn configure<F>(mut self, f: F) -> io::Result<ServerBuilder>
-    where
-        F: Fn(&mut ServiceConfig) -> io::Result<()>,
-    {
-        let mut cfg = ServiceConfig::new(self.threads, self.backlog);
-
-        f(&mut cfg)?;
-
-        if let Some(apply) = cfg.apply {
-            let mut srv = ConfiguredService::new(apply);
-            for (name, lst) in cfg.services {
-                let token = self.token.next();
-                srv.stream(token, name.clone(), lst.local_addr()?);
-                self.sockets.push((token, name, MioListener::Tcp(lst)));
-            }
-            self.services.push(Box::new(srv));
-        }
-        self.threads = cfg.threads;
-
-        Ok(self)
-    }
-
     /// Add new service to the server.
     pub fn bind<F, U, N: AsRef<str>>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
@@ -184,7 +156,7 @@ impl ServerBuilder {
         let sockets = bind_addr(addr, self.backlog)?;
 
         for lst in sockets {
-            let token = self.token.next();
+            let token = self.next_token();
             self.services.push(StreamNewService::create(
                 name.as_ref().to_string(),
                 token,
@@ -233,7 +205,7 @@ impl ServerBuilder {
     {
         use std::net::{IpAddr, Ipv4Addr};
         lst.set_nonblocking(true)?;
-        let token = self.token.next();
+        let token = self.next_token();
         let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         self.services.push(StreamNewService::create(
             name.as_ref().to_string(),
@@ -259,7 +231,7 @@ impl ServerBuilder {
         lst.set_nonblocking(true)?;
         let addr = lst.local_addr()?;
 
-        let token = self.token.next();
+        let token = self.next_token();
         self.services.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
@@ -318,12 +290,11 @@ impl ServerBuilder {
     fn start_worker(
         &self,
         idx: usize,
-        waker: WakerQueue,
+        waker_queue: WakerQueue,
     ) -> (WorkerHandleAccept, WorkerHandleServer) {
-        let avail = WorkerAvailability::new(idx, waker);
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
 
-        ServerWorker::start(idx, services, avail, self.worker_config)
+        ServerWorker::start(idx, services, waker_queue, self.worker_config)
     }
 
     fn handle_cmd(&mut self, item: ServerCommand) {
@@ -436,6 +407,12 @@ impl ServerBuilder {
                 }
             }
         }
+    }
+
+    fn next_token(&mut self) -> usize {
+        let token = self.token;
+        self.token += 1;
+        token
     }
 }
 
