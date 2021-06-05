@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* When matching URL parameters, `%25` is kept in the percent-encoded form - no longer decoded to `%`. [#357]
+
+[#357]: https://github.com/actix/actix-net/pull/357
 
 
 ## 0.2.7 - 2021-02-06
