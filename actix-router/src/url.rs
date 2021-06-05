@@ -170,11 +170,7 @@ impl Quoter {
             idx += 1;
         }
 
-        cloned.map(|data| {
-            // SAFETY: we get data from http::Uri, which does UTF-8 checks already
-            // this code only decodes valid pct encoded values
-            unsafe { String::from_utf8_unchecked(data) }
-        })
+        cloned.map(|data| String::from_utf8_lossy(&data).into_owned())
     }
 }
 
@@ -257,6 +253,16 @@ mod tests {
         let encoded = percent_encode(test.as_bytes());
         let path = match_url("/a/{id}/b", format!("/a/{}/b", &encoded));
         assert_eq!(path.get("id").unwrap(), &test);
+    }
+
+    #[test]
+    fn test_invalid_utf8() {
+        let invalid_utf8 = percent_encode((0x80..=0xff).collect::<Vec<_>>().as_slice());
+        let uri = Uri::try_from(format!("/{}", invalid_utf8)).unwrap();
+        let path = Path::new(Url::new(uri));
+
+        // We should always get a valid utf8 string
+        assert!(String::from_utf8(path.path().as_bytes().to_owned()).is_ok());
     }
 
     #[test]
