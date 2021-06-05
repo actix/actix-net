@@ -10,6 +10,9 @@ use crate::{IntoPattern, Resource, ResourcePath};
 
 const MAX_DYNAMIC_SEGMENTS: usize = 16;
 
+/// Regex flags to allow '.' in regex to match '\n'
+///
+/// See the docs under: https://docs.rs/regex/1.5.4/regex/#grouping-and-flags
 const REGEX_FLAGS: &str = "(?s-m)";
 
 /// ResourceDef describes an entry in resources table
