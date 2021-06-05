@@ -118,8 +118,8 @@ impl<T: ResourcePath> Path<T> {
         name: impl Into<Cow<'static, str>>,
         value: impl Into<Cow<'static, str>>,
     ) {
-        let value: Cow<'static, str> = value.into();
-        self.segments.push((name.into(), PathItem::Static(value)));
+        self.segments
+            .push((name.into(), PathItem::Static(value.into())));
     }
 
     /// Check if there are any matched patterns
