@@ -1,19 +1,20 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* `Path::add` and `add_static` takes `impl Into<Cow<'static, str>>` [#345]
 * When matching URL parameters, `%25` is kept in the percent-encoded form - no longer decoded to `%`. [#357]
 * Fixed a bug where the `Path` extractor returns unsafe malformed string due to malformed URL. [#359]
 
+[#345]: https://github.com/actix/actix-net/pull/345
 [#357]: https://github.com/actix/actix-net/pull/357
 [#359]: https://github.com/actix/actix-net/pull/359
 
 
 ## 0.2.7 - 2021-02-06
 * Add `Router::recognize_checked` [#247]
-* `Path::add` and `add_static` takes `impl Into<Cow<'static, str>>` [#345]
 
 [#247]: https://github.com/actix/actix-net/pull/247
-[#345]: https://github.com/actix/actix-net/pull/345
+
 
 ## 0.2.6 - 2021-01-09
 * Use `bytestring` version range compatible with Bytes v1.0. [#246]
