@@ -4,7 +4,7 @@
 
 
 ## 0.3.0 - 2021-06-06
-* When matching URL parameters, `%25` is kept in the percent-encoded form; no longer decoded to `%`. [#357]
+* When matching path parameters, `%25` is now kept in the percent-encoded form; no longer decoded to `%`. [#357]
 * Path tail patterns now match new lines (`\n`) in request URL. [#360]
 * Fixed a safety bug where `Path` could return a malformed string after percent decoding. [#359]
 * Methods `Path::{add, add_static}` now take `impl Into<Cow<'static, str>>`. [#345]
