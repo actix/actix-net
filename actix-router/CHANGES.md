@@ -4,10 +4,12 @@
 * `Path::add` and `add_static` takes `impl Into<Cow<'static, str>>` [#345]
 * When matching URL parameters, `%25` is kept in the percent-encoded form - no longer decoded to `%`. [#357]
 * Fixed a bug where the `Path` extractor returns unsafe malformed string due to malformed URL. [#359]
+* Path tail patterns now match `'\n'` in request URL. [#360]
 
 [#345]: https://github.com/actix/actix-net/pull/345
 [#357]: https://github.com/actix/actix-net/pull/357
 [#359]: https://github.com/actix/actix-net/pull/359
+[#360]: https://github.com/actix/actix-net/pull/360
 
 
 ## 0.2.7 - 2021-02-06

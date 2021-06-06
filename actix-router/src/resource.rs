@@ -10,6 +10,11 @@ use crate::{IntoPattern, Resource, ResourcePath};
 
 const MAX_DYNAMIC_SEGMENTS: usize = 16;
 
+/// Regex flags to allow '.' in regex to match '\n'
+///
+/// See the docs under: https://docs.rs/regex/1.5.4/regex/#grouping-and-flags
+const REGEX_FLAGS: &str = "(?s-m)";
+
 /// ResourceDef describes an entry in resources table
 ///
 /// Resource definition can contain only 16 dynamic segments
@@ -571,7 +576,7 @@ impl ResourceDef {
     ) -> (String, Vec<PatternElement>, bool, usize) {
         if pattern.find('{').is_none() {
             return if let Some(path) = pattern.strip_suffix('*') {
-                let re = String::from("^") + path + "(.*)";
+                let re = format!("{}^{}(.*)", REGEX_FLAGS, path);
                 (re, vec![PatternElement::Str(String::from(path))], true, 0)
             } else {
                 (
@@ -584,7 +589,7 @@ impl ResourceDef {
         }
 
         let mut elements = Vec::new();
-        let mut re = String::from("^");
+        let mut re = format!("{}^", REGEX_FLAGS);
         let mut dyn_elements = 0;
 
         while let Some(idx) = pattern.find('{') {
@@ -815,6 +820,32 @@ mod tests {
         assert!(re.is_match("/user/2345"));
         assert!(re.is_match("/user/2345/"));
         assert!(re.is_match("/user/2345/sdg"));
+    }
+
+    #[test]
+    fn test_newline() {
+        let re = ResourceDef::new("/user/a\nb");
+        assert!(re.is_match("/user/a\nb"));
+        assert!(!re.is_match("/user/a\nb/profile"));
+
+        let re = ResourceDef::new("/a{x}b/test/a{y}b");
+        let mut path = Path::new("/a\nb/test/a\nb");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("x").unwrap(), "\n");
+        assert_eq!(path.get("y").unwrap(), "\n");
+
+        let re = ResourceDef::new("/user/*");
+        assert!(re.is_match("/user/a\nb/"));
+
+        let re = ResourceDef::new("/user/{id}*");
+        let mut path = Path::new("/user/a\nb/a\nb");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("id").unwrap(), "a\nb/a\nb");
+
+        let re = ResourceDef::new("/user/{id:.*}");
+        let mut path = Path::new("/user/a\nb/a\nb");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("id").unwrap(), "a\nb/a\nb");
     }
 
     #[cfg(feature = "http")]
