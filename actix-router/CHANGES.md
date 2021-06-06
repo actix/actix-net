@@ -3,7 +3,7 @@
 ## Unreleased - 2021-xx-xx
 
 
-## 0.3.0 - 2021-06-06
+## 0.4.0 - 2021-06-06
 * When matching path parameters, `%25` is now kept in the percent-encoded form; no longer decoded to `%`. [#357]
 * Path tail patterns now match new lines (`\n`) in request URL. [#360]
 * Fixed a safety bug where `Path` could return a malformed string after percent decoding. [#359]
@@ -13,6 +13,9 @@
 [#357]: https://github.com/actix/actix-net/pull/357
 [#359]: https://github.com/actix/actix-net/pull/359
 [#360]: https://github.com/actix/actix-net/pull/360
+
+## 0.3.0 - 2019-12-31
+* Version was yanked previously. See https://crates.io/crates/actix-router/0.3.0
 
 
 ## 0.2.7 - 2021-02-06
