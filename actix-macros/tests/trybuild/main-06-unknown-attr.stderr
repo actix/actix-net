@@ -1,4 +1,4 @@
-error: Unkown attribute specified
+error: Unknown attribute specified
  --> $DIR/main-06-unknown-attr.rs:1:18
   |
 1 | #[actix_rt::main(foo = "bar")]

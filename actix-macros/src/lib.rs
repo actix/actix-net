@@ -67,7 +67,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 },
                 _ => {
-                    return syn::Error::new_spanned(arg, "Unkown attribute specified")
+                    return syn::Error::new_spanned(arg, "Unknown attribute specified")
                         .to_compile_error()
                         .into();
                 }
