@@ -4,6 +4,9 @@ fn compile_macros() {
     t.pass("tests/trybuild/main-01-basic.rs");
     t.compile_fail("tests/trybuild/main-02-only-async.rs");
     t.pass("tests/trybuild/main-03-fn-params.rs");
+    t.pass("tests/trybuild/main-04-system-path.rs");
+    t.compile_fail("tests/trybuild/main-05-system-expect-path.rs");
+    t.compile_fail("tests/trybuild/main-06-unknown-attr.rs");
 
     t.pass("tests/trybuild/test-01-basic.rs");
     t.pass("tests/trybuild/test-02-keep-attrs.rs");

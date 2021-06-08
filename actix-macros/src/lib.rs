@@ -27,8 +27,10 @@ use quote::quote;
 #[allow(clippy::needless_doctest_main)]
 #[proc_macro_attribute]
 #[cfg(not(test))] // Work around for rust-lang/rust#62127
-pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
+pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = syn::parse_macro_input!(item as syn::ItemFn);
+    let args = syn::parse_macro_input!(args as syn::AttributeArgs);
+
     let attrs = &input.attrs;
     let vis = &input.vis;
     let sig = &mut input.sig;
@@ -43,13 +45,47 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
         .into();
     }
 
+    let mut system = syn::parse_str::<syn::Path>("::actix_rt::System").unwrap();
+
+    for arg in &args {
+        match arg {
+            syn::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
+                lit: syn::Lit::Str(lit),
+                path,
+                ..
+            })) => match path
+                .get_ident()
+                .map(|i| i.to_string().to_lowercase())
+                .as_deref()
+            {
+                Some("system") => match lit.parse() {
+                    Ok(path) => system = path,
+                    Err(_) => {
+                        return syn::Error::new_spanned(lit, "Expected path")
+                            .to_compile_error()
+                            .into();
+                    }
+                },
+                _ => {
+                    return syn::Error::new_spanned(arg, "Unknown attribute specified")
+                        .to_compile_error()
+                        .into();
+                }
+            },
+            _ => {
+                return syn::Error::new_spanned(arg, "Unknown attribute specified")
+                    .to_compile_error()
+                    .into();
+            }
+        }
+    }
+
     sig.asyncness = None;
 
     (quote! {
         #(#attrs)*
         #vis #sig {
-            actix_rt::System::new()
-                .block_on(async move { #body })
+            <#system>::new().block_on(async move { #body })
         }
     })
     .into()
