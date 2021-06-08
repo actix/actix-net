@@ -4,9 +4,11 @@
 
 
 ## 0.2.0 - 2021-02-02
+* Add optional argument `system` to `main` macro which can be used to specify the path to `actix_rt::System` (useful for re-exports). [#363]
 * Update to latest `actix_rt::System::new` signature. [#261]
 
 [#261]: https://github.com/actix/actix-net/pull/261
+[#363]: https://github.com/actix/actix-net/pull/363
 
 
 ## 0.2.0-beta.1 - 2021-01-09
