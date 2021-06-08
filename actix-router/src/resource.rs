@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::mem;
 
 use regex::{escape, Regex, RegexSet};
 
@@ -8,6 +9,11 @@ use crate::path::{Path, PathItem};
 use crate::{IntoPattern, Resource, ResourcePath};
 
 const MAX_DYNAMIC_SEGMENTS: usize = 16;
+
+/// Regex flags to allow '.' in regex to match '\n'
+///
+/// See the docs under: https://docs.rs/regex/1.5.4/regex/#grouping-and-flags
+const REGEX_FLAGS: &str = "(?s-m)";
 
 /// ResourceDef describes an entry in resources table
 ///
@@ -272,15 +278,12 @@ impl ResourceDef {
                 true
             }
             PatternType::Dynamic(ref re, ref names, len) => {
-                let mut idx = 0;
                 let mut pos = 0;
-                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] =
-                    [PathItem::Static(""); MAX_DYNAMIC_SEGMENTS];
+                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                 if let Some(captures) = re.captures(path.path()) {
                     for (no, name) in names.iter().enumerate() {
                         if let Some(m) = captures.name(&name) {
-                            idx += 1;
                             pos = m.end();
                             segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
                         } else {
@@ -294,8 +297,8 @@ impl ResourceDef {
                 } else {
                     return false;
                 }
-                for idx in 0..idx {
-                    path.add(names[idx], segments[idx]);
+                for i in 0..names.len() {
+                    path.add(names[i], mem::take(&mut segments[i]));
                 }
                 path.skip((pos + len) as u16);
                 true
@@ -303,15 +306,12 @@ impl ResourceDef {
             PatternType::DynamicSet(ref re, ref params) => {
                 if let Some(idx) = re.matches(path.path()).into_iter().next() {
                     let (ref pattern, ref names, len) = params[idx];
-                    let mut idx = 0;
                     let mut pos = 0;
-                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] =
-                        [PathItem::Static(""); MAX_DYNAMIC_SEGMENTS];
+                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                     if let Some(captures) = pattern.captures(path.path()) {
                         for (no, name) in names.iter().enumerate() {
                             if let Some(m) = captures.name(&name) {
-                                idx += 1;
                                 pos = m.end();
                                 segments[no] =
                                     PathItem::Segment(m.start() as u16, m.end() as u16);
@@ -326,8 +326,8 @@ impl ResourceDef {
                     } else {
                         return false;
                     }
-                    for idx in 0..idx {
-                        path.add(names[idx], segments[idx]);
+                    for i in 0..names.len() {
+                        path.add(names[i], mem::take(&mut segments[i]));
                     }
                     path.skip((pos + len) as u16);
                     true
@@ -385,15 +385,12 @@ impl ResourceDef {
                 true
             }
             PatternType::Dynamic(ref re, ref names, len) => {
-                let mut idx = 0;
                 let mut pos = 0;
-                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] =
-                    [PathItem::Static(""); MAX_DYNAMIC_SEGMENTS];
+                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                 if let Some(captures) = re.captures(res.resource_path().path()) {
                     for (no, name) in names.iter().enumerate() {
                         if let Some(m) = captures.name(&name) {
-                            idx += 1;
                             pos = m.end();
                             segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
                         } else {
@@ -413,8 +410,8 @@ impl ResourceDef {
                 }
 
                 let path = res.resource_path();
-                for idx in 0..idx {
-                    path.add(names[idx], segments[idx]);
+                for i in 0..names.len() {
+                    path.add(names[i], mem::take(&mut segments[i]));
                 }
                 path.skip((pos + len) as u16);
                 true
@@ -423,15 +420,12 @@ impl ResourceDef {
                 let path = res.resource_path().path();
                 if let Some(idx) = re.matches(path).into_iter().next() {
                     let (ref pattern, ref names, len) = params[idx];
-                    let mut idx = 0;
                     let mut pos = 0;
-                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] =
-                        [PathItem::Static(""); MAX_DYNAMIC_SEGMENTS];
+                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                     if let Some(captures) = pattern.captures(path) {
                         for (no, name) in names.iter().enumerate() {
                             if let Some(m) = captures.name(&name) {
-                                idx += 1;
                                 pos = m.end();
                                 segments[no] =
                                     PathItem::Segment(m.start() as u16, m.end() as u16);
@@ -452,8 +446,8 @@ impl ResourceDef {
                     }
 
                     let path = res.resource_path();
-                    for idx in 0..idx {
-                        path.add(names[idx], segments[idx]);
+                    for i in 0..names.len() {
+                        path.add(names[i], mem::take(&mut segments[i]));
                     }
                     path.skip((pos + len) as u16);
                     true
@@ -582,7 +576,7 @@ impl ResourceDef {
     ) -> (String, Vec<PatternElement>, bool, usize) {
         if pattern.find('{').is_none() {
             return if let Some(path) = pattern.strip_suffix('*') {
-                let re = String::from("^") + path + "(.*)";
+                let re = format!("{}^{}(.*)", REGEX_FLAGS, path);
                 (re, vec![PatternElement::Str(String::from(path))], true, 0)
             } else {
                 (
@@ -595,7 +589,7 @@ impl ResourceDef {
         }
 
         let mut elements = Vec::new();
-        let mut re = String::from("^");
+        let mut re = format!("{}^", REGEX_FLAGS);
         let mut dyn_elements = 0;
 
         while let Some(idx) = pattern.find('{') {
@@ -826,6 +820,32 @@ mod tests {
         assert!(re.is_match("/user/2345"));
         assert!(re.is_match("/user/2345/"));
         assert!(re.is_match("/user/2345/sdg"));
+    }
+
+    #[test]
+    fn test_newline() {
+        let re = ResourceDef::new("/user/a\nb");
+        assert!(re.is_match("/user/a\nb"));
+        assert!(!re.is_match("/user/a\nb/profile"));
+
+        let re = ResourceDef::new("/a{x}b/test/a{y}b");
+        let mut path = Path::new("/a\nb/test/a\nb");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("x").unwrap(), "\n");
+        assert_eq!(path.get("y").unwrap(), "\n");
+
+        let re = ResourceDef::new("/user/*");
+        assert!(re.is_match("/user/a\nb/"));
+
+        let re = ResourceDef::new("/user/{id}*");
+        let mut path = Path::new("/user/a\nb/a\nb");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("id").unwrap(), "a\nb/a\nb");
+
+        let re = ResourceDef::new("/user/{id:.*}");
+        let mut path = Path::new("/user/a\nb/a\nb");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("id").unwrap(), "a\nb/a\nb");
     }
 
     #[cfg(feature = "http")]
