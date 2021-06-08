@@ -31,7 +31,7 @@ fn set_bit(array: &mut [u8], ch: u8) {
 }
 
 thread_local! {
-    static DEFAULT_QUOTER: Quoter = Quoter::new(b"@:", b"/+");
+    static DEFAULT_QUOTER: Quoter = Quoter::new(b"@:", b"%/+");
 }
 
 #[derive(Default, Clone, Debug)]
@@ -170,11 +170,7 @@ impl Quoter {
             idx += 1;
         }
 
-        cloned.map(|data| {
-            // SAFETY: we get data from http::Uri, which does UTF-8 checks already
-            // this code only decodes valid pct encoded values
-            unsafe { String::from_utf8_unchecked(data) }
-        })
+        cloned.map(|data| String::from_utf8_lossy(&data).into_owned())
     }
 }
 
@@ -204,24 +200,69 @@ mod tests {
     use super::*;
     use crate::{Path, ResourceDef};
 
+    const PROTECTED: &[u8] = b"%/+";
+
+    fn match_url(pattern: &'static str, url: impl AsRef<str>) -> Path<Url> {
+        let re = ResourceDef::new(pattern);
+        let uri = Uri::try_from(url.as_ref()).unwrap();
+        let mut path = Path::new(Url::new(uri));
+        assert!(re.match_path(&mut path));
+        path
+    }
+
+    fn percent_encode(data: &[u8]) -> String {
+        data.into_iter().map(|c| format!("%{:02X}", c)).collect()
+    }
+
     #[test]
     fn test_parse_url() {
-        let re = ResourceDef::new("/user/{id}/test");
+        let re = "/user/{id}/test";
 
-        let url = Uri::try_from("/user/2345/test").unwrap();
-        let mut path = Path::new(Url::new(url));
-        assert!(re.match_path(&mut path));
+        let path = match_url(re, "/user/2345/test");
         assert_eq!(path.get("id").unwrap(), "2345");
 
-        let url = Uri::try_from("/user/qwe%25/test").unwrap();
-        let mut path = Path::new(Url::new(url));
-        assert!(re.match_path(&mut path));
-        assert_eq!(path.get("id").unwrap(), "qwe%");
+        // "%25" should never be decoded into '%' to gurantee the output is a valid
+        // percent-encoded format
+        let path = match_url(re, "/user/qwe%25/test");
+        assert_eq!(path.get("id").unwrap(), "qwe%25");
 
-        let url = Uri::try_from("/user/qwe%25rty/test").unwrap();
-        let mut path = Path::new(Url::new(url));
-        assert!(re.match_path(&mut path));
-        assert_eq!(path.get("id").unwrap(), "qwe%rty");
+        let path = match_url(re, "/user/qwe%25rty/test");
+        assert_eq!(path.get("id").unwrap(), "qwe%25rty");
+    }
+
+    #[test]
+    fn test_protected_chars() {
+        let encoded = percent_encode(PROTECTED);
+        let path = match_url("/user/{id}/test", format!("/user/{}/test", encoded));
+        assert_eq!(path.get("id").unwrap(), &encoded);
+    }
+
+    #[test]
+    fn test_non_protecteed_ascii() {
+        let nonprotected_ascii = ('\u{0}'..='\u{7F}')
+            .filter(|&c| c.is_ascii() && !PROTECTED.contains(&(c as u8)))
+            .collect::<String>();
+        let encoded = percent_encode(nonprotected_ascii.as_bytes());
+        let path = match_url("/user/{id}/test", format!("/user/{}/test", encoded));
+        assert_eq!(path.get("id").unwrap(), &nonprotected_ascii);
+    }
+
+    #[test]
+    fn test_valid_utf8_multibyte() {
+        let test = ('\u{FF00}'..='\u{FFFF}').collect::<String>();
+        let encoded = percent_encode(test.as_bytes());
+        let path = match_url("/a/{id}/b", format!("/a/{}/b", &encoded));
+        assert_eq!(path.get("id").unwrap(), &test);
+    }
+
+    #[test]
+    fn test_invalid_utf8() {
+        let invalid_utf8 = percent_encode((0x80..=0xff).collect::<Vec<_>>().as_slice());
+        let uri = Uri::try_from(format!("/{}", invalid_utf8)).unwrap();
+        let path = Path::new(Url::new(uri));
+
+        // We should always get a valid utf8 string
+        assert!(String::from_utf8(path.path().as_bytes().to_owned()).is_ok());
     }
 
     #[test]
