@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 0.2.1 - 2021-02-02
 * Add optional argument `system` to `main` macro which can be used to specify the path to `actix_rt::System` (useful for re-exports). [#363]
 
 [#363]: https://github.com/actix/actix-net/pull/363
