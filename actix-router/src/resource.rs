@@ -24,12 +24,12 @@ pub struct ResourceDef {
     tp: PatternType,
     name: String,
     pattern: String,
-    elements: Vec<PatternElement>,
+    elements: Option<Vec<PatternElement>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 enum PatternElement {
-    Str(String),
+    Const(String),
     Var(String),
 }
 
@@ -76,7 +76,7 @@ impl ResourceDef {
             ResourceDef {
                 id: 0,
                 tp: PatternType::DynamicSet(RegexSet::new(re_set).unwrap(), data),
-                elements: Vec::new(),
+                elements: None,
                 name: String::new(),
                 pattern: "".to_owned(),
             }
@@ -139,7 +139,7 @@ impl ResourceDef {
 
         ResourceDef {
             tp,
-            elements,
+            elements: Some(elements),
             id: 0,
             name: String::new(),
             pattern: path,
@@ -458,34 +458,34 @@ impl ResourceDef {
         }
     }
 
+    /// Build resource path with a closure that maps variable elements' names to values.
+    fn build_resource_path<F, I>(&self, path: &mut String, mut vars: F) -> bool
+    where
+        F: FnMut(&str) -> Option<I>,
+        I: AsRef<str>,
+    {
+        for el in match self.elements {
+            Some(ref elements) => elements,
+            None => return false,
+        } {
+            match *el {
+                PatternElement::Const(ref val) => path.push_str(val),
+                PatternElement::Var(ref name) => match vars(name) {
+                    Some(val) => path.push_str(val.as_ref()),
+                    _ => return false,
+                },
+            }
+        }
+        true
+    }
+
     /// Build resource path from elements. Returns `true` on success.
     pub fn resource_path<U, I>(&self, path: &mut String, elements: &mut U) -> bool
     where
         U: Iterator<Item = I>,
         I: AsRef<str>,
     {
-        match self.tp {
-            PatternType::Prefix(ref p) => path.push_str(p),
-            PatternType::Static(ref p) => path.push_str(p),
-            PatternType::Dynamic(..) => {
-                for el in &self.elements {
-                    match *el {
-                        PatternElement::Str(ref s) => path.push_str(s),
-                        PatternElement::Var(_) => {
-                            if let Some(val) = elements.next() {
-                                path.push_str(val.as_ref())
-                            } else {
-                                return false;
-                            }
-                        }
-                    }
-                }
-            }
-            PatternType::DynamicSet(..) => {
-                return false;
-            }
-        }
-        true
+        self.build_resource_path(path, |_| elements.next())
     }
 
     /// Build resource path from elements. Returns `true` on success.
@@ -499,28 +499,7 @@ impl ResourceDef {
         V: AsRef<str>,
         S: std::hash::BuildHasher,
     {
-        match self.tp {
-            PatternType::Prefix(ref p) => path.push_str(p),
-            PatternType::Static(ref p) => path.push_str(p),
-            PatternType::Dynamic(..) => {
-                for el in &self.elements {
-                    match *el {
-                        PatternElement::Str(ref s) => path.push_str(s),
-                        PatternElement::Var(ref name) => {
-                            if let Some(val) = elements.get(name) {
-                                path.push_str(val.as_ref())
-                            } else {
-                                return false;
-                            }
-                        }
-                    }
-                }
-            }
-            PatternType::DynamicSet(..) => {
-                return false;
-            }
-        }
-        true
+        self.build_resource_path(path, |name| elements.get(name))
     }
 
     fn parse_param(pattern: &str) -> (PatternElement, String, &str, bool) {
@@ -577,11 +556,11 @@ impl ResourceDef {
         if pattern.find('{').is_none() {
             return if let Some(path) = pattern.strip_suffix('*') {
                 let re = format!("{}^{}(.*)", REGEX_FLAGS, path);
-                (re, vec![PatternElement::Str(String::from(path))], true, 0)
+                (re, vec![PatternElement::Const(String::from(path))], true, 0)
             } else {
                 (
                     String::from(pattern),
-                    vec![PatternElement::Str(String::from(pattern))],
+                    vec![PatternElement::Const(String::from(pattern))],
                     false,
                     pattern.chars().count(),
                 )
@@ -594,7 +573,7 @@ impl ResourceDef {
 
         while let Some(idx) = pattern.find('{') {
             let (prefix, rem) = pattern.split_at(idx);
-            elements.push(PatternElement::Str(String::from(prefix)));
+            elements.push(PatternElement::Const(String::from(prefix)));
             re.push_str(&escape(prefix));
             let (param_pattern, re_part, rem, tail) = Self::parse_param(rem);
             if tail {
@@ -607,7 +586,7 @@ impl ResourceDef {
             dyn_elements += 1;
         }
 
-        elements.push(PatternElement::Str(String::from(pattern)));
+        elements.push(PatternElement::Const(String::from(pattern)));
         re.push_str(&escape(pattern));
 
         if dyn_elements > MAX_DYNAMIC_SEGMENTS {
