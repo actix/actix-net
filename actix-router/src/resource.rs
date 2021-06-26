@@ -264,19 +264,19 @@ impl ResourceDef {
         R: Resource<T>,
         F: Fn(&R, &Option<U>) -> bool,
     {
-        match self.tp {
+        let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
+        let path = res.resource_path();
+
+        let (matched_len, matched_vars) = match self.tp {
             PatternType::Static(ref s) => {
-                if s == res.resource_path().path() && check(res, user_data) {
-                    let path = res.resource_path();
-                    path.skip(path.len() as u16);
-                    true
-                } else {
-                    false
+                if s != path.path() {
+                    return false;
                 }
+                (path.len(), None)
             }
             PatternType::Prefix(ref s) => {
                 let len = {
-                    let r_path = res.resource_path().path();
+                    let r_path = path.path();
                     if s == r_path {
                         s.len()
                     } else if r_path.starts_with(s)
@@ -291,18 +291,12 @@ impl ResourceDef {
                         return false;
                     }
                 };
-                if !check(res, user_data) {
-                    return false;
-                }
-                let path = res.resource_path();
-                path.skip(min(path.path().len(), len) as u16);
-                true
+                (min(path.len(), len), None)
             }
             PatternType::Dynamic(ref re, ref names, len) => {
                 let mut pos = 0;
-                let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
-                if let Some(captures) = re.captures(res.resource_path().path()) {
+                if let Some(captures) = re.captures(path.path()) {
                     for (no, name) in names.iter().enumerate() {
                         if let Some(m) = captures.name(&name) {
                             pos = m.end();
@@ -318,24 +312,13 @@ impl ResourceDef {
                 } else {
                     return false;
                 }
-
-                if !check(res, user_data) {
-                    return false;
-                }
-
-                let path = res.resource_path();
-                for i in 0..names.len() {
-                    path.add(names[i], mem::take(&mut segments[i]));
-                }
-                path.skip((pos + len) as u16);
-                true
+                (pos + len, Some(names))
             }
             PatternType::DynamicSet(ref re, ref params) => {
-                let path = res.resource_path().path();
+                let path = path.path();
                 if let Some(idx) = re.matches(path).into_iter().next() {
                     let (ref pattern, ref names, len) = params[idx];
                     let mut pos = 0;
-                    let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
 
                     if let Some(captures) = pattern.captures(path) {
                         for (no, name) in names.iter().enumerate() {
@@ -354,22 +337,27 @@ impl ResourceDef {
                     } else {
                         return false;
                     }
-
-                    if !check(res, user_data) {
-                        return false;
-                    }
-
-                    let path = res.resource_path();
-                    for i in 0..names.len() {
-                        path.add(names[i], mem::take(&mut segments[i]));
-                    }
-                    path.skip((pos + len) as u16);
-                    true
+                    (pos + len, Some(names))
                 } else {
-                    false
+                    return false;
                 }
             }
+        };
+
+        if !check(res, user_data) {
+            return false;
         }
+
+        // Modify `path` to skip matched part and store matched segments
+        let path = res.resource_path();
+        if let Some(vars) = matched_vars {
+            for i in 0..vars.len() {
+                path.add(vars[i], mem::take(&mut segments[i]));
+            }
+        }
+        path.skip(matched_len as u16);
+
+        true
     }
 
     /// Build resource path with a closure that maps variable elements' names to values.
