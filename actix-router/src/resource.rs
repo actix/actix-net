@@ -733,6 +733,7 @@ mod tests {
             "/user/{id}",
             "/v{version}/resource/{id}",
             "/{id:[[:digit:]]{6}}",
+            "/static",
         ]);
         assert!(re.is_match("/user/profile"));
         assert!(re.is_match("/user/2345"));
@@ -760,6 +761,10 @@ mod tests {
         assert!(!re.is_match("/012"));
         assert!(!re.is_match("/01234567"));
         assert!(!re.is_match("/XXXXXX"));
+
+        assert!(re.is_match("/static"));
+        assert!(!re.is_match("/a/static"));
+        assert!(!re.is_match("/static/a"));
 
         let mut path = Path::new("/012345");
         assert!(re.match_path(&mut path));
@@ -820,6 +825,12 @@ mod tests {
         assert!(re.is_match("/user/2345"));
         assert!(re.is_match("/user/2345/"));
         assert!(re.is_match("/user/2345/sdg"));
+
+        let re = ResourceDef::new("/user/{id}/*");
+        assert!(!re.is_match("/user/2345"));
+        let mut path = Path::new("/user/2345/sdg");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("id").unwrap(), "2345");
     }
 
     #[test]
