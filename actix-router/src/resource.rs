@@ -252,7 +252,7 @@ impl ResourceDef {
         match self.tp {
             PatternType::Static(ref s) => {
                 if s == path.path() {
-                    path.skip(path.len() as u16);
+                    path.skip(path.path().len() as u16);
                     true
                 } else {
                     false
@@ -354,7 +354,7 @@ impl ResourceDef {
             PatternType::Static(ref s) => {
                 if s == res.resource_path().path() && check(res, user_data) {
                     let path = res.resource_path();
-                    path.skip(path.len() as u16);
+                    path.skip(path.path().len() as u16);
                     true
                 } else {
                     false
