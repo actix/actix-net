@@ -56,7 +56,7 @@ impl ResourceDef {
             let mut re_set = Vec::new();
 
             for path in set {
-                let (pattern, _, _, len) = ResourceDef::parse(&path, false);
+                let (pattern, _, _, len) = ResourceDef::parse(&path, false, true);
 
                 let re = match Regex::new(&pattern) {
                     Ok(re) => re,
@@ -116,7 +116,7 @@ impl ResourceDef {
     /// Parse path pattern and create new `Pattern` instance with custom prefix
     fn with_prefix(path: &str, for_prefix: bool) -> Self {
         let path = path.to_owned();
-        let (pattern, elements, is_dynamic, len) = ResourceDef::parse(&path, for_prefix);
+        let (pattern, elements, is_dynamic, len) = ResourceDef::parse(&path, for_prefix, false);
 
         let tp = if is_dynamic {
             let re = match Regex::new(&pattern) {
@@ -573,19 +573,15 @@ impl ResourceDef {
     fn parse(
         mut pattern: &str,
         mut for_prefix: bool,
+        force_dynamic: bool,
     ) -> (String, Vec<PatternElement>, bool, usize) {
-        if pattern.find('{').is_none() {
-            return if let Some(path) = pattern.strip_suffix('*') {
-                let re = format!("{}^{}(.*)", REGEX_FLAGS, path);
-                (re, vec![PatternElement::Str(String::from(path))], true, 0)
-            } else {
-                (
-                    String::from(pattern),
-                    vec![PatternElement::Str(String::from(pattern))],
-                    false,
-                    pattern.chars().count(),
-                )
-            };
+        if !force_dynamic && pattern.find('{').is_none() && !pattern.ends_with('*') {
+            return (
+                String::from(pattern),
+                vec![PatternElement::Str(String::from(pattern))],
+                false,
+                pattern.chars().count(),
+            );
         }
 
         let mut elements = Vec::new();
@@ -605,6 +601,13 @@ impl ResourceDef {
             re.push_str(&re_part);
             pattern = rem;
             dyn_elements += 1;
+        }
+
+        if let Some(path) = pattern.strip_suffix('*') {
+            elements.push(PatternElement::Str(String::from(path)));
+            re.push_str(&escape(path));
+            re.push_str("(.*)");
+            pattern = "";
         }
 
         elements.push(PatternElement::Str(String::from(pattern)));
