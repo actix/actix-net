@@ -132,6 +132,19 @@ impl ResourceDef {
         &self.pattern
     }
 
+    pub fn insert_prefix(&mut self, prefix: &str) {
+        let is_prefix = match &self.tp {
+            PatternType::Static(_) => false,
+            PatternType::Prefix(_) => true,
+            PatternType::Dynamic(re, ..) => re.as_str().ends_with('$'),
+            PatternType::DynamicSet(..) => panic!(),
+        };
+        let new_pattern = format!("{}{}", insert_slash(prefix), self.pattern());
+
+        // TODO Docs; Tests; dynamicset suppot!!!!!
+        *self = ResourceDef::from_single_pattern(&new_pattern, is_prefix);
+    }
+
     /// Check if path matches this pattern.
     #[inline]
     pub fn is_match(&self, path: &str) -> bool {
