@@ -203,12 +203,9 @@ impl ResourceDef {
                 Some(min(p_len, len))
             }
             PatternType::DynamicSet(ref re, ref params) => {
-                if let Some(idx) = re.matches(path).into_iter().next() {
-                    let (ref pattern, _) = params[idx];
-                    pattern.find(path).map(|m| m.end())
-                } else {
-                    None
-                }
+                let idx = re.matches(path).into_iter().next()?;
+                let (ref pattern, _) = params[idx];
+                pattern.find(path).map(|m| m.end())
             }
         }
     }
@@ -260,48 +257,39 @@ impl ResourceDef {
                 (min(path.len(), len), None)
             }
             PatternType::Dynamic(ref re, ref names) => {
-                if let Some(captures) = re.captures(path.path()) {
-                    for (no, name) in names.iter().enumerate() {
-                        if let Some(m) = captures.name(&name) {
-                            segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
-                        } else {
-                            log::error!(
-                                "Dynamic path match but not all segments found: {}",
-                                name
-                            );
-                            return false;
-                        }
+                let captures = match re.captures(path.path()) {
+                    Some(captures) => captures,
+                    _ => return false,
+                };
+                for (no, name) in names.iter().enumerate() {
+                    if let Some(m) = captures.name(&name) {
+                        segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
+                    } else {
+                        log::error!("Dynamic path match but not all segments found: {}", name);
+                        return false;
                     }
-                    (captures[0].len(), Some(names))
-                } else {
-                    return false;
                 }
+                (captures[0].len(), Some(names))
             }
             PatternType::DynamicSet(ref re, ref params) => {
                 let path = path.path();
-                if let Some(idx) = re.matches(path).into_iter().next() {
-                    let (ref pattern, ref names) = params[idx];
-
-                    if let Some(captures) = pattern.captures(path) {
-                        for (no, name) in names.iter().enumerate() {
-                            if let Some(m) = captures.name(&name) {
-                                segments[no] =
-                                    PathItem::Segment(m.start() as u16, m.end() as u16);
-                            } else {
-                                log::error!(
-                                    "Dynamic path match but not all segments found: {}",
-                                    name
-                                );
-                                return false;
-                            }
-                        }
-                        (captures[0].len(), Some(names))
+                let (pattern, names) = match re.matches(path).into_iter().next() {
+                    Some(idx) => &params[idx],
+                    _ => return false,
+                };
+                let captures = match pattern.captures(path.path()) {
+                    Some(captures) => captures,
+                    _ => return false,
+                };
+                for (no, name) in names.iter().enumerate() {
+                    if let Some(m) = captures.name(&name) {
+                        segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
                     } else {
+                        log::error!("Dynamic path match but not all segments found: {}", name);
                         return false;
                     }
-                } else {
-                    return false;
                 }
+                (captures[0].len(), Some(names))
             }
         };
 
