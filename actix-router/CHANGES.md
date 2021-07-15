@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Fix segment interpolation leaving `Path` in unintended state after matching. [#368]
+
+[#368]: https://github.com/actix/actix-net/pull/368
 
 
 ## 0.4.0 - 2021-06-06

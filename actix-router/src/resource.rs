@@ -235,7 +235,7 @@ impl ResourceDef {
                 if s != path.path() {
                     return false;
                 }
-                (path.len(), None)
+                (path.path().len(), None)
             }
             PatternType::Prefix(ref s) => {
                 let len = {
@@ -254,7 +254,7 @@ impl ResourceDef {
                         return false;
                     }
                 };
-                (min(path.len(), len), None)
+                (min(path.path().len(), len), None)
             }
             PatternType::Dynamic(ref re, ref names) => {
                 let captures = match re.captures(path.path()) {
@@ -500,6 +500,10 @@ mod tests {
         assert!(!re.is_match("/name/"));
         assert!(!re.is_match("/name~"));
 
+        let mut path = Path::new("/name");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.unprocessed(), "");
+
         assert_eq!(re.is_prefix_match("/name"), Some(5));
         assert_eq!(re.is_prefix_match("/name1"), None);
         assert_eq!(re.is_prefix_match("/name/"), None);
@@ -513,6 +517,10 @@ mod tests {
         let re = ResourceDef::new("/user/profile");
         assert!(re.is_match("/user/profile"));
         assert!(!re.is_match("/user/profile/profile"));
+
+        let mut path = Path::new("/user/profile");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.unprocessed(), "");
     }
 
     #[test]
@@ -526,10 +534,12 @@ mod tests {
         let mut path = Path::new("/user/profile");
         assert!(re.match_path(&mut path));
         assert_eq!(path.get("id").unwrap(), "profile");
+        assert_eq!(path.unprocessed(), "");
 
         let mut path = Path::new("/user/1245125");
         assert!(re.match_path(&mut path));
         assert_eq!(path.get("id").unwrap(), "1245125");
+        assert_eq!(path.unprocessed(), "");
 
         let re = ResourceDef::new("/v{version}/resource/{id}");
         assert!(re.is_match("/v1/resource/320120"));
@@ -540,6 +550,7 @@ mod tests {
         assert!(re.match_path(&mut path));
         assert_eq!(path.get("version").unwrap(), "151");
         assert_eq!(path.get("id").unwrap(), "adage32");
+        assert_eq!(path.unprocessed(), "");
 
         let re = ResourceDef::new("/{id:[[:digit:]]{6}}");
         assert!(re.is_match("/012345"));
@@ -550,6 +561,7 @@ mod tests {
         let mut path = Path::new("/012345");
         assert!(re.match_path(&mut path));
         assert_eq!(path.get("id").unwrap(), "012345");
+        assert_eq!(path.unprocessed(), "");
     }
 
     #[allow(clippy::cognitive_complexity)]
@@ -568,10 +580,12 @@ mod tests {
         let mut path = Path::new("/user/profile");
         assert!(re.match_path(&mut path));
         assert_eq!(path.get("id").unwrap(), "profile");
+        assert_eq!(path.unprocessed(), "");
 
         let mut path = Path::new("/user/1245125");
         assert!(re.match_path(&mut path));
         assert_eq!(path.get("id").unwrap(), "1245125");
+        assert_eq!(path.unprocessed(), "");
 
         assert!(re.is_match("/v1/resource/320120"));
         assert!(!re.is_match("/v/resource/1"));
@@ -704,6 +718,14 @@ mod tests {
         assert!(re.is_match("/name1"));
         assert!(re.is_match("/name~"));
 
+        let mut path = Path::new("/name");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.unprocessed(), "");
+
+        let mut path = Path::new("/name/test");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.unprocessed(), "/test");
+
         assert_eq!(re.is_prefix_match("/name"), Some(5));
         assert_eq!(re.is_prefix_match("/name/"), Some(5));
         assert_eq!(re.is_prefix_match("/name/test/test"), Some(5));
@@ -719,6 +741,10 @@ mod tests {
         assert!(re.is_match("/name/"));
         assert!(re.is_match("/name/gs"));
         assert!(!re.is_match("/name"));
+
+        let mut path = Path::new("/name/gs");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.unprocessed(), "/gs");
     }
 
     #[test]
@@ -736,11 +762,13 @@ mod tests {
         assert!(re.match_path(&mut path));
         assert_eq!(&path["name"], "test2");
         assert_eq!(&path[0], "test2");
+        assert_eq!(path.unprocessed(), "");
 
         let mut path = Path::new("/test2/subpath1/subpath2/index.html");
         assert!(re.match_path(&mut path));
         assert_eq!(&path["name"], "test2");
         assert_eq!(&path[0], "test2");
+        assert_eq!(path.unprocessed(), "subpath1/subpath2/index.html");
     }
 
     #[test]
