@@ -1,7 +1,10 @@
-use std::cmp::min;
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
-use std::mem;
+use std::{
+    borrow::Cow,
+    cmp::min,
+    collections::HashMap,
+    hash::{Hash, Hasher},
+    mem,
+};
 
 use regex::{escape, Regex, RegexSet};
 
@@ -15,30 +18,49 @@ const MAX_DYNAMIC_SEGMENTS: usize = 16;
 /// See the docs under: https://docs.rs/regex/1.5.4/regex/#grouping-and-flags
 const REGEX_FLAGS: &str = "(?s-m)";
 
-/// ResourceDef describes an entry in resources table
+/// Describes an entry in a resource table.
 ///
-/// Resource definition can contain only 16 dynamic segments
+/// Resource definition can contain at most 16 dynamic segments.
 #[derive(Clone, Debug)]
 pub struct ResourceDef {
     id: u16,
-    tp: PatternType,
+
+    /// Stores
+    pat_type: PatternType,
+
+    /// Optional name of resource definition.
     name: String,
+
+    /// Pattern that generated the resource definition.
+    // TODO: Sort of, in dynamic set pattern type it is blank, consider change.
     pattern: String,
+
+    ///
     elements: Option<Vec<PatternElement>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 enum PatternElement {
+    /// Literal slice of pattern.
     Const(String),
+
+    /// Name of dynamic segment.
     Var(String),
 }
 
 #[derive(Clone, Debug)]
 #[allow(clippy::large_enum_variant)]
 enum PatternType {
+    /// Single constant/literal segment.
     Static(String),
+
+    /// Single constant/literal prefix segment.
     Prefix(String),
+
+    /// Single regular expression and list of dynamic segment names.
     Dynamic(Regex, Vec<&'static str>),
+
+    /// Regular expression set and list of component expressions plus dynamic segment names.
     DynamicSet(RegexSet, Vec<(Regex, Vec<&'static str>)>),
 }
 
@@ -65,7 +87,7 @@ impl ResourceDef {
 
             ResourceDef {
                 id: 0,
-                tp: PatternType::DynamicSet(RegexSet::new(re_set).unwrap(), data),
+                pat_type: PatternType::DynamicSet(RegexSet::new(re_set).unwrap(), data),
                 elements: None,
                 name: String::new(),
                 pattern: "".to_owned(),
@@ -82,9 +104,8 @@ impl ResourceDef {
         ResourceDef::from_single_pattern(path, true)
     }
 
-    /// Parse path pattern and create new `Pattern` instance.
-    /// Inserts `/` to begging of the pattern.
-    ///
+    /// Parse path pattern and create new `Pattern` instance, inserting a `/` to beginning of
+    /// the pattern if absent.
     ///
     /// Use `prefix` type instead of `static`.
     ///
@@ -93,12 +114,12 @@ impl ResourceDef {
         ResourceDef::from_single_pattern(&insert_slash(path), true)
     }
 
-    /// Resource id
+    /// Resource ID.
     pub fn id(&self) -> u16 {
         self.id
     }
 
-    /// Set resource id
+    /// Set resource ID.
     pub fn set_id(&mut self, id: u16) {
         self.id = id;
     }
@@ -106,10 +127,10 @@ impl ResourceDef {
     /// Parse path pattern and create a new instance
     fn from_single_pattern(pattern: &str, for_prefix: bool) -> Self {
         let pattern = pattern.to_owned();
-        let (tp, elements) = ResourceDef::parse(&pattern, for_prefix, false);
+        let (pat_type, elements) = ResourceDef::parse(&pattern, for_prefix, false);
 
         ResourceDef {
-            tp,
+            pat_type,
             pattern,
             elements: Some(elements),
             id: 0,
@@ -117,7 +138,7 @@ impl ResourceDef {
         }
     }
 
-    /// Resource pattern name
+    /// Resource pattern name.
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -135,7 +156,7 @@ impl ResourceDef {
     /// Check if path matches this pattern.
     #[inline]
     pub fn is_match(&self, path: &str) -> bool {
-        match self.tp {
+        match self.pat_type {
             PatternType::Static(ref s) => s == path,
             PatternType::Prefix(ref s) => path.starts_with(s),
             PatternType::Dynamic(ref re, _) => re.is_match(path),
@@ -145,34 +166,52 @@ impl ResourceDef {
 
     /// Is prefix path a match against this resource.
     pub fn is_prefix_match(&self, path: &str) -> Option<usize> {
-        let p_len = path.len();
+        let path_len = path.len();
         let path = if path.is_empty() { "/" } else { path };
 
-        match self.tp {
-            PatternType::Static(ref s) => {
-                if s == path {
-                    Some(p_len)
+        match self.pat_type {
+            PatternType::Static(ref segment) => {
+                if segment == path {
+                    Some(path_len)
                 } else {
                     None
                 }
             }
-            PatternType::Dynamic(ref re, _) => re.find(path).map(|m| m.end()),
-            PatternType::Prefix(ref s) => {
-                let len = if path == s {
-                    s.len()
-                } else if path.starts_with(s)
-                    && (s.ends_with('/') || path.split_at(s.len()).1.starts_with('/'))
-                {
-                    if s.ends_with('/') {
-                        s.len() - 1
-                    } else {
-                        s.len()
-                    }
+
+            PatternType::Prefix(ref prefix) => {
+                let prefix_len = if path == prefix {
+                    // path length === prefix segment length
+                    path_len
                 } else {
-                    return None;
+                    let is_slash_next =
+                        prefix.ends_with('/') || path.split_at(prefix.len()).1.starts_with('/');
+
+                    if path.starts_with(prefix) && is_slash_next {
+                        // enters this branch if segment delimiter ("/") is present after prefix
+                        //
+                        // i.e., path starts with prefix segment
+                        // and prefix segment ends with /
+                        // or first character in path after prefix segment length is /
+                        //
+                        // eg: Prefix("/test/") or Prefix("/test") would match:
+                        // - /test/foo
+                        // - /test/foo
+
+                        if prefix.ends_with('/') {
+                            prefix.len() - 1
+                        } else {
+                            prefix.len()
+                        }
+                    } else {
+                        return None;
+                    }
                 };
-                Some(min(p_len, len))
+
+                Some(min(path_len, prefix_len))
             }
+
+            PatternType::Dynamic(ref re, _) => re.find(path).map(|m| m.end()),
+
             PatternType::DynamicSet(ref re, ref params) => {
                 let idx = re.matches(path).into_iter().next()?;
                 let (ref pattern, _) = params[idx];
@@ -201,37 +240,48 @@ impl ResourceDef {
         let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
         let path = res.resource_path();
 
-        let (matched_len, matched_vars) = match self.tp {
-            PatternType::Static(ref s) => {
-                if s != path.path() {
+        let (matched_len, matched_vars) = match self.pat_type {
+            PatternType::Static(ref segment) => {
+                if segment != path.path() {
                     return false;
                 }
+
                 (path.path().len(), None)
             }
-            PatternType::Prefix(ref s) => {
+
+            PatternType::Prefix(ref prefix) => {
+                let path_str = path.path();
+                let path_len = path_str.len();
+
                 let len = {
-                    let r_path = path.path();
-                    if s == r_path {
-                        s.len()
-                    } else if r_path.starts_with(s)
-                        && (s.ends_with('/') || r_path.split_at(s.len()).1.starts_with('/'))
-                    {
-                        if s.ends_with('/') {
-                            s.len() - 1
-                        } else {
-                            s.len()
-                        }
+                    if prefix == path_str {
+                        // prefix length === path length
+                        path_len
                     } else {
-                        return false;
+                        let is_slash_next = prefix.ends_with('/')
+                            || path_str.split_at(prefix.len()).1.starts_with('/');
+
+                        if path_str.starts_with(prefix) && is_slash_next {
+                            if prefix.ends_with('/') {
+                                prefix.len() - 1
+                            } else {
+                                prefix.len()
+                            }
+                        } else {
+                            return false;
+                        }
                     }
                 };
+
                 (min(path.path().len(), len), None)
             }
+
             PatternType::Dynamic(ref re, ref names) => {
                 let captures = match re.captures(path.path()) {
                     Some(captures) => captures,
                     _ => return false,
                 };
+
                 for (no, name) in names.iter().enumerate() {
                     if let Some(m) = captures.name(&name) {
                         segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
@@ -240,18 +290,22 @@ impl ResourceDef {
                         return false;
                     }
                 }
+
                 (captures[0].len(), Some(names))
             }
+
             PatternType::DynamicSet(ref re, ref params) => {
                 let path = path.path();
                 let (pattern, names) = match re.matches(path).into_iter().next() {
                     Some(idx) => &params[idx],
                     _ => return false,
                 };
+
                 let captures = match pattern.captures(path.path()) {
                     Some(captures) => captures,
                     _ => return false,
                 };
+
                 for (no, name) in names.iter().enumerate() {
                     if let Some(m) = captures.name(&name) {
                         segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
@@ -260,6 +314,7 @@ impl ResourceDef {
                         return false;
                     }
                 }
+
                 (captures[0].len(), Some(names))
             }
         };
@@ -298,6 +353,7 @@ impl ResourceDef {
                 },
             }
         }
+
         true
     }
 
@@ -327,6 +383,7 @@ impl ResourceDef {
     fn parse_param(pattern: &str) -> (PatternElement, String, &str, bool) {
         const DEFAULT_PATTERN: &str = "[^/]+";
         const DEFAULT_PATTERN_TAIL: &str = ".*";
+
         let mut params_nesting = 0usize;
         let close_idx = pattern
             .find(|c| match c {
@@ -341,6 +398,7 @@ impl ResourceDef {
                 _ => false,
             })
             .expect("malformed dynamic segment");
+
         let (mut param, mut rem) = pattern.split_at(close_idx + 1);
         param = &param[1..param.len() - 1]; // Remove outer brackets
         let tail = rem == "*";
@@ -363,6 +421,7 @@ impl ResourceDef {
                 },
             ),
         };
+
         (
             PatternElement::Var(name.to_string()),
             format!(r"(?P<{}>{})", &name, &pattern),
@@ -392,15 +451,19 @@ impl ResourceDef {
 
         while let Some(idx) = pattern.find('{') {
             let (prefix, rem) = pattern.split_at(idx);
+
             elements.push(PatternElement::Const(String::from(prefix)));
             re.push_str(&escape(prefix));
+
             let (param_pattern, re_part, rem, tail) = Self::parse_param(rem);
+
             if tail {
                 for_prefix = true;
             }
 
             elements.push(param_pattern);
             re.push_str(&re_part);
+
             pattern = rem;
             dyn_elements += 1;
         }
@@ -466,12 +529,14 @@ impl From<String> for ResourceDef {
     }
 }
 
-pub(crate) fn insert_slash(path: &str) -> String {
-    let mut path = path.to_owned();
+pub(crate) fn insert_slash(path: &str) -> Cow<'_, str> {
     if !path.is_empty() && !path.starts_with('/') {
-        path.insert(0, '/');
-    };
-    path
+        let mut new_path = "/".to_owned();
+        new_path.push_str(path);
+        Cow::Owned(new_path)
+    } else {
+        Cow::Borrowed(path)
+    }
 }
 
 #[cfg(test)]
