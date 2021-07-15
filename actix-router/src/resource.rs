@@ -235,7 +235,7 @@ impl ResourceDef {
                 if s != path.path() {
                     return false;
                 }
-                (path.len(), None)
+                (path.path().len(), None)
             }
             PatternType::Prefix(ref s) => {
                 let len = {
@@ -254,7 +254,7 @@ impl ResourceDef {
                         return false;
                     }
                 };
-                (min(path.len(), len), None)
+                (min(path.path().len(), len), None)
             }
             PatternType::Dynamic(ref re, ref names) => {
                 let captures = match re.captures(path.path()) {
