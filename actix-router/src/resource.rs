@@ -110,10 +110,10 @@ impl ResourceDef {
 
         ResourceDef {
             tp,
+            pattern,
             elements: Some(elements),
             id: 0,
             name: String::new(),
-            pattern: pattern.to_string(),
         }
     }
 
@@ -385,7 +385,7 @@ impl ResourceDef {
             return (tp, vec![PatternElement::Const(String::from(pattern))]);
         }
 
-        let pattern_orig = pattern.to_owned();
+        let pattern_orig = pattern;
         let mut elements = Vec::new();
         let mut re = format!("{}^", REGEX_FLAGS);
         let mut dyn_elements = 0;
