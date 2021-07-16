@@ -448,7 +448,7 @@ impl ResourceDef {
         })
     }
 
-    fn parse_param(pattern: &str) -> (PatternElement, String, &str, bool) {
+    fn parse_param(pattern: &str) -> (PatternElement, String, &str) {
         const DEFAULT_PATTERN: &str = "[^/]+";
         const DEFAULT_PATTERN_TAIL: &str = ".*";
 
@@ -502,7 +502,7 @@ impl ResourceDef {
 
         let regex = format!(r"(?P<{}>{})", &name, &pattern);
 
-        (element, regex, unprocessed, tail)
+        (element, regex, unprocessed)
     }
 
     fn parse(
@@ -532,9 +532,9 @@ impl ResourceDef {
             elements.push(PatternElement::Const(prefix.to_owned()));
             re.push_str(&escape(prefix));
 
-            let (param_pattern, re_part, rem, tail) = Self::parse_param(rem);
+            let (param_pattern, re_part, rem) = Self::parse_param(rem);
 
-            if tail {
+            if matches!(param_pattern, PatternElement::Tail(_)) {
                 has_tail_segment = true;
             }
 
@@ -556,7 +556,7 @@ impl ResourceDef {
 
             dyn_elements += 1;
         } else if !has_tail_segment {
-            // prevent `Const("")` element from being added after dynamic segments
+            // prevent `Const("")` element from being added after tail segments
 
             elements.push(PatternElement::Const(pattern.to_owned()));
             re.push_str(&escape(pattern));
