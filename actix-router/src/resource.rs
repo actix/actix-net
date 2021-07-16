@@ -506,28 +506,31 @@ impl ResourceDef {
     }
 
     fn parse(
-        mut pattern: &str,
+        pattern: &str,
         for_prefix: bool,
         force_dynamic: bool,
     ) -> (PatternType, Vec<PatternElement>) {
-        if !force_dynamic && pattern.find('{').is_none() && !pattern.ends_with('*') {
+        let mut unprocessed = pattern;
+
+        if !force_dynamic && unprocessed.find('{').is_none() && !unprocessed.ends_with('*') {
+            // pattern is static
+
             let tp = if for_prefix {
-                PatternType::Prefix(pattern.to_owned())
+                PatternType::Prefix(unprocessed.to_owned())
             } else {
-                PatternType::Static(pattern.to_owned())
+                PatternType::Static(unprocessed.to_owned())
             };
 
-            return (tp, vec![PatternElement::Const(pattern.to_owned())]);
+            return (tp, vec![PatternElement::Const(unprocessed.to_owned())]);
         }
 
-        let pattern_orig = pattern;
         let mut elements = Vec::new();
         let mut re = format!("{}^", REGEX_FLAGS);
         let mut dyn_elements = 0;
         let mut has_tail_segment = false;
 
-        while let Some(idx) = pattern.find('{') {
-            let (prefix, rem) = pattern.split_at(idx);
+        while let Some(idx) = unprocessed.find('{') {
+            let (prefix, rem) = unprocessed.split_at(idx);
 
             elements.push(PatternElement::Const(prefix.to_owned()));
             re.push_str(&escape(prefix));
@@ -541,11 +544,11 @@ impl ResourceDef {
             elements.push(param_pattern);
             re.push_str(&re_part);
 
-            pattern = rem;
+            unprocessed = rem;
             dyn_elements += 1;
         }
 
-        if let Some(path) = pattern.strip_suffix('*') {
+        if let Some(path) = unprocessed.strip_suffix('*') {
             // unnamed tail segment
 
             elements.push(PatternElement::Const(path.to_owned()));
@@ -555,11 +558,11 @@ impl ResourceDef {
             re.push_str("(.*)");
 
             dyn_elements += 1;
-        } else if !has_tail_segment {
-            // prevent `Const("")` element from being added after tail segments
+        } else if !has_tail_segment && !unprocessed.is_empty() {
+            // prevent `Const("")` element from being added after tail segment
 
-            elements.push(PatternElement::Const(pattern.to_owned()));
-            re.push_str(&escape(pattern));
+            elements.push(PatternElement::Const(unprocessed.to_owned()));
+            re.push_str(&escape(unprocessed));
         }
 
         if dyn_elements > MAX_DYNAMIC_SEGMENTS {
@@ -575,7 +578,7 @@ impl ResourceDef {
 
         let re = match Regex::new(&re) {
             Ok(re) => re,
-            Err(err) => panic!("Wrong path pattern: \"{}\" {}", pattern_orig, err),
+            Err(err) => panic!("Wrong path pattern: \"{}\" {}", pattern, err),
         };
 
         // `Bok::leak(Box::new(name))` is an intentional memory leak. In typical applications the
@@ -872,6 +875,8 @@ mod tests {
     #[test]
     fn prefix_static() {
         let re = ResourceDef::prefix("/name");
+        println!("{:#?}", &re);
+
         assert!(re.is_match("/name"));
         assert!(re.is_match("/name/"));
         assert!(re.is_match("/name/test/test"));
@@ -909,7 +914,11 @@ mod tests {
 
     #[test]
     fn prefix_dynamic() {
+        let re = ResourceDef::prefix("/{name}");
+        println!("{:#?}", &re);
+
         let re = ResourceDef::prefix("/{name}/");
+        println!("{:#?}", &re);
 
         assert!(re.is_match("/name/"));
         assert!(re.is_match("/name/gs"));
@@ -977,12 +986,12 @@ mod tests {
         map.insert("item1", "item");
 
         let mut s = String::new();
-        assert!(!resource.resource_path_named(&mut s, &map));
+        assert!(!resource.resource_path_from_map(&mut s, &map));
 
         map.insert("item2", "item2");
 
         let mut s = String::new();
-        assert!(resource.resource_path_named(&mut s, &map));
+        assert!(resource.resource_path_from_map(&mut s, &map));
         assert_eq!(s, "/user/item/item2/");
     }
 
@@ -1000,7 +1009,7 @@ mod tests {
         let mut s = String::new();
         let mut map = HashMap::new();
         map.insert("item1", "item");
-        assert!(!resource.resource_path_named(&mut s, &map));
+        assert!(!resource.resource_path_from_map(&mut s, &map));
 
         let mut s = String::new();
         assert!(resource.resource_path_from_map_with_tail(&mut s, &map, "2345"));
@@ -1018,7 +1027,7 @@ mod tests {
         let mut s = String::new();
         let mut map = HashMap::new();
         map.insert("item1", "item");
-        assert!(resource.resource_path_named(&mut s, &map));
+        assert!(resource.resource_path_from_map(&mut s, &map));
         assert_eq!(s, "/user/item");
     }
 
