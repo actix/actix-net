@@ -48,29 +48,19 @@ impl ResourceDef {
     /// Panics if path pattern is malformed.
     pub fn new<T: IntoPattern>(path: T) -> Self {
         if path.is_single() {
-            let patterns = path.patterns();
-            ResourceDef::with_prefix(&patterns[0], false)
+            ResourceDef::from_single_pattern(&path.patterns()[0], false)
         } else {
-            let set = path.patterns();
             let mut data = Vec::new();
             let mut re_set = Vec::new();
 
-            for path in set {
-                let (pattern, _, _) = ResourceDef::parse(&path, false);
-
-                let re = match Regex::new(&pattern) {
-                    Ok(re) => re,
-                    Err(err) => panic!("Wrong path pattern: \"{}\" {}", path, err),
-                };
-                // actix creates one router per thread
-                let names: Vec<_> = re
-                    .capture_names()
-                    .filter_map(|name| {
-                        name.map(|name| Box::leak(Box::new(name.to_owned())).as_str())
-                    })
-                    .collect();
-                data.push((re, names));
-                re_set.push(pattern);
+            for pattern in path.patterns() {
+                match ResourceDef::parse(&pattern, false, true) {
+                    (PatternType::Dynamic(re, names), _) => {
+                        re_set.push(re.as_str().to_owned());
+                        data.push((re, names));
+                    }
+                    _ => unreachable!(),
+                }
             }
 
             ResourceDef {
@@ -89,7 +79,7 @@ impl ResourceDef {
     ///
     /// Panics if path regex pattern is malformed.
     pub fn prefix(path: &str) -> Self {
-        ResourceDef::with_prefix(path, true)
+        ResourceDef::from_single_pattern(path, true)
     }
 
     /// Parse path pattern and create new `Pattern` instance.
@@ -100,7 +90,7 @@ impl ResourceDef {
     ///
     /// Panics if path regex pattern is malformed.
     pub fn root_prefix(path: &str) -> Self {
-        ResourceDef::with_prefix(&insert_slash(path), true)
+        ResourceDef::from_single_pattern(&insert_slash(path), true)
     }
 
     /// Resource id
@@ -113,36 +103,17 @@ impl ResourceDef {
         self.id = id;
     }
 
-    /// Parse path pattern and create new `Pattern` instance with custom prefix
-    fn with_prefix(path: &str, for_prefix: bool) -> Self {
-        let path = path.to_owned();
-        let (pattern, elements, is_dynamic) = ResourceDef::parse(&path, for_prefix);
-
-        let tp = if is_dynamic {
-            let re = match Regex::new(&pattern) {
-                Ok(re) => re,
-                Err(err) => panic!("Wrong path pattern: \"{}\" {}", path, err),
-            };
-            // actix creates one router per thread
-            let names = re
-                .capture_names()
-                .filter_map(|name| {
-                    name.map(|name| Box::leak(Box::new(name.to_owned())).as_str())
-                })
-                .collect();
-            PatternType::Dynamic(re, names)
-        } else if for_prefix {
-            PatternType::Prefix(pattern)
-        } else {
-            PatternType::Static(pattern)
-        };
+    /// Parse path pattern and create a new instance
+    fn from_single_pattern(pattern: &str, for_prefix: bool) -> Self {
+        let pattern = pattern.to_owned();
+        let (tp, elements) = ResourceDef::parse(&pattern, for_prefix, false);
 
         ResourceDef {
             tp,
+            pattern,
             elements: Some(elements),
             id: 0,
             name: String::new(),
-            pattern: path,
         }
     }
 
@@ -400,20 +371,21 @@ impl ResourceDef {
         )
     }
 
-    fn parse(mut pattern: &str, mut for_prefix: bool) -> (String, Vec<PatternElement>, bool) {
-        if pattern.find('{').is_none() {
-            return if let Some(path) = pattern.strip_suffix('*') {
-                let re = format!("{}^{}(.*)", REGEX_FLAGS, path);
-                (re, vec![PatternElement::Const(String::from(path))], true)
+    fn parse(
+        mut pattern: &str,
+        mut for_prefix: bool,
+        force_dynamic: bool,
+    ) -> (PatternType, Vec<PatternElement>) {
+        if !force_dynamic && pattern.find('{').is_none() && !pattern.ends_with('*') {
+            let tp = if for_prefix {
+                PatternType::Prefix(String::from(pattern))
             } else {
-                (
-                    String::from(pattern),
-                    vec![PatternElement::Const(String::from(pattern))],
-                    false,
-                )
+                PatternType::Static(String::from(pattern))
             };
+            return (tp, vec![PatternElement::Const(String::from(pattern))]);
         }
 
+        let pattern_orig = pattern;
         let mut elements = Vec::new();
         let mut re = format!("{}^", REGEX_FLAGS);
         let mut dyn_elements = 0;
@@ -433,6 +405,13 @@ impl ResourceDef {
             dyn_elements += 1;
         }
 
+        if let Some(path) = pattern.strip_suffix('*') {
+            elements.push(PatternElement::Const(String::from(path)));
+            re.push_str(&escape(path));
+            re.push_str("(.*)");
+            pattern = "";
+        }
+
         elements.push(PatternElement::Const(String::from(pattern)));
         re.push_str(&escape(pattern));
 
@@ -446,7 +425,18 @@ impl ResourceDef {
         if !for_prefix {
             re.push('$');
         }
-        (re, elements, true)
+
+        let re = match Regex::new(&re) {
+            Ok(re) => re,
+            Err(err) => panic!("Wrong path pattern: \"{}\" {}", pattern_orig, err),
+        };
+        // actix creates one router per thread
+        let names = re
+            .capture_names()
+            .filter_map(|name| name.map(|name| Box::leak(Box::new(name.to_owned())).as_str()))
+            .collect();
+
+        (PatternType::Dynamic(re, names), elements)
     }
 }
 
@@ -571,6 +561,7 @@ mod tests {
             "/user/{id}",
             "/v{version}/resource/{id}",
             "/{id:[[:digit:]]{6}}",
+            "/static",
         ]);
         assert!(re.is_match("/user/profile"));
         assert!(re.is_match("/user/2345"));
@@ -600,6 +591,10 @@ mod tests {
         assert!(!re.is_match("/012"));
         assert!(!re.is_match("/01234567"));
         assert!(!re.is_match("/XXXXXX"));
+
+        assert!(re.is_match("/static"));
+        assert!(!re.is_match("/a/static"));
+        assert!(!re.is_match("/static/a"));
 
         let mut path = Path::new("/012345");
         assert!(re.match_path(&mut path));
@@ -660,6 +655,12 @@ mod tests {
         assert!(re.is_match("/user/2345"));
         assert!(re.is_match("/user/2345/"));
         assert!(re.is_match("/user/2345/sdg"));
+
+        let re = ResourceDef::new("/user/{id}/*");
+        assert!(!re.is_match("/user/2345"));
+        let mut path = Path::new("/user/2345/sdg");
+        assert!(re.match_path(&mut path));
+        assert_eq!(path.get("id").unwrap(), "2345");
     }
 
     #[test]
