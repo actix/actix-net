@@ -18,34 +18,14 @@ impl Default for PathItem {
     }
 }
 
-/// Resource path match information
+/// Resource path match information.
 ///
 /// If resource path contains variable patterns, `Path` stores them.
-#[derive(Debug)]
+#[derive(Debug, Clone, Default)]
 pub struct Path<T> {
     path: T,
     pub(crate) skip: u16,
     pub(crate) segments: Vec<(Cow<'static, str>, PathItem)>,
-}
-
-impl<T: Default> Default for Path<T> {
-    fn default() -> Self {
-        Path {
-            path: T::default(),
-            skip: 0,
-            segments: Vec::new(),
-        }
-    }
-}
-
-impl<T: Clone> Clone for Path<T> {
-    fn clone(&self) -> Self {
-        Path {
-            path: self.path.clone(),
-            skip: self.skip,
-            segments: self.segments.clone(),
-        }
-    }
 }
 
 impl<T: ResourcePath> Path<T> {
@@ -122,15 +102,15 @@ impl<T: ResourcePath> Path<T> {
             .push((name.into(), PathItem::Static(value.into())));
     }
 
-    /// Check if there are any matched patterns
+    /// Check if there are any matched patterns.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
 
-    /// Check number of extracted parameters
+    /// Returns number of interpolated segments.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn segment_count(&self) -> usize {
         self.segments.len()
     }
 
@@ -195,7 +175,7 @@ impl<'a, T: ResourcePath> Iterator for PathIter<'a, T> {
 
     #[inline]
     fn next(&mut self) -> Option<(&'a str, &'a str)> {
-        if self.idx < self.params.len() {
+        if self.idx < self.params.segment_count() {
             let idx = self.idx;
             let res = match self.params.segments[idx].1 {
                 PathItem::Static(ref s) => &s,
