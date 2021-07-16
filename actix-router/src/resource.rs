@@ -559,7 +559,7 @@ impl ResourceDef {
 
             dyn_elements += 1;
         } else if !has_tail_segment && !unprocessed.is_empty() {
-            // prevent `Const("")` element from being added after tail segment
+            // prevent `Const("")` element from being added after last dynamic segment
 
             elements.push(PatternElement::Const(unprocessed.to_owned()));
             re.push_str(&escape(unprocessed));
@@ -875,7 +875,6 @@ mod tests {
     #[test]
     fn prefix_static() {
         let re = ResourceDef::prefix("/name");
-        println!("{:#?}", &re);
 
         assert!(re.is_match("/name"));
         assert!(re.is_match("/name/"));
@@ -914,11 +913,7 @@ mod tests {
 
     #[test]
     fn prefix_dynamic() {
-        let re = ResourceDef::prefix("/{name}");
-        println!("{:#?}", &re);
-
         let re = ResourceDef::prefix("/{name}/");
-        println!("{:#?}", &re);
 
         assert!(re.is_match("/name/"));
         assert!(re.is_match("/name/gs"));
