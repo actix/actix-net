@@ -25,17 +25,19 @@ const REGEX_FLAGS: &str = "(?s-m)";
 pub struct ResourceDef {
     id: u16,
 
-    /// Stores
+    /// Pattern type.
     pat_type: PatternType,
 
-    /// Optional name of resource definition.
+    /// Optional name of resource definition. Defaults to "".
     name: String,
 
     /// Pattern that generated the resource definition.
-    // TODO: Sort of, in dynamic set pattern type it is blank, consider change.
+    // TODO: Sort of, in dynamic set pattern type it is blank, consider change to option.
     pattern: String,
 
+    /// List of elements that compose the pattern, in order.
     ///
+    /// `None` with pattern type is DynamicSet.
     elements: Option<Vec<PatternElement>>,
 }
 
