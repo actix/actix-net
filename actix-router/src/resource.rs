@@ -81,19 +81,17 @@ impl ResourceDef {
         match path.patterns() {
             Patterns::Single(pattern) => ResourceDef::from_single_pattern(&pattern, false),
 
+            // since zero length pattern sets are possible
+            // just return a useless `ResourceDef`
+            Patterns::List(patterns) if patterns.is_empty() => ResourceDef {
+                id: 0,
+                name: String::new(),
+                pattern: String::new(),
+                pat_type: PatternType::DynamicSet(RegexSet::empty(), Vec::new()),
+                elements: None,
+            },
+
             Patterns::List(patterns) => {
-                if patterns.is_empty() {
-                    // since zero length pattern sets are possible, return a useless `ResourceDef`
-
-                    return ResourceDef {
-                        id: 0,
-                        name: String::new(),
-                        pattern: String::new(),
-                        pat_type: PatternType::DynamicSet(RegexSet::empty(), Vec::new()),
-                        elements: None,
-                    };
-                }
-
                 let mut re_set = Vec::with_capacity(patterns.len());
                 let mut pattern_data = Vec::new();
 
