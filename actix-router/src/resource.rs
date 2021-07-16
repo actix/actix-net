@@ -6,11 +6,12 @@ use std::{
     mem,
 };
 
-use either::Either;
 use regex::{escape, Regex, RegexSet};
 
-use crate::path::{Path, PathItem};
-use crate::{IntoPatterns, Resource, ResourcePath};
+use crate::{
+    path::{Path, PathItem},
+    IntoPatterns, Patterns, Resource, ResourcePath,
+};
 
 const MAX_DYNAMIC_SEGMENTS: usize = 16;
 
@@ -78,9 +79,9 @@ impl ResourceDef {
     /// Panics if path pattern is malformed.
     pub fn new<T: IntoPatterns>(path: T) -> Self {
         match path.patterns() {
-            Either::Left(pattern) => ResourceDef::from_single_pattern(&pattern, false),
+            Patterns::Single(pattern) => ResourceDef::from_single_pattern(&pattern, false),
 
-            Either::Right(patterns) => {
+            Patterns::List(patterns) => {
                 if patterns.is_empty() {
                     // since zero length pattern sets are possible, return a useless `ResourceDef`
 

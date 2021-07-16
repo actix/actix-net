@@ -4,8 +4,6 @@
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
-use either::Either;
-
 mod de;
 mod path;
 mod resource;
@@ -42,44 +40,51 @@ impl ResourcePath for bytestring::ByteString {
     }
 }
 
+/// One or many patterns.
+#[derive(Debug, Clone)]
+pub enum Patterns {
+    Single(String),
+    List(Vec<String>),
+}
+
 /// Helper trait for type that could be converted to one or more path pattern.
 pub trait IntoPatterns {
-    fn patterns(&self) -> Either<String, Vec<String>>;
+    fn patterns(&self) -> Patterns;
 }
 
 impl IntoPatterns for String {
-    fn patterns(&self) -> Either<String, Vec<String>> {
-        Either::Left(self.clone())
+    fn patterns(&self) -> Patterns {
+        Patterns::Single(self.clone())
     }
 }
 
 impl<'a> IntoPatterns for &'a String {
-    fn patterns(&self) -> Either<String, Vec<String>> {
-        Either::Left((*self).clone())
+    fn patterns(&self) -> Patterns {
+        Patterns::Single((*self).clone())
     }
 }
 
 impl<'a> IntoPatterns for &'a str {
-    fn patterns(&self) -> Either<String, Vec<String>> {
-        Either::Left((*self).to_owned())
+    fn patterns(&self) -> Patterns {
+        Patterns::Single((*self).to_owned())
     }
 }
 
 impl<T: AsRef<str>> IntoPatterns for Vec<T> {
-    fn patterns(&self) -> Either<String, Vec<String>> {
+    fn patterns(&self) -> Patterns {
         let mut patterns = self.iter().map(|v| v.as_ref().to_owned());
 
         match patterns.size_hint() {
-            (1, _) => Either::Left(patterns.next().unwrap()),
-            _ => Either::Right(patterns.collect()),
+            (1, _) => Patterns::Single(patterns.next().unwrap()),
+            _ => Patterns::List(patterns.collect()),
         }
     }
 }
 
 macro_rules! array_patterns_single (($tp:ty) => {
     impl IntoPatterns for [$tp; 1] {
-        fn patterns(&self) -> Either<String, Vec<String>> {
-            Either::Left(self[0].to_owned())
+        fn patterns(&self) -> Patterns {
+            Patterns::Single(self[0].to_owned())
         }
     }
 });
@@ -88,8 +93,8 @@ macro_rules! array_patterns_multiple (($tp:ty, $str_fn:expr, $($num:tt) +) => {
     // for each array length specified in $num
     $(
         impl IntoPatterns for [$tp; $num] {
-            fn patterns(&self) -> Either<String, Vec<String>> {
-                Either::Right(self.iter().map($str_fn).collect())
+            fn patterns(&self) -> Patterns {
+                Patterns::List(self.iter().map($str_fn).collect())
             }
         }
     )+
