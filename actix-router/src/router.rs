@@ -1,4 +1,4 @@
-use crate::{IntoPattern, Resource, ResourceDef, ResourcePath};
+use crate::{IntoPatterns, Resource, ResourceDef, ResourcePath};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ResourceId(pub u16);
@@ -88,7 +88,7 @@ pub struct RouterBuilder<T, U = ()> {
 
 impl<T, U> RouterBuilder<T, U> {
     /// Register resource for specified path.
-    pub fn path<P: IntoPattern>(
+    pub fn path<P: IntoPatterns>(
         &mut self,
         path: P,
         resource: T,

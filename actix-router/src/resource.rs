@@ -6,10 +6,11 @@ use std::{
     mem,
 };
 
+use either::Either;
 use regex::{escape, Regex, RegexSet};
 
 use crate::path::{Path, PathItem};
-use crate::{IntoPattern, Resource, ResourcePath};
+use crate::{IntoPatterns, Resource, ResourcePath};
 
 const MAX_DYNAMIC_SEGMENTS: usize = 16;
 
@@ -25,15 +26,15 @@ const REGEX_FLAGS: &str = "(?s-m)";
 pub struct ResourceDef {
     id: u16,
 
-    /// Pattern type.
-    pat_type: PatternType,
-
     /// Optional name of resource definition. Defaults to "".
     name: String,
 
     /// Pattern that generated the resource definition.
     // TODO: Sort of, in dynamic set pattern type it is blank, consider change to option.
     pattern: String,
+
+    /// Pattern type.
+    pat_type: PatternType,
 
     /// List of elements that compose the pattern, in order.
     ///
@@ -75,29 +76,45 @@ impl ResourceDef {
     /// Parse path pattern and create new `Pattern` instance.
     ///
     /// Panics if path pattern is malformed.
-    pub fn new<T: IntoPattern>(path: T) -> Self {
-        if path.is_single() {
-            ResourceDef::from_single_pattern(&path.patterns()[0], false)
-        } else {
-            let mut data = Vec::new();
-            let mut re_set = Vec::new();
+    pub fn new<T: IntoPatterns>(path: T) -> Self {
+        match path.patterns() {
+            Either::Left(pattern) => ResourceDef::from_single_pattern(&pattern, false),
 
-            for pattern in path.patterns() {
-                match ResourceDef::parse(&pattern, false, true) {
-                    (PatternType::Dynamic(re, names), _) => {
-                        re_set.push(re.as_str().to_owned());
-                        data.push((re, names));
-                    }
-                    _ => unreachable!(),
+            Either::Right(patterns) => {
+                if patterns.is_empty() {
+                    // since zero length pattern sets are possible, return a useless `ResourceDef`
+
+                    return ResourceDef {
+                        id: 0,
+                        name: String::new(),
+                        pattern: String::new(),
+                        pat_type: PatternType::DynamicSet(RegexSet::empty(), Vec::new()),
+                        elements: None,
+                    };
                 }
-            }
 
-            ResourceDef {
-                id: 0,
-                pat_type: PatternType::DynamicSet(RegexSet::new(re_set).unwrap(), data),
-                elements: None,
-                name: String::new(),
-                pattern: "".to_owned(),
+                let mut re_set = Vec::with_capacity(patterns.len());
+                let mut pattern_data = Vec::new();
+
+                for pattern in patterns {
+                    match ResourceDef::parse(&pattern, false, true) {
+                        (PatternType::Dynamic(re, names), _) => {
+                            re_set.push(re.as_str().to_owned());
+                            pattern_data.push((re, names));
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+
+                let pattern_re_set = RegexSet::new(re_set).unwrap();
+
+                ResourceDef {
+                    id: 0,
+                    name: String::new(),
+                    pattern: String::new(),
+                    pat_type: PatternType::DynamicSet(pattern_re_set, pattern_data),
+                    elements: None,
+                }
             }
         }
     }
