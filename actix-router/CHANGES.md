@@ -1,6 +1,12 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Fix segment interpolation leaving `Path` in unintended state after matching. [#368]
+* Path tail pattern now works as expected after a dynamic segment (e.g. `/user/{uid}/*`). [#366]
+* Fixed a bug where, in multi-patterns, static patterns are interpreted as regex. [#366]
+
+[#368]: https://github.com/actix/actix-net/pull/368
+[#366]: https://github.com/actix/actix-net/pull/366
 
 
 ## 0.4.0 - 2021-06-06

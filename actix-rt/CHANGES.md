@@ -8,7 +8,7 @@
   `Ready` object in ok variant. [#293]
   * Breakage is acceptable since `ActixStream` was not intended to be public.
 
-[#293] https://github.com/actix/actix-net/pull/293
+[#293]: https://github.com/actix/actix-net/pull/293
 
 
 ## 2.1.0 - 2021-02-24
