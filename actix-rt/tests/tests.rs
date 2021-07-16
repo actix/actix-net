@@ -286,7 +286,7 @@ fn new_arbiter_with_tokio() {
 
     arb.join().unwrap();
 
-    assert_eq!(false, counter.load(Ordering::SeqCst));
+    assert!(!counter.load(Ordering::SeqCst));
 }
 
 #[test]

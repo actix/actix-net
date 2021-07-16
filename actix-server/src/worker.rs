@@ -73,7 +73,7 @@ fn handle_pair(
 /// On reaching counter limit worker would use `mio::Waker` and `WakerQueue` to wake up `Accept`
 /// and notify it to update cached `Availability` again to mark worker as able to accept work again.
 ///
-/// Hense a wake up would only happen after `Accept` increment it to limit.
+/// Hence, a wake up would only happen after `Accept` increment it to limit.
 /// And a decrement to limit always wake up `Accept`.
 #[derive(Clone)]
 pub(crate) struct Counter {
@@ -179,8 +179,9 @@ impl WorkerHandleAccept {
 /// Handle to worker than can send stop message to worker.
 ///
 /// Held by [ServerBuilder](crate::builder::ServerBuilder).
+#[derive(Debug)]
 pub(crate) struct WorkerHandleServer {
-    pub idx: usize,
+    idx: usize,
     tx: UnboundedSender<Stop>,
 }
 
