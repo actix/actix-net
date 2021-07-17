@@ -20,12 +20,17 @@ path = "src/lib.rs"
 default = ["http"]
 
 [dependencies]
+bytestring = ">=0.1.5, <2"
+http = { version = "0.2.3", optional = true }
+log = "0.4"
 regex = "1.5"
 serde = "1"
-bytestring = ">=0.1.5, <2"
-log = "0.4"
-http = { version = "0.2.3", optional = true }
 
 [dev-dependencies]
 http = "0.2.3"
 serde = { version = "1", features = ["derive"] }
+criterion = { version = "0.3", features = ["html_reports"] }
+
+[[bench]]
+name = "router"
+harness = false
