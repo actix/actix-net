@@ -41,7 +41,7 @@ impl ResourcePath for bytestring::ByteString {
 }
 
 /// One or many patterns.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Patterns {
     Single(String),
     List(Vec<String>),

@@ -10,6 +10,9 @@
 * Rename `Path::{len => segment_count}` to be more descriptive of it's purpose. [#370]
 * Alias `ResourceDef::{resource_path => resource_path_from_iter}` pending eventual deprecation. [#371]
 * Alias `ResourceDef::{resource_path_named => resource_path_from_map}` pending eventual deprecation. [#371]
+* Remove `ResourceDef::name_mut` and introduce `ResourceDef::set_name`. [#???]
+* Return type of `ResourceDef::name` is now `Option<&str>`. [#???]
+* Return type of `ResourceDef::pattern` is now `Option<&str>`. [#???]
 
 [#368]: https://github.com/actix/actix-net/pull/368
 [#366]: https://github.com/actix/actix-net/pull/366
@@ -17,6 +20,7 @@
 [#370]: https://github.com/actix/actix-net/pull/370
 [#371]: https://github.com/actix/actix-net/pull/371
 [#372]: https://github.com/actix/actix-net/pull/372
+[#???]: https://github.com/actix/actix-net/pull/???
 
 
 ## 0.4.0 - 2021-06-06
