@@ -135,21 +135,18 @@ macro_rules! register {
             concat!("/user/keys"),
             concat!("/user/keys/", $p1),
         ];
-        std::array::IntoIter::new(arr)
+
+        arr.to_vec()
     }};
 }
 
-fn call() -> impl Iterator<Item = &'static str> {
-    let arr = [
-        "/authorizations",
-        "/user/repos",
-        "/repos/rust-lang/rust/stargazers",
-        "/orgs/rust-lang/public_members/nikomatsakis",
-        "/repos/rust-lang/rust/releases/1.51.0",
-    ];
-
-    std::array::IntoIter::new(arr)
-}
+static PATHS: [&'static str; 5] = [
+    "/authorizations",
+    "/user/repos",
+    "/repos/rust-lang/rust/stargazers",
+    "/orgs/rust-lang/public_members/nikomatsakis",
+    "/repos/rust-lang/rust/releases/1.51.0",
+];
 
 fn main() {
     let mut router = actix_router::Router::<bool>::build();
@@ -162,7 +159,7 @@ fn main() {
 
     if firestorm::enabled() {
         firestorm::bench("target", || {
-            for route in call() {
+            for &route in &PATHS {
                 let mut path = actix_router::Path::new(route);
                 actix.recognize(&mut path).unwrap();
             }
