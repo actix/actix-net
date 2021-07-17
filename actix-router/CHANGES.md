@@ -10,9 +10,12 @@
 * Rename `Path::{len => segment_count}` to be more descriptive of it's purpose. [#370]
 * Alias `ResourceDef::{resource_path => resource_path_from_iter}` pending eventual deprecation. [#371]
 * Alias `ResourceDef::{resource_path_named => resource_path_from_map}` pending eventual deprecation. [#371]
-* Remove `ResourceDef::name_mut` and introduce `ResourceDef::set_name`. [#???]
-* Return type of `ResourceDef::name` is now `Option<&str>`. [#???]
-* Return type of `ResourceDef::pattern` is now `Option<&str>`. [#???]
+* Remove `ResourceDef::name_mut` and introduce `ResourceDef::set_name`. [#373]
+* Return type of `ResourceDef::name` is now `Option<&str>`. [#373]
+* Return type of `ResourceDef::pattern` is now `Option<&str>`. [#373]
+* Introduce `ResourceDef::pattern_iter` to get an iterator over all patterns in a multi-pattern resource. [#373]
+* Rename `ResourceDef::{match_path => is_path_match}`. [#373]
+* Rename `ResourceDef::{match_path_checked => is_path_match_fn}`. [#373]
 
 [#368]: https://github.com/actix/actix-net/pull/368
 [#366]: https://github.com/actix/actix-net/pull/366
@@ -20,7 +23,7 @@
 [#370]: https://github.com/actix/actix-net/pull/370
 [#371]: https://github.com/actix/actix-net/pull/371
 [#372]: https://github.com/actix/actix-net/pull/372
-[#???]: https://github.com/actix/actix-net/pull/???
+[#373]: https://github.com/actix/actix-net/pull/373
 
 
 ## 0.4.0 - 2021-06-06
