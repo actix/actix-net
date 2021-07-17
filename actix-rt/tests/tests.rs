@@ -1,9 +1,5 @@
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::channel,
-        Arc,
-    },
+    sync::mpsc::channel,
     thread,
     time::{Duration, Instant},
 };
@@ -230,6 +226,7 @@ fn system_stop_stops_arbiters() {
     arb.join().unwrap();
 }
 
+#[cfg(not(feature = "io-uring"))]
 #[test]
 fn new_system_with_tokio() {
     let (tx, rx) = channel();
@@ -262,8 +259,14 @@ fn new_system_with_tokio() {
     assert_eq!(rx.recv().unwrap(), 42);
 }
 
+#[cfg(not(feature = "io-uring"))]
 #[test]
 fn new_arbiter_with_tokio() {
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
     let _ = System::new();
 
     let arb = Arbiter::with_tokio_rt(|| {
@@ -297,4 +300,28 @@ fn try_current_no_system() {
 #[test]
 fn try_current_with_system() {
     System::new().block_on(async { assert!(System::try_current().is_some()) });
+}
+
+#[cfg(feature = "io-uring")]
+#[test]
+fn tokio_uring_arbiter() {
+    let system = System::new();
+    let (tx, rx) = std::sync::mpsc::channel();
+    Arbiter::new().spawn(async move {
+        let handle = actix_rt::spawn(async move {
+            let f = tokio_uring::fs::File::create("test.txt").await.unwrap();
+            let buf = b"Hello World!";
+            let (res, _) = f.write_at(&buf[..], 0).await;
+            assert!(res.is_ok());
+            f.sync_all().await.unwrap();
+            f.close().await.unwrap();
+            std::fs::remove_file("test.txt").unwrap();
+        });
+        handle.await.unwrap();
+        tx.send(true).unwrap();
+    });
+
+    assert!(rx.recv().unwrap());
+
+    drop(system);
 }

@@ -39,6 +39,9 @@
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
+#[cfg(all(not(target_os = "linux"), feature = "io-uring"))]
+compile_error!("io_uring is a linux only feature.");
+
 use std::future::Future;
 
 use tokio::task::JoinHandle;
