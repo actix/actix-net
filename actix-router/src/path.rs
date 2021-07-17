@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::ops::Index;
 
+use firestorm::profile_method;
 use serde::de;
 
 use crate::de::PathDeserializer;
@@ -37,21 +38,23 @@ impl<T: ResourcePath> Path<T> {
         }
     }
 
-    /// Get reference to inner path instance
+    /// Get reference to inner path instance.
     #[inline]
     pub fn get_ref(&self) -> &T {
         &self.path
     }
 
-    /// Get mutable reference to inner path instance
+    /// Get mutable reference to inner path instance.
     #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         &mut self.path
     }
 
-    /// Path
+    /// Path.
     #[inline]
     pub fn path(&self) -> &str {
+        profile_method!(path);
+
         let skip = self.skip as usize;
         let path = self.path.path();
         if skip <= path.len() {
@@ -61,7 +64,7 @@ impl<T: ResourcePath> Path<T> {
         }
     }
 
-    /// Set new path
+    /// Set new path.
     #[inline]
     pub fn set(&mut self, path: T) {
         self.skip = 0;
@@ -69,20 +72,22 @@ impl<T: ResourcePath> Path<T> {
         self.segments.clear();
     }
 
-    /// Reset state
+    /// Reset state.
     #[inline]
     pub fn reset(&mut self) {
         self.skip = 0;
         self.segments.clear();
     }
 
-    /// Skip first `n` chars in path
+    /// Skip first `n` chars in path.
     #[inline]
     pub fn skip(&mut self, n: u16) {
         self.skip += n;
     }
 
     pub(crate) fn add(&mut self, name: impl Into<Cow<'static, str>>, value: PathItem) {
+        profile_method!(add);
+
         match value {
             PathItem::Static(s) => self.segments.push((name.into(), PathItem::Static(s))),
             PathItem::Segment(begin, end) => self.segments.push((
@@ -116,6 +121,8 @@ impl<T: ResourcePath> Path<T> {
 
     /// Get matched parameter by name without type conversion
     pub fn get(&self, key: &str) -> Option<&str> {
+        profile_method!(get);
+        
         for item in self.segments.iter() {
             if key == item.0 {
                 return match item.1 {
@@ -140,9 +147,10 @@ impl<T: ResourcePath> Path<T> {
 
     /// Get matched parameter by name.
     ///
-    /// If keyed parameter is not available empty string is used as default
-    /// value.
+    /// If keyed parameter is not available empty string is used as default value.
     pub fn query(&self, key: &str) -> &str {
+        profile_method!(query);
+        
         if let Some(s) = self.get(key) {
             s
         } else {
@@ -150,7 +158,7 @@ impl<T: ResourcePath> Path<T> {
         }
     }
 
-    /// Return iterator to items in parameter container
+    /// Return iterator to items in parameter container.
     pub fn iter(&self) -> PathIter<'_, T> {
         PathIter {
             idx: 0,
@@ -160,6 +168,7 @@ impl<T: ResourcePath> Path<T> {
 
     /// Try to deserialize matching parameters to a specified type `U`
     pub fn load<'de, U: serde::Deserialize<'de>>(&'de self) -> Result<U, de::value::Error> {
+        profile_method!(load);
         de::Deserialize::deserialize(PathDeserializer::new(self))
     }
 }

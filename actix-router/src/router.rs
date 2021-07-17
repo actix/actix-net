@@ -1,3 +1,5 @@
+use firestorm::profile_method;
+
 use crate::{IntoPatterns, Resource, ResourceDef, ResourcePath};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -24,6 +26,8 @@ impl<T, U> Router<T, U> {
         R: Resource<P>,
         P: ResourcePath,
     {
+        profile_method!(recognize);
+
         for item in self.0.iter() {
             if item.0.match_path(resource.resource_path()) {
                 return Some((&item.1, ResourceId(item.0.id())));
@@ -37,6 +41,8 @@ impl<T, U> Router<T, U> {
         R: Resource<P>,
         P: ResourcePath,
     {
+        profile_method!(recognize_mut);
+
         for item in self.0.iter_mut() {
             if item.0.match_path(resource.resource_path()) {
                 return Some((&mut item.1, ResourceId(item.0.id())));
@@ -55,6 +61,8 @@ impl<T, U> Router<T, U> {
         R: Resource<P>,
         P: ResourcePath,
     {
+        profile_method!(recognize_checked);
+
         for item in self.0.iter() {
             if item.0.match_path_checked(resource, &check, &item.2) {
                 return Some((&item.1, ResourceId(item.0.id())));
@@ -73,6 +81,8 @@ impl<T, U> Router<T, U> {
         R: Resource<P>,
         P: ResourcePath,
     {
+        profile_method!(recognize_mut_checked);
+
         for item in self.0.iter_mut() {
             if item.0.match_path_checked(resource, &check, &item.2) {
                 return Some((&mut item.1, ResourceId(item.0.id())));
@@ -93,6 +103,8 @@ impl<T, U> RouterBuilder<T, U> {
         path: P,
         resource: T,
     ) -> &mut (ResourceDef, T, Option<U>) {
+        profile_method!(path);
+
         self.resources
             .push((ResourceDef::new(path), resource, None));
         self.resources.last_mut().unwrap()
@@ -100,6 +112,8 @@ impl<T, U> RouterBuilder<T, U> {
 
     /// Register resource for specified path prefix.
     pub fn prefix(&mut self, prefix: &str, resource: T) -> &mut (ResourceDef, T, Option<U>) {
+        profile_method!(prefix);
+
         self.resources
             .push((ResourceDef::prefix(prefix), resource, None));
         self.resources.last_mut().unwrap()
@@ -107,6 +121,8 @@ impl<T, U> RouterBuilder<T, U> {
 
     /// Register resource for ResourceDef
     pub fn rdef(&mut self, rdef: ResourceDef, resource: T) -> &mut (ResourceDef, T, Option<U>) {
+        profile_method!(rdef);
+
         self.resources.push((rdef, resource, None));
         self.resources.last_mut().unwrap()
     }

@@ -6,6 +6,7 @@ use std::{
     mem,
 };
 
+use firestorm::{profile_fn, profile_method, profile_section};
 use regex::{escape, Regex, RegexSet};
 
 use crate::{
@@ -78,6 +79,8 @@ impl ResourceDef {
     ///
     /// Panics if path pattern is malformed.
     pub fn new<T: IntoPatterns>(path: T) -> Self {
+        profile_method!(new);
+
         match path.patterns() {
             Patterns::Single(pattern) => ResourceDef::from_single_pattern(&pattern, false),
 
@@ -124,6 +127,7 @@ impl ResourceDef {
     ///
     /// Panics if path regex pattern is malformed.
     pub fn prefix(path: &str) -> Self {
+        profile_method!(prefix);
         ResourceDef::from_single_pattern(path, true)
     }
 
@@ -134,6 +138,7 @@ impl ResourceDef {
     ///
     /// Panics if path regex pattern is malformed.
     pub fn root_prefix(path: &str) -> Self {
+        profile_method!(root_prefix);
         ResourceDef::from_single_pattern(&insert_slash(path), true)
     }
 
@@ -149,6 +154,8 @@ impl ResourceDef {
 
     /// Parse path pattern and create a new instance
     fn from_single_pattern(pattern: &str, for_prefix: bool) -> Self {
+        profile_method!(from_single_pattern);
+
         let pattern = pattern.to_owned();
         let (pat_type, elements) = ResourceDef::parse(&pattern, for_prefix, false);
 
@@ -179,6 +186,8 @@ impl ResourceDef {
     /// Check if path matches this pattern.
     #[inline]
     pub fn is_match(&self, path: &str) -> bool {
+        profile_method!(is_match);
+
         match self.pat_type {
             PatternType::Static(ref s) => s == path,
             PatternType::Prefix(ref s) => path.starts_with(s),
@@ -189,6 +198,8 @@ impl ResourceDef {
 
     /// Is prefix path a match against this resource.
     pub fn is_prefix_match(&self, path: &str) -> Option<usize> {
+        profile_method!(is_prefix_match);
+
         let path_len = path.len();
         let path = if path.is_empty() { "/" } else { path };
 
@@ -245,6 +256,7 @@ impl ResourceDef {
 
     /// Is the given path and parameters a match against this pattern.
     pub fn match_path<T: ResourcePath>(&self, path: &mut Path<T>) -> bool {
+        profile_method!(match_path);
         self.match_path_checked(path, &|_, _| true, &Some(()))
     }
 
@@ -260,11 +272,15 @@ impl ResourceDef {
         R: Resource<T>,
         F: Fn(&R, &Option<U>) -> bool,
     {
+        profile_method!(match_path_checked);
+
         let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
         let path = res.resource_path();
 
         let (matched_len, matched_vars) = match self.pat_type {
             PatternType::Static(ref segment) => {
+                profile_section!(pattern_static);
+
                 if segment != path.path() {
                     return false;
                 }
@@ -273,6 +289,8 @@ impl ResourceDef {
             }
 
             PatternType::Prefix(ref prefix) => {
+                profile_section!(pattern_dynamic);
+
                 let path_str = path.path();
                 let path_len = path_str.len();
 
@@ -300,24 +318,39 @@ impl ResourceDef {
             }
 
             PatternType::Dynamic(ref re, ref names) => {
-                let captures = match re.captures(path.path()) {
-                    Some(captures) => captures,
-                    _ => return false,
+                profile_section!(pattern_dynamic);
+
+                let captures = {
+                    profile_section!(pattern_dynamic_regex_exec);
+
+                    match re.captures(path.path()) {
+                        Some(captures) => captures,
+                        _ => return false,
+                    }
                 };
 
-                for (no, name) in names.iter().enumerate() {
-                    if let Some(m) = captures.name(&name) {
-                        segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
-                    } else {
-                        log::error!("Dynamic path match but not all segments found: {}", name);
-                        return false;
+                {
+                    profile_section!(pattern_dynamic_extract_captures);
+
+                    for (no, name) in names.iter().enumerate() {
+                        if let Some(m) = captures.name(&name) {
+                            segments[no] = PathItem::Segment(m.start() as u16, m.end() as u16);
+                        } else {
+                            log::error!(
+                                "Dynamic path match but not all segments found: {}",
+                                name
+                            );
+                            return false;
+                        }
                     }
-                }
+                };
 
                 (captures[0].len(), Some(names))
             }
 
             PatternType::DynamicSet(ref re, ref params) => {
+                profile_section!(pattern_dynamic_set);
+
                 let path = path.path();
                 let (pattern, names) = match re.matches(path).into_iter().next() {
                     Some(idx) => &params[idx],
@@ -394,6 +427,7 @@ impl ResourceDef {
         U: Iterator<Item = I>,
         I: AsRef<str>,
     {
+        profile_method!(resource_path_from_iter);
         self.build_resource_path(path, |_| elements.next())
     }
 
@@ -404,6 +438,7 @@ impl ResourceDef {
         U: Iterator<Item = I>,
         I: AsRef<str>,
     {
+        profile_method!(build_resource_path);
         self.resource_path_from_iter(path, elements)
     }
 
@@ -420,6 +455,7 @@ impl ResourceDef {
         V: AsRef<str>,
         S: BuildHasher,
     {
+        profile_method!(resource_path_from_map);
         self.build_resource_path(path, |name| {
             name.and_then(|name| elements.get(name).map(AsRef::<str>::as_ref))
         })
@@ -458,6 +494,7 @@ impl ResourceDef {
         S: BuildHasher,
         T: AsRef<str>,
     {
+        profile_method!(resource_path_from_map_with_tail);
         self.build_resource_path(path, |name| match name {
             Some(name) => elements.get(name).map(AsRef::<str>::as_ref),
             None => Some(tail.as_ref()),
@@ -465,6 +502,8 @@ impl ResourceDef {
     }
 
     fn parse_param(pattern: &str) -> (PatternElement, String, &str) {
+        profile_method!(parse_param);
+
         const DEFAULT_PATTERN: &str = "[^/]+";
         const DEFAULT_PATTERN_TAIL: &str = ".*";
 
@@ -526,6 +565,8 @@ impl ResourceDef {
         for_prefix: bool,
         force_dynamic: bool,
     ) -> (PatternType, Vec<PatternElement>) {
+        profile_method!(parse);
+
         let mut unprocessed = pattern;
 
         if !force_dynamic && unprocessed.find('{').is_none() && !unprocessed.ends_with('*') {
@@ -637,6 +678,8 @@ impl From<String> for ResourceDef {
 }
 
 pub(crate) fn insert_slash(path: &str) -> Cow<'_, str> {
+    profile_fn!(insert_slash);
+
     if !path.is_empty() && !path.starts_with('/') {
         let mut new_path = String::with_capacity(path.len() + 1);
         new_path.push('/');
