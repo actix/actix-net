@@ -674,17 +674,6 @@ impl ResourceDef {
         self.build_resource_path(path, |_| values.next())
     }
 
-    // intentionally not deprecated yet
-    #[doc(hidden)]
-    pub fn resource_path<U, I>(&self, path: &mut String, values: &mut U) -> bool
-    where
-        U: Iterator<Item = I>,
-        I: AsRef<str>,
-    {
-        profile_method!(build_resource_path);
-        self.resource_path_from_iter(path, values)
-    }
-
     /// Assembles resource path from map of dynamic segment values.
     ///
     /// Returns `true` on success.
@@ -706,21 +695,6 @@ impl ResourceDef {
         self.build_resource_path(path, |name| {
             name.and_then(|name| values.get(name).map(AsRef::<str>::as_ref))
         })
-    }
-
-    // intentionally not deprecated yet
-    #[doc(hidden)]
-    pub fn resource_path_named<K, V, S>(
-        &self,
-        path: &mut String,
-        values: &HashMap<K, V, S>,
-    ) -> bool
-    where
-        K: Borrow<str> + Eq + Hash,
-        V: AsRef<str>,
-        S: BuildHasher,
-    {
-        self.resource_path_from_map(path, values)
     }
 
     /// Assembles resource path from map of dynamic segment values, allowing tail segments to
@@ -1278,6 +1252,7 @@ mod tests {
         assert_eq!(path.unprocessed(), "subpath1/subpath2/index.html");
 
         let resource = ResourceDef::prefix("/user");
+        // input string shorter than prefix
         assert!(resource.is_prefix_match("/foo").is_none());
     }
 

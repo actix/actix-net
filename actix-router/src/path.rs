@@ -122,7 +122,7 @@ impl<T: ResourcePath> Path<T> {
     /// Get matched parameter by name without type conversion
     pub fn get(&self, key: &str) -> Option<&str> {
         profile_method!(get);
-        
+
         for item in self.segments.iter() {
             if key == item.0 {
                 return match item.1 {
@@ -150,7 +150,7 @@ impl<T: ResourcePath> Path<T> {
     /// If keyed parameter is not available empty string is used as default value.
     pub fn query(&self, key: &str) -> &str {
         profile_method!(query);
-        
+
         if let Some(s) = self.get(key) {
             s
         } else {
