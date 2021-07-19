@@ -72,6 +72,12 @@ impl<'a> IntoPatterns for &'a str {
     }
 }
 
+impl IntoPatterns for bytestring::ByteString {
+    fn patterns(&self) -> Patterns {
+        Patterns::Single(self.to_string())
+    }
+}
+
 impl<T: AsRef<str>> IntoPatterns for Vec<T> {
     fn patterns(&self) -> Patterns {
         let mut patterns = self.iter().map(|v| v.as_ref().to_owned());

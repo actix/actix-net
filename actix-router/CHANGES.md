@@ -6,7 +6,8 @@
 * Introduce `ResourceDef::pattern_iter` to get an iterator over all patterns in a multi-pattern resource. [#373]
 * Fix segment interpolation leaving `Path` in unintended state after matching. [#368]
 * Path tail pattern now works as expected after a dynamic segment (e.g. `/user/{uid}/*`). [#366]
-* Fixed a bug in multi-patterns where static patterns are interpreted as regex. [#366]
+* Fix a bug in multi-patterns where static patterns are interpreted as regex. [#366]
+* Fix `ResourceDef` `PartialEq` implementation.
 * Re-work `IntoPatterns` trait. [#372]
 * Rename `Path::{len => segment_count}` to be more descriptive of it's purpose. [#370]
 * Rename `ResourceDef::{resource_path => resource_path_from_iter}`. [#371]

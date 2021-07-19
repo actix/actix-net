@@ -53,11 +53,7 @@ impl<T, U> Router<T, U> {
         None
     }
 
-    pub fn recognize_fn<R, P, F>(
-        &self,
-        resource: &mut R,
-        check: F,
-    ) -> Option<(&T, ResourceId)>
+    pub fn recognize_fn<R, P, F>(&self, resource: &mut R, check: F) -> Option<(&T, ResourceId)>
     where
         F: Fn(&R, &Option<U>) -> bool,
         R: Resource<P>,
