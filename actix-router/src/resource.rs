@@ -842,10 +842,10 @@ impl ResourceDef {
     /// assert!(resource.resource_path_from_iter(&mut s, &["123", "my-post"]));
     /// assert_eq!(s, "/user/123/post/my-post");
     /// ```
-    pub fn resource_path_from_iter<U>(&self, path: &mut String, values: U) -> bool
+    pub fn resource_path_from_iter<I>(&self, path: &mut String, values: I) -> bool
     where
-        U: IntoIterator,
-        U::Item: AsRef<str>,
+        I: IntoIterator,
+        I::Item: AsRef<str>,
     {
         profile_method!(resource_path_from_iter);
         let mut iter = values.into_iter();
