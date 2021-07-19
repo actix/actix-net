@@ -14,6 +14,8 @@ pub use self::path::Path;
 pub use self::resource::ResourceDef;
 pub use self::router::{ResourceInfo, Router, RouterBuilder};
 
+// TODO: this trait is necessary, document it
+// see impl Resource for ServiceRequest
 pub trait Resource<T: ResourcePath> {
     fn resource_path(&mut self) -> &mut Path<T>;
 }
@@ -41,7 +43,7 @@ impl ResourcePath for bytestring::ByteString {
 }
 
 /// One or many patterns.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Patterns {
     Single(String),
     List(Vec<String>),
@@ -67,6 +69,12 @@ impl<'a> IntoPatterns for &'a String {
 impl<'a> IntoPatterns for &'a str {
     fn patterns(&self) -> Patterns {
         Patterns::Single((*self).to_owned())
+    }
+}
+
+impl IntoPatterns for bytestring::ByteString {
+    fn patterns(&self) -> Patterns {
+        Patterns::Single(self.to_string())
     }
 }
 

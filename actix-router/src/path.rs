@@ -4,8 +4,7 @@ use std::ops::Index;
 use firestorm::profile_method;
 use serde::de;
 
-use crate::de::PathDeserializer;
-use crate::{Resource, ResourcePath};
+use crate::{de::PathDeserializer, Resource, ResourcePath};
 
 #[derive(Debug, Clone)]
 pub(crate) enum PathItem {
@@ -120,24 +119,21 @@ impl<T: ResourcePath> Path<T> {
     }
 
     /// Get matched parameter by name without type conversion
-    pub fn get(&self, key: &str) -> Option<&str> {
+    pub fn get(&self, name: &str) -> Option<&str> {
         profile_method!(get);
-        
-        for item in self.segments.iter() {
-            if key == item.0 {
-                return match item.1 {
+
+        for (seg_name, val) in self.segments.iter() {
+            if name == seg_name {
+                return match val {
                     PathItem::Static(ref s) => Some(&s),
                     PathItem::Segment(s, e) => {
-                        Some(&self.path.path()[(s as usize)..(e as usize)])
+                        Some(&self.path.path()[(*s as usize)..(*e as usize)])
                     }
                 };
             }
         }
-        if key == "tail" {
-            Some(&self.path.path()[(self.skip as usize)..])
-        } else {
-            None
-        }
+
+        None
     }
 
     /// Get unprocessed part of the path
@@ -150,7 +146,7 @@ impl<T: ResourcePath> Path<T> {
     /// If keyed parameter is not available empty string is used as default value.
     pub fn query(&self, key: &str) -> &str {
         profile_method!(query);
-        
+
         if let Some(s) = self.get(key) {
             s
         } else {

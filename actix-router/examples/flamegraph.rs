@@ -140,7 +140,7 @@ macro_rules! register {
     }};
 }
 
-static PATHS: [&'static str; 5] = [
+static PATHS: [&str; 5] = [
     "/authorizations",
     "/user/repos",
     "/repos/rust-lang/rust/stargazers",

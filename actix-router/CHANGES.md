@@ -1,15 +1,23 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Resource definitions with unnamed tail segments now correctly interpolate the tail when constructed from an iterator. [#371]
-* Introduce `ResourceDef::resource_path_from_map_with_tail` method to allow building paths in the presence of unnamed tail segments. [#371]
+* Fix a bug in multi-patterns where static patterns are interpreted as regex. [#366]
+* Introduce `ResourceDef::pattern_iter` to get an iterator over all patterns in a multi-pattern resource. [#373]
 * Fix segment interpolation leaving `Path` in unintended state after matching. [#368]
-* Path tail pattern now works as expected after a dynamic segment (e.g. `/user/{uid}/*`). [#366]
-* Fixed a bug where, in multi-patterns, static patterns are interpreted as regex. [#366]
-* Re-work `IntoPatterns` trait. [#372]
+* Fix `ResourceDef` `PartialEq` implementation.
+* Re-work `IntoPatterns` trait, adding a `Patterns` enum. [#372]
+* Implement `IntoPatterns` for `bytestring::ByteString`. [#372]
 * Rename `Path::{len => segment_count}` to be more descriptive of it's purpose. [#370]
-* Alias `ResourceDef::{resource_path => resource_path_from_iter}` pending eventual deprecation. [#371]
-* Alias `ResourceDef::{resource_path_named => resource_path_from_map}` pending eventual deprecation. [#371]
+* Rename `ResourceDef::{resource_path => resource_path_from_iter}`. [#371]
+* `ResourceDef::resource_path_from_iter` now takes an `IntoIterator`. [#373]
+* Rename `ResourceDef::{resource_path_named => resource_path_from_map}`. [#371]
+* Rename `ResourceDef::{is_prefix_match => find_match}`. [#373]
+* Rename `ResourceDef::{match_path => capture_match_info}`. [#373]
+* Rename `ResourceDef::{match_path_checked => capture_match_info_fn}`. [#373]
+* Remove `ResourceDef::name_mut` and introduce `ResourceDef::set_name`. [#373]
+* Rename `Router::{*_checked => *_fn}`. [#373]
+* Return type of `ResourceDef::name` is now `Option<&str>`. [#373]
+* Return type of `ResourceDef::pattern` is now `Option<&str>`. [#373]
 
 [#368]: https://github.com/actix/actix-net/pull/368
 [#366]: https://github.com/actix/actix-net/pull/366
@@ -17,6 +25,7 @@
 [#370]: https://github.com/actix/actix-net/pull/370
 [#371]: https://github.com/actix/actix-net/pull/371
 [#372]: https://github.com/actix/actix-net/pull/372
+[#373]: https://github.com/actix/actix-net/pull/373
 
 
 ## 0.4.0 - 2021-06-06
