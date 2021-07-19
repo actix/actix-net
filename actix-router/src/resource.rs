@@ -98,13 +98,11 @@ const REGEX_FLAGS: &str = "(?s-m)";
 /// ```
 /// # use actix_router::ResourceDef;
 /// let resource = ResourceDef::prefix("/home");
-///
 /// assert!(resource.is_match("/home"));
 /// assert!(resource.is_match("/home/new"));
 /// assert!(!resource.is_match("/homes"));
 ///
 /// let resource = ResourceDef::prefix("/user/{id}/");
-///
 /// assert!(resource.is_match("/user/123/"));
 /// assert!(resource.is_match("/user/123/stars"));
 /// ```
@@ -639,27 +637,72 @@ impl ResourceDef {
         }
     }
 
-    /// Collects dynamic segment values into given path.
+    /// Collects dynamic segment values into `path`.
     ///
     /// Returns `true` if `path` matches this resource.
+    ///
+    /// # Examples
+    /// ```
+    /// use actix_router::{Path, ResourceDef};
+    ///
+    /// let resource = ResourceDef::prefix("/user/{id}");
+    /// let mut path = Path::new("/user/123/stars");
+    /// assert!(resource.capture_match_info(&mut path));
+    /// assert_eq!(path.get("id").unwrap(), "123");
+    /// assert_eq!(path.unprocessed(), "/stars");
+    ///
+    /// let resource = ResourceDef::new("/blob/{path}*");
+    /// let mut path = Path::new("/blob/HEAD/Cargo.toml");
+    /// assert!(resource.capture_match_info(&mut path));
+    /// assert_eq!(path.get("path").unwrap(), "HEAD/Cargo.toml");
+    /// assert_eq!(path.unprocessed(), "");
+    /// ```
     pub fn capture_match_info<T: ResourcePath>(&self, path: &mut Path<T>) -> bool {
         profile_method!(is_path_match);
         self.capture_match_info_fn(path, &|_, _| true, &None::<()>)
     }
 
-    /// Collects dynamic segment values into given resource after matching paths and executing
+    /// Collects dynamic segment values into `resource` after matching paths and executing
     /// check function.
     ///
     /// The check function is given a reference to the passed resource and optional arbitrary data.
     /// This is useful if you want to conditionally match on some non-path related aspect of the
     /// resource type.
     ///
-    /// Returns `true` if resource path matches this resource definition using the supplied check function.
+    /// Returns `true` if resource path matches this resource definition _and_ satisfies the
+    /// given check function.
     ///
-    /// The check function is supplied with the resource `res` and `user_data`.
+    /// # Examples
+    /// ```
+    /// use actix_router::{Path, ResourceDef};
+    ///
+    /// fn try_match(resource: &ResourceDef, path: &mut Path<&str>) -> bool {
+    ///     let admin_allowed = std::env::var("ADMIN_ALLOWED").ok();
+    ///
+    ///     resource.capture_match_info_fn(
+    ///         path,
+    ///         // when env var is not set, reject when path contains "admin"
+    ///         &|res, admin_allowed| !res.path().contains("admin"),
+    ///         &admin_allowed
+    ///     )
+    /// }
+    ///
+    /// let resource = ResourceDef::prefix("/user/{id}");
+    ///
+    /// // path matches; segment values are collected into path
+    /// let mut path = Path::new("/user/james/stars");
+    /// assert!(try_match(&resource, &mut path));
+    /// assert_eq!(path.get("id").unwrap(), "james");
+    /// assert_eq!(path.unprocessed(), "/stars");
+    ///
+    /// // path matches but fails check function; no segments are collected
+    /// let mut path = Path::new("/user/admin/stars");
+    /// assert!(!try_match(&resource, &mut path));
+    /// assert_eq!(path.unprocessed(), "/user/admin/stars");
+    /// ```
     pub fn capture_match_info_fn<R, T, F, U>(
         &self,
-        res: &mut R,
+        resource: &mut R,
         check_fn: &F,
         user_data: &Option<U>,
     ) -> bool
@@ -671,7 +714,7 @@ impl ResourceDef {
         profile_method!(is_path_match_fn);
 
         let mut segments = <[PathItem; MAX_DYNAMIC_SEGMENTS]>::default();
-        let path = res.resource_path();
+        let path = resource.resource_path();
         let path_str = path.path();
 
         let (matched_len, matched_vars, tail) = match &self.pat_type {
@@ -742,12 +785,12 @@ impl ResourceDef {
             }
         };
 
-        if !check_fn(res, user_data) {
+        if !check_fn(resource, user_data) {
             return false;
         }
 
         // Modify `path` to skip matched part and store matched segments
-        let path = res.resource_path();
+        let path = resource.resource_path();
 
         if let Some(vars) = matched_vars {
             for i in 0..vars.len() {
@@ -786,11 +829,19 @@ impl ResourceDef {
         true
     }
 
-    /// Assembles resource path from iterator of dynamic segment values.
+    /// Assembles full resource path from iterator of dynamic segment values.
     ///
-    /// Returns `true` on success.
+    /// Returns `true` on success. If resource definition is multi-pattern, this will always fail.
     ///
-    /// If resource pattern has a tail segment, the iterator must be able to provide a value for it.
+    /// # Examples
+    /// ```
+    /// # use actix_router::ResourceDef;
+    /// let mut s = String::new();
+    /// let resource = ResourceDef::new("/user/{id}/stars");
+    ///
+    /// assert!(resource.resource_path_from_iter(&mut s, &mut ["123"].iter()));
+    /// assert_eq!(s, "/user/123/stars");
+    /// ```
     pub fn resource_path_from_iter<U, I>(&self, path: &mut String, values: &mut U) -> bool
     where
         U: Iterator<Item = I>,
@@ -802,7 +853,21 @@ impl ResourceDef {
 
     /// Assembles resource path from map of dynamic segment values.
     ///
-    /// Returns `true` on success.
+    /// Returns `true` on success. If resource definition is multi-pattern, this will always fail.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::collections::HashMap;
+    /// # use actix_router::ResourceDef;
+    /// let mut s = String::new();
+    /// let resource = ResourceDef::new("/user/{id}/stars");
+    ///
+    /// let mut map = HashMap::new();
+    /// map.insert("id", "123");
+    ///
+    /// assert!(resource.resource_path_from_map(&mut s, &map));
+    /// assert_eq!(s, "/user/123/stars");
+    /// ```
     pub fn resource_path_from_map<K, V, S>(
         &self,
         path: &mut String,

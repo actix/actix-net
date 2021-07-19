@@ -1,8 +1,6 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Resource definitions with unnamed tail segments now correctly interpolate the tail when constructed from an iterator. [#371]
-* Introduce `ResourceDef::resource_path_from_map_with_tail` method to allow building paths in the presence of unnamed tail segments. [#371]
 * Introduce `ResourceDef::pattern_iter` to get an iterator over all patterns in a multi-pattern resource. [#373]
 * Fix segment interpolation leaving `Path` in unintended state after matching. [#368]
 * Path tail pattern now works as expected after a dynamic segment (e.g. `/user/{uid}/*`). [#366]
