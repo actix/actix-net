@@ -133,22 +133,23 @@ const REGEX_FLAGS: &str = "(?s-m)";
 ///
 ///
 /// # Tail Segments
-/// As a shortcut to defining a custom regex for matching _all_ characters (not just those up until
-/// a `/` character), a resource pattern can match the entire remaining path portion.
+/// As a shortcut to defining a custom regex for matching _all_ remaining characters (not just those
+/// up until a `/` character), there is a special pattern to match (and capture) the remaining
+/// path portion.
 ///
-/// To do this use a segment definition `{name}*`. Since tail segments are given names too, segment
-/// values are extracted in the same way as non-tail dynamic segments.
+/// To do this, use the segment pattern: `{name}*`. Since a tail segment also has a name, values are
+/// extracted in the same way as non-tail dynamic segments.
 ///
 /// ## Examples
 /// ```rust
 /// # use actix_router::{Path, ResourceDef};
-/// let resource = ResourceDef::new("/redirect/{tail}*");
-/// assert!(resource.is_match("/redirect/home"));
-/// assert!(resource.is_match("/redirect/user/123"));
+/// let resource = ResourceDef::new("/blob/{tail}*");
+/// assert!(resource.is_match("/blob/HEAD/Cargo.toml"));
+/// assert!(resource.is_match("/blob/HEAD/README.md"));
 ///
-/// let mut path = Path::new("/redirect/user/123");
+/// let mut path = Path::new("/blob/main/LICENSE");
 /// resource.capture_match_info(&mut path);
-/// assert_eq!(path.get("tail").unwrap(), "user/123");
+/// assert_eq!(path.get("tail").unwrap(), "main/LICENSE");
 /// ```
 ///
 ///
@@ -827,42 +828,50 @@ impl ResourceDef {
 
     /// Assembles full resource path from iterator of dynamic segment values.
     ///
-    /// Returns `true` on success. If resource definition is multi-pattern, this will always fail.
+    /// Returns `true` on success.
+    ///
+    /// Resource paths can not be built from multi-pattern resources; this call will always return
+    /// false and will not add anything to the string buffer.
     ///
     /// # Examples
     /// ```
     /// # use actix_router::ResourceDef;
     /// let mut s = String::new();
-    /// let resource = ResourceDef::new("/user/{id}/stars");
+    /// let resource = ResourceDef::new("/user/{id}/post/{title}");
     ///
-    /// assert!(resource.resource_path_from_iter(&mut s, &mut ["123"].iter()));
-    /// assert_eq!(s, "/user/123/stars");
+    /// assert!(resource.resource_path_from_iter(&mut s, &["123", "my-post"]));
+    /// assert_eq!(s, "/user/123/post/my-post");
     /// ```
-    pub fn resource_path_from_iter<U, I>(&self, path: &mut String, values: &mut U) -> bool
+    pub fn resource_path_from_iter<U>(&self, path: &mut String, values: U) -> bool
     where
-        U: Iterator<Item = I>,
-        I: AsRef<str>,
+        U: IntoIterator,
+        U::Item: AsRef<str>,
     {
         profile_method!(resource_path_from_iter);
-        self.build_resource_path(path, |_| values.next())
+        let mut iter = values.into_iter();
+        self.build_resource_path(path, |_| iter.next())
     }
 
     /// Assembles resource path from map of dynamic segment values.
     ///
-    /// Returns `true` on success. If resource definition is multi-pattern, this will always fail.
+    /// Returns `true` on success.
+    ///
+    /// Resource paths can not be built from multi-pattern resources; this call will always return
+    /// false and will not add anything to the string buffer.
     ///
     /// # Examples
     /// ```
     /// # use std::collections::HashMap;
     /// # use actix_router::ResourceDef;
     /// let mut s = String::new();
-    /// let resource = ResourceDef::new("/user/{id}/stars");
+    /// let resource = ResourceDef::new("/user/{id}/post/{title}");
     ///
     /// let mut map = HashMap::new();
     /// map.insert("id", "123");
+    /// map.insert("title", "my-post");
     ///
     /// assert!(resource.resource_path_from_map(&mut s, &map));
-    /// assert_eq!(s, "/user/123/stars");
+    /// assert_eq!(s, "/user/123/post/my-post");
     /// ```
     pub fn resource_path_from_map<K, V, S>(
         &self,
