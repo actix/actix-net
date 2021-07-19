@@ -717,12 +717,12 @@ impl ResourceDef {
         let path = resource.resource_path();
         let path_str = path.path();
 
-        let (matched_len, matched_vars, tail) = match &self.pat_type {
+        let (matched_len, matched_vars) = match &self.pat_type {
             PatternType::Static(_) | PatternType::Prefix(_) => {
                 profile_section!(pattern_static_or_prefix);
 
                 match self.find_match(path_str) {
-                    Some(len) => (len, None, None),
+                    Some(len) => (len, None),
                     None => return false,
                 }
             }
@@ -755,7 +755,7 @@ impl ResourceDef {
                     }
                 };
 
-                (captures[0].len(), Some(names), None)
+                (captures[0].len(), Some(names))
             }
 
             PatternType::DynamicSet(re, params) => {
@@ -781,7 +781,7 @@ impl ResourceDef {
                     }
                 }
 
-                (captures[0].len(), Some(names), None)
+                (captures[0].len(), Some(names))
             }
         };
 
@@ -796,10 +796,6 @@ impl ResourceDef {
             for i in 0..vars.len() {
                 path.add(vars[i], mem::take(&mut segments[i]));
             }
-        }
-
-        if let Some(tail) = tail {
-            path.add_tail(tail)
         }
 
         path.skip(matched_len as u16);

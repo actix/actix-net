@@ -6,7 +6,8 @@
 * Path tail pattern now works as expected after a dynamic segment (e.g. `/user/{uid}/*`). [#366]
 * Fix a bug in multi-patterns where static patterns are interpreted as regex. [#366]
 * Fix `ResourceDef` `PartialEq` implementation.
-* Re-work `IntoPatterns` trait. [#372]
+* Re-work `IntoPatterns` trait, adding a `Patterns` enum. [#372]
+* Implement `IntoPatterns` for `bytestring::ByteString`. [#372]
 * Rename `Path::{len => segment_count}` to be more descriptive of it's purpose. [#370]
 * Rename `ResourceDef::{resource_path => resource_path_from_iter}`. [#371]
 * Rename `ResourceDef::{resource_path_named => resource_path_from_map}`. [#371]

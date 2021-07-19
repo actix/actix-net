@@ -26,7 +26,6 @@ pub struct Path<T> {
     path: T,
     pub(crate) skip: u16,
     pub(crate) segments: Vec<(Cow<'static, str>, PathItem)>,
-    pub(crate) tail: Option<PathItem>,
 }
 
 impl<T: ResourcePath> Path<T> {
@@ -35,7 +34,6 @@ impl<T: ResourcePath> Path<T> {
             path,
             skip: 0,
             segments: Vec::new(),
-            tail: None,
         }
     }
 
@@ -96,11 +94,6 @@ impl<T: ResourcePath> Path<T> {
                 PathItem::Segment(self.skip + begin, self.skip + end),
             )),
         }
-    }
-
-    pub(crate) fn add_tail(&mut self, value: PathItem) {
-        profile_method!(add_tail);
-        self.tail = Some(value);
     }
 
     #[doc(hidden)]
