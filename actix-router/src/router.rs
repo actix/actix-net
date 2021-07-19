@@ -29,10 +29,11 @@ impl<T, U> Router<T, U> {
         profile_method!(recognize);
 
         for item in self.0.iter() {
-            if item.0.is_path_match(resource.resource_path()) {
+            if item.0.capture_match_info(resource.resource_path()) {
                 return Some((&item.1, ResourceId(item.0.id())));
             }
         }
+
         None
     }
 
@@ -44,14 +45,15 @@ impl<T, U> Router<T, U> {
         profile_method!(recognize_mut);
 
         for item in self.0.iter_mut() {
-            if item.0.is_path_match(resource.resource_path()) {
+            if item.0.capture_match_info(resource.resource_path()) {
                 return Some((&mut item.1, ResourceId(item.0.id())));
             }
         }
+
         None
     }
 
-    pub fn recognize_checked<R, P, F>(
+    pub fn recognize_fn<R, P, F>(
         &self,
         resource: &mut R,
         check: F,
@@ -64,14 +66,15 @@ impl<T, U> Router<T, U> {
         profile_method!(recognize_checked);
 
         for item in self.0.iter() {
-            if item.0.is_path_match_fn(resource, &check, &item.2) {
+            if item.0.capture_match_info_fn(resource, &check, &item.2) {
                 return Some((&item.1, ResourceId(item.0.id())));
             }
         }
+
         None
     }
 
-    pub fn recognize_mut_checked<R, P, F>(
+    pub fn recognize_mut_fn<R, P, F>(
         &mut self,
         resource: &mut R,
         check: F,
@@ -84,10 +87,11 @@ impl<T, U> Router<T, U> {
         profile_method!(recognize_mut_checked);
 
         for item in self.0.iter_mut() {
-            if item.0.is_path_match_fn(resource, &check, &item.2) {
+            if item.0.capture_match_info_fn(resource, &check, &item.2) {
                 return Some((&mut item.1, ResourceId(item.0.id())));
             }
         }
+
         None
     }
 }

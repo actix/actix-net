@@ -61,11 +61,6 @@ enum PatternSegment {
 
     /// Name of dynamic segment.
     Var(String),
-
-    /// Tail segment. If present in segment list, it will always be last.
-    ///
-    /// Tail has optional name for patterns like `/foo/{tail}*` vs "/foo/*".
-    Tail(Option<String>),
 }
 
 #[derive(Clone, Debug)]
@@ -397,6 +392,9 @@ impl ResourceDef {
     pub fn is_match(&self, path: &str) -> bool {
         profile_method!(is_match);
 
+        // in effect this function could be expressed as:
+        // self.find_match(path).is_some()
+
         match self.pat_type {
             PatternType::Static(ref s) => s == path,
             PatternType::Prefix(ref s) => path.starts_with(s),
@@ -414,28 +412,28 @@ impl ResourceDef {
     ///
     /// // static resource does not do prefix matching
     /// let resource = ResourceDef::new("/user");
-    /// assert_eq!(resource.is_prefix_match("/user"), Some(5));
-    /// assert!(resource.is_prefix_match("/user/").is_none());
-    /// assert!(resource.is_prefix_match("/user/123").is_none());
-    /// assert!(resource.is_prefix_match("/foo").is_none());
+    /// assert_eq!(resource.find_match("/user"), Some(5));
+    /// assert!(resource.find_match("/user/").is_none());
+    /// assert!(resource.find_match("/user/123").is_none());
+    /// assert!(resource.find_match("/foo").is_none());
     ///
     /// // constant prefix resource
     /// let resource = ResourceDef::prefix("/user");
-    /// assert_eq!(resource.is_prefix_match("/user"), Some(5));
-    /// assert_eq!(resource.is_prefix_match("/user/"), Some(5));
-    /// assert_eq!(resource.is_prefix_match("/user/123"), Some(5));
-    /// assert!(resource.is_prefix_match("/foo").is_none());
+    /// assert_eq!(resource.find_match("/user"), Some(5));
+    /// assert_eq!(resource.find_match("/user/"), Some(5));
+    /// assert_eq!(resource.find_match("/user/123"), Some(5));
+    /// assert!(resource.find_match("/foo").is_none());
     ///
     /// // dynamic prefix resource
     /// let resource = ResourceDef::prefix("/user/{id}");
-    /// assert_eq!(resource.is_prefix_match("/user/123"), Some(9));
-    /// assert_eq!(resource.is_prefix_match("/user/123/"), Some(9));
-    /// assert_eq!(resource.is_prefix_match("/user/123/stars"), Some(9));
-    /// assert!(resource.is_prefix_match("/user/").is_none());
-    /// assert!(resource.is_prefix_match("/foo").is_none());
+    /// assert_eq!(resource.find_match("/user/123"), Some(9));
+    /// assert_eq!(resource.find_match("/user/123/"), Some(9));
+    /// assert_eq!(resource.find_match("/user/123/stars"), Some(9));
+    /// assert!(resource.find_match("/user/").is_none());
+    /// assert!(resource.find_match("/foo").is_none());
     /// ```
-    pub fn is_prefix_match(&self, path: &str) -> Option<usize> {
-        profile_method!(is_prefix_match);
+    pub fn find_match(&self, path: &str) -> Option<usize> {
+        profile_method!(find_match);
 
         let path_len = path.len();
         let path = if path.is_empty() { "/" } else { path };
@@ -464,9 +462,9 @@ impl ResourceDef {
                         // and prefix segment ends with /
                         // or first character in path after prefix segment length is /
                         //
-                        // eg: Prefix("/test/") or Prefix("/test") would match:
-                        // - /test/foo
-                        // - /test/foo
+                        // eg: Prefix("/test/") or Prefix("/test") would match "/test/" and
+                        // "/test/foo" but Prefix("/test") would not process "/test" here since it
+                        // is handled by the earlier if case
 
                         if prefix.ends_with('/') {
                             prefix.len() - 1
@@ -491,32 +489,39 @@ impl ResourceDef {
         }
     }
 
+    /// Collects dynamic segment values into given path.
+    ///
     /// Returns `true` if `path` matches this resource.
-    pub fn is_path_match<T: ResourcePath>(&self, path: &mut Path<T>) -> bool {
+    pub fn capture_match_info<T: ResourcePath>(&self, path: &mut Path<T>) -> bool {
         profile_method!(is_path_match);
-        self.is_path_match_fn(path, &|_, _| true, &None::<()>)
+        self.capture_match_info_fn(path, &|_, _| true, &None::<()>)
     }
 
-    /// Returns `true` if `path` matches this resource using the supplied check function.
+    /// Collects dynamic segment values into given resource after matching paths and executing
+    /// check function.
+    ///
+    /// The check function is given a reference to the passed resource and optional arbitrary data.
+    ///
+    /// Returns `true` if resource path matches this resource definition using the supplied check function.
     ///
     /// The check function is supplied with the resource `res` and `user_data`.
-    pub fn is_path_match_fn<R, T, F, U>(
+    pub fn capture_match_info_fn<R, T, F, U>(
         &self,
         res: &mut R,
         check_fn: &F,
         user_data: &Option<U>,
     ) -> bool
     where
-        T: ResourcePath,
         R: Resource<T>,
+        T: ResourcePath,
         F: Fn(&R, &Option<U>) -> bool,
     {
         profile_method!(is_path_match_fn);
 
-        let mut segments: [PathItem; MAX_DYNAMIC_SEGMENTS] = Default::default();
+        let mut segments = <[PathItem; MAX_DYNAMIC_SEGMENTS]>::default();
         let path = res.resource_path();
 
-        let (matched_len, matched_vars) = match self.pat_type {
+        let (matched_len, matched_vars, tail) = match self.pat_type {
             PatternType::Static(ref segment) => {
                 profile_section!(pattern_static);
 
@@ -524,7 +529,7 @@ impl ResourceDef {
                     return false;
                 }
 
-                (path.path().len(), None)
+                (path.path().len(), None, None)
             }
 
             PatternType::Prefix(ref prefix) => {
@@ -538,7 +543,7 @@ impl ResourceDef {
                         // prefix length === path length
                         path_len
                     } else {
-                        // note: see comments in is_prefix_match source
+                        // note: see comments in find_match source
 
                         if path_str.starts_with(prefix)
                             && (prefix.ends_with('/')
@@ -555,7 +560,7 @@ impl ResourceDef {
                     }
                 };
 
-                (min(path.path().len(), len), None)
+                (min(path.path().len(), len), None, None)
             }
 
             PatternType::Dynamic(ref re, ref names) => {
@@ -586,7 +591,7 @@ impl ResourceDef {
                     }
                 };
 
-                (captures[0].len(), Some(names))
+                (captures[0].len(), Some(names), None)
             }
 
             PatternType::DynamicSet(ref re, ref params) => {
@@ -612,7 +617,10 @@ impl ResourceDef {
                     }
                 }
 
-                (captures[0].len(), Some(names))
+                let tail = captures.get(captures.len() - 1);
+                println!("{:#?}", tail);
+
+                (captures[0].len(), Some(names), None)
             }
         };
 
@@ -622,22 +630,26 @@ impl ResourceDef {
 
         // Modify `path` to skip matched part and store matched segments
         let path = res.resource_path();
+
         if let Some(vars) = matched_vars {
             for i in 0..vars.len() {
                 path.add(vars[i], mem::take(&mut segments[i]));
             }
         }
+
+        if let Some(tail) = tail {
+            path.add_tail(tail)
+        }
+
         path.skip(matched_len as u16);
 
         true
     }
 
     /// Assembles resource path using a closure that maps variable segment names to values.
-    ///
-    /// Unnamed tail pattern segments will receive `None`.
     fn build_resource_path<F, I>(&self, path: &mut String, mut vars: F) -> bool
     where
-        F: FnMut(Option<&str>) -> Option<I>,
+        F: FnMut(&str) -> Option<I>,
         I: AsRef<str>,
     {
         for el in match self.segments {
@@ -646,13 +658,9 @@ impl ResourceDef {
         } {
             match *el {
                 PatternSegment::Const(ref val) => path.push_str(val),
-                PatternSegment::Var(ref name) => match vars(Some(name)) {
+                PatternSegment::Var(ref name) => match vars(name) {
                     Some(val) => path.push_str(val.as_ref()),
                     _ => return false,
-                },
-                PatternSegment::Tail(ref name) => match vars(name.as_deref()) {
-                    Some(val) => path.push_str(val.as_ref()),
-                    None => return false,
                 },
             }
         }
@@ -692,38 +700,10 @@ impl ResourceDef {
         S: BuildHasher,
     {
         profile_method!(resource_path_from_map);
-        self.build_resource_path(path, |name| {
-            name.and_then(|name| values.get(name).map(AsRef::<str>::as_ref))
-        })
+        self.build_resource_path(path, |name| values.get(name).map(AsRef::<str>::as_ref))
     }
 
-    /// Assembles resource path from map of dynamic segment values, allowing tail segments to
-    /// be appended.
-    ///
-    /// Returns `true` on success.
-    ///
-    /// If resource pattern does not define a tail segment, the `tail` parameter will be unused.
-    /// In this case, use [`resource_path_from_map`][Self::resource_path_from_map] instead.
-    pub fn resource_path_from_map_with_tail<K, V, S, T>(
-        &self,
-        path: &mut String,
-        values: &HashMap<K, V, S>,
-        tail: T,
-    ) -> bool
-    where
-        K: Borrow<str> + Eq + Hash,
-        V: AsRef<str>,
-        S: BuildHasher,
-        T: AsRef<str>,
-    {
-        profile_method!(resource_path_from_map_with_tail);
-        self.build_resource_path(path, |name| match name {
-            Some(name) => values.get(name).map(AsRef::<str>::as_ref),
-            None => Some(tail.as_ref()),
-        })
-    }
-
-    /// Parse path pattern and create a new instance
+    /// Parse path pattern and create a new instance.
     fn from_single_pattern(pattern: &str, is_prefix: bool) -> Self {
         profile_method!(from_single_pattern);
 
@@ -745,10 +725,11 @@ impl ResourceDef {
     /// - the segment descriptor, either `Var` or `Tail`
     /// - the segment's regex to check values against
     /// - the remaining, unprocessed string slice
+    /// - whether the parsed parameter represents a tail pattern
     ///
     /// # Panics
     /// Panics if given patterns does not contain a dynamic segment.
-    fn parse_param(pattern: &str) -> (PatternSegment, String, &str) {
+    fn parse_param(pattern: &str) -> (PatternSegment, String, &str, bool) {
         profile_method!(parse_param);
 
         const DEFAULT_PATTERN: &str = "[^/]+";
@@ -779,7 +760,7 @@ impl ResourceDef {
         let (name, pattern) = match param.find(':') {
             Some(idx) => {
                 if tail {
-                    panic!("Custom regex is not supported for remainder match");
+                    panic!("custom regex is not supported for tail match");
                 }
 
                 let (name, pattern) = param.split_at(idx);
@@ -796,15 +777,10 @@ impl ResourceDef {
             ),
         };
 
-        let segment = if tail {
-            PatternSegment::Tail(Some(name.to_string()))
-        } else {
-            PatternSegment::Var(name.to_string())
-        };
-
+        let segment = PatternSegment::Var(name.to_string());
         let regex = format!(r"(?P<{}>{})", &name, &pattern);
 
-        (segment, regex, unprocessed)
+        (segment, regex, unprocessed, tail)
     }
 
     /// Parse `pattern` using `is_prefix` and `force_dynamic` flags.
@@ -849,9 +825,9 @@ impl ResourceDef {
             segments.push(PatternSegment::Const(prefix.to_owned()));
             re.push_str(&escape(prefix));
 
-            let (param_pattern, re_part, rem) = Self::parse_param(rem);
+            let (param_pattern, re_part, rem, tail) = Self::parse_param(rem);
 
-            if matches!(param_pattern, PatternSegment::Tail(_)) {
+            if tail {
                 has_tail_segment = true;
             }
 
@@ -862,16 +838,15 @@ impl ResourceDef {
             dyn_segment_count += 1;
         }
 
-        if let Some(path) = unprocessed.strip_suffix('*') {
+        if unprocessed.ends_with('*') {
             // unnamed tail segment
 
-            segments.push(PatternSegment::Const(path.to_owned()));
-            segments.push(PatternSegment::Tail(None));
+            #[cfg(not(test))]
+            log::warn!("tail segments must have names; consider `{{tail}}*`");
 
-            re.push_str(&escape(path));
-            re.push_str("(.*)");
-
-            dyn_segment_count += 1;
+            // to test this case
+            #[cfg(test)]
+            panic!("tail segments must have names");
         } else if !has_tail_segment && !unprocessed.is_empty() {
             // prevent `Const("")` element from being added after last dynamic segment
 
@@ -886,7 +861,7 @@ impl ResourceDef {
             );
         }
 
-        if !is_prefix && !has_tail_segment {
+        if !is_prefix {
             re.push('$');
         }
 
@@ -964,13 +939,13 @@ mod tests {
         assert!(!re.is_match("/name~"));
 
         let mut path = Path::new("/name");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.unprocessed(), "");
 
-        assert_eq!(re.is_prefix_match("/name"), Some(5));
-        assert_eq!(re.is_prefix_match("/name1"), None);
-        assert_eq!(re.is_prefix_match("/name/"), None);
-        assert_eq!(re.is_prefix_match("/name~"), None);
+        assert_eq!(re.find_match("/name"), Some(5));
+        assert_eq!(re.find_match("/name1"), None);
+        assert_eq!(re.find_match("/name/"), None);
+        assert_eq!(re.find_match("/name~"), None);
 
         let re = ResourceDef::new("/name/");
         assert!(re.is_match("/name/"));
@@ -982,7 +957,7 @@ mod tests {
         assert!(!re.is_match("/user/profile/profile"));
 
         let mut path = Path::new("/user/profile");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.unprocessed(), "");
     }
 
@@ -995,12 +970,12 @@ mod tests {
         assert!(!re.is_match("/user/2345/sdg"));
 
         let mut path = Path::new("/user/profile");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "profile");
         assert_eq!(path.unprocessed(), "");
 
         let mut path = Path::new("/user/1245125");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "1245125");
         assert_eq!(path.unprocessed(), "");
 
@@ -1010,7 +985,7 @@ mod tests {
         assert!(!re.is_match("/resource"));
 
         let mut path = Path::new("/v151/resource/adage32");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("version").unwrap(), "151");
         assert_eq!(path.get("id").unwrap(), "adage32");
         assert_eq!(path.unprocessed(), "");
@@ -1022,7 +997,7 @@ mod tests {
         assert!(!re.is_match("/XXXXXX"));
 
         let mut path = Path::new("/012345");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "012345");
         assert_eq!(path.unprocessed(), "");
     }
@@ -1042,12 +1017,12 @@ mod tests {
         assert!(!re.is_match("/user/2345/sdg"));
 
         let mut path = Path::new("/user/profile");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "profile");
         assert_eq!(path.unprocessed(), "");
 
         let mut path = Path::new("/user/1245125");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "1245125");
         assert_eq!(path.unprocessed(), "");
 
@@ -1056,7 +1031,7 @@ mod tests {
         assert!(!re.is_match("/resource"));
 
         let mut path = Path::new("/v151/resource/adage32");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("version").unwrap(), "151");
         assert_eq!(path.get("id").unwrap(), "adage32");
 
@@ -1070,7 +1045,7 @@ mod tests {
         assert!(!re.is_match("/static/a"));
 
         let mut path = Path::new("/012345");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "012345");
 
         let re = ResourceDef::new([
@@ -1099,32 +1074,34 @@ mod tests {
         let re = ResourceDef::new("/user/-{id}*");
 
         let mut path = Path::new("/user/-profile");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "profile");
 
         let mut path = Path::new("/user/-2345");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "2345");
 
         let mut path = Path::new("/user/-2345/");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "2345/");
 
         let mut path = Path::new("/user/-2345/sdg");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "2345/sdg");
     }
 
     #[test]
     fn static_tail() {
-        let re = ResourceDef::new("/user*");
+        let re = ResourceDef::new("/user{tail}*");
+        assert!(re.is_match("/users"));
+        assert!(re.is_match("/user-foo"));
         assert!(re.is_match("/user/profile"));
         assert!(re.is_match("/user/2345"));
         assert!(re.is_match("/user/2345/"));
         assert!(re.is_match("/user/2345/sdg"));
         assert!(!re.is_match("/foo/profile"));
 
-        let re = ResourceDef::new("/user/*");
+        let re = ResourceDef::new("/user/{tail}*");
         assert!(re.is_match("/user/profile"));
         assert!(re.is_match("/user/2345"));
         assert!(re.is_match("/user/2345/"));
@@ -1134,10 +1111,10 @@ mod tests {
 
     #[test]
     fn dynamic_tail() {
-        let re = ResourceDef::new("/user/{id}/*");
+        let re = ResourceDef::new("/user/{id}/{tail}*");
         assert!(!re.is_match("/user/2345"));
         let mut path = Path::new("/user/2345/sdg");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "2345");
     }
 
@@ -1149,21 +1126,21 @@ mod tests {
 
         let re = ResourceDef::new("/a{x}b/test/a{y}b");
         let mut path = Path::new("/a\nb/test/a\nb");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("x").unwrap(), "\n");
         assert_eq!(path.get("y").unwrap(), "\n");
 
-        let re = ResourceDef::new("/user/*");
+        let re = ResourceDef::new("/user/{tail}*");
         assert!(re.is_match("/user/a\nb/"));
 
         let re = ResourceDef::new("/user/{id}*");
         let mut path = Path::new("/user/a\nb/a\nb");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "a\nb/a\nb");
 
         let re = ResourceDef::new("/user/{id:.*}");
         let mut path = Path::new("/user/a\nb/a\nb");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "a\nb/a\nb");
     }
 
@@ -1175,16 +1152,16 @@ mod tests {
         let re = ResourceDef::new("/user/{id}/test");
 
         let mut path = Path::new("/user/2345/test");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "2345");
 
         let mut path = Path::new("/user/qwe%25/test");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "qwe%25");
 
         let uri = http::Uri::try_from("/user/qwe%25/test").unwrap();
         let mut path = Path::new(uri);
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.get("id").unwrap(), "qwe%25");
     }
 
@@ -1199,18 +1176,18 @@ mod tests {
         assert!(re.is_match("/name~"));
 
         let mut path = Path::new("/name");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.unprocessed(), "");
 
         let mut path = Path::new("/name/test");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.unprocessed(), "/test");
 
-        assert_eq!(re.is_prefix_match("/name"), Some(5));
-        assert_eq!(re.is_prefix_match("/name/"), Some(5));
-        assert_eq!(re.is_prefix_match("/name/test/test"), Some(5));
-        assert_eq!(re.is_prefix_match("/name1"), None);
-        assert_eq!(re.is_prefix_match("/name~"), None);
+        assert_eq!(re.find_match("/name"), Some(5));
+        assert_eq!(re.find_match("/name/"), Some(5));
+        assert_eq!(re.find_match("/name/test/test"), Some(5));
+        assert_eq!(re.find_match("/name1"), None);
+        assert_eq!(re.find_match("/name~"), None);
 
         let re = ResourceDef::prefix("/name/");
         assert!(re.is_match("/name/"));
@@ -1223,7 +1200,7 @@ mod tests {
         assert!(!re.is_match("/name"));
 
         let mut path = Path::new("/name/gs");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(path.unprocessed(), "/gs");
     }
 
@@ -1235,25 +1212,25 @@ mod tests {
         assert!(re.is_match("/name/gs"));
         assert!(!re.is_match("/name"));
 
-        assert_eq!(re.is_prefix_match("/name/"), Some(6));
-        assert_eq!(re.is_prefix_match("/name/gs"), Some(6));
-        assert_eq!(re.is_prefix_match("/name"), None);
+        assert_eq!(re.find_match("/name/"), Some(6));
+        assert_eq!(re.find_match("/name/gs"), Some(6));
+        assert_eq!(re.find_match("/name"), None);
 
         let mut path = Path::new("/test2/");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(&path["name"], "test2");
         assert_eq!(&path[0], "test2");
         assert_eq!(path.unprocessed(), "");
 
         let mut path = Path::new("/test2/subpath1/subpath2/index.html");
-        assert!(re.is_path_match(&mut path));
+        assert!(re.capture_match_info(&mut path));
         assert_eq!(&path["name"], "test2");
         assert_eq!(&path[0], "test2");
         assert_eq!(path.unprocessed(), "subpath1/subpath2/index.html");
 
         let resource = ResourceDef::prefix("/user");
         // input string shorter than prefix
-        assert!(resource.is_prefix_match("/foo").is_none());
+        assert!(resource.find_match("/foo").is_none());
     }
 
     #[test]
@@ -1312,24 +1289,6 @@ mod tests {
 
     #[test]
     fn build_path_tail() {
-        let resource = ResourceDef::new("/user/{item1}/*");
-
-        let mut s = String::new();
-        assert!(!resource.resource_path_from_iter(&mut s, &mut (&["user1"]).iter()));
-
-        let mut s = String::new();
-        assert!(resource.resource_path_from_iter(&mut s, &mut (&["user1", "2345"]).iter()));
-        assert_eq!(s, "/user/user1/2345");
-
-        let mut s = String::new();
-        let mut map = HashMap::new();
-        map.insert("item1", "item");
-        assert!(!resource.resource_path_from_map(&mut s, &map));
-
-        let mut s = String::new();
-        assert!(resource.resource_path_from_map_with_tail(&mut s, &map, "2345"));
-        assert_eq!(s, "/user/item/2345");
-
         let resource = ResourceDef::new("/user/{item1}*");
 
         let mut s = String::new();
@@ -1343,17 +1302,6 @@ mod tests {
         let mut map = HashMap::new();
         map.insert("item1", "item");
         assert!(resource.resource_path_from_map(&mut s, &map));
-        assert_eq!(s, "/user/item");
-    }
-
-    #[test]
-    fn build_path_tail_when_resource_has_no_tail() {
-        let resource = ResourceDef::new("/user/{item1}");
-
-        let mut map = HashMap::new();
-        map.insert("item1", "item");
-        let mut s = String::new();
-        assert!(resource.resource_path_from_map_with_tail(&mut s, &map, "2345"));
         assert_eq!(s, "/user/item");
     }
 
@@ -1379,5 +1327,17 @@ mod tests {
         ResourceDef::new(
             "/{a}/{b}/{c}/{d}/{e}/{f}/{g}/{h}/{i}/{j}/{k}/{l}/{m}/{n}/{o}/{p}/{q}",
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_custom_regex_for_tail() {
+        ResourceDef::new(r"/{tail:\d+}*");
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_unnamed_tail_segment() {
+        ResourceDef::new(r"/*");
     }
 }

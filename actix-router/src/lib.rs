@@ -14,6 +14,8 @@ pub use self::path::Path;
 pub use self::resource::ResourceDef;
 pub use self::router::{ResourceInfo, Router, RouterBuilder};
 
+// TODO: this trait is necessary, document it
+// see impl Resource for ServiceRequest
 pub trait Resource<T: ResourcePath> {
     fn resource_path(&mut self) -> &mut Path<T>;
 }

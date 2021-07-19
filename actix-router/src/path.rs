@@ -4,8 +4,7 @@ use std::ops::Index;
 use firestorm::profile_method;
 use serde::de;
 
-use crate::de::PathDeserializer;
-use crate::{Resource, ResourcePath};
+use crate::{de::PathDeserializer, Resource, ResourcePath};
 
 #[derive(Debug, Clone)]
 pub(crate) enum PathItem {
@@ -27,6 +26,7 @@ pub struct Path<T> {
     path: T,
     pub(crate) skip: u16,
     pub(crate) segments: Vec<(Cow<'static, str>, PathItem)>,
+    pub(crate) tail: Option<PathItem>,
 }
 
 impl<T: ResourcePath> Path<T> {
@@ -35,6 +35,7 @@ impl<T: ResourcePath> Path<T> {
             path,
             skip: 0,
             segments: Vec::new(),
+            tail: None,
         }
     }
 
@@ -97,6 +98,11 @@ impl<T: ResourcePath> Path<T> {
         }
     }
 
+    pub(crate) fn add_tail(&mut self, value: PathItem) {
+        profile_method!(add_tail);
+        self.tail = Some(value);
+    }
+
     #[doc(hidden)]
     pub fn add_static(
         &mut self,
@@ -120,24 +126,21 @@ impl<T: ResourcePath> Path<T> {
     }
 
     /// Get matched parameter by name without type conversion
-    pub fn get(&self, key: &str) -> Option<&str> {
+    pub fn get(&self, name: &str) -> Option<&str> {
         profile_method!(get);
 
-        for item in self.segments.iter() {
-            if key == item.0 {
-                return match item.1 {
+        for (seg_name, val) in self.segments.iter() {
+            if name == seg_name {
+                return match val {
                     PathItem::Static(ref s) => Some(&s),
                     PathItem::Segment(s, e) => {
-                        Some(&self.path.path()[(s as usize)..(e as usize)])
+                        Some(&self.path.path()[(*s as usize)..(*e as usize)])
                     }
                 };
             }
         }
-        if key == "tail" {
-            Some(&self.path.path()[(self.skip as usize)..])
-        } else {
-            None
-        }
+
+        None
     }
 
     /// Get unprocessed part of the path
