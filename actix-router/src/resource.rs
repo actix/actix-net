@@ -573,10 +573,9 @@ impl ResourceDef {
             PatternType::Prefix(ref prefix) => is_strict_prefix(prefix, path),
 
             // dynamic prefix
-            PatternType::Dynamic(ref re, _) if !re.as_str().ends_with("$") => {
+            PatternType::Dynamic(ref re, _) if !re.as_str().ends_with('$') => {
                 match re.find(path) {
                     // prefix matches exactly
-                    // TODO: im p sure tail segments will hit this now too
                     Some(m) if m.end() == path.len() => true,
 
                     // prefix matches part
@@ -639,10 +638,9 @@ impl ResourceDef {
             PatternType::Prefix(_) => None,
 
             // dynamic prefix
-            PatternType::Dynamic(ref re, _) if !re.as_str().ends_with("$") => {
+            PatternType::Dynamic(ref re, _) if !re.as_str().ends_with('$') => {
                 match re.find(path) {
                     // prefix matches exactly
-                    // TODO: im p sure tail segments will hit this now too
                     Some(m) if m.end() == path.len() => Some(m.end()),
 
                     // prefix matches part
