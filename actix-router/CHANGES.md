@@ -7,7 +7,7 @@
 * Fix a bug in multi-patterns where static patterns are interpreted as regex. [#366]
 * Introduce `ResourceDef::pattern_iter` to get an iterator over all patterns in a multi-pattern resource. [#373]
 * Fix segment interpolation leaving `Path` in unintended state after matching. [#368]
-* Fix `ResourceDef` `PartialEq` implementation.
+* Fix `ResourceDef` `PartialEq` implementation. [#373]
 * Re-work `IntoPatterns` trait, adding a `Patterns` enum. [#372]
 * Implement `IntoPatterns` for `bytestring::ByteString`. [#372]
 * Rename `Path::{len => segment_count}` to be more descriptive of it's purpose. [#370]
