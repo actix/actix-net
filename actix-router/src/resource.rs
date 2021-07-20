@@ -304,8 +304,8 @@ impl ResourceDef {
     /// this method vs using `new`; they will not be appended with the `$` meta-character that
     /// matches the end of an input.
     ///
-    /// Although it will compile and run correctly, it is meaningless to construct a prefix
-    /// resource definition with a tail segment; use [`new`][Self::new] in this case.
+    /// It is incorrect to construct a prefix resource definition with a tail segment; use
+    /// [`new`][Self::new] in this case to avoid a warning log.
     ///
     /// # Panics
     /// Panics if path regex pattern is malformed.
@@ -335,6 +335,8 @@ impl ResourceDef {
 
     /// Constructs a new resource definition using a string pattern that performs prefix matching,
     /// inserting a `/` to beginning of the pattern if absent and pattern is not empty.
+    ///
+    /// See [`prefix`][Self::prefix] for more.
     ///
     /// # Panics
     /// Panics if path regex pattern is malformed.
