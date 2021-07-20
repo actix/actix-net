@@ -576,7 +576,6 @@ impl ResourceDef {
             PatternType::Dynamic(ref re, _) if !re.as_str().ends_with("$") => {
                 match re.find(path) {
                     // prefix matches exactly
-                    // TODO: im p sure tail segments will hit this now too
                     Some(m) if m.end() == path.len() => true,
 
                     // prefix matches part
@@ -647,7 +646,6 @@ impl ResourceDef {
             PatternType::Dynamic(ref re, _) if !re.as_str().ends_with("$") => {
                 match re.find(path) {
                     // prefix matches exactly
-                    // TODO: im p sure tail segments will hit this now too
                     Some(m) if m.end() == path.len() => Some(m.end()),
 
                     // prefix matches part
@@ -1052,13 +1050,32 @@ impl ResourceDef {
             dyn_segment_count += 1;
         }
 
+        if is_prefix && has_tail_segment {
+            // tail segments in prefixes have no defined semantics
+
+            #[cfg(not(test))]
+            log::warn!(
+                "Prefix resources should not have tail segments. \
+                Use `ResourceDef::new` constructor. \
+                This may become a panic in the future."
+            );
+
+            // panic in tests to make this case detectable
+            #[cfg(test)]
+            panic!("prefix resource definitions should not have tail segments");
+        }
+
         if unprocessed.ends_with('*') {
             // unnamed tail segment
 
             #[cfg(not(test))]
-            log::warn!("tail segments must have names; consider `{{tail}}*`");
+            log::warn!(
+                "Tail segments must have names. \
+                Consider `.../{{tail}}*`. \
+                This may become a panic in the future."
+            );
 
-            // to this case detectable in tests
+            // panic in tests to make this case detectable
             #[cfg(test)]
             panic!("tail segments must have names");
         } else if !has_tail_segment && !unprocessed.is_empty() {
@@ -1179,7 +1196,6 @@ mod tests {
 
         assert_eq!(ResourceDef::new("/"), ResourceDef::new(["/"]));
         assert_eq!(ResourceDef::new("/"), ResourceDef::new(vec!["/"]));
-        assert_eq!(ResourceDef::new("/{id}*"), ResourceDef::prefix("/{id}*"));
 
         assert_ne!(ResourceDef::new(""), ResourceDef::prefix(""));
         assert_ne!(ResourceDef::new("/"), ResourceDef::prefix("/"));
@@ -1711,11 +1727,11 @@ mod tests {
     #[test]
     #[should_panic]
     fn invalid_unnamed_tail_segment() {
-        ResourceDef::new(r"/*");
+        ResourceDef::new("/*");
     }
 
     #[test]
-    // #[should_panic] // TODO: consider if this should be allowed
+    #[should_panic]
     fn prefix_plus_tail_match_is_allowed() {
         ResourceDef::prefix("/user/{id}*");
     }
