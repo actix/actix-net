@@ -525,6 +525,28 @@ impl ResourceDef {
         }
     }
 
+    pub fn join(&self, other: &ResourceDef) -> ResourceDef {
+        fn delimited(this: &str, other: &str) -> bool {
+            this.is_empty() || other.is_empty() || this.ends_with('/') || other.starts_with('/')
+        }
+
+        let patterns = self
+            .pattern_iter()
+            .flat_map(move |this| other.pattern_iter().map(move |other| (this, other)))
+            .map(|(this, other)| match delimited(this, other) {
+                true => [this, other].join(""),
+                false => [this, other].join("/"),
+            })
+            .collect::<Vec<_>>();
+
+        let is_prefix = other.is_prefix();
+
+        match patterns.len() {
+            1 => ResourceDef::from_single_pattern(&patterns[0], is_prefix),
+            _ => ResourceDef::new(patterns),
+        }
+    }
+
     /// Returns `true` if `path` matches this resource.
     ///
     /// The behavior of this method depends on how the `ResourceDef` was constructed. For example,
