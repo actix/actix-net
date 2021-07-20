@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Add `io-uring` feature for enabling async file Io on linux system. [#374]
+
+[#374]: https://github.com/actix/actix-net/pull/374
 
 
 ## 2.2.0 - 2021-03-29

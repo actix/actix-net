@@ -31,11 +31,6 @@ impl Runtime {
         })
     }
 
-    /// Reference to local task set.
-    pub(crate) fn local_set(&self) -> &LocalSet {
-        &self.local
-    }
-
     /// Offload a future onto the single-threaded runtime.
     ///
     /// The returned join handle can be used to await the future's result.
