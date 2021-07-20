@@ -628,12 +628,12 @@ impl ResourceDef {
             PatternType::Prefix(prefix) if is_strict_prefix(prefix, path) => Some(prefix.len()),
             PatternType::Prefix(_) => None,
 
-            PatternType::Dynamic(re, _) => re.find(path).map(|m| m.end()),
+            PatternType::Dynamic(re, _) => Some(re.captures(path)?[1].len()),
 
             PatternType::DynamicSet(re, params) => {
                 let idx = re.matches(path).into_iter().next()?;
                 let (ref pattern, _) = params[idx];
-                pattern.find(path).map(|m| m.end())
+                Some(pattern.captures(path)?[1].len())
             }
         }
     }
@@ -659,7 +659,7 @@ impl ResourceDef {
     /// assert_eq!(path.unprocessed(), "");
     /// ```
     pub fn capture_match_info<T: ResourcePath>(&self, path: &mut Path<T>) -> bool {
-        profile_method!(is_path_match);
+        profile_method!(capture_match_info);
         self.capture_match_info_fn(path, &|_, _| true, &None::<()>)
     }
 
@@ -712,7 +712,7 @@ impl ResourceDef {
         T: ResourcePath,
         F: Fn(&R, &Option<U>) -> bool,
     {
-        profile_method!(is_path_match_fn);
+        profile_method!(capture_match_info_fn);
 
         let mut segments = <[PathItem; MAX_DYNAMIC_SEGMENTS]>::default();
         let path = resource.resource_path();
@@ -756,7 +756,7 @@ impl ResourceDef {
                     }
                 };
 
-                (captures[0].len(), Some(names))
+                (captures[1].len(), Some(names))
             }
 
             PatternType::DynamicSet(re, params) => {
@@ -782,7 +782,7 @@ impl ResourceDef {
                     }
                 }
 
-                (captures[0].len(), Some(names))
+                (captures[1].len(), Some(names))
             }
         };
 
@@ -1045,8 +1045,16 @@ impl ResourceDef {
             );
         }
 
-        if !is_prefix && !has_tail_segment {
+        // Store pattern in capture group #1 to have segment-boundary match oustide it
+        let mut re = format!("({})", re);
+
+        if has_tail_segment {
+            ();
+        } else if !is_prefix {
             re.push('$');
+        } else if is_prefix && !pattern.ends_with('/') {
+            // make sure that match ends in a segment boundary
+            re.push_str(r"(/|$)");
         }
 
         let re = match Regex::new(&re) {
@@ -1478,10 +1486,6 @@ mod tests {
         assert_eq!(&path[0], "test2");
         assert_eq!(path.unprocessed(), "subpath1/subpath2/index.html");
 
-        let resource = ResourceDef::prefix(r"/id/{id:\d{3}}");
-        assert!(resource.is_match("/id/1234"));
-        assert_eq!(resource.find_match("/id/1234"), Some(7));
-
         let resource = ResourceDef::prefix("/user");
         // input string shorter than prefix
         assert!(resource.find_match("/foo").is_none());
@@ -1552,6 +1556,21 @@ mod tests {
         assert!(resource.capture_match_info(&mut path));
         assert!(path.get("id").is_none());
         assert!(path.get("uid").is_some());
+    }
+
+    #[test]
+    fn dynamic_prefix_proper_segmentation() {
+        let resource = ResourceDef::prefix(r"/id/{id:\d{3}}");
+
+        assert!(resource.is_match("/id/123"));
+        assert!(resource.is_match("/id/123/foo"));
+        assert!(!resource.is_match("/id/1234"));
+        assert!(!resource.is_match("/id/123a"));
+
+        assert_eq!(resource.find_match("/id/123"), Some(7));
+        assert_eq!(resource.find_match("/id/123/foo"), Some(7));
+        assert_eq!(resource.find_match("/id/1234"), None);
+        assert_eq!(resource.find_match("/id/123a"), None);
     }
 
     #[test]
