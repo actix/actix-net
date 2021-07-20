@@ -616,13 +616,8 @@ impl ResourceDef {
         profile_method!(find_match);
 
         match &self.pat_type {
-            PatternType::Static(segment) => {
-                if segment == path {
-                    Some(segment.len())
-                } else {
-                    None
-                }
-            }
+            PatternType::Static(segment) if path == segment => Some(segment.len()),
+            PatternType::Static(_) => None,
 
             PatternType::Prefix(prefix) if path == prefix => Some(prefix.len()),
             PatternType::Prefix(prefix) if is_strict_prefix(prefix, path) => Some(prefix.len()),
@@ -1121,7 +1116,7 @@ pub(crate) fn insert_slash(path: &str) -> Cow<'_, str> {
 ///
 /// The `strict` refers to the fact that this will return `false` if `prefix == path`.
 fn is_strict_prefix(prefix: &str, path: &str) -> bool {
-    path.starts_with(prefix) && (prefix.ends_with('/') || path[prefix.len()..].starts_with('/'))
+    path.starts_with(prefix) && (prefix.ends_with('/') || path[prefix.len()..].starts_with('/') || prefix.is_empty())
 }
 
 #[cfg(test)]
