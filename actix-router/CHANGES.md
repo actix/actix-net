@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 0.5.0-beta.1 - 2021-07-20
 * Fix a bug in multi-patterns where static patterns are interpreted as regex. [#366]
 * Introduce `ResourceDef::pattern_iter` to get an iterator over all patterns in a multi-pattern resource. [#373]
 * Fix segment interpolation leaving `Path` in unintended state after matching. [#368]

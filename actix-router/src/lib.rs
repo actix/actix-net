@@ -1,4 +1,4 @@
-//! Resource path matching library.
+//! Resource path matching and router.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
