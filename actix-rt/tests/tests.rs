@@ -302,7 +302,7 @@ fn try_current_with_system() {
     System::new().block_on(async { assert!(System::try_current().is_some()) });
 }
 
-#[cfg(feature = "io-uring")]
+#[cfg(all(target_os = "linux", feature = "io-uring"))]
 #[test]
 fn tokio_uring_arbiter() {
     let system = System::new();

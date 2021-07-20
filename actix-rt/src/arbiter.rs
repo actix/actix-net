@@ -91,7 +91,7 @@ pub struct Arbiter {
 }
 
 impl Arbiter {
-    #[cfg(not(feature = "io-uring"))]
+    #[cfg(any(not(target_os = "linux"), not(feature = "io-uring")))]
     /// Spawn a new Arbiter thread and start its event loop.
     ///
     /// # Panics
@@ -104,7 +104,7 @@ impl Arbiter {
         })
     }
 
-    #[cfg(not(feature = "io-uring"))]
+    #[cfg(any(not(target_os = "linux"), not(feature = "io-uring")))]
     /// Spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
@@ -159,7 +159,7 @@ impl Arbiter {
         Arbiter { tx, thread_handle }
     }
 
-    #[cfg(feature = "io-uring")]
+    #[cfg(all(target_os = "linux", feature = "io-uring"))]
     /// Spawn a new Arbiter thread and start its event loop with `tokio-uring` runtime.
     ///
     /// # Panics
