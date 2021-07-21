@@ -350,13 +350,6 @@ impl ResourceDef {
     /// assert!(!resource.is_match("user/123"));
     /// assert!(!resource.is_match("user/123/stars"));
     /// assert!(!resource.is_match("/foo"));
-    ///
-    /// let resource = ResourceDef::prefix("user/{id}");
-    /// assert!(resource.is_match("user/123"));
-    /// assert!(resource.is_match("user/123/stars"));
-    /// assert!(!resource.is_match("/user/123"));
-    /// assert!(!resource.is_match("/user/123/stars"));
-    /// assert!(!resource.is_match("foo"));
     /// ```
     pub fn prefix(path: &str) -> Self {
         profile_method!(prefix);
@@ -377,7 +370,6 @@ impl ResourceDef {
     ///
     /// assert_eq!(&resource, &ResourceDef::prefix("/user/{id}"));
     /// assert_eq!(&resource, &ResourceDef::root_prefix("/user/{id}"));
-    /// assert_ne!(&resource, &ResourceDef::new("user/{id}"));
     /// assert_ne!(&resource, &ResourceDef::new("/user/{id}"));
     ///
     /// assert!(resource.is_match("/user/123"));
