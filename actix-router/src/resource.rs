@@ -33,13 +33,13 @@ const REGEX_FLAGS: &str = "(?s-m)";
 /// Resource pattern is defined as a string of zero or more _segments_ where each segment is
 /// preceeded by a slash `/`.
 ///
-/// This means that pattern string *must* either be empty or begin with a slash (`/`).
+/// This means that pattern string __must__ either be empty or begin with a slash (`/`).
 /// This also implies that a trailing slash in pattern defines an empty segment.
-/// For example, the pattern `"/user/"` have two segment: `["user", ""]`
+/// For example, the pattern `"/user/"` has two segments: `["user", ""]`
 ///
-/// A key point to undertand is that `ResourceDef` matches segments, not string.
+/// A key point to undertand is that `ResourceDef` matches segments, not strings.
 /// It matches segments individually.
-/// For exmaple, the pattern `/user/` is not considered a prefix for the path `/user/123/456`,
+/// For example, the pattern `/user/` is not considered a prefix for the path `/user/123/456`,
 /// because the second segment doesn't match: `["user", ""]` vs `["user", "123", "456"]`.
 ///
 /// This definition is consistent with the definition of absolute URL path in
@@ -107,8 +107,8 @@ const REGEX_FLAGS: &str = "(?s-m)";
 /// A prefix resource is defined as pattern that can match just the start of a path.
 ///
 /// Prefix patterns with a trailing slash may have a weird, though correct, behavior.
-/// It basically defines and requires an empty segment to match.
-/// Examples are given below..
+/// They basically define and require an empty segment to match.
+/// Examples are given below.
 ///
 /// Empty pattern matches any path as a prefix.
 ///
@@ -124,7 +124,6 @@ const REGEX_FLAGS: &str = "(?s-m)";
 ///
 /// // prefix pattern with a trailing slash
 /// let resource = ResourceDef::prefix("/user/{id}/");
-/// eprintln!("{:?}", resource);
 /// assert!(resource.is_match("/user/123/"));
 /// assert!(resource.is_match("/user/123//stars"));
 /// assert!(!resource.is_match("/user/123/stars"));
@@ -142,7 +141,7 @@ const REGEX_FLAGS: &str = "(?s-m)";
 /// is numeric.
 ///
 /// The regex could pontentially match multiple segments. If this is not wanted, then care must be
-/// taken to avoid matching a slash `/`. It is guaranteed, however, that the match ends in a
+/// taken to avoid matching a slash `/`. It is guaranteed, however, that the match ends at a
 /// segment boundary; the pattern `r"(/|$)` is always appended to the regex.
 ///
 /// By default, dynamic segments use this regex: `[^/]+`. This shows why it is the case, as shown in
@@ -1003,7 +1002,7 @@ impl ResourceDef {
         profile_method!(parse);
 
         if !pattern.is_empty() && !pattern.starts_with('/') {
-            panic!("Resource pattern must either be empty or begins with '/'",);
+            panic!("Resource pattern must either be empty or begin with '/'",);
         }
 
         let mut unprocessed = pattern;
@@ -1067,10 +1066,10 @@ impl ResourceDef {
             );
         }
 
-        // Store the pattern at capture group #1 to have context info outside it
+        // Store the pattern in capture group #1 to have context info outside it
         let mut re = format!("({})", re);
 
-        // Ensure the match ends in a new segment boundary
+        // Ensure the match ends at a segment boundary
         if !is_prefix && !has_tail_segment {
             re.push('$');
         } else if is_prefix && !has_tail_segment {
