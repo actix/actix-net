@@ -1,4 +1,4 @@
-//! Resource path matching library.
+//! Resource path matching and router.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
@@ -49,6 +49,15 @@ pub enum Patterns {
     List(Vec<String>),
 }
 
+impl Patterns {
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Patterns::Single(_) => false,
+            Patterns::List(pats) => pats.is_empty(),
+        }
+    }
+}
+
 /// Helper trait for type that could be converted to one or more path pattern.
 pub trait IntoPatterns {
     fn patterns(&self) -> Patterns;
@@ -75,6 +84,12 @@ impl<'a> IntoPatterns for &'a str {
 impl IntoPatterns for bytestring::ByteString {
     fn patterns(&self) -> Patterns {
         Patterns::Single(self.to_string())
+    }
+}
+
+impl IntoPatterns for Patterns {
+    fn patterns(&self) -> Patterns {
+        self.clone()
     }
 }
 
