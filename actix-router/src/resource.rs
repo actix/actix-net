@@ -955,7 +955,9 @@ impl ResourceDef {
                 }
                 _ => false,
             })
-            .expect("malformed dynamic segment");
+            .unwrap_or_else(|| {
+                panic!(r#"path "{}" contains malformed dynamic segment"#, pattern)
+            });
 
         let (mut param, mut unprocessed) = pattern.split_at(close_idx + 1);
 
