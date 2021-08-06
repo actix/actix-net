@@ -525,6 +525,29 @@ impl ResourceDef {
         }
     }
 
+    /// Joins two resources.
+    ///
+    /// Resulting resource is prefix if `other` is prefix.
+    ///
+    /// # Examples
+    /// ```
+    /// # use actix_router::ResourceDef;
+    /// let joined = ResourceDef::prefix("/root").join(&ResourceDef::prefix("/seg"));
+    /// assert_eq!(joined, ResourceDef::prefix("/root/seg"));
+    /// ```
+    pub fn join(&self, other: &ResourceDef) -> ResourceDef {
+        let patterns = self
+            .pattern_iter()
+            .flat_map(move |this| other.pattern_iter().map(move |other| (this, other)))
+            .map(|(this, other)| [this, other].join(""))
+            .collect::<Vec<_>>();
+
+        match patterns.len() {
+            1 => ResourceDef::from_single_pattern(&patterns[0], other.is_prefix()),
+            _ => ResourceDef::new(patterns),
+        }
+    }
+
     /// Returns `true` if `path` matches this resource.
     ///
     /// The behavior of this method depends on how the `ResourceDef` was constructed. For example,
@@ -1634,6 +1657,51 @@ mod tests {
 
         let re = ResourceDef::prefix("/{id}/");
         assert_eq!(re.find_match("/abc/def"), result);
+    }
+
+    #[test]
+    fn join() {
+        // test joined defs match the same paths as each component separately
+
+        fn seq_find_match(re1: &ResourceDef, re2: &ResourceDef, path: &str) -> Option<usize> {
+            let len1 = re1.find_match(path)?;
+            let len2 = re2.find_match(&path[len1..])?;
+            Some(len1 + len2)
+        }
+
+        macro_rules! join_test {
+            ($pat1:expr, $pat2:expr => $($test:expr),+) => {{
+                let pat1 = $pat1;
+                let pat2 = $pat2;
+                $({
+                    let _path = $test;
+                    let (re1, re2) = (ResourceDef::prefix(pat1), ResourceDef::new(pat2));
+                    let _seq = seq_find_match(&re1, &re2, _path);
+                    let _join = re1.join(&re2).find_match(_path);
+                    assert_eq!(
+                        _seq, _join,
+                        "patterns: prefix {:?}, {:?}; mismatch on \"{}\"; seq={:?}; join={:?}",
+                        pat1, pat2, _path, _seq, _join
+                    );
+                    assert!(!re1.join(&re2).is_prefix());
+
+                    let (re1, re2) = (ResourceDef::prefix(pat1), ResourceDef::prefix(pat2));
+                    let _seq = seq_find_match(&re1, &re2, _path);
+                    let _join = re1.join(&re2).find_match(_path);
+                    assert_eq!(
+                        _seq, _join,
+                        "patterns: prefix {:?}, prefix {:?}; mismatch on \"{}\"; seq={:?}; join={:?}",
+                        pat1, pat2, _path, _seq, _join
+                    );
+                    assert!(re1.join(&re2).is_prefix());
+                })+
+            }}
+        }
+
+        join_test!("", "" => "", "/hello", "/");
+        join_test!("/user", "" => "", "/user", "/user/123", "/user11", "user", "user/123");
+        join_test!("",  "/user"=> "", "/user", "foo", "/user11", "user", "user/123");
+        join_test!("/user",  "/xx"=> "", "",  "/", "/user", "/xx", "/userxx", "/user/xx");
     }
 
     #[test]

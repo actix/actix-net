@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Introduce `ResourceDef::join`. [#380]
+
+[#380]: https://github.com/actix/actix-net/pull/380
 
 
 ## 0.5.0-beta.1 - 2021-07-20
