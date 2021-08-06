@@ -2,7 +2,6 @@
 members = [
   "actix-codec",
   "actix-macros",
-  "actix-router",
   "actix-rt",
   "actix-server",
   "actix-service",
@@ -17,7 +16,6 @@ members = [
 [patch.crates-io]
 actix-codec = { path = "actix-codec" }
 actix-macros = { path = "actix-macros" }
-actix-router = { path = "actix-router" }
 actix-rt = { path = "actix-rt" }
 actix-server = { path = "actix-server" }
 actix-service = { path = "actix-service" }
