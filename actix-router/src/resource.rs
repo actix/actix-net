@@ -634,13 +634,8 @@ impl ResourceDef {
         profile_method!(find_match);
 
         match &self.pat_type {
-            PatternType::Static(segment) => {
-                if segment == path {
-                    Some(segment.len())
-                } else {
-                    None
-                }
-            }
+            PatternType::Static(segment) if path == segment => Some(segment.len()),
+            PatternType::Static(_) => None,
 
             PatternType::Prefix(prefix) if is_prefix(prefix, path) => Some(prefix.len()),
             PatternType::Prefix(_) => None,
@@ -677,7 +672,7 @@ impl ResourceDef {
     /// ```
     pub fn capture_match_info<T: ResourcePath>(&self, path: &mut Path<T>) -> bool {
         profile_method!(is_path_match);
-        self.capture_match_info_fn(path, &|_, _| true, &None::<()>)
+        self.capture_match_info_fn(path, |_, _| true, ())
     }
 
     /// Collects dynamic segment values into `resource` after matching paths and executing
@@ -700,7 +695,7 @@ impl ResourceDef {
     ///     resource.capture_match_info_fn(
     ///         path,
     ///         // when env var is not set, reject when path contains "admin"
-    ///         &|res, admin_allowed| !res.path().contains("admin"),
+    ///         |res, admin_allowed| !res.path().contains("admin"),
     ///         &admin_allowed
     ///     )
     /// }
@@ -721,13 +716,13 @@ impl ResourceDef {
     pub fn capture_match_info_fn<R, T, F, U>(
         &self,
         resource: &mut R,
-        check_fn: &F,
-        user_data: &Option<U>,
+        check_fn: F,
+        user_data: U,
     ) -> bool
     where
         R: Resource<T>,
         T: ResourcePath,
-        F: Fn(&R, &Option<U>) -> bool,
+        F: FnOnce(&R, U) -> bool,
     {
         profile_method!(is_path_match_fn);
 
