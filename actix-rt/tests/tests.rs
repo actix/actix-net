@@ -1,4 +1,5 @@
 use std::{
+    future::Future,
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::channel,
@@ -9,7 +10,6 @@ use std::{
 };
 
 use actix_rt::{Arbiter, System};
-use futures_core::Future;
 use tokio::sync::oneshot;
 
 #[test]

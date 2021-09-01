@@ -155,10 +155,36 @@ pub mod task {
     pub use tokio::task::{spawn_blocking, yield_now, JoinError, JoinHandle};
 }
 
-/// Spawns a future on the current thread.
+/// Spawns a future on the current thread as a new task.
+///
+/// If not immediately awaited, the task can be cancelled using [`JoinHandle::abort`].
+///
+/// The provided future is spawned as a new task; therefore, panics are caught.
 ///
 /// # Panics
 /// Panics if Actix system is not running.
+///
+/// # Examples
+/// ```
+/// # use std::time::Duration;
+/// # actix_rt::Runtime::new().unwrap().block_on(async {
+/// // task resolves successfully
+/// assert_eq!(actix_rt::spawn(async { 1 }).await.unwrap(), 1);
+///
+/// // task panics
+/// assert!(actix_rt::spawn(async {
+///     panic!("panic is caught at task boundary");
+/// })
+/// .await
+/// .unwrap_err()
+/// .is_panic());
+///
+/// // task is cancelled before completion
+/// let handle = actix_rt::spawn(actix_rt::time::sleep(Duration::from_secs(100)));
+/// handle.abort();
+/// assert!(handle.await.unwrap_err().is_cancelled());
+/// # });
+/// ```
 #[inline]
 pub fn spawn<Fut>(f: Fut) -> JoinHandle<Fut::Output>
 where
