@@ -11,3 +11,5 @@ extern crate tls_openssl as openssl;
 pub mod accept;
 #[cfg(feature = "connect")]
 pub mod connect;
+#[cfg(feature = "rustls")]
+pub use tokio_rustls::rustls;
