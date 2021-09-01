@@ -104,9 +104,7 @@ jobs:
       - name: tests
         if: matrix.target.triple != 'x86_64-pc-windows-gnu'
         uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --workspace --all-features --no-fail-fast -- --nocapture
+        with: { command: ci-test }
 
       - name: Generate coverage file
         if: >
@@ -129,3 +127,22 @@ jobs:
         run: |
           cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
           cargo-cache
+
+  rustdoc:
+    name: rustdoc
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust (nightly)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-x86_64-unknown-linux-gnu
+          profile: minimal
+          override: true
+
+      - name: doc tests
+        uses: actions-rs/cargo@v1
+        timeout-minutes: 40
+        with: { command: ci-doctest }
