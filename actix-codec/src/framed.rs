@@ -21,14 +21,13 @@ bitflags::bitflags! {
 }
 
 pin_project_lite::pin_project! {
-    /// A unified `Stream` and `Sink` interface to an underlying I/O object, using
-    /// the `Encoder` and `Decoder` traits to encode and decode frames.
+    /// A unified `Stream` and `Sink` interface to an underlying I/O object, using the `Encoder` and
+    /// `Decoder` traits to encode and decode frames.
     ///
-    /// Raw I/O objects work with byte sequences, but higher-level code usually
-    /// wants to batch these into meaningful chunks, called "frames". This
-    /// method layers framing on top of an I/O object, by using the `Encoder`/`Decoder`
-    /// traits to handle encoding and decoding of message frames. Note that
-    /// the incoming and outgoing frame types may be distinct.
+    /// Raw I/O objects work with byte sequences, but higher-level code usually wants to batch these
+    /// into meaningful chunks, called "frames". This method layers framing on top of an I/O object,
+    /// by using the `Encoder`/`Decoder` traits to handle encoding and decoding of message frames.
+    /// Note that the incoming and outgoing frame types may be distinct.
     pub struct Framed<T, U> {
         #[pin]
         io: T,
@@ -44,10 +43,9 @@ where
     T: AsyncRead + AsyncWrite,
     U: Decoder,
 {
-    /// This function returns a *single* object that is both `Stream` and
-    /// `Sink`; grouping this into a single object is often useful for layering
-    /// things like gzip or TLS, which require both read and write access to the
-    /// underlying object.
+    /// This function returns a *single* object that is both `Stream` and `Sink`; grouping this into
+    /// a single object is often useful for layering things like gzip or TLS, which require both
+    /// read and write access to the underlying object.
     pub fn new(io: T, codec: U) -> Framed<T, U> {
         Framed {
             io,
@@ -70,21 +68,18 @@ impl<T, U> Framed<T, U> {
         &mut self.codec
     }
 
-    /// Returns a reference to the underlying I/O stream wrapped by
-    /// `Frame`.
+    /// Returns a reference to the underlying I/O stream wrapped by `Frame`.
     ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise
-    /// being worked with.
+    /// Note that care should be taken to not tamper with the underlying stream of data coming in as
+    /// it may corrupt the stream of frames otherwise being worked with.
     pub fn io_ref(&self) -> &T {
         &self.io
     }
 
     /// Returns a mutable reference to the underlying I/O stream.
     ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise
-    /// being worked with.
+    /// Note that care should be taken to not tamper with the underlying stream of data coming in as
+    /// it may corrupt the stream of frames otherwise being worked with.
     pub fn io_mut(&mut self) -> &mut T {
         &mut self.io
     }
@@ -184,10 +179,9 @@ impl<T, U> Framed<T, U> {
     {
         loop {
             let mut this = self.as_mut().project();
-            // Repeatedly call `decode` or `decode_eof` as long as it is
-            // "readable". Readable is defined as not having returned `None`. If
-            // the upstream has returned EOF, and the decoder is no longer
-            // readable, it can be assumed that the decoder will never become
+            // Repeatedly call `decode` or `decode_eof` as long as it is "readable". Readable is
+            // defined as not having returned `None`. If the upstream has returned EOF, and the
+            // decoder is no longer readable, it can be assumed that the decoder will never become
             // readable again, at which point the stream is terminated.
 
             if this.flags.contains(Flags::READABLE) {
@@ -215,7 +209,7 @@ impl<T, U> Framed<T, U> {
 
             debug_assert!(!this.flags.contains(Flags::EOF));
 
-            // Otherwise, try to read more data and try again. Make sure we've got room
+            // Otherwise, try to read more data and try again. Make sure we've got room.
             let remaining = this.read_buf.capacity() - this.read_buf.len();
             if remaining < LW {
                 this.read_buf.reserve(HW - remaining)
@@ -341,13 +335,12 @@ where
 }
 
 impl<T, U> Framed<T, U> {
-    /// This function returns a *single* object that is both `Stream` and
-    /// `Sink`; grouping this into a single object is often useful for layering
-    /// things like gzip or TLS, which require both read and write access to the
-    /// underlying object.
+    /// This function returns a *single* object that is both `Stream` and `Sink`; grouping this into
+    /// a single object is often useful for layering things like gzip or TLS, which require both
+    /// read and write access to the underlying object.
     ///
-    /// These objects take a stream, a read buffer and a write buffer. These
-    /// fields can be obtained from an existing `Framed` with the `into_parts` method.
+    /// These objects take a stream, a read buffer and a write buffer. These fields can be obtained
+    /// from an existing `Framed` with the `into_parts` method.
     pub fn from_parts(parts: FramedParts<T, U>) -> Framed<T, U> {
         Framed {
             io: parts.io,
@@ -358,12 +351,11 @@ impl<T, U> Framed<T, U> {
         }
     }
 
-    /// Consumes the `Frame`, returning its underlying I/O stream, the buffer
-    /// with unprocessed data, and the codec.
+    /// Consumes the `Frame`, returning its underlying I/O stream, the buffer with unprocessed data,
+    /// and the codec.
     ///
-    /// Note that care should be taken to not tamper with the underlying stream
-    /// of data coming in as it may corrupt the stream of frames otherwise
-    /// being worked with.
+    /// Note that care should be taken to not tamper with the underlying stream of data coming in as
+    /// it may corrupt the stream of frames otherwise being worked with.
     pub fn into_parts(self) -> FramedParts<T, U> {
         FramedParts {
             io: self.io,
@@ -376,14 +368,15 @@ impl<T, U> Framed<T, U> {
 }
 
 /// `FramedParts` contains an export of the data of a Framed transport.
-/// It can be used to construct a new `Framed` with a different codec.
-/// It contains all current buffers and the inner transport.
+///
+/// It can be used to construct a new `Framed` with a different codec. It contains all current
+/// buffers and the inner transport.
 #[derive(Debug)]
 pub struct FramedParts<T, U> {
-    /// The inner transport used to read bytes to and write bytes to
+    /// The inner transport used to read bytes to and write bytes to.
     pub io: T,
 
-    /// The codec
+    /// The codec object.
     pub codec: U,
 
     /// The buffer with read but unprocessed data.
@@ -396,7 +389,7 @@ pub struct FramedParts<T, U> {
 }
 
 impl<T, U> FramedParts<T, U> {
-    /// Create a new, default, `FramedParts`
+    /// Creates a new default `FramedParts`.
     pub fn new(io: T, codec: U) -> FramedParts<T, U> {
         FramedParts {
             io,
@@ -407,7 +400,7 @@ impl<T, U> FramedParts<T, U> {
         }
     }
 
-    /// Create a new `FramedParts` with read buffer
+    /// Creates a new `FramedParts` with read buffer.
     pub fn with_read_buf(io: T, codec: U, read_buf: BytesMut) -> FramedParts<T, U> {
         FramedParts {
             io,
