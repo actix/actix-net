@@ -86,7 +86,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with: { command: ci-check-lib-linux }
       - name: check lib
-        if: matrix.target.triple != 'x86_64-pc-windows-gnu'
+        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
         uses: actions-rs/cargo@v1
         with: { command: ci-check-min }
       
