@@ -142,6 +142,12 @@ jobs:
           profile: minimal
           override: true
 
+      - name: Generate Cargo.lock
+        uses: actions-rs/cargo@v1
+        with: { command: generate-lockfile }
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v1.3.0
+
       - name: Install cargo-hack
         uses: actions-rs/cargo@v1
         with:
