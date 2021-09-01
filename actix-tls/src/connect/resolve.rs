@@ -164,7 +164,7 @@ impl<T: Address> Service<Connect<T>> for Resolver {
                 }
 
                 Self::Custom(resolver) => {
-                    let resolver = Rc::clone(&resolver);
+                    let resolver = Rc::clone(resolver);
                     ResolverFuture::LookupCustom(Box::pin(async move {
                         let addrs = resolver
                             .lookup(req.hostname(), req.port())
