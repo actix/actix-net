@@ -300,11 +300,12 @@ fn try_current_with_system() {
     System::new().block_on(async { assert!(System::try_current().is_some()) });
 }
 
+#[allow(clippy::unit_cmp)]
 #[actix_rt::test]
 async fn spawn_local() {
     // demonstrate that spawn -> R is strictly more capable than spawn -> ()
 
-    assert_eq!(actix_rt::spawn(async { (|| {})() }).await.unwrap(), ());
+    assert_eq!(actix_rt::spawn(async {}).await.unwrap(), ());
     assert_eq!(actix_rt::spawn(async { 1 }).await.unwrap(), 1);
     assert!(actix_rt::spawn(async { panic!("") }).await.is_err());
 
