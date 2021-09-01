@@ -46,7 +46,10 @@ use tokio::task::JoinHandle;
 // Cannot define a main macro when compiled into test harness.
 // Workaround for https://github.com/rust-lang/rust/issues/62127.
 #[cfg(all(feature = "macros", not(test)))]
-pub use actix_macros::{main, test};
+pub use actix_macros::main;
+
+#[cfg(feature = "macros")]
+pub use actix_macros::test;
 
 mod arbiter;
 mod runtime;

@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use actix_rt::{Arbiter, System};
+use actix_rt::{task::JoinError, Arbiter, System};
 use tokio::sync::oneshot;
 
 #[test]
@@ -301,25 +301,25 @@ fn try_current_with_system() {
 }
 
 #[allow(clippy::unit_cmp)]
-#[actix_rt::test]
-async fn spawn_local() {
-    // demonstrate that spawn -> R is strictly more capable than spawn -> ()
+#[test]
+fn spawn_local() {
+    System::new().block_on(async {
+        // demonstrate that spawn -> R is strictly more capable than spawn -> ()
 
-    assert_eq!(actix_rt::spawn(async {}).await.unwrap(), ());
-    assert_eq!(actix_rt::spawn(async { 1 }).await.unwrap(), 1);
-    assert!(actix_rt::spawn(async { panic!("") }).await.is_err());
+        assert_eq!(actix_rt::spawn(async {}).await.unwrap(), ());
+        assert_eq!(actix_rt::spawn(async { 1 }).await.unwrap(), 1);
+        assert!(actix_rt::spawn(async { panic!("") }).await.is_err());
 
-    actix_rt::spawn(async { tokio::time::sleep(Duration::from_millis(50)).await })
-        .await
-        .unwrap();
+        actix_rt::spawn(async { tokio::time::sleep(Duration::from_millis(50)).await })
+            .await
+            .unwrap();
 
-    use actix_rt::task::JoinError;
+        fn g<F: Future<Output = Result<(), JoinError>>>(_f: F) {}
+        g(actix_rt::spawn(async {}));
+        // g(actix_rt::spawn(async { 1 })); // compile err
 
-    fn g<F: Future<Output = Result<(), JoinError>>>(_f: F) {}
-    g(actix_rt::spawn(async {}));
-    // g(actix_rt::spawn(async { 1 })); // compile err
-
-    fn h<F: Future<Output = Result<R, JoinError>>, R>(_f: F) {}
-    h(actix_rt::spawn(async {}));
-    h(actix_rt::spawn(async { 1 }));
+        fn h<F: Future<Output = Result<R, JoinError>>, R>(_f: F) {}
+        h(actix_rt::spawn(async {}));
+        h(actix_rt::spawn(async { 1 }));
+    })
 }
