@@ -334,6 +334,8 @@ mod linux_only {
         Arc,
     };
 
+    use super::*;
+
     #[test]
     fn tokio_uring_arbiter() {
         let system = System::new();
