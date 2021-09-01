@@ -76,13 +76,19 @@ jobs:
           args: cargo-hack
 
       - name: check lib
-        if: matrix.target.os != 'ubuntu-latest'
+        if: >
+          matrix.target.os != 'ubuntu-latest'
+          && matrix.target.triple != 'x86_64-pc-windows-gnu'
         uses: actions-rs/cargo@v1
         with: { command: ci-check-lib }
       - name: check lib
         if: matrix.target.os == 'ubuntu-latest'
         uses: actions-rs/cargo@v1
         with: { command: ci-check-lib-linux }
+      - name: check lib
+        if: matrix.target.triple != 'x86_64-pc-windows-gnu'
+        uses: actions-rs/cargo@v1
+        with: { command: ci-check-min }
       
       - name: check full
         # TODO: compile OpenSSL and run tests on MinGW
