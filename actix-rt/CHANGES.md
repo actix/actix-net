@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* The `spawn` method can now resolve with non-unit outputs. [#369]
+
+[#369]: https://github.com/actix/actix-net/pull/369
 
 
 ## 2.2.0 - 2021-03-29
