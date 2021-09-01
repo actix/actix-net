@@ -19,7 +19,7 @@ pub trait Address: Unpin + 'static {
 
 impl Address for String {
     fn hostname(&self) -> &str {
-        &self
+        self
     }
 }
 
