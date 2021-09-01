@@ -24,10 +24,13 @@ macro_rules! parse_single_value {
         where
             V: Visitor<'de>,
         {
-            if self.path.len() != 1 {
+            if self.path.segment_count() != 1 {
                 Err(de::value::Error::custom(
-                    format!("wrong number of parameters: {} expected 1", self.path.len())
-                        .as_str(),
+                    format!(
+                        "wrong number of parameters: {} expected 1",
+                        self.path.segment_count()
+                    )
+                    .as_str(),
                 ))
             } else {
                 let v = self.path[0].parse().map_err(|_| {
@@ -110,11 +113,11 @@ impl<'de, T: ResourcePath + 'de> Deserializer<'de> for PathDeserializer<'de, T> 
     where
         V: Visitor<'de>,
     {
-        if self.path.len() < len {
+        if self.path.segment_count() < len {
             Err(de::value::Error::custom(
                 format!(
                     "wrong number of parameters: {} expected {}",
-                    self.path.len(),
+                    self.path.segment_count(),
                     len
                 )
                 .as_str(),
@@ -135,11 +138,11 @@ impl<'de, T: ResourcePath + 'de> Deserializer<'de> for PathDeserializer<'de, T> 
     where
         V: Visitor<'de>,
     {
-        if self.path.len() < len {
+        if self.path.segment_count() < len {
             Err(de::value::Error::custom(
                 format!(
                     "wrong number of parameters: {} expected {}",
-                    self.path.len(),
+                    self.path.segment_count(),
                     len
                 )
                 .as_str(),
@@ -173,9 +176,13 @@ impl<'de, T: ResourcePath + 'de> Deserializer<'de> for PathDeserializer<'de, T> 
     where
         V: Visitor<'de>,
     {
-        if self.path.len() != 1 {
+        if self.path.segment_count() != 1 {
             Err(de::value::Error::custom(
-                format!("wrong number of parameters: {} expected 1", self.path.len()).as_str(),
+                format!(
+                    "wrong number of parameters: {} expected 1",
+                    self.path.segment_count()
+                )
+                .as_str(),
             ))
         } else {
             visitor.visit_str(&self.path[0])
@@ -485,8 +492,7 @@ impl<'de> de::VariantAccess<'de> for UnitVariant {
 
 #[cfg(test)]
 mod tests {
-    use serde::de;
-    use serde_derive::Deserialize;
+    use serde::{de, Deserialize};
 
     use super::*;
     use crate::path::Path;

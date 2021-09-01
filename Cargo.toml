@@ -27,3 +27,8 @@ actix-utils = { path = "actix-utils" }
 bytestring = { path = "bytestring" }
 local-channel = { path = "local-channel" }
 local-waker = { path = "local-waker" }
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1

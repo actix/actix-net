@@ -1,5 +1,9 @@
 /// An implementation of [`poll_ready`]() that always signals readiness.
 ///
+/// This should only be used for basic leaf services that have no concept of un-readiness.
+/// For wrapper or other serivice types, use [`forward_ready!`] for simple cases or write a bespoke
+/// `poll_ready` implementation.
+///
 /// [`poll_ready`]: crate::Service::poll_ready
 ///
 /// # Examples

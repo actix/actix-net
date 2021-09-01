@@ -1,4 +1,6 @@
-use crate::{IntoPattern, Resource, ResourceDef, ResourcePath};
+use firestorm::profile_method;
+
+use crate::{IntoPatterns, Resource, ResourceDef, ResourcePath};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ResourceId(pub u16);
@@ -10,7 +12,11 @@ pub struct ResourceInfo {
 }
 
 /// Resource router.
-pub struct Router<T, U = ()>(Vec<(ResourceDef, T, Option<U>)>);
+// T is the resource itself
+// U is any other data needed for routing like method guards
+pub struct Router<T, U = ()> {
+    routes: Vec<(ResourceDef, T, Option<U>)>,
+}
 
 impl<T, U> Router<T, U> {
     pub fn build() -> RouterBuilder<T, U> {
@@ -24,11 +30,14 @@ impl<T, U> Router<T, U> {
         R: Resource<P>,
         P: ResourcePath,
     {
-        for item in self.0.iter() {
-            if item.0.match_path(resource.resource_path()) {
+        profile_method!(recognize);
+
+        for item in self.routes.iter() {
+            if item.0.capture_match_info(resource.resource_path()) {
                 return Some((&item.1, ResourceId(item.0.id())));
             }
         }
+
         None
     }
 
@@ -37,33 +46,35 @@ impl<T, U> Router<T, U> {
         R: Resource<P>,
         P: ResourcePath,
     {
-        for item in self.0.iter_mut() {
-            if item.0.match_path(resource.resource_path()) {
+        profile_method!(recognize_mut);
+
+        for item in self.routes.iter_mut() {
+            if item.0.capture_match_info(resource.resource_path()) {
                 return Some((&mut item.1, ResourceId(item.0.id())));
             }
         }
+
         None
     }
 
-    pub fn recognize_checked<R, P, F>(
-        &self,
-        resource: &mut R,
-        check: F,
-    ) -> Option<(&T, ResourceId)>
+    pub fn recognize_fn<R, P, F>(&self, resource: &mut R, check: F) -> Option<(&T, ResourceId)>
     where
         F: Fn(&R, &Option<U>) -> bool,
         R: Resource<P>,
         P: ResourcePath,
     {
-        for item in self.0.iter() {
-            if item.0.match_path_checked(resource, &check, &item.2) {
+        profile_method!(recognize_checked);
+
+        for item in self.routes.iter() {
+            if item.0.capture_match_info_fn(resource, &check, &item.2) {
                 return Some((&item.1, ResourceId(item.0.id())));
             }
         }
+
         None
     }
 
-    pub fn recognize_mut_checked<R, P, F>(
+    pub fn recognize_mut_fn<R, P, F>(
         &mut self,
         resource: &mut R,
         check: F,
@@ -73,11 +84,14 @@ impl<T, U> Router<T, U> {
         R: Resource<P>,
         P: ResourcePath,
     {
-        for item in self.0.iter_mut() {
-            if item.0.match_path_checked(resource, &check, &item.2) {
+        profile_method!(recognize_mut_checked);
+
+        for item in self.routes.iter_mut() {
+            if item.0.capture_match_info_fn(resource, &check, &item.2) {
                 return Some((&mut item.1, ResourceId(item.0.id())));
             }
         }
+
         None
     }
 }
@@ -88,11 +102,13 @@ pub struct RouterBuilder<T, U = ()> {
 
 impl<T, U> RouterBuilder<T, U> {
     /// Register resource for specified path.
-    pub fn path<P: IntoPattern>(
+    pub fn path<P: IntoPatterns>(
         &mut self,
         path: P,
         resource: T,
     ) -> &mut (ResourceDef, T, Option<U>) {
+        profile_method!(path);
+
         self.resources
             .push((ResourceDef::new(path), resource, None));
         self.resources.last_mut().unwrap()
@@ -100,6 +116,8 @@ impl<T, U> RouterBuilder<T, U> {
 
     /// Register resource for specified path prefix.
     pub fn prefix(&mut self, prefix: &str, resource: T) -> &mut (ResourceDef, T, Option<U>) {
+        profile_method!(prefix);
+
         self.resources
             .push((ResourceDef::prefix(prefix), resource, None));
         self.resources.last_mut().unwrap()
@@ -107,13 +125,17 @@ impl<T, U> RouterBuilder<T, U> {
 
     /// Register resource for ResourceDef
     pub fn rdef(&mut self, rdef: ResourceDef, resource: T) -> &mut (ResourceDef, T, Option<U>) {
+        profile_method!(rdef);
+
         self.resources.push((rdef, resource, None));
         self.resources.last_mut().unwrap()
     }
 
     /// Finish configuration and create router instance.
     pub fn finish(self) -> Router<T, U> {
-        Router(self.resources)
+        Router {
+            routes: self.resources,
+        }
     }
 }
 

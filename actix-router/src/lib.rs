@@ -1,4 +1,4 @@
-//! Resource path matching library.
+//! Resource path matching and router.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
@@ -14,6 +14,8 @@ pub use self::path::Path;
 pub use self::resource::ResourceDef;
 pub use self::router::{ResourceInfo, Router, RouterBuilder};
 
+// TODO: this trait is necessary, document it
+// see impl Resource for ServiceRequest
 pub trait Resource<T: ResourcePath> {
     fn resource_path(&mut self) -> &mut Path<T>;
 }
@@ -40,98 +42,92 @@ impl ResourcePath for bytestring::ByteString {
     }
 }
 
-/// Helper trait for type that could be converted to path pattern
-pub trait IntoPattern {
-    fn is_single(&self) -> bool;
-
-    fn patterns(&self) -> Vec<String>;
+/// One or many patterns.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Patterns {
+    Single(String),
+    List(Vec<String>),
 }
 
-impl IntoPattern for String {
-    fn is_single(&self) -> bool {
-        true
-    }
-
-    fn patterns(&self) -> Vec<String> {
-        vec![self.clone()]
-    }
-}
-
-impl<'a> IntoPattern for &'a String {
-    fn is_single(&self) -> bool {
-        true
-    }
-
-    fn patterns(&self) -> Vec<String> {
-        vec![self.as_str().to_string()]
-    }
-}
-
-impl<'a> IntoPattern for &'a str {
-    fn is_single(&self) -> bool {
-        true
-    }
-
-    fn patterns(&self) -> Vec<String> {
-        vec![(*self).to_string()]
-    }
-}
-
-impl<T: AsRef<str>> IntoPattern for Vec<T> {
-    fn is_single(&self) -> bool {
-        self.len() == 1
-    }
-
-    fn patterns(&self) -> Vec<String> {
-        self.iter().map(|v| v.as_ref().to_string()).collect()
-    }
-}
-
-macro_rules! array_patterns (($tp:ty, $num:tt) => {
-    impl IntoPattern for [$tp; $num] {
-        fn is_single(&self) -> bool {
-            $num == 1
+impl Patterns {
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Patterns::Single(_) => false,
+            Patterns::List(pats) => pats.is_empty(),
         }
+    }
+}
 
-        fn patterns(&self) -> Vec<String> {
-            self.iter().map(|v| v.to_string()).collect()
+/// Helper trait for type that could be converted to one or more path pattern.
+pub trait IntoPatterns {
+    fn patterns(&self) -> Patterns;
+}
+
+impl IntoPatterns for String {
+    fn patterns(&self) -> Patterns {
+        Patterns::Single(self.clone())
+    }
+}
+
+impl<'a> IntoPatterns for &'a String {
+    fn patterns(&self) -> Patterns {
+        Patterns::Single((*self).clone())
+    }
+}
+
+impl<'a> IntoPatterns for &'a str {
+    fn patterns(&self) -> Patterns {
+        Patterns::Single((*self).to_owned())
+    }
+}
+
+impl IntoPatterns for bytestring::ByteString {
+    fn patterns(&self) -> Patterns {
+        Patterns::Single(self.to_string())
+    }
+}
+
+impl IntoPatterns for Patterns {
+    fn patterns(&self) -> Patterns {
+        self.clone()
+    }
+}
+
+impl<T: AsRef<str>> IntoPatterns for Vec<T> {
+    fn patterns(&self) -> Patterns {
+        let mut patterns = self.iter().map(|v| v.as_ref().to_owned());
+
+        match patterns.size_hint() {
+            (1, _) => Patterns::Single(patterns.next().unwrap()),
+            _ => Patterns::List(patterns.collect()),
+        }
+    }
+}
+
+macro_rules! array_patterns_single (($tp:ty) => {
+    impl IntoPatterns for [$tp; 1] {
+        fn patterns(&self) -> Patterns {
+            Patterns::Single(self[0].to_owned())
         }
     }
 });
 
-array_patterns!(&str, 1);
-array_patterns!(&str, 2);
-array_patterns!(&str, 3);
-array_patterns!(&str, 4);
-array_patterns!(&str, 5);
-array_patterns!(&str, 6);
-array_patterns!(&str, 7);
-array_patterns!(&str, 8);
-array_patterns!(&str, 9);
-array_patterns!(&str, 10);
-array_patterns!(&str, 11);
-array_patterns!(&str, 12);
-array_patterns!(&str, 13);
-array_patterns!(&str, 14);
-array_patterns!(&str, 15);
-array_patterns!(&str, 16);
+macro_rules! array_patterns_multiple (($tp:ty, $str_fn:expr, $($num:tt) +) => {
+    // for each array length specified in $num
+    $(
+        impl IntoPatterns for [$tp; $num] {
+            fn patterns(&self) -> Patterns {
+                Patterns::List(self.iter().map($str_fn).collect())
+            }
+        }
+    )+
+});
 
-array_patterns!(String, 1);
-array_patterns!(String, 2);
-array_patterns!(String, 3);
-array_patterns!(String, 4);
-array_patterns!(String, 5);
-array_patterns!(String, 6);
-array_patterns!(String, 7);
-array_patterns!(String, 8);
-array_patterns!(String, 9);
-array_patterns!(String, 10);
-array_patterns!(String, 11);
-array_patterns!(String, 12);
-array_patterns!(String, 13);
-array_patterns!(String, 14);
-array_patterns!(String, 15);
-array_patterns!(String, 16);
+array_patterns_single!(&str);
+array_patterns_multiple!(&str, |&v| v.to_owned(), 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
+
+array_patterns_single!(String);
+array_patterns_multiple!(String, |v| v.clone(), 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16);
 
 #[cfg(feature = "http")]
 mod url;
@@ -140,9 +136,10 @@ mod url;
 pub use self::url::{Quoter, Url};
 
 #[cfg(feature = "http")]
-mod http_support {
-    use super::ResourcePath;
+mod http_impls {
     use http::Uri;
+
+    use super::ResourcePath;
 
     impl ResourcePath for Uri {
         fn path(&self) -> &str {

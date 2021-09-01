@@ -206,12 +206,12 @@ mod tests {
         let re = ResourceDef::new(pattern);
         let uri = Uri::try_from(url.as_ref()).unwrap();
         let mut path = Path::new(Url::new(uri));
-        assert!(re.match_path(&mut path));
+        assert!(re.capture_match_info(&mut path));
         path
     }
 
     fn percent_encode(data: &[u8]) -> String {
-        data.into_iter().map(|c| format!("%{:02X}", c)).collect()
+        data.iter().map(|c| format!("%{:02X}", c)).collect()
     }
 
     #[test]
@@ -221,7 +221,7 @@ mod tests {
         let path = match_url(re, "/user/2345/test");
         assert_eq!(path.get("id").unwrap(), "2345");
 
-        // "%25" should never be decoded into '%' to gurantee the output is a valid
+        // "%25" should never be decoded into '%' to guarantee the output is a valid
         // percent-encoded format
         let path = match_url(re, "/user/qwe%25/test");
         assert_eq!(path.get("id").unwrap(), "qwe%25");
