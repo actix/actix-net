@@ -1,10 +1,11 @@
 use std::{
+    future::Future,
     sync::mpsc::channel,
     thread,
     time::{Duration, Instant},
 };
 
-use actix_rt::{Arbiter, System};
+use actix_rt::{task::JoinError, Arbiter, System};
 use tokio::sync::oneshot;
 
 #[test]
@@ -302,26 +303,62 @@ fn try_current_with_system() {
     System::new().block_on(async { assert!(System::try_current().is_some()) });
 }
 
-#[cfg(all(target_os = "linux", feature = "io-uring"))]
+#[allow(clippy::unit_cmp)]
 #[test]
-fn tokio_uring_arbiter() {
-    let system = System::new();
-    let (tx, rx) = std::sync::mpsc::channel();
-    Arbiter::new().spawn(async move {
-        let handle = actix_rt::spawn(async move {
-            let f = tokio_uring::fs::File::create("test.txt").await.unwrap();
-            let buf = b"Hello World!";
-            let (res, _) = f.write_at(&buf[..], 0).await;
-            assert!(res.is_ok());
-            f.sync_all().await.unwrap();
-            f.close().await.unwrap();
-            std::fs::remove_file("test.txt").unwrap();
+fn spawn_local() {
+    System::new().block_on(async {
+        // demonstrate that spawn -> R is strictly more capable than spawn -> ()
+
+        assert_eq!(actix_rt::spawn(async {}).await.unwrap(), ());
+        assert_eq!(actix_rt::spawn(async { 1 }).await.unwrap(), 1);
+        assert!(actix_rt::spawn(async { panic!("") }).await.is_err());
+
+        actix_rt::spawn(async { tokio::time::sleep(Duration::from_millis(50)).await })
+            .await
+            .unwrap();
+
+        fn g<F: Future<Output = Result<(), JoinError>>>(_f: F) {}
+        g(actix_rt::spawn(async {}));
+        // g(actix_rt::spawn(async { 1 })); // compile err
+
+        fn h<F: Future<Output = Result<R, JoinError>>, R>(_f: F) {}
+        h(actix_rt::spawn(async {}));
+        h(actix_rt::spawn(async { 1 }));
+    })
+}
+
+#[cfg(all(target_os = "linux", feature = "io-uring"))]
+mod linux_only {
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
+    #[test]
+    fn tokio_uring_arbiter() {
+        let system = System::new();
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        Arbiter::new().spawn(async move {
+            let handle = actix_rt::spawn(async move {
+                let f = tokio_uring::fs::File::create("test.txt").await.unwrap();
+                let buf = b"Hello World!";
+
+                let (res, _) = f.write_at(&buf[..], 0).await;
+                assert!(res.is_ok());
+
+                f.sync_all().await.unwrap();
+                f.close().await.unwrap();
+
+                std::fs::remove_file("test.txt").unwrap();
+            });
+
+            handle.await.unwrap();
+            tx.send(true).unwrap();
         });
-        handle.await.unwrap();
-        tx.send(true).unwrap();
-    });
 
-    assert!(rx.recv().unwrap());
+        assert!(rx.recv().unwrap());
 
-    drop(system);
+        drop(system);
+    }
 }
