@@ -1,5 +1,21 @@
 [alias]
 chk = "check --workspace --all-features --tests --examples --bins"
 lint = "clippy --workspace --all-features --tests --examples --bins -- -Dclippy::todo"
-ci-test = "test --workspace --all-features --lib --tests --no-fail-fast -- --nocapture"
+
 ci-doctest = "test --workspace --all-features --doc --no-fail-fast -- --nocapture"
+
+# just check the library (without dev deps)
+ci-check-lib = "hack --workspace --feature-powerset --exclude-features io-uring check"
+ci-check-lib-linux = "hack --workspace --feature-powerset check"
+
+# check everything
+ci-check = "hack --workspace --feature-powerset --exclude-features io-uring check --tests --examples"
+ci-check-linux = "hack --workspace --feature-powerset check --tests --examples"
+
+# tests avoiding io-uring feature
+ci-test = "hack test --workspace --exclude=actix-rt --exclude=actix-server --all-features --lib --tests --no-fail-fast -- --nocapture"
+ci-test-rt = "    hack --feature-powerset --exclude-features io-uring test --package=actix-rt     --lib --tests --no-fail-fast -- --nocapture"
+ci-test-server = "hack --feature-powerset --exclude-features io-uring test --package=actix-server --lib --tests --no-fail-fast -- --nocapture"
+
+# test with io-uring feature
+ci-test-linux = "test --workspace --all-features --lib --tests --no-fail-fast -- --nocapture"
