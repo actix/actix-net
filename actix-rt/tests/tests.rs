@@ -328,39 +328,30 @@ fn spawn_local() {
 }
 
 #[cfg(all(target_os = "linux", feature = "io-uring"))]
-mod linux_only {
-    use std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    };
+#[test]
+fn tokio_uring_arbiter() {
+    let system = System::new();
+    let (tx, rx) = std::sync::mpsc::channel();
 
-    use super::*;
+    Arbiter::new().spawn(async move {
+        let handle = actix_rt::spawn(async move {
+            let f = tokio_uring::fs::File::create("test.txt").await.unwrap();
+            let buf = b"Hello World!";
 
-    #[test]
-    fn tokio_uring_arbiter() {
-        let system = System::new();
-        let (tx, rx) = std::sync::mpsc::channel();
+            let (res, _) = f.write_at(&buf[..], 0).await;
+            assert!(res.is_ok());
 
-        Arbiter::new().spawn(async move {
-            let handle = actix_rt::spawn(async move {
-                let f = tokio_uring::fs::File::create("test.txt").await.unwrap();
-                let buf = b"Hello World!";
+            f.sync_all().await.unwrap();
+            f.close().await.unwrap();
 
-                let (res, _) = f.write_at(&buf[..], 0).await;
-                assert!(res.is_ok());
-
-                f.sync_all().await.unwrap();
-                f.close().await.unwrap();
-
-                std::fs::remove_file("test.txt").unwrap();
-            });
-
-            handle.await.unwrap();
-            tx.send(true).unwrap();
+            std::fs::remove_file("test.txt").unwrap();
         });
 
-        assert!(rx.recv().unwrap());
+        handle.await.unwrap();
+        tx.send(true).unwrap();
+    });
 
-        drop(system);
-    }
+    assert!(rx.recv().unwrap());
+
+    drop(system);
 }

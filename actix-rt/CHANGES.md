@@ -1,7 +1,7 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Add `io-uring` feature for enabling async file Io on linux system. [#374]
+* Add `io-uring` feature for enabling async file I/O on linux. [#374]
 * The `spawn` method can now resolve with non-unit outputs. [#369]
 
 [#369]: https://github.com/actix/actix-net/pull/369

@@ -32,6 +32,10 @@
 //! arbiter.stop();
 //! arbiter.join().unwrap();
 //! ```
+//!
+//! # `io-uring` Support
+//! There is experimental support for using io-uring with this crate by enabling the
+//! `io-uring` feature. For now, it is semver exempt.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![allow(clippy::type_complexity)]

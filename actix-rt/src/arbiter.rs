@@ -91,11 +91,11 @@ pub struct Arbiter {
 }
 
 impl Arbiter {
-    #[cfg(any(not(target_os = "linux"), not(feature = "io-uring")))]
     /// Spawn a new Arbiter thread and start its event loop.
     ///
     /// # Panics
     /// Panics if a [System] is not registered on the current thread.
+    #[cfg(any(not(target_os = "linux"), not(feature = "io-uring")))]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Arbiter {
         Self::with_tokio_rt(|| {
@@ -104,10 +104,10 @@ impl Arbiter {
         })
     }
 
-    #[cfg(any(not(target_os = "linux"), not(feature = "io-uring")))]
     /// Spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
+    #[cfg(any(not(target_os = "linux"), not(feature = "io-uring")))]
     #[doc(hidden)]
     pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
     where
@@ -159,11 +159,11 @@ impl Arbiter {
         Arbiter { tx, thread_handle }
     }
 
-    #[cfg(all(target_os = "linux", feature = "io-uring"))]
     /// Spawn a new Arbiter thread and start its event loop with `tokio-uring` runtime.
     ///
     /// # Panics
     /// Panics if a [System] is not registered on the current thread.
+    #[cfg(all(target_os = "linux", feature = "io-uring"))]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Arbiter {
         let sys = System::current();
@@ -211,7 +211,7 @@ impl Arbiter {
         Arbiter { tx, thread_handle }
     }
 
-    /// Sets up an Arbiter runner in a new System using the provided runtime local task set.
+    /// Sets up an Arbiter runner in a new System using the environment's local set.
     pub(crate) fn in_new_system() -> ArbiterHandle {
         let (tx, rx) = mpsc::unbounded_channel();
 

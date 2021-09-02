@@ -54,7 +54,6 @@ impl System {
         let (sys_tx, sys_rx) = mpsc::unbounded_channel();
 
         let rt = Runtime::from(runtime_factory());
-
         let sys_arbiter = rt.block_on(async { Arbiter::in_new_system() });
         let system = System::construct(sys_tx, sys_arbiter.clone());
 

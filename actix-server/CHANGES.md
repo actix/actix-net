@@ -3,7 +3,7 @@
 ## Unreleased - 2021-xx-xx
 * Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to this change. [#349]
 * Remove `ServerBuilder::configure` [#349]
-* Add `io-uring` feature for enabling async file Io on linux system. [#374]
+* Add `io-uring` feature for enabling async file I/O on linux. [#374]
 
 [#349]: https://github.com/actix/actix-net/pull/349
 [#374]: https://github.com/actix/actix-net/pull/374
