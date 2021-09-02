@@ -19,4 +19,5 @@ ci-test-rt = "    hack --feature-powerset --exclude-features io-uring test --pac
 ci-test-server = "hack --feature-powerset --exclude-features io-uring test --package=actix-server --lib --tests --no-fail-fast -- --nocapture"
 
 # test with io-uring feature
-ci-test-linux = "test --workspace --all-features --lib --tests --no-fail-fast -- --nocapture"
+ci-test-rt-linux = "    hack --feature-powerset test --package=actix-rt     --lib --tests --no-fail-fast -- --nocapture"
+ci-test-server-linux = "hack --feature-powerset test --package=actix-server --lib --tests --no-fail-fast -- --nocapture"

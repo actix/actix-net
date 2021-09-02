@@ -112,8 +112,10 @@ jobs:
           cargo ci-test-server
       - name: tests
         if: matrix.target.os == 'ubuntu-latest'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-test-linux }
+        run: |
+          cargo ci-test
+          cargo ci-test-rt-linux
+          cargo ci-test-server-linux
 
       - name: Generate coverage file
         if: >

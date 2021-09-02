@@ -288,7 +288,7 @@ impl ServerWorker {
             Arbiter::new()
         };
 
-        #[cfg(any(not(target_os = "linux"), not(feature = "io-uring")))]
+        #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
         let arbiter = Arbiter::with_tokio_rt(move || {
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
