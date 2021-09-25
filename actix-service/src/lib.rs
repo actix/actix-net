@@ -77,7 +77,7 @@ use self::ready::{err, ok, ready, Ready};
 ///
 ///      fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> { ... }
 ///
-///      fn call(&self, req: Self::Request) -> Self::Future { ... }
+///      fn call(&self, req: u8) -> Self::Future { ... }
 /// }
 /// ```
 ///
