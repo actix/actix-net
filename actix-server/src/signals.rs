@@ -8,8 +8,6 @@ use crate::server::Server;
 #[allow(dead_code)]
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub(crate) enum Signal {
-    /// SIGHUP
-    Hup,
     /// SIGINT
     Int,
     /// SIGTERM
@@ -41,7 +39,6 @@ impl Signals {
 
             let sig_map = [
                 (unix::SignalKind::interrupt(), Signal::Int),
-                (unix::SignalKind::hangup(), Signal::Hup),
                 (unix::SignalKind::terminate(), Signal::Term),
                 (unix::SignalKind::quit(), Signal::Quit),
             ];
