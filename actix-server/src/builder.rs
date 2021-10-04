@@ -335,7 +335,6 @@ impl ServerBuilder {
                             completion: None,
                         })
                     }
-                    _ => (),
                 }
             }
             ServerCommand::Notify(tx) => {
