@@ -3,8 +3,13 @@
 ## Unreleased - 2021-xx-xx
 * Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to this change. [#349]
 * Remove `ServerBuilder::configure` [#349]
+* Server no long listens to SIGHUP signal.
+  It actually did not take any action when receiving SIGHUP, the only thing SIGHUP did was to stop
+  the Server from receiving any future signal, because the `Signals` future stops on the first
+  signal received [#389]
 
 [#349]: https://github.com/actix/actix-net/pull/349
+[#389]: https://github.com/actix/actix-net/pull/389
 
 
 ## 2.0.0-beta.5 - 2021-04-20
