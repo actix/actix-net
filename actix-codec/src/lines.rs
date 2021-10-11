@@ -35,7 +35,7 @@ impl Decoder for LinesCodec {
             return Ok(None);
         }
 
-        let len = match memchr(b'\n', src.chunk()) {
+        let len = match memchr(b'\n', src) {
             Some(n) => n,
             None => {
                 return Ok(None);
@@ -128,13 +128,13 @@ mod tests {
         let mut buf = BytesMut::new();
 
         codec.encode("", &mut buf).unwrap();
-        assert_eq!(buf.chunk(), b"\n");
+        assert_eq!(&buf[..], b"\n");
 
         codec.encode("test", &mut buf).unwrap();
-        assert_eq!(buf.chunk(), b"\ntest\n");
+        assert_eq!(&buf[..], b"\ntest\n");
 
         codec.encode("a\nb", &mut buf).unwrap();
-        assert_eq!(buf.chunk(), b"\ntest\na\nb\n");
+        assert_eq!(&buf[..], b"\ntest\na\nb\n");
     }
 
     #[test]
@@ -143,18 +143,18 @@ mod tests {
 
         let mut buf = BytesMut::new();
         codec.encode("1234567", &mut buf).unwrap();
-        assert_eq!(buf.chunk(), b"1234567\n");
+        assert_eq!(&buf[..], b"1234567\n");
 
         let mut buf = BytesMut::new();
         codec.encode("12345678", &mut buf).unwrap();
-        assert_eq!(buf.chunk(), b"12345678\n");
+        assert_eq!(&buf[..], b"12345678\n");
 
         let mut buf = BytesMut::new();
         codec.encode("123456789111213", &mut buf).unwrap();
-        assert_eq!(buf.chunk(), b"123456789111213\n");
+        assert_eq!(&buf[..], b"123456789111213\n");
 
         let mut buf = BytesMut::new();
         codec.encode("1234567891112131", &mut buf).unwrap();
-        assert_eq!(buf.chunk(), b"1234567891112131\n");
+        assert_eq!(&buf[..], b"1234567891112131\n");
     }
 }
