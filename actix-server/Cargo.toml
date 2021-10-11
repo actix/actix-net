@@ -18,6 +18,7 @@ path = "src/lib.rs"
 
 [features]
 default = []
+io-uring = ["actix-rt/io-uring"]
 
 [dependencies]
 actix-rt = { version = "2.0.0", default-features = false }

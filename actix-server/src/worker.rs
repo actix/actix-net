@@ -280,14 +280,24 @@ impl ServerWorker {
         let counter_clone = counter.clone();
         // every worker runs in it's own arbiter.
         // use a custom tokio runtime builder to change the settings of runtime.
-        Arbiter::with_tokio_rt(move || {
+        #[cfg(all(target_os = "linux", feature = "io-uring"))]
+        let arbiter = {
+            // TODO: pass max blocking thread config when tokio-uring enable configuration
+            // on building runtime.
+            let _ = config.max_blocking_threads;
+            Arbiter::new()
+        };
+
+        #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
+        let arbiter = Arbiter::with_tokio_rt(move || {
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .max_blocking_threads(config.max_blocking_threads)
                 .build()
                 .unwrap()
-        })
-        .spawn(async move {
+        });
+
+        arbiter.spawn(async move {
             let fut = factories
                 .iter()
                 .enumerate()

@@ -3,11 +3,13 @@
 ## Unreleased - 2021-xx-xx
 * Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to this change. [#349]
 * Remove `ServerBuilder::configure` [#349]
+* Add `io-uring` feature for enabling async file I/O on linux. [#374]
 * Server no long listens to SIGHUP signal.
   It actually did not take any action when receiving SIGHUP, the only thing SIGHUP did was to stop
   the Server from receiving any future signal, because the `Signals` future stops on the first
   signal received [#389]
 
+[#374]: https://github.com/actix/actix-net/pull/374
 [#349]: https://github.com/actix/actix-net/pull/349
 [#389]: https://github.com/actix/actix-net/pull/389
 
