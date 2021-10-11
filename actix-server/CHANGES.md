@@ -4,7 +4,7 @@
 
 
 ## 2.0.0-beta.6 - 2021-10-11
-* Add `io-uring` feature for enabling async file I/O on linux. [#374]
+* Add experimental (semver-exempt) `io-uring` feature for enabling async file I/O on linux. [#374]
 * Server no long listens to `SIGHUP` signal. Previously, the received was not used but did block
   subsequent exit signals from working. [#389]
 * Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to
