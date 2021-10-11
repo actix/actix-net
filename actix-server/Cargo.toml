@@ -1,13 +1,13 @@
 [package]
 name = "actix-server"
-version = "2.0.0-beta.5"
+version = "2.0.0-beta.6"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "fakeshadow <24548779@qq.com>",
 ]
 description = "General purpose TCP server built for the Actix ecosystem"
 keywords = ["network", "framework", "async", "futures"]
-repository = "https://github.com/actix/actix-net"
+repository = "https://github.com/actix/actix-net.git"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
@@ -29,13 +29,13 @@ futures-core = { version = "0.3.7", default-features = false, features = ["alloc
 log = "0.4"
 mio = { version = "0.7.6", features = ["os-poll", "net"] }
 num_cpus = "1.13"
-tokio = { version = "1.2", features = ["sync"] }
+tokio = { version = "1.5.1", features = ["sync"] }
 
 [dev-dependencies]
 actix-codec = "0.4.0-beta.1"
 actix-rt = "2.0.0"
 
 bytes = "1"
-env_logger = "0.8"
+env_logger = "0.9"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
-tokio = { version = "1", features = ["io-util"] }
+tokio = { version = "1.5.1", features = ["io-util"] }

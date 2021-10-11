@@ -1,5 +1,4 @@
 [alias]
-chk = "check --workspace --all-features --tests --examples --bins"
 lint = "clippy --workspace --all-features --tests --examples --bins -- -Dclippy::todo"
 
 ci-doctest = "test --workspace --all-features --doc --no-fail-fast -- --nocapture"
