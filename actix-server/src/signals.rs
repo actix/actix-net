@@ -4,27 +4,33 @@ use std::task::{Context, Poll};
 
 use crate::server::Server;
 
-/// Different types of process signals
+/// Types of process signals.
 #[allow(dead_code)]
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub(crate) enum Signal {
-    /// SIGINT
+    /// `SIGINT`
     Int,
-    /// SIGTERM
+
+    /// `SIGTERM`
     Term,
-    /// SIGQUIT
+
+    /// `SIGQUIT`
     Quit,
 }
 
+/// Process signal listener.
 pub(crate) struct Signals {
     srv: Server,
+
     #[cfg(not(unix))]
     signals: futures_core::future::LocalBoxFuture<'static, std::io::Result<()>>,
+
     #[cfg(unix)]
     signals: Vec<(Signal, actix_rt::signal::unix::Signal)>,
 }
 
 impl Signals {
+    /// Spawns a signal listening future that is able to send commands to the `Server`.
     pub(crate) fn start(srv: Server) {
         #[cfg(not(unix))]
         {
@@ -33,6 +39,7 @@ impl Signals {
                 signals: Box::pin(actix_rt::signal::ctrl_c()),
             });
         }
+
         #[cfg(unix)]
         {
             use actix_rt::signal::unix;
@@ -76,6 +83,7 @@ impl Future for Signals {
             }
             Poll::Pending => Poll::Pending,
         }
+
         #[cfg(unix)]
         {
             for (sig, fut) in self.signals.iter_mut() {

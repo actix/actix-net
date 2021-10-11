@@ -312,23 +312,25 @@ impl ServerBuilder {
                 // Handle `SIGINT`, `SIGTERM`, `SIGQUIT` signals and stop actix system
                 match sig {
                     Signal::Int => {
-                        info!("SIGINT received, exiting");
+                        info!("SIGINT received, starting forced shutdown");
                         self.exit = true;
                         self.handle_cmd(ServerCommand::Stop {
                             graceful: false,
                             completion: None,
                         })
                     }
+
                     Signal::Term => {
-                        info!("SIGTERM received, stopping");
+                        info!("SIGTERM received, starting graceful shutdown");
                         self.exit = true;
                         self.handle_cmd(ServerCommand::Stop {
                             graceful: true,
                             completion: None,
                         })
                     }
+
                     Signal::Quit => {
-                        info!("SIGQUIT received, exiting");
+                        info!("SIGQUIT received, starting forced shutdown");
                         self.exit = true;
                         self.handle_cmd(ServerCommand::Stop {
                             graceful: false,
@@ -359,12 +361,14 @@ impl ServerBuilder {
 
                 rt::spawn(async move {
                     if graceful {
+                        // wait for all workers to shut down
                         let _ = join_all(stop).await;
                     }
 
                     if let Some(tx) = completion {
                         let _ = tx.send(());
                     }
+
                     for tx in notify {
                         let _ = tx.send(());
                     }
