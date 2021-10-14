@@ -5,13 +5,18 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
-use actix_rt::net::{ActixStream, Ready};
+use actix_rt::{
+    net::{ActixStream, Ready},
+    time::{sleep, Sleep},
+};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
 use futures_core::future::LocalBoxFuture;
+use pin_project_lite::pin_project;
 use tokio_rustls::{Accept, TlsAcceptor};
 
 pub use tokio_rustls::rustls::{ServerConfig, Session};
@@ -158,22 +163,40 @@ impl<T: ActixStream> Service<T> for AcceptorService {
 
     fn call(&self, req: T) -> Self::Future {
         AcceptorServiceFut {
-            _guard: self.conns.get(),
             fut: self.acceptor.accept(req),
+            // default tls accept timeout is 3 seconds.
+            // TODO: make it configurable with service builder.
+            timeout: sleep(Duration::from_secs(3)),
+            _guard: self.conns.get(),
         }
     }
 }
 
-pub struct AcceptorServiceFut<T: ActixStream> {
-    fut: Accept<T>,
-    _guard: CounterGuard,
+pin_project! {
+    pub struct AcceptorServiceFut<T: ActixStream> {
+        fut: Accept<T>,
+        #[pin]
+        timeout: Sleep,
+        _guard: CounterGuard,
+    }
 }
 
 impl<T: ActixStream> Future for AcceptorServiceFut<T> {
     type Output = Result<TlsStream<T>, io::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-        Pin::new(&mut this.fut).poll(cx).map_ok(TlsStream)
+        let mut this = self.project();
+        match Pin::new(&mut this.fut).poll(cx) {
+            Poll::Ready(res) => Poll::Ready(res.map(TlsStream)),
+            Poll::Pending => {
+                this.timeout.poll(cx).map(|_| {
+                    // TODO: make the error message typed.
+                    Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "Tls Handshake timedout",
+                    ))
+                })
+            }
+        }
     }
 }
