@@ -1,12 +1,12 @@
 [package]
 name = "actix-macros"
-version = "0.2.1"
+version = "0.2.2"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Ibraheem Ahmed <ibrah1440@gmail.com>",
 ]
 description = "Macros for Actix system and runtime"
-repository = "https://github.com/actix/actix-net"
+repository = "https://github.com/actix/actix-net.git"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
