@@ -1,6 +1,10 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Improve error recovery potential when macro input is invalid. [#391]
+* Allow custom `System`s on test macro. [#391]
+
+[#391]: https://github.com/actix/actix-net/pull/391
 
 
 ## 0.2.1 - 2021-02-02
