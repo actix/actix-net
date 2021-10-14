@@ -11,4 +11,7 @@ fn compile_macros() {
     t.pass("tests/trybuild/test-01-basic.rs");
     t.pass("tests/trybuild/test-02-keep-attrs.rs");
     t.compile_fail("tests/trybuild/test-03-only-async.rs");
+    t.pass("tests/trybuild/test-04-system-path.rs");
+    t.compile_fail("tests/trybuild/test-05-system-expect-path.rs");
+    t.compile_fail("tests/trybuild/test-06-unknown-attr.rs");
 }
