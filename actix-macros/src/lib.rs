@@ -30,12 +30,8 @@ use quote::quote;
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = match syn::parse::<syn::ItemFn>(item.clone()) {
         Ok(input) => input,
-        Err(err) => {
-            let mut item = item;
-            let compile_err = TokenStream::from(err.to_compile_error());
-            item.extend(compile_err);
-            return item;
-        }
+        // on parse err, make IDEs happy; see fn docs
+        Err(err) => return input_and_compile_error(item, err),
     };
 
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
@@ -113,12 +109,8 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = match syn::parse::<syn::ItemFn>(item.clone()) {
         Ok(input) => input,
-        Err(err) => {
-            let mut item = item;
-            let compile_err = TokenStream::from(err.to_compile_error());
-            item.extend(compile_err);
-            return item;
-        }
+        // on parse err, make IDEs happy; see fn docs
+        Err(err) => return input_and_compile_error(item, err),
     };
 
     let args = syn::parse_macro_input!(args as syn::AttributeArgs);
@@ -195,4 +187,16 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
         }
     })
     .into()
+}
+
+/// Converts the error to a token stream and appends it to the original input.
+///
+/// Returning the original input in addition to the error is good for IDEs which can gracefully
+/// recover and show more precise errors within the macro body.
+///
+/// See <https://github.com/rust-analyzer/rust-analyzer/issues/10468> for more info.
+fn input_and_compile_error(mut item: TokenStream, err: syn::Error) -> TokenStream {
+    let compile_err = TokenStream::from(err.to_compile_error());
+    item.extend(compile_err);
+    return item;
 }
