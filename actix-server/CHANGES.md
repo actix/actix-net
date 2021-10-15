@@ -2,6 +2,10 @@
 
 ## Unreleased - 2021-xx-xx
 
+* Reduce the log noise. [#394]
+
+[#394]: https://github.com/actix/actix-net/pull/394
+
 
 ## 2.0.0-beta.6 - 2021-10-11
 * Add experimental (semver-exempt) `io-uring` feature for enabling async file I/O on linux. [#374]

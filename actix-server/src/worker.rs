@@ -17,7 +17,7 @@ use actix_rt::{
     Arbiter,
 };
 use futures_core::{future::LocalBoxFuture, ready};
-use log::{error, info, trace};
+use log::{debug, error, trace};
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     oneshot,
@@ -465,11 +465,11 @@ impl Future for ServerWorker {
         {
             let num = this.counter.total();
             if num == 0 {
-                info!("Shutting down worker, 0 connections");
+                debug!("Shutting down worker, 0 connections");
                 let _ = tx.send(true);
                 return Poll::Ready(());
             } else if graceful {
-                info!("Graceful worker shutdown, {} connections", num);
+                debug!("Graceful worker shutdown, {} connections", num);
                 this.shutdown(false);
 
                 this.state = WorkerState::Shutdown(Shutdown {
@@ -478,7 +478,7 @@ impl Future for ServerWorker {
                     tx,
                 });
             } else {
-                info!("Force shutdown worker, {} connections", num);
+                debug!("Force shutdown worker, {} connections", num);
                 this.shutdown(true);
 
                 let _ = tx.send(false);

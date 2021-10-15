@@ -7,7 +7,7 @@ use std::{
 };
 
 use actix_rt::{self as rt, net::TcpStream, time::sleep, System};
-use log::{error, info};
+use log::{debug, error, info};
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver},
     oneshot,
@@ -250,7 +250,7 @@ impl ServerBuilder {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
-            info!("Starting {} workers", self.threads);
+            debug!("Starting {} workers", self.threads);
 
             // start workers
             let handles = (0..self.threads)
@@ -265,7 +265,7 @@ impl ServerBuilder {
 
             // start accept thread
             for sock in &self.sockets {
-                info!("Starting \"{}\" service on {}", sock.1, sock.2);
+                debug!("Starting \"{}\" service on {}", sock.1, sock.2);
             }
             self.accept.start(
                 mem::take(&mut self.sockets)
