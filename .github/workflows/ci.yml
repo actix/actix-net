@@ -102,6 +102,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with: { command: ci-check-linux }
 
+      # Increase ulimit for io-uring
+      - name: locked-in-memory size
+        if: > 
+          matrix.target.os == 'ubuntu-latest'
+        run:
+          sudo ulimit -l 512
+
       - name: tests
         if: >
           matrix.target.os != 'ubuntu-latest'
