@@ -107,7 +107,7 @@ jobs:
         if: > 
           matrix.target.os == 'ubuntu-latest'
         run:
-          sudo ulimit -l 512
+          ulimit -l 512
 
       - name: tests
         if: >
