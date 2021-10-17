@@ -15,7 +15,7 @@
 //! blocking task thread-pool using [`task::spawn_blocking`].
 //!
 //! # Examples
-//! ```
+//! ```no_run
 //! use std::sync::mpsc;
 //! use actix_rt::{Arbiter, System};
 //!
