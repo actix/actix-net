@@ -1,9 +1,14 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.3.0 - 2021-10-11
 * The `spawn` method can now resolve with non-unit outputs. [#369]
+* Add experimental (semver-exempt) `io-uring` feature for enabling async file I/O on linux. [#374]
 
 [#369]: https://github.com/actix/actix-net/pull/369
+[#374]: https://github.com/actix/actix-net/pull/374
 
 
 ## 2.2.0 - 2021-03-29

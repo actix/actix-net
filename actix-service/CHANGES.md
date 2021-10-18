@@ -3,6 +3,10 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 2.0.1 - 2021-10-11
+* Documentation fix.
+
+
 ## 2.0.0 - 2021-04-16
 * Removed pipeline and related structs/functions. [#335]
 

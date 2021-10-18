@@ -15,8 +15,8 @@ pub(crate) enum ServerCommand {
     Pause(oneshot::Sender<()>),
     Resume(oneshot::Sender<()>),
     Signal(Signal),
-    /// Whether to try and shut down gracefully
     Stop {
+        /// True if shut down should be graceful.
         graceful: bool,
         completion: Option<oneshot::Sender<()>>,
     },
@@ -24,6 +24,13 @@ pub(crate) enum ServerCommand {
     Notify(oneshot::Sender<()>),
 }
 
+/// Server handle.
+///
+/// # Shutdown Signals
+/// On UNIX systems, `SIGQUIT` will start a graceful shutdown and `SIGTERM` or `SIGINT` will start a
+/// forced shutdown. On Windows, a CTRL-C signal will start a forced shutdown.
+///
+/// A graceful shutdown will wait for all workers to stop first.
 #[derive(Debug)]
 pub struct Server(
     UnboundedSender<ServerCommand>,

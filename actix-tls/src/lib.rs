@@ -5,6 +5,7 @@
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 #[cfg(feature = "openssl")]
+#[allow(unused_extern_crates)]
 extern crate tls_openssl as openssl;
 
 #[cfg(feature = "accept")]

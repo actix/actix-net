@@ -9,12 +9,9 @@ use std::{
 };
 
 use futures_core::ready;
-use tokio::{sync::mpsc, task::LocalSet};
+use tokio::sync::mpsc;
 
-use crate::{
-    runtime::{default_tokio_runtime, Runtime},
-    system::{System, SystemCommand},
-};
+use crate::system::{System, SystemCommand};
 
 pub(crate) static COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -98,16 +95,19 @@ impl Arbiter {
     ///
     /// # Panics
     /// Panics if a [System] is not registered on the current thread.
+    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Arbiter {
         Self::with_tokio_rt(|| {
-            default_tokio_runtime().expect("Cannot create new Arbiter's Runtime.")
+            crate::runtime::default_tokio_runtime()
+                .expect("Cannot create new Arbiter's Runtime.")
         })
     }
 
     /// Spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
+    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
     #[doc(hidden)]
     pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
     where
@@ -127,7 +127,7 @@ impl Arbiter {
             .spawn({
                 let tx = tx.clone();
                 move || {
-                    let rt = Runtime::from(runtime_factory());
+                    let rt = crate::runtime::Runtime::from(runtime_factory());
                     let hnd = ArbiterHandle::new(tx);
 
                     System::set_current(sys);
@@ -159,15 +159,67 @@ impl Arbiter {
         Arbiter { tx, thread_handle }
     }
 
-    /// Sets up an Arbiter runner in a new System using the provided runtime local task set.
-    pub(crate) fn in_new_system(local: &LocalSet) -> ArbiterHandle {
+    /// Spawn a new Arbiter thread and start its event loop with `tokio-uring` runtime.
+    ///
+    /// # Panics
+    /// Panics if a [System] is not registered on the current thread.
+    #[cfg(all(target_os = "linux", feature = "io-uring"))]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Arbiter {
+        let sys = System::current();
+        let system_id = sys.id();
+        let arb_id = COUNT.fetch_add(1, Ordering::Relaxed);
+
+        let name = format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id);
+        let (tx, rx) = mpsc::unbounded_channel();
+
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
+
+        let thread_handle = thread::Builder::new()
+            .name(name.clone())
+            .spawn({
+                let tx = tx.clone();
+                move || {
+                    let hnd = ArbiterHandle::new(tx);
+
+                    System::set_current(sys);
+
+                    HANDLE.with(|cell| *cell.borrow_mut() = Some(hnd.clone()));
+
+                    // register arbiter
+                    let _ = System::current()
+                        .tx()
+                        .send(SystemCommand::RegisterArbiter(arb_id, hnd));
+
+                    ready_tx.send(()).unwrap();
+
+                    // run arbiter event processing loop
+                    tokio_uring::start(ArbiterRunner { rx });
+
+                    // deregister arbiter
+                    let _ = System::current()
+                        .tx()
+                        .send(SystemCommand::DeregisterArbiter(arb_id));
+                }
+            })
+            .unwrap_or_else(|err| {
+                panic!("Cannot spawn Arbiter's thread: {:?}. {:?}", &name, err)
+            });
+
+        ready_rx.recv().unwrap();
+
+        Arbiter { tx, thread_handle }
+    }
+
+    /// Sets up an Arbiter runner in a new System using the environment's local set.
+    pub(crate) fn in_new_system() -> ArbiterHandle {
         let (tx, rx) = mpsc::unbounded_channel();
 
         let hnd = ArbiterHandle::new(tx);
 
         HANDLE.with(|cell| *cell.borrow_mut() = Some(hnd.clone()));
 
-        local.spawn_local(ArbiterRunner { rx });
+        crate::spawn(ArbiterRunner { rx });
 
         hnd
     }

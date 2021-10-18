@@ -5,13 +5,12 @@ use actix_rt::{net::TcpStream, System};
 
 use crate::{Server, ServerBuilder, ServiceFactory};
 
-/// The `TestServer` type.
+/// A testing server.
 ///
-/// `TestServer` is very simple test server that simplify process of writing
-/// integration tests for actix-net applications.
+/// `TestServer` is very simple test server that simplify process of writing integration tests for
+/// network applications.
 ///
 /// # Examples
-///
 /// ```
 /// use actix_service::fn_service;
 /// use actix_server::TestServer;
@@ -39,7 +38,7 @@ pub struct TestServerRuntime {
 }
 
 impl TestServer {
-    /// Start new server with server builder
+    /// Start new server with server builder.
     pub fn start<F>(mut factory: F) -> TestServerRuntime
     where
         F: FnMut(ServerBuilder) -> ServerBuilder + Send + 'static,
@@ -64,7 +63,7 @@ impl TestServer {
         }
     }
 
-    /// Start new test server with application factory
+    /// Start new test server with application factory.
     pub fn with<F: ServiceFactory<TcpStream>>(factory: F) -> TestServerRuntime {
         let (tx, rx) = mpsc::channel();
 
@@ -99,7 +98,7 @@ impl TestServer {
         }
     }
 
-    /// Get first available unused local address
+    /// Get first available unused local address.
     pub fn unused_addr() -> net::SocketAddr {
         let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
         let socket = mio::net::TcpSocket::new_v4().unwrap();
@@ -111,27 +110,27 @@ impl TestServer {
 }
 
 impl TestServerRuntime {
-    /// Test server host
+    /// Test server host.
     pub fn host(&self) -> &str {
         &self.host
     }
 
-    /// Test server port
+    /// Test server port.
     pub fn port(&self) -> u16 {
         self.port
     }
 
-    /// Get test server address
+    /// Get test server address.
     pub fn addr(&self) -> net::SocketAddr {
         self.addr
     }
 
-    /// Stop http server
+    /// Stop server.
     fn stop(&mut self) {
         self.system.stop();
     }
 
-    /// Connect to server, return tokio TcpStream
+    /// Connect to server, returning a Tokio `TcpStream`.
     pub fn connect(&self) -> std::io::Result<TcpStream> {
         TcpStream::from_std(net::TcpStream::connect(self.addr)?)
     }

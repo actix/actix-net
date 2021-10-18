@@ -75,36 +75,47 @@ jobs:
           command: install
           args: cargo-hack
 
-      - name: check minimal
+      - name: check lib
+        if: >
+          matrix.target.os != 'ubuntu-latest'
+          && matrix.target.triple != 'x86_64-pc-windows-gnu'
         uses: actions-rs/cargo@v1
-        with:
-          command: hack
-          args: check --workspace --no-default-features
-
-      - name: check minimal + tests
+        with: { command: ci-check-lib }
+      - name: check lib
+        if: matrix.target.os == 'ubuntu-latest'
         uses: actions-rs/cargo@v1
-        with:
-          command: hack
-          args: check --workspace --no-default-features --tests --examples
-
-      - name: check default
+        with: { command: ci-check-lib-linux }
+      - name: check lib
+        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
         uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --workspace --tests --examples
-
+        with: { command: ci-check-min }
+      
       - name: check full
         # TODO: compile OpenSSL and run tests on MinGW
-        if: matrix.target.triple != 'x86_64-pc-windows-gnu'
+        if: >
+          matrix.target.os != 'ubuntu-latest'
+          && matrix.target.triple != 'x86_64-pc-windows-gnu'
         uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --workspace --all-features --tests --examples
+        with: { command: ci-check }
+      - name: check all
+        if: matrix.target.os == 'ubuntu-latest'
+        uses: actions-rs/cargo@v1
+        with: { command: ci-check-linux }
 
       - name: tests
-        if: matrix.target.triple != 'x86_64-pc-windows-gnu'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-test }
+        if: >
+          matrix.target.os != 'ubuntu-latest'
+          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        run: |
+          cargo ci-test
+          cargo ci-test-rt
+          cargo ci-test-server
+      - name: tests
+        if: matrix.target.os == 'ubuntu-latest'
+        run: |
+          cargo ci-test
+          cargo ci-test-rt-linux
+          cargo ci-test-server-linux
 
       - name: Generate coverage file
         if: >
@@ -120,8 +131,7 @@ jobs:
           && matrix.version == 'stable'
           && github.ref == 'refs/heads/master'
         uses: codecov/codecov-action@v1
-        with:
-          file: cobertura.xml
+        with: { file: cobertura.xml }
 
       - name: Clear the cargo caches
         run: |

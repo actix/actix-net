@@ -1,21 +1,25 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to this change. [#349]
-* Remove `ServerBuilder::configure` [#349]
-* Server no long listens to SIGHUP signal.
-  It actually did not take any action when receiving SIGHUP, the only thing SIGHUP did was to stop
-  the Server from receiving any future signal, because the `Signals` future stops on the first
-  signal received [#389]
 
+
+## 2.0.0-beta.6 - 2021-10-11
+* Add experimental (semver-exempt) `io-uring` feature for enabling async file I/O on linux. [#374]
+* Server no long listens to `SIGHUP` signal. Previously, the received was not used but did block
+  subsequent exit signals from working. [#389]
+* Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to
+  this change. [#349]
+* Remove `ServerBuilder::configure` [#349]
+
+[#374]: https://github.com/actix/actix-net/pull/374
 [#349]: https://github.com/actix/actix-net/pull/349
 [#389]: https://github.com/actix/actix-net/pull/389
 
 
 ## 2.0.0-beta.5 - 2021-04-20
-* Server shutdown would notify all workers to exit regardless if shutdown is graceful.
-  This would make all worker shutdown immediately in force shutdown case. [#333]
-  
+* Server shutdown notifies all workers to exit regardless if shutdown is graceful. This causes all
+  workers to shutdown immediately in force shutdown case. [#333]
+
 [#333]: https://github.com/actix/actix-net/pull/333
 
 

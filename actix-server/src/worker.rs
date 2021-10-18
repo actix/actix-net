@@ -280,14 +280,24 @@ impl ServerWorker {
         let counter_clone = counter.clone();
         // every worker runs in it's own arbiter.
         // use a custom tokio runtime builder to change the settings of runtime.
-        Arbiter::with_tokio_rt(move || {
+        #[cfg(all(target_os = "linux", feature = "io-uring"))]
+        let arbiter = {
+            // TODO: pass max blocking thread config when tokio-uring enable configuration
+            // on building runtime.
+            let _ = config.max_blocking_threads;
+            Arbiter::new()
+        };
+
+        #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
+        let arbiter = Arbiter::with_tokio_rt(move || {
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .max_blocking_threads(config.max_blocking_threads)
                 .build()
                 .unwrap()
-        })
-        .spawn(async move {
+        });
+
+        arbiter.spawn(async move {
             let fut = factories
                 .iter()
                 .enumerate()
@@ -419,13 +429,15 @@ struct Restart {
     fut: LocalBoxFuture<'static, Result<(usize, BoxedServerService), ()>>,
 }
 
-// Shutdown keep states necessary for server shutdown:
-// Sleep for interval check the shutdown progress.
-// Instant for the start time of shutdown.
-// Sender for send back the shutdown outcome(force/grace) to StopCommand caller.
+/// State necessary for server shutdown.
 struct Shutdown {
+    // Interval for checking the shutdown progress.
     timer: Pin<Box<Sleep>>,
+
+    /// Start time of shutdown.
     start_from: Instant,
+
+    /// Notify of the shutdown outcome (force/grace) to stop caller.
     tx: oneshot::Sender<bool>,
 }
 
@@ -511,23 +523,25 @@ impl Future for ServerWorker {
                 self.poll(cx)
             }
             WorkerState::Shutdown(ref mut shutdown) => {
-                // Wait for 1 second.
+                // wait for 1 second
                 ready!(shutdown.timer.as_mut().poll(cx));
 
                 if this.counter.total() == 0 {
-                    // Graceful shutdown.
+                    // graceful shutdown
                     if let WorkerState::Shutdown(shutdown) = mem::take(&mut this.state) {
                         let _ = shutdown.tx.send(true);
                     }
+
                     Poll::Ready(())
                 } else if shutdown.start_from.elapsed() >= this.shutdown_timeout {
-                    // Timeout forceful shutdown.
+                    // timeout forceful shutdown
                     if let WorkerState::Shutdown(shutdown) = mem::take(&mut this.state) {
                         let _ = shutdown.tx.send(false);
                     }
+
                     Poll::Ready(())
                 } else {
-                    // Reset timer and wait for 1 second.
+                    // reset timer and wait for 1 second
                     let time = Instant::now() + Duration::from_secs(1);
                     shutdown.timer.as_mut().reset(time);
                     shutdown.timer.as_mut().poll(cx)
