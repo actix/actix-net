@@ -1,10 +1,11 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Update `tokio-rustls` to `0.23`, which uses `rustls` `0.20`.
-* Brought in `rustls-pemfile` as a dev-dependency, to show updated usage for the
-  `tcp-rustls` example.
-* Removed a re-export of `Session` from `rustls`, as it seems to longer exist.
+* Update `tokio-rustls` to `0.23` which uses `rustls` `0.20`. [#396]
+* Removed a re-export of `Session` from `rustls` as it no longer exist. [#396]
+
+[#396]: https://github.com/actix/actix-net/pull/396
+
 
 ## 3.0.0-beta.5 - 2021-03-29
 * Changed `connect::ssl::rustls::RustlsConnectorService` to return error when `DNSNameRef`
