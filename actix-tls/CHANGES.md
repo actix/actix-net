@@ -1,16 +1,19 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-
+* Update `tokio-rustls` to `0.23`, which uses `rustls` `0.20`.
+* Brought in `rustls-pemfile` as a dev-dependency, to show updated usage for the
+  `tcp-rustls` example.
+* Removed a re-export of `Session` from `rustls`, as it seems to longer exist.
 
 ## 3.0.0-beta.5 - 2021-03-29
-* Changed `connect::ssl::rustls::RustlsConnectorService` to return error when `DNSNameRef` 
+* Changed `connect::ssl::rustls::RustlsConnectorService` to return error when `DNSNameRef`
   generation failed instead of panic. [#296]
 * Remove `connect::ssl::openssl::OpensslConnectServiceFactory`. [#297]
 * Remove `connect::ssl::openssl::OpensslConnectService`. [#297]
 * Add `connect::ssl::native_tls` module for native tls support. [#295]
 * Rename `accept::{nativetls => native_tls}`. [#295]
-* Remove `connect::TcpConnectService` type. service caller expect a `TcpStream` should use 
+* Remove `connect::TcpConnectService` type. service caller expect a `TcpStream` should use
   `connect::ConnectService` instead and call `Connection<T, TcpStream>::into_parts`. [#299]
 
 [#295]: https://github.com/actix/actix-net/pull/295
