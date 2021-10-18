@@ -105,7 +105,7 @@ where
     Fut: Future<Output = Result<Res, Err>>,
 {
     f: F,
-    _t: PhantomData<fn() -> Req>,
+    _t: PhantomData<fn(Req)>,
 }
 
 impl<F, Fut, Req, Res, Err> FnService<F, Fut, Req, Res, Err>
@@ -160,7 +160,7 @@ where
     Fut: Future<Output = Result<Res, Err>>,
 {
     f: F,
-    _t: PhantomData<fn() -> (Req, Cfg)>,
+    _t: PhantomData<fn(Req, Cfg)>,
 }
 
 impl<F, Fut, Req, Res, Err, Cfg> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
@@ -237,7 +237,7 @@ where
     Srv: Service<Req>,
 {
     f: F,
-    _t: PhantomData<fn() -> (Fut, Cfg, Req, Srv, Err)>,
+    _t: PhantomData<fn(Cfg, Req) -> (Fut, Srv, Err)>,
 }
 
 impl<F, Fut, Cfg, Srv, Req, Err> FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
@@ -293,7 +293,7 @@ where
     Fut: Future<Output = Result<Srv, Err>>,
 {
     f: F,
-    _t: PhantomData<fn() -> (Cfg, Req)>,
+    _t: PhantomData<fn(Cfg, Req)>,
 }
 
 impl<F, Cfg, Srv, Req, Fut, Err> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>

@@ -16,7 +16,7 @@ use super::{Service, ServiceFactory};
 pub struct MapErr<S, Req, F, E> {
     service: S,
     f: F,
-    _t: PhantomData<fn() -> (E, Req)>,
+    _t: PhantomData<fn(Req) -> E>,
 }
 
 impl<S, Req, F, E> MapErr<S, Req, F, E> {
@@ -112,7 +112,7 @@ where
 {
     a: A,
     f: F,
-    e: PhantomData<fn() -> (E, Req)>,
+    e: PhantomData<fn(Req) -> E>,
 }
 
 impl<A, Req, F, E> MapErrServiceFactory<A, Req, F, E>
