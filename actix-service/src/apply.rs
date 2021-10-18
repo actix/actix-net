@@ -51,7 +51,7 @@ where
 {
     service: S,
     wrap_fn: F,
-    _phantom: PhantomData<(Req, In, Res, Err)>,
+    _phantom: PhantomData<fn() -> (Req, In, Res, Err)>,
 }
 
 impl<S, F, Fut, Req, In, Res, Err> Apply<S, F, Req, In, Res, Err>
@@ -106,7 +106,7 @@ where
 pub struct ApplyFactory<SF, F, Req, In, Res, Err> {
     factory: SF,
     wrap_fn: F,
-    _phantom: PhantomData<(Req, In, Res, Err)>,
+    _phantom: PhantomData<fn() -> (Req, In, Res, Err)>,
 }
 
 impl<SF, F, Fut, Req, In, Res, Err> ApplyFactory<SF, F, Req, In, Res, Err>
@@ -171,7 +171,7 @@ pin_project! {
         #[pin]
         fut: SF::Future,
         wrap_fn: Option<F>,
-        _phantom: PhantomData<(Req, Res)>,
+        _phantom: PhantomData<fn()->(Req, Res)>,
     }
 }
 

@@ -14,7 +14,7 @@ use super::Transform;
 pub struct TransformMapInitErr<T, S, Req, F, E> {
     transform: T,
     mapper: F,
-    _phantom: PhantomData<(S, Req, E)>,
+    _phantom: PhantomData<fn() -> (S, Req, E)>,
 }
 
 impl<T, S, F, E, Req> TransformMapInitErr<T, S, Req, F, E> {
