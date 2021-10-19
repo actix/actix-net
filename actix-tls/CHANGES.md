@@ -3,6 +3,7 @@
 ## Unreleased - 2021-xx-xx
 * Update `tokio-rustls` to `0.23` which uses `rustls` `0.20`. [#396]
 * Removed a re-export of `Session` from `rustls` as it no longer exist. [#396]
+* Minimum supported Rust version (MSRV) is now 1.52.
 
 [#396]: https://github.com/actix/actix-net/pull/396
 
