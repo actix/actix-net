@@ -139,9 +139,9 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     sig.asyncness = None;
 
     let missing_test_attr = if has_test_attr {
-        quote!()
+        quote! {}
     } else {
-        quote!(#[test])
+        quote! { #[::core::prelude::v1::test] }
     };
 
     let mut system = syn::parse_str::<syn::Path>("::actix_rt::System").unwrap();
