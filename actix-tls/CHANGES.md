@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 3.0.0-beta.6 - 2021-10-19
 * Update `tokio-rustls` to `0.23` which uses `rustls` `0.20`. [#396]
 * Removed a re-export of `Session` from `rustls` as it no longer exist. [#396]
 * Minimum supported Rust version (MSRV) is now 1.52.

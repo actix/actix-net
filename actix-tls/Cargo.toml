@@ -1,6 +1,6 @@
 [package]
 name = "actix-tls"
-version = "3.0.0-beta.5"
+version = "3.0.0-beta.6"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "TLS acceptor and connector services for Actix ecosystem"
 keywords = ["network", "tls", "ssl", "async", "transport"]
@@ -38,7 +38,7 @@ native-tls = ["tokio-native-tls"]
 uri = ["http"]
 
 [dependencies]
-actix-codec = "0.4.0-beta.1"
+actix-codec = "0.4.0"
 actix-rt = { version = "2.2.0", default-features = false }
 actix-service = "2.0.0"
 actix-utils = "3.0.0"
