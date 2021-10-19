@@ -155,6 +155,7 @@ impl System {
 pub struct SystemRunner {
     rt: Runtime,
     stop_rx: oneshot::Receiver<i32>,
+    #[allow(dead_code)]
     system: System,
 }
 
