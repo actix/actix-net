@@ -22,4 +22,5 @@ syn = { version = "^1", features = ["full"] }
 actix-rt = "2.0.0"
 
 futures-util = { version = "0.3.7", default-features = false }
+rustversion = "1"
 trybuild = "1"
