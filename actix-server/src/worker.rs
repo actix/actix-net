@@ -181,6 +181,7 @@ impl WorkerHandleAccept {
 /// Held by [ServerBuilder](crate::builder::ServerBuilder).
 #[derive(Debug)]
 pub(crate) struct WorkerHandleServer {
+    #[allow(dead_code)]
     idx: usize,
     tx: UnboundedSender<Stop>,
 }

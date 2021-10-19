@@ -198,5 +198,5 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 fn input_and_compile_error(mut item: TokenStream, err: syn::Error) -> TokenStream {
     let compile_err = TokenStream::from(err.to_compile_error());
     item.extend(compile_err);
-    return item;
+    item
 }

@@ -5,18 +5,21 @@ ci-doctest = "test --workspace --all-features --doc --no-fail-fast -- --nocaptur
 
 # just check the library (without dev deps)
 ci-check-min = "hack --workspace check --no-default-features"
-ci-check-lib = "hack --workspace --feature-powerset --exclude-features io-uring check"
+ci-check-lib = "hack --workspace --feature-powerset --exclude-features=io-uring check"
 ci-check-lib-linux = "hack --workspace --feature-powerset check"
 
 # check everything
-ci-check = "hack --workspace --feature-powerset --exclude-features io-uring check --tests --examples"
+ci-check = "hack --workspace --feature-powerset --exclude-features=io-uring check --tests --examples"
 ci-check-linux = "hack --workspace --feature-powerset check --tests --examples"
 
 # tests avoiding io-uring feature
 ci-test = "hack test --workspace --exclude=actix-rt --exclude=actix-server --all-features --lib --tests --no-fail-fast -- --nocapture"
-ci-test-rt = "    hack --feature-powerset --exclude-features io-uring test --package=actix-rt     --lib --tests --no-fail-fast -- --nocapture"
-ci-test-server = "hack --feature-powerset --exclude-features io-uring test --package=actix-server --lib --tests --no-fail-fast -- --nocapture"
+ci-test-rt = "    hack --feature-powerset --exclude-features=io-uring test --package=actix-rt     --lib --tests --no-fail-fast -- --nocapture"
+ci-test-server = "hack --feature-powerset --exclude-features=io-uring test --package=actix-server --lib --tests --no-fail-fast -- --nocapture"
 
 # test with io-uring feature
 ci-test-rt-linux = "    hack --feature-powerset test --package=actix-rt     --lib --tests --no-fail-fast -- --nocapture"
 ci-test-server-linux = "hack --feature-powerset test --package=actix-server --lib --tests --no-fail-fast -- --nocapture"
+
+# test lower msrv
+ci-test-lower-msrv = "hack --workspace --feature-powerset test --lib --tests --no-fail-fast -- --nocapture"
