@@ -54,7 +54,7 @@ tls-openssl = { package = "openssl", version = "0.10.9", optional = true }
 tokio-openssl = { version = "0.6", optional = true }
 
 # rustls
-tokio-rustls = { version = "0.22", optional = true }
+tokio-rustls = { version = "0.23", optional = true }
 webpki-roots = { version = "0.21", optional = true }
 
 # native-tls
@@ -67,6 +67,7 @@ bytes = "1"
 env_logger = "0.8"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
 log = "0.4"
+rustls-pemfile = "0.2.1"
 trust-dns-resolver = "0.20.0"
 
 [[example]]
