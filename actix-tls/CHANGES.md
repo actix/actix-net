@@ -3,6 +3,13 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.0-beta.7 - 2021-10-20
+* Add `webpki_roots_cert_store()` to get rustls compatible webpki roots cert store. [#???]
+* Alias `connect::ssl` to `connect::tls`. [#???]
+
+[#???]: https://github.com/actix/actix-net/pull/???
+
+
 ## 3.0.0-beta.6 - 2021-10-19
 * Update `tokio-rustls` to `0.23` which uses `rustls` `0.20`. [#396]
 * Removed a re-export of `Session` from `rustls` as it no longer exist. [#396]
