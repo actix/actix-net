@@ -18,7 +18,7 @@ jobs:
           - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
           - { name: Windows (32-bit), os: windows-latest, triple: i686-pc-windows-msvc }
         version:
-          - 1.46.0 # MSRV
+          - 1.52.0 # MSRV for -server and -tls
           - stable
           - nightly
 
@@ -64,8 +64,7 @@ jobs:
 
       # - name: Generate Cargo.lock
       #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: generate-lockfile
+      #   with: { command: generate-lockfile }
       # - name: Cache Dependencies
       #   uses: Swatinem/rust-cache@v1.2.0
 
@@ -118,26 +117,66 @@ jobs:
           cargo ci-test-rt-linux
           cargo ci-test-server-linux
 
-      - name: Generate coverage file
-        if: >
-          matrix.target.os == 'ubuntu-latest'
-          && matrix.version == 'stable'
-          && github.ref == 'refs/heads/master'
+      - name: Clear the cargo caches
         run: |
-          cargo install cargo-tarpaulin
-          cargo tarpaulin --out Xml --verbose
-      - name: Upload to Codecov
-        if: >
-          matrix.target.os == 'ubuntu-latest'
-          && matrix.version == 'stable'
-          && github.ref == 'refs/heads/master'
-        uses: codecov/codecov-action@v1
-        with: { file: cobertura.xml }
+          cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
+          cargo-cache
+  
+  build_and_test_lower_msrv:
+    name: Linux / 1.46 (lower MSRV)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install 1.46.0 # MSRV for all but -server and -tls
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.46.0-x86_64-unknown-linux-gnu
+          profile: minimal
+          override: true
+
+      - name: Install cargo-hack
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-hack
+
+      - name: tests
+        run: cargo ci-test-lower-msrv
 
       - name: Clear the cargo caches
         run: |
           cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
           cargo-cache
+  
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust (nightly)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable-x86_64-unknown-linux-gnu
+          profile: minimal
+          override: true
+
+      - name: Generate Cargo.lock
+        uses: actions-rs/cargo@v1
+        with: { command: generate-lockfile }
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v1.3.0
+    
+      - name: Generate coverage file
+        if: github.ref == 'refs/heads/master'
+        run: |
+          cargo install cargo-tarpaulin
+          cargo tarpaulin --out Xml --verbose
+      - name: Upload to Codecov
+        if: github.ref == 'refs/heads/master'
+        uses: codecov/codecov-action@v1
+        with: { file: cobertura.xml }
 
   rustdoc:
     name: rustdoc

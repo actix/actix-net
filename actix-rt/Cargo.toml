@@ -23,7 +23,7 @@ macros = ["actix-macros"]
 io-uring = ["tokio-uring"]
 
 [dependencies]
-actix-macros = { version = "0.2.0", optional = true }
+actix-macros = { version = "0.2.3", optional = true }
 
 futures-core = { version = "0.3", default-features = false }
 tokio = { version = "1.5.1", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }

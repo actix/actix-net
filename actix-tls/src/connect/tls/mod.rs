@@ -1,4 +1,4 @@
-//! SSL Services
+//! TLS Services
 
 #[cfg(feature = "openssl")]
 pub mod openssl;

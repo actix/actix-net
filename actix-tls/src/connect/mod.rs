@@ -21,7 +21,9 @@ mod connector;
 mod error;
 mod resolve;
 mod service;
-pub mod ssl;
+pub mod tls;
+#[doc(hidden)]
+pub use tls as ssl;
 #[cfg(feature = "uri")]
 mod uri;
 

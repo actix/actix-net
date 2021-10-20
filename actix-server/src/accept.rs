@@ -81,13 +81,8 @@ struct Accept {
 }
 
 /// Array of u128 with every bit as marker for a worker handle's availability.
+#[derive(Debug, Default)]
 struct Availability([u128; 4]);
-
-impl Default for Availability {
-    fn default() -> Self {
-        Self([0; 4])
-    }
-}
 
 impl Availability {
     /// Check if any worker handle is available

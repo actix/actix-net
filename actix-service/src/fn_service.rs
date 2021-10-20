@@ -52,9 +52,9 @@ pub fn fn_factory<F, Cfg, Srv, Req, Fut, Err>(
     f: F,
 ) -> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
 where
-    Srv: Service<Req>,
     F: Fn() -> Fut,
     Fut: Future<Output = Result<Srv, Err>>,
+    Srv: Service<Req>,
 {
     FnServiceNoConfig::new(f)
 }
