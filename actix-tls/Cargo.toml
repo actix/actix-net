@@ -1,6 +1,6 @@
 [package]
 name = "actix-tls"
-version = "3.0.0-beta.6"
+version = "3.0.0-beta.7"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>"]
 description = "TLS acceptor and connector services for Actix ecosystem"
 keywords = ["network", "tls", "ssl", "async", "transport"]
@@ -55,7 +55,7 @@ tokio-openssl = { version = "0.6", optional = true }
 
 # rustls
 tokio-rustls = { version = "0.23", optional = true }
-webpki-roots = { version = "0.21", optional = true }
+webpki-roots = { version = "0.22", optional = true }
 
 # native-tls
 tokio-native-tls = { version = "0.3", optional = true }
@@ -64,7 +64,7 @@ tokio-native-tls = { version = "0.3", optional = true }
 actix-rt = "2.2.0"
 actix-server = "2.0.0-beta.6"
 bytes = "1"
-env_logger = "0.8"
+env_logger = "0.9"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
 log = "0.4"
 rustls-pemfile = "0.2.1"

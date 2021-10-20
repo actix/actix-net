@@ -14,10 +14,25 @@ use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::trace;
-use tokio_rustls::rustls::client::ServerName;
+use tokio_rustls::rustls::{client::ServerName, OwnedTrustAnchor, RootCertStore};
 use tokio_rustls::{Connect, TlsConnector};
 
 use crate::connect::{Address, Connection};
+
+/// Returns standard root certificates from `webpki-roots` crate as a rustls certificate store.
+pub fn webpki_roots_cert_store() -> RootCertStore {
+    let mut root_certs = RootCertStore::empty();
+    for cert in TLS_SERVER_ROOTS.0 {
+        let cert = OwnedTrustAnchor::from_subject_spki_name_constraints(
+            cert.subject,
+            cert.spki,
+            cert.name_constraints,
+        );
+        let certs = vec![cert].into_iter();
+        root_certs.add_server_trust_anchors(certs);
+    }
+    root_certs
+}
 
 /// Rustls connector factory
 pub struct RustlsConnector {
