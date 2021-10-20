@@ -22,6 +22,8 @@ mod error;
 mod resolve;
 mod service;
 pub mod ssl;
+#[doc(inline)]
+pub use ssl as tls;
 #[cfg(feature = "uri")]
 mod uri;
 

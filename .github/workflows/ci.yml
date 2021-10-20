@@ -7,6 +7,18 @@ on:
     branches: [master]
 
 jobs:
+  check_ulimit:
+    name: check ulimit (temp)
+    runs-on: ubuntu-latest
+    steps:
+      - name: check ulimit
+        run: |
+          which sudo || true
+          ulimit -a || true
+          sudo ulimit -a || true
+          ulimit -l 512 || true
+          sudo ulimit -l 512 || true
+
   build_and_test:
     strategy:
       fail-fast: false
