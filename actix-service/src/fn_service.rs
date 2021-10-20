@@ -407,7 +407,7 @@ mod tests {
             ok::<_, Rc<u8>>(fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8))))
         });
 
-        fn is_send<T: Send + Clone>(_: &T) {}
+        fn is_send<T: Send + Sync + Clone>(_: &T) {}
 
         is_send(&fac_1);
         is_send(&map_config(fac_1.clone(), |_: Rc<u8>| Rc::new(0u8)));
