@@ -178,7 +178,7 @@ impl<T, U> Framed<T, U> {
         U: Decoder,
     {
         loop {
-            let mut this = self.as_mut().project();
+            let this = self.as_mut().project();
             // Repeatedly call `decode` or `decode_eof` as long as it is "readable". Readable is
             // defined as not having returned `None`. If the upstream has returned EOF, and the
             // decoder is no longer readable, it can be assumed that the decoder will never become
@@ -186,7 +186,7 @@ impl<T, U> Framed<T, U> {
 
             if this.flags.contains(Flags::READABLE) {
                 if this.flags.contains(Flags::EOF) {
-                    match this.codec.decode_eof(&mut this.read_buf) {
+                    match this.codec.decode_eof(this.read_buf) {
                         Ok(Some(frame)) => return Poll::Ready(Some(Ok(frame))),
                         Ok(None) => return Poll::Ready(None),
                         Err(e) => return Poll::Ready(Some(Err(e))),
@@ -195,7 +195,7 @@ impl<T, U> Framed<T, U> {
 
                 log::trace!("attempting to decode a frame");
 
-                match this.codec.decode(&mut this.read_buf) {
+                match this.codec.decode(this.read_buf) {
                     Ok(Some(frame)) => {
                         log::trace!("frame decoded from buffer");
                         return Poll::Ready(Some(Ok(frame)));

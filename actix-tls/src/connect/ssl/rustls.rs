@@ -1,4 +1,5 @@
 use std::{
+    convert::TryFrom,
     future::Future,
     io,
     pin::Pin,
@@ -6,7 +7,6 @@ use std::{
     task::{Context, Poll},
 };
 
-pub use tokio_rustls::rustls::Session;
 pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
 pub use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -14,7 +14,7 @@ use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::trace;
-use tokio_rustls::webpki::DNSNameRef;
+use tokio_rustls::rustls::client::ServerName;
 use tokio_rustls::{Connect, TlsConnector};
 
 use crate::connect::{Address, Connection};
@@ -89,7 +89,7 @@ where
         trace!("SSL Handshake start for: {:?}", connection.host());
         let (stream, connection) = connection.replace_io(());
 
-        match DNSNameRef::try_from_ascii_str(connection.host()) {
+        match ServerName::try_from(connection.host()) {
             Ok(host) => RustlsConnectorServiceFuture::Future {
                 connect: TlsConnector::from(self.connector.clone()).connect(host, stream),
                 connection: Some(connection),
