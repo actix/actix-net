@@ -5,8 +5,6 @@ use std::{net, thread, time::Duration};
 use actix_rt::{net::TcpStream, time::sleep};
 use actix_server::Server;
 use actix_service::fn_service;
-use actix_utils::future::ok;
-use futures_util::future::lazy;
 
 fn unused_addr() -> net::SocketAddr {
     let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
@@ -23,25 +21,28 @@ fn test_bind() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
-            Server::build()
+        actix_rt::System::new().block_on(async {
+            let srv = Server::build()
                 .workers(1)
                 .disable_signals()
-                .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
-                .unwrap()
-                .run()
-        }));
+                .bind("test", addr, move || {
+                    fn_service(|_| async { Ok::<_, ()>(()) })
+                })?
+                .run();
 
-        let _ = tx.send((srv, actix_rt::System::current()));
-        let _ = sys.run();
+            let _ = tx.send((srv.clone(), actix_rt::System::current()));
+
+            srv.await
+        })
     });
-    let (_, sys) = rx.recv().unwrap();
+    let (srv, sys) = rx.recv().unwrap();
 
     thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
+
+    let _ = srv.stop(true);
     sys.stop();
-    let _ = h.join();
+    h.join().unwrap().unwrap();
 }
 
 #[test]
@@ -50,25 +51,30 @@ fn test_listen() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
-        let lst = net::TcpListener::bind(addr).unwrap();
-        sys.block_on(async {
-            Server::build()
+        let lst = net::TcpListener::bind(addr)?;
+        actix_rt::System::new().block_on(async {
+            let srv = Server::build()
                 .disable_signals()
                 .workers(1)
-                .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
-                .unwrap()
+                .listen("test", lst, move || {
+                    fn_service(|_| async { Ok::<_, ()>(()) })
+                })?
                 .run();
-            let _ = tx.send(actix_rt::System::current());
-        });
-        let _ = sys.run();
+
+            let _ = tx.send((srv.clone(), actix_rt::System::current()));
+
+            srv.await
+        })
     });
-    let sys = rx.recv().unwrap();
+
+    let (srv, sys) = rx.recv().unwrap();
 
     thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
+
+    let _ = srv.stop(true);
     sys.stop();
-    let _ = h.join();
+    h.join().unwrap().unwrap();
 }
 
 #[test]
@@ -84,9 +90,8 @@ fn test_start() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
-            Server::build()
+        actix_rt::System::new().block_on(async {
+            let srv = Server::build()
                 .backlog(100)
                 .disable_signals()
                 .bind("test", addr, move || {
@@ -95,13 +100,13 @@ fn test_start() {
                         f.send(Bytes::from_static(b"test")).await.unwrap();
                         Ok::<_, ()>(())
                     })
-                })
-                .unwrap()
-                .run()
-        }));
+                })?
+                .run();
 
-        let _ = tx.send((srv, actix_rt::System::current()));
-        let _ = sys.run();
+            let _ = tx.send((srv.clone(), actix_rt::System::current()));
+
+            srv.await
+        })
     });
 
     let (srv, sys) = rx.recv().unwrap();
@@ -134,12 +139,10 @@ fn test_start() {
 
     // stop
     let _ = srv.stop(false);
-    thread::sleep(Duration::from_millis(100));
-    assert!(net::TcpStream::connect(addr).is_err());
-
-    thread::sleep(Duration::from_millis(100));
     sys.stop();
-    let _ = h.join();
+    h.join().unwrap().unwrap();
+
+    assert!(net::TcpStream::connect(addr).is_err());
 }
 
 #[actix_rt::test]
@@ -209,9 +212,8 @@ async fn test_max_concurrent_connections() {
     }
 
     srv.stop(false).await;
-
     sys.stop();
-    let _ = h.join().unwrap();
+    h.join().unwrap().unwrap();
 }
 
 #[actix_rt::test]
@@ -266,16 +268,14 @@ async fn test_service_restart() {
                         let num = num.clone();
                         async move { Ok::<_, ()>(TestService(num)) }
                     })
-                })
-                .unwrap()
+                })?
                 .bind("addr2", addr2, move || {
                     let num2 = num2.clone();
                     fn_factory(move || {
                         let num2 = num2.clone();
                         async move { Ok::<_, ()>(TestService(num2)) }
                     })
-                })
-                .unwrap()
+                })?
                 .workers(1)
                 .run();
 
@@ -306,9 +306,9 @@ async fn test_service_restart() {
     assert!(num_clone.load(Ordering::SeqCst) > 5);
     assert!(num2_clone.load(Ordering::SeqCst) > 5);
 
-    sys.stop();
     let _ = server.stop(false);
-    let _ = h.join().unwrap();
+    sys.stop();
+    h.join().unwrap().unwrap();
 }
 
 #[ignore]
@@ -380,12 +380,12 @@ async fn worker_restart() {
         actix_rt::System::new().block_on(async {
             let server = Server::build()
                 .disable_signals()
-                .bind("addr", addr, move || TestServiceFactory(counter.clone()))
-                .unwrap()
+                .bind("addr", addr, move || TestServiceFactory(counter.clone()))?
                 .workers(2)
                 .run();
 
             let _ = tx.send((server.clone(), actix_rt::System::current()));
+
             server.await
         })
     });
@@ -447,7 +447,7 @@ async fn worker_restart() {
     assert_eq!("3", id);
     stream.shutdown().await.unwrap();
 
-    sys.stop();
     let _ = server.stop(false);
-    let _ = h.join().unwrap();
+    sys.stop();
+    h.join().unwrap().unwrap();
 }
