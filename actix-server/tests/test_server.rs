@@ -142,6 +142,7 @@ fn test_start() {
     sys.stop();
     h.join().unwrap().unwrap();
 
+    thread::sleep(Duration::from_secs(1));
     assert!(net::TcpStream::connect(addr).is_err());
 }
 
