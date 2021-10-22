@@ -125,13 +125,19 @@ impl ServerBuilder {
 
     /// Sets the maximum per-worker number of concurrent connections.
     ///
-    /// All socket listeners will stop accepting connections when this limit is
-    /// reached for each worker.
+    /// All socket listeners will stop accepting connections when this limit is reached for
+    /// each worker.
     ///
-    /// By default max connections is set to a 25k per worker.
-    pub fn maxconn(mut self, num: usize) -> Self {
+    /// By default max connections is set to a 25,600 per worker.
+    pub fn max_concurrent_connections(mut self, num: usize) -> Self {
         self.worker_config.max_concurrent_connections(num);
         self
+    }
+
+    #[doc(hidden)]
+    #[deprecated(since = "2.0.0", note = "Renamed to `max_concurrent_connections`.")]
+    pub fn maxconn(self, num: usize) -> Self {
+        self.max_concurrent_connections(num)
     }
 
     /// Stop Actix system.
@@ -158,7 +164,11 @@ impl ServerBuilder {
         self
     }
 
-    /// Add new service to the server.
+    /// Bind server to socket addresses.
+    ///
+    /// Binds to all network interface addresses that resolve from the `addr` argument.
+    /// Eg. using `localhost` might bind to both IPv4 and IPv6 addresses. Bind to multiple distinct
+    /// interfaces at the same time by passing a list of socket addresses.
     pub fn bind<F, U, N: AsRef<str>>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
         F: ServiceFactory<TcpStream>,
@@ -180,56 +190,9 @@ impl ServerBuilder {
         Ok(self)
     }
 
-    /// Add new unix domain service to the server.
-    #[cfg(unix)]
-    pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
-    where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
-        N: AsRef<str>,
-        U: AsRef<std::path::Path>,
-    {
-        // The path must not exist when we try to bind.
-        // Try to remove it to avoid bind error.
-        if let Err(e) = std::fs::remove_file(addr.as_ref()) {
-            // NotFound is expected and not an issue. Anything else is.
-            if e.kind() != std::io::ErrorKind::NotFound {
-                return Err(e);
-            }
-        }
-
-        let lst = crate::socket::StdUnixListener::bind(addr)?;
-        self.listen_uds(name, lst, factory)
-    }
-
-    /// Add new unix domain service to the server.
-    /// Useful when running as a systemd service and
-    /// a socket FD can be acquired using the systemd crate.
-    #[cfg(unix)]
-    pub fn listen_uds<F, N: AsRef<str>>(
-        mut self,
-        name: N,
-        lst: crate::socket::StdUnixListener,
-        factory: F,
-    ) -> io::Result<Self>
-    where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
-    {
-        use std::net::{IpAddr, Ipv4Addr};
-        lst.set_nonblocking(true)?;
-        let token = self.next_token();
-        let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-        self.services.push(StreamNewService::create(
-            name.as_ref().to_string(),
-            token,
-            factory,
-            addr,
-        ));
-        self.sockets
-            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
-        Ok(self)
-    }
-
-    /// Add new service to the server.
+    /// Bind server to existing TCP listener.
+    ///
+    /// Useful when running as a systemd service and a socket FD can be passed to the process.
     pub fn listen<F, N: AsRef<str>>(
         mut self,
         name: N,
@@ -240,9 +203,10 @@ impl ServerBuilder {
         F: ServiceFactory<TcpStream>,
     {
         lst.set_nonblocking(true)?;
-        let addr = lst.local_addr()?;
 
+        let addr = lst.local_addr()?;
         let token = self.next_token();
+
         self.services.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
@@ -434,6 +398,62 @@ impl ServerBuilder {
     }
 }
 
+/// Unix Domain Socket (UDS) support.
+#[cfg(unix)]
+impl ServerBuilder {
+    /// Add new unix domain service to the server.
+    pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
+    where
+        F: ServiceFactory<actix_rt::net::UnixStream>,
+        N: AsRef<str>,
+        U: AsRef<std::path::Path>,
+    {
+        // The path must not exist when we try to bind.
+        // Try to remove it to avoid bind error.
+        if let Err(e) = std::fs::remove_file(addr.as_ref()) {
+            // NotFound is expected and not an issue. Anything else is.
+            if e.kind() != std::io::ErrorKind::NotFound {
+                return Err(e);
+            }
+        }
+
+        let lst = crate::socket::StdUnixListener::bind(addr)?;
+        self.listen_uds(name, lst, factory)
+    }
+
+    /// Add new unix domain service to the server.
+    ///
+    /// Useful when running as a systemd service and a socket FD can be passed to the process.
+    pub fn listen_uds<F, N: AsRef<str>>(
+        mut self,
+        name: N,
+        lst: crate::socket::StdUnixListener,
+        factory: F,
+    ) -> io::Result<Self>
+    where
+        F: ServiceFactory<actix_rt::net::UnixStream>,
+    {
+        use std::net::{IpAddr, Ipv4Addr};
+
+        lst.set_nonblocking(true)?;
+
+        let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let token = self.next_token();
+
+        self.services.push(StreamNewService::create(
+            name.as_ref().to_string(),
+            token,
+            factory,
+            addr,
+        ));
+
+        self.sockets
+            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
+
+        Ok(self)
+    }
+}
+
 impl Future for ServerBuilder {
     type Output = ();
 
@@ -452,29 +472,30 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
     backlog: u32,
 ) -> io::Result<Vec<MioTcpListener>> {
     let mut err = None;
-    let mut succ = false;
+    let mut success = false;
     let mut sockets = Vec::new();
+
     for addr in addr.to_socket_addrs()? {
         match create_tcp_listener(addr, backlog) {
             Ok(lst) => {
-                succ = true;
+                success = true;
                 sockets.push(lst);
             }
             Err(e) => err = Some(e),
         }
     }
 
-    if !succ {
-        if let Some(e) = err.take() {
-            Err(e)
+    if success {
+        Ok(sockets)
+    } else {
+        if let Some(err) = err.take() {
+            Err(err)
         } else {
             Err(io::Error::new(
                 io::ErrorKind::Other,
-                "Can not bind to address.",
+                "Can not bind to socket address",
             ))
         }
-    } else {
-        Ok(sockets)
     }
 }
 

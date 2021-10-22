@@ -2,6 +2,7 @@
 
 ## Unreleased - 2021-xx-xx
 * Rename `Server` to `ServerHandle`. [#???]
+* Rename `ServerBuilder::{maxconn => max_concurrent_connections}`. [#???]
 * Minimum supported Rust version (MSRV) is now 1.52.
 
 [#???]: https://github.com/actix/actix-net/pull/???

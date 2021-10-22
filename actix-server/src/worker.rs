@@ -247,7 +247,7 @@ impl Default for ServerWorkerConfig {
         Self {
             shutdown_timeout: Duration::from_secs(30),
             max_blocking_threads,
-            max_concurrent_connections: 25600,
+            max_concurrent_connections: 25_600,
         }
     }
 }
