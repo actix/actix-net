@@ -15,13 +15,24 @@ use tokio::sync::{
 
 use crate::accept::AcceptLoop;
 use crate::join_all;
-use crate::server::{Server, ServerCommand};
+use crate::server::{ServerCommand, ServerHandle};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
 use crate::socket::{MioTcpListener, MioTcpSocket};
 use crate::waker_queue::{WakerInterest, WakerQueue};
 use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleAccept, WorkerHandleServer};
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct Server;
+
+impl Server {
+    /// Start server building process.
+    pub fn build() -> ServerBuilder {
+        ServerBuilder::default()
+    }
+}
 
 /// Server builder
 pub struct ServerBuilder {
@@ -35,7 +46,7 @@ pub struct ServerBuilder {
     exit: bool,
     no_signals: bool,
     cmd: UnboundedReceiver<ServerCommand>,
-    server: Server,
+    server: ServerHandle,
     notify: Vec<oneshot::Sender<()>>,
     worker_config: ServerWorkerConfig,
 }
@@ -50,7 +61,7 @@ impl ServerBuilder {
     /// Create new Server builder instance
     pub fn new() -> ServerBuilder {
         let (tx, rx) = unbounded_channel();
-        let server = Server::new(tx);
+        let server = ServerHandle::new(tx);
 
         ServerBuilder {
             threads: num_cpus::get(),
@@ -246,7 +257,7 @@ impl ServerBuilder {
     }
 
     /// Starts processing incoming connections and return server controller.
-    pub fn run(mut self) -> Server {
+    pub fn run(mut self) -> ServerHandle {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {

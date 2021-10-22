@@ -1,7 +1,10 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Rename `Server` to `ServerHandle`. [#???]
 * Minimum supported Rust version (MSRV) is now 1.52.
+
+[#???]: https://github.com/actix/actix-net/pull/???
 
 
 ## 2.0.0-beta.6 - 2021-10-11
