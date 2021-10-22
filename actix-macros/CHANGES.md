@@ -3,6 +3,12 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 0.2.3 - 2021-10-19
+* Fix test macro in presence of other imports named "test". [#399]
+
+[#399]: https://github.com/actix/actix-net/pull/399
+
+
 ## 0.2.2 - 2021-10-14
 * Improve error recovery potential when macro input is invalid. [#391]
 * Allow custom `System`s on test macro. [#391]

@@ -1,9 +1,10 @@
 [package]
 name = "actix-macros"
-version = "0.2.2"
+version = "0.2.3"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Ibraheem Ahmed <ibrah1440@gmail.com>",
+    "Rob Ede <robjtede@icloud.com>",
 ]
 description = "Macros for Actix system and runtime"
 repository = "https://github.com/actix/actix-net.git"
@@ -22,4 +23,5 @@ syn = { version = "^1", features = ["full"] }
 actix-rt = "2.0.0"
 
 futures-util = { version = "0.3.7", default-features = false }
+rustversion = "1"
 trybuild = "1"
