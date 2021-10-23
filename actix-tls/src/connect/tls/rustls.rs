@@ -1,4 +1,5 @@
 use std::{
+    convert::TryFrom,
     future::Future,
     io,
     pin::Pin,
@@ -6,7 +7,6 @@ use std::{
     task::{Context, Poll},
 };
 
-pub use tokio_rustls::rustls::Session;
 pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
 pub use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -14,10 +14,25 @@ use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::trace;
-use tokio_rustls::webpki::DNSNameRef;
+use tokio_rustls::rustls::{client::ServerName, OwnedTrustAnchor, RootCertStore};
 use tokio_rustls::{Connect, TlsConnector};
 
 use crate::connect::{Address, Connection};
+
+/// Returns standard root certificates from `webpki-roots` crate as a rustls certificate store.
+pub fn webpki_roots_cert_store() -> RootCertStore {
+    let mut root_certs = RootCertStore::empty();
+    for cert in TLS_SERVER_ROOTS.0 {
+        let cert = OwnedTrustAnchor::from_subject_spki_name_constraints(
+            cert.subject,
+            cert.spki,
+            cert.name_constraints,
+        );
+        let certs = vec![cert].into_iter();
+        root_certs.add_server_trust_anchors(certs);
+    }
+    root_certs
+}
 
 /// Rustls connector factory
 pub struct RustlsConnector {
@@ -89,7 +104,7 @@ where
         trace!("SSL Handshake start for: {:?}", connection.host());
         let (stream, connection) = connection.replace_io(());
 
-        match DNSNameRef::try_from_ascii_str(connection.host()) {
+        match ServerName::try_from(connection.host()) {
             Ok(host) => RustlsConnectorServiceFuture::Future {
                 connect: TlsConnector::from(self.connector.clone()).connect(host, stream),
                 connection: Some(connection),

@@ -5,7 +5,7 @@ use actix_rt::{
     time::{sleep, Instant},
     System,
 };
-use log::{error, info};
+use log::{debug, error, info};
 use mio::{Interest, Poll, Token as MioToken};
 
 use crate::server::Server;
@@ -81,13 +81,8 @@ struct Accept {
 }
 
 /// Array of u128 with every bit as marker for a worker handle's availability.
+#[derive(Debug, Default)]
 struct Availability([u128; 4]);
-
-impl Default for Availability {
-    fn default() -> Self {
-        Self([0; 4])
-    }
-}
 
 impl Availability {
     /// Check if any worker handle is available
@@ -234,7 +229,7 @@ impl Accept {
                     WAKER_TOKEN => {
                         let exit = self.handle_waker(sockets);
                         if exit {
-                            info!("Accept is stopped.");
+                            info!("Accept thread stopped");
                             return;
                         }
                     }
@@ -370,14 +365,14 @@ impl Accept {
 
     fn register_logged(&self, info: &mut ServerSocketInfo) {
         match self.register(info) {
-            Ok(_) => info!("Resume accepting connections on {}", info.lst.local_addr()),
+            Ok(_) => debug!("Resume accepting connections on {}", info.lst.local_addr()),
             Err(e) => error!("Can not register server socket {}", e),
         }
     }
 
     fn deregister_logged(&self, info: &mut ServerSocketInfo) {
         match self.poll.registry().deregister(&mut info.lst) {
-            Ok(_) => info!("Paused accepting connections on {}", info.lst.local_addr()),
+            Ok(_) => debug!("Paused accepting connections on {}", info.lst.local_addr()),
             Err(e) => {
                 error!("Can not deregister server socket {}", e)
             }

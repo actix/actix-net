@@ -250,7 +250,14 @@ impl ServerBuilder {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
-            info!("Starting {} workers", self.threads);
+            for (_, name, lst) in &self.sockets {
+                info!(
+                    r#"Starting service: "{}", workers: {}, listening on: {}"#,
+                    name,
+                    self.threads,
+                    lst.local_addr()
+                );
+            }
 
             // start workers
             let handles = (0..self.threads)
@@ -264,9 +271,6 @@ impl ServerBuilder {
                 .collect();
 
             // start accept thread
-            for sock in &self.sockets {
-                info!("Starting \"{}\" service on {}", sock.1, sock.2);
-            }
             self.accept.start(
                 mem::take(&mut self.sockets)
                     .into_iter()
@@ -312,7 +316,7 @@ impl ServerBuilder {
                 // Handle `SIGINT`, `SIGTERM`, `SIGQUIT` signals and stop actix system
                 match sig {
                     Signal::Int => {
-                        info!("SIGINT received, starting forced shutdown");
+                        info!("SIGINT received; starting forced shutdown");
                         self.exit = true;
                         self.handle_cmd(ServerCommand::Stop {
                             graceful: false,
@@ -321,7 +325,7 @@ impl ServerBuilder {
                     }
 
                     Signal::Term => {
-                        info!("SIGTERM received, starting graceful shutdown");
+                        info!("SIGTERM received; starting graceful shutdown");
                         self.exit = true;
                         self.handle_cmd(ServerCommand::Stop {
                             graceful: true,
@@ -330,7 +334,7 @@ impl ServerBuilder {
                     }
 
                     Signal::Quit => {
-                        info!("SIGQUIT received, starting forced shutdown");
+                        info!("SIGQUIT received; starting forced shutdown");
                         self.exit = true;
                         self.handle_cmd(ServerCommand::Stop {
                             graceful: false,
@@ -390,7 +394,7 @@ impl ServerBuilder {
                 }
 
                 if found {
-                    error!("Worker has died {:?}, restarting", idx);
+                    error!("Worker {} has died; restarting", idx);
 
                     let mut new_idx = self.handles.len();
                     'found: loop {

@@ -1,12 +1,15 @@
 use std::{
     future::Future,
-    sync::mpsc::channel,
-    thread,
     time::{Duration, Instant},
 };
 
 use actix_rt::{task::JoinError, Arbiter, System};
-use tokio::sync::oneshot;
+
+#[cfg(not(feature = "io-uring"))]
+use {
+    std::{sync::mpsc::channel, thread},
+    tokio::sync::oneshot,
+};
 
 #[test]
 fn await_for_timer() {
@@ -103,6 +106,10 @@ fn wait_for_spawns() {
     assert!(rt.block_on(handle).is_err());
 }
 
+// Temporary disabled tests for io-uring feature.
+// They should be enabled when possible.
+
+#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_spawn_fn_runs() {
     let _ = System::new();
@@ -119,6 +126,7 @@ fn arbiter_spawn_fn_runs() {
     arbiter.join().unwrap();
 }
 
+#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_handle_spawn_fn_runs() {
     let sys = System::new();
@@ -141,6 +149,7 @@ fn arbiter_handle_spawn_fn_runs() {
     sys.run().unwrap();
 }
 
+#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_drop_no_panic_fn() {
     let _ = System::new();
@@ -152,6 +161,7 @@ fn arbiter_drop_no_panic_fn() {
     arbiter.join().unwrap();
 }
 
+#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_drop_no_panic_fut() {
     let _ = System::new();
@@ -163,18 +173,7 @@ fn arbiter_drop_no_panic_fut() {
     arbiter.join().unwrap();
 }
 
-#[test]
-#[should_panic]
-fn no_system_current_panic() {
-    System::current();
-}
-
-#[test]
-#[should_panic]
-fn no_system_arbiter_new_panic() {
-    Arbiter::new();
-}
-
+#[cfg(not(feature = "io-uring"))]
 #[test]
 fn system_arbiter_spawn() {
     let runner = System::new();
@@ -205,6 +204,7 @@ fn system_arbiter_spawn() {
     thread.join().unwrap();
 }
 
+#[cfg(not(feature = "io-uring"))]
 #[test]
 fn system_stop_stops_arbiters() {
     let sys = System::new();
@@ -294,6 +294,18 @@ fn new_arbiter_with_tokio() {
 }
 
 #[test]
+#[should_panic]
+fn no_system_current_panic() {
+    System::current();
+}
+
+#[test]
+#[should_panic]
+fn no_system_arbiter_new_panic() {
+    Arbiter::new();
+}
+
+#[test]
 fn try_current_no_system() {
     assert!(System::try_current().is_none())
 }
@@ -330,28 +342,27 @@ fn spawn_local() {
 #[cfg(all(target_os = "linux", feature = "io-uring"))]
 #[test]
 fn tokio_uring_arbiter() {
-    let system = System::new();
-    let (tx, rx) = std::sync::mpsc::channel();
+    System::new().block_on(async {
+        let (tx, rx) = std::sync::mpsc::channel();
 
-    Arbiter::new().spawn(async move {
-        let handle = actix_rt::spawn(async move {
-            let f = tokio_uring::fs::File::create("test.txt").await.unwrap();
-            let buf = b"Hello World!";
+        Arbiter::new().spawn(async move {
+            let handle = actix_rt::spawn(async move {
+                let f = tokio_uring::fs::File::create("test.txt").await.unwrap();
+                let buf = b"Hello World!";
 
-            let (res, _) = f.write_at(&buf[..], 0).await;
-            assert!(res.is_ok());
+                let (res, _) = f.write_at(&buf[..], 0).await;
+                assert!(res.is_ok());
 
-            f.sync_all().await.unwrap();
-            f.close().await.unwrap();
+                f.sync_all().await.unwrap();
+                f.close().await.unwrap();
 
-            std::fs::remove_file("test.txt").unwrap();
+                std::fs::remove_file("test.txt").unwrap();
+            });
+
+            handle.await.unwrap();
+            tx.send(true).unwrap();
         });
 
-        handle.await.unwrap();
-        tx.send(true).unwrap();
-    });
-
-    assert!(rx.recv().unwrap());
-
-    drop(system);
+        assert!(rx.recv().unwrap());
+    })
 }

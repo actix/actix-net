@@ -35,25 +35,29 @@ use actix_service::ServiceFactoryExt as _;
 use actix_tls::accept::rustls::{Acceptor as RustlsAcceptor, TlsStream};
 use futures_util::future::ok;
 use log::info;
-use rustls::{
-    internal::pemfile::certs, internal::pemfile::rsa_private_keys, NoClientAuth, ServerConfig,
-};
+use rustls::{server::ServerConfig, Certificate, PrivateKey};
+use rustls_pemfile::{certs, rsa_private_keys};
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
     env::set_var("RUST_LOG", "info");
     env_logger::init();
 
-    let mut tls_config = ServerConfig::new(NoClientAuth::new());
-
     // Load TLS key and cert files
     let cert_file = &mut BufReader::new(File::open("./examples/cert.pem").unwrap());
     let key_file = &mut BufReader::new(File::open("./examples/key.pem").unwrap());
 
-    let cert_chain = certs(cert_file).unwrap();
+    let cert_chain = certs(cert_file)
+        .unwrap()
+        .into_iter()
+        .map(Certificate)
+        .collect();
     let mut keys = rsa_private_keys(key_file).unwrap();
-    tls_config
-        .set_single_cert(cert_chain, keys.remove(0))
+
+    let tls_config = ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth()
+        .with_single_cert(cert_chain, PrivateKey(keys.remove(0)))
         .unwrap();
 
     let tls_acceptor = RustlsAcceptor::new(tls_config);

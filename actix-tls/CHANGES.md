@@ -3,14 +3,29 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.0-beta.7 - 2021-10-20
+* Add `webpki_roots_cert_store()` to get rustls compatible webpki roots cert store. [#401]
+* Alias `connect::ssl` to `connect::tls`. [#401]
+
+[#401]: https://github.com/actix/actix-net/pull/401
+
+
+## 3.0.0-beta.6 - 2021-10-19
+* Update `tokio-rustls` to `0.23` which uses `rustls` `0.20`. [#396]
+* Removed a re-export of `Session` from `rustls` as it no longer exist. [#396]
+* Minimum supported Rust version (MSRV) is now 1.52.
+
+[#396]: https://github.com/actix/actix-net/pull/396
+
+
 ## 3.0.0-beta.5 - 2021-03-29
-* Changed `connect::ssl::rustls::RustlsConnectorService` to return error when `DNSNameRef` 
+* Changed `connect::ssl::rustls::RustlsConnectorService` to return error when `DNSNameRef`
   generation failed instead of panic. [#296]
 * Remove `connect::ssl::openssl::OpensslConnectServiceFactory`. [#297]
 * Remove `connect::ssl::openssl::OpensslConnectService`. [#297]
 * Add `connect::ssl::native_tls` module for native tls support. [#295]
 * Rename `accept::{nativetls => native_tls}`. [#295]
-* Remove `connect::TcpConnectService` type. service caller expect a `TcpStream` should use 
+* Remove `connect::TcpConnectService` type. service caller expect a `TcpStream` should use
   `connect::ConnectService` instead and call `Connection<T, TcpStream>::into_parts`. [#299]
 
 [#295]: https://github.com/actix/actix-net/pull/295

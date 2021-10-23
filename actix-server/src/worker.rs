@@ -181,6 +181,7 @@ impl WorkerHandleAccept {
 /// Held by [ServerBuilder](crate::builder::ServerBuilder).
 #[derive(Debug)]
 pub(crate) struct WorkerHandleServer {
+    #[allow(dead_code)]
     idx: usize,
     tx: UnboundedSender<Stop>,
 }
@@ -465,11 +466,11 @@ impl Future for ServerWorker {
         {
             let num = this.counter.total();
             if num == 0 {
-                info!("Shutting down worker, 0 connections");
+                info!("Shutting down idle worker");
                 let _ = tx.send(true);
                 return Poll::Ready(());
             } else if graceful {
-                info!("Graceful worker shutdown, {} connections", num);
+                info!("Graceful worker shutdown; finishing {} connections", num);
                 this.shutdown(false);
 
                 this.state = WorkerState::Shutdown(Shutdown {
@@ -478,7 +479,7 @@ impl Future for ServerWorker {
                     tx,
                 });
             } else {
-                info!("Force shutdown worker, {} connections", num);
+                info!("Force shutdown worker, closing {} connections", num);
                 this.shutdown(true);
 
                 let _ = tx.send(false);
