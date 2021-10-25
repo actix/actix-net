@@ -1,6 +1,7 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Add `.and_then_send()` & `AndThenSendServiceFactory` for creating `Send`able chained services. [#403]
 
 
 ## 2.0.1 - 2021-10-11

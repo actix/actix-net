@@ -1,11 +1,13 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Rename `Server` to `ServerHandle`. [#???]
-* Rename `ServerBuilder::{maxconn => max_concurrent_connections}`. [#???]
+* Rename `Server` to `ServerHandle`. [#403]
+* Rename `ServerBuilder::{maxconn => max_concurrent_connections}`. [#403]
+* Remove wrapper `service::ServiceFactory` trait. [#403]
+* `Server::bind` and related methods now take a regular `ServiceFactory` (from actix-service crate). [#403]
 * Minimum supported Rust version (MSRV) is now 1.52.
 
-[#???]: https://github.com/actix/actix-net/pull/???
+[#403]: https://github.com/actix/actix-net/pull/403
 
 
 ## 2.0.0-beta.6 - 2021-10-11

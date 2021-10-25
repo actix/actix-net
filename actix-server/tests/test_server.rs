@@ -25,9 +25,7 @@ fn test_bind() {
             let srv = Server::build()
                 .workers(1)
                 .disable_signals()
-                .bind("test", addr, move || {
-                    fn_service(|_| async { Ok::<_, ()>(()) })
-                })?
+                .bind("test", addr, fn_service(|_| async { Ok::<_, ()>(()) }))?
                 .run();
 
             let _ = tx.send((srv.clone(), actix_rt::System::current()));
@@ -56,9 +54,7 @@ fn test_listen() {
             let srv = Server::build()
                 .disable_signals()
                 .workers(1)
-                .listen("test", lst, move || {
-                    fn_service(|_| async { Ok::<_, ()>(()) })
-                })?
+                .listen("test", lst, fn_service(|_| async { Ok::<_, ()>(()) }))?
                 .run();
 
             let _ = tx.send((srv.clone(), actix_rt::System::current()));
@@ -94,13 +90,15 @@ fn test_start() {
             let srv = Server::build()
                 .backlog(100)
                 .disable_signals()
-                .bind("test", addr, move || {
+                .bind(
+                    "test",
+                    addr,
                     fn_service(|io: TcpStream| async move {
                         let mut f = Framed::new(io, BytesCodec);
                         f.send(Bytes::from_static(b"test")).await.unwrap();
                         Ok::<_, ()>(())
-                    })
-                })?
+                    }),
+                )?
                 .run();
 
             let _ = tx.send((srv.clone(), actix_rt::System::current()));
@@ -173,7 +171,7 @@ async fn test_max_concurrent_connections() {
                 .max_concurrent_connections(max_conn)
                 .workers(1)
                 .disable_signals()
-                .bind("test", addr, move || {
+                .bind("test", addr, {
                     let counter = counter.clone();
                     fn_service(move |_io: TcpStream| {
                         let counter = counter.clone();
@@ -263,14 +261,14 @@ async fn test_service_restart() {
             let server = Server::build()
                 .backlog(1)
                 .disable_signals()
-                .bind("addr1", addr1, move || {
+                .bind("addr1", addr1, {
                     let num = num.clone();
                     fn_factory(move || {
                         let num = num.clone();
                         async move { Ok::<_, ()>(TestService(num)) }
                     })
                 })?
-                .bind("addr2", addr2, move || {
+                .bind("addr2", addr2, {
                     let num2 = num2.clone();
                     fn_factory(move || {
                         let num2 = num2.clone();
@@ -319,6 +317,7 @@ async fn worker_restart() {
     use futures_core::future::LocalBoxFuture;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+    #[derive(Debug, Clone)]
     struct TestServiceFactory(Arc<AtomicUsize>);
 
     impl ServiceFactory<TcpStream> for TestServiceFactory {
@@ -381,7 +380,7 @@ async fn worker_restart() {
         actix_rt::System::new().block_on(async {
             let server = Server::build()
                 .disable_signals()
-                .bind("addr", addr, move || TestServiceFactory(counter.clone()))?
+                .bind("addr", addr, TestServiceFactory(counter.clone()))?
                 .workers(2)
                 .run();
 

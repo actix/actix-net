@@ -21,7 +21,6 @@ use actix_rt::net::TcpStream;
 use actix_server::Server;
 use actix_service::{fn_service, ServiceFactoryExt as _};
 use bytes::BytesMut;
-use futures_util::future::ok;
 use log::{error, info};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -39,11 +38,11 @@ async fn main() -> io::Result<()> {
     // logical CPU cores as the worker count. For this reason, the closure passed to bind needs
     // to return a service *factory*; so it can be created once per worker.
     Server::build()
-        .bind("echo", addr, move || {
+        .bind("echo", addr, {
             let count = Arc::clone(&count);
             let num2 = Arc::clone(&count);
 
-            fn_service(move |mut stream: TcpStream| {
+            let svc = fn_service(move |mut stream: TcpStream| {
                 let count = Arc::clone(&count);
 
                 async move {
@@ -78,11 +77,15 @@ async fn main() -> io::Result<()> {
                 }
             })
             .map_err(|err| error!("Service Error: {:?}", err))
-            .and_then(move |(_, size)| {
+            .and_then_send(move |(_, size)| {
                 let num = num2.load(Ordering::SeqCst);
                 info!("[{}] total bytes read: {}", num, size);
-                ok(size)
-            })
+                async move { Ok(size) }
+            });
+
+            let svc2 = svc.clone();
+
+            svc2
         })?
         .workers(1)
         .run()

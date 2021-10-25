@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     future::Future,
     io, mem,
     pin::Pin,
@@ -7,32 +8,25 @@ use std::{
 };
 
 use actix_rt::{self as rt, net::TcpStream, time::sleep, System};
+use actix_service::ServiceFactory;
 use log::{error, info};
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver},
     oneshot,
 };
 
-use crate::accept::AcceptLoop;
-use crate::join_all;
-use crate::server::{ServerCommand, ServerHandle};
-use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
-use crate::signals::{Signal, Signals};
-use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
-use crate::socket::{MioTcpListener, MioTcpSocket};
-use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleAccept, WorkerHandleServer};
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct Server;
-
-impl Server {
-    /// Start server building process.
-    pub fn build() -> ServerBuilder {
-        ServerBuilder::default()
-    }
-}
+use crate::{
+    accept::AcceptLoop,
+    join_all,
+    server::{ServerCommand, ServerHandle},
+    service::{InternalServiceFactory, StreamNewService},
+    signals::{Signal, Signals},
+    socket::{
+        MioListener, MioTcpListener, MioTcpSocket, StdSocketAddr, StdTcpListener, ToSocketAddrs,
+    },
+    waker_queue::{WakerInterest, WakerQueue},
+    worker::{ServerWorker, ServerWorkerConfig, WorkerHandleAccept, WorkerHandleServer},
+};
 
 /// Server builder
 pub struct ServerBuilder {
@@ -169,38 +163,48 @@ impl ServerBuilder {
     /// Binds to all network interface addresses that resolve from the `addr` argument.
     /// Eg. using `localhost` might bind to both IPv4 and IPv6 addresses. Bind to multiple distinct
     /// interfaces at the same time by passing a list of socket addresses.
-    pub fn bind<F, U, N: AsRef<str>>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
+    pub fn bind<F, U, InitErr>(
+        mut self,
+        name: impl AsRef<str>,
+        addr: U,
+        factory: F,
+    ) -> io::Result<Self>
     where
-        F: ServiceFactory<TcpStream>,
+        F: ServiceFactory<TcpStream, Config = (), InitError = InitErr> + Send + Clone + 'static,
+        InitErr: fmt::Debug + Send + 'static,
         U: ToSocketAddrs,
     {
         let sockets = bind_addr(addr, self.backlog)?;
 
         for lst in sockets {
             let token = self.next_token();
+
             self.services.push(StreamNewService::create(
                 name.as_ref().to_string(),
                 token,
                 factory.clone(),
                 lst.local_addr()?,
             ));
+
             self.sockets
                 .push((token, name.as_ref().to_string(), MioListener::Tcp(lst)));
         }
+
         Ok(self)
     }
 
     /// Bind server to existing TCP listener.
     ///
     /// Useful when running as a systemd service and a socket FD can be passed to the process.
-    pub fn listen<F, N: AsRef<str>>(
+    pub fn listen<F, InitErr>(
         mut self,
-        name: N,
+        name: impl AsRef<str>,
         lst: StdTcpListener,
         factory: F,
     ) -> io::Result<Self>
     where
-        F: ServiceFactory<TcpStream>,
+        F: ServiceFactory<TcpStream, Config = (), InitError = InitErr> + Send + Clone + 'static,
+        InitErr: fmt::Debug + Send + 'static,
     {
         lst.set_nonblocking(true)?;
 
@@ -259,7 +263,7 @@ impl ServerBuilder {
                 Signals::start(self.server.clone());
             }
 
-            // start http server actor
+            // start http server
             let server = self.server.clone();
             rt::spawn(self);
             server
@@ -402,11 +406,19 @@ impl ServerBuilder {
 #[cfg(unix)]
 impl ServerBuilder {
     /// Add new unix domain service to the server.
-    pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
+    pub fn bind_uds<F, U, InitErr>(
+        self,
+        name: impl AsRef<str>,
+        addr: U,
+        factory: F,
+    ) -> io::Result<Self>
     where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
-        N: AsRef<str>,
+        F: ServiceFactory<actix_rt::net::UnixStream, Config = (), InitError = InitErr>
+            + Send
+            + Clone
+            + 'static,
         U: AsRef<std::path::Path>,
+        InitErr: fmt::Debug + Send + 'static,
     {
         // The path must not exist when we try to bind.
         // Try to remove it to avoid bind error.
@@ -424,14 +436,18 @@ impl ServerBuilder {
     /// Add new unix domain service to the server.
     ///
     /// Useful when running as a systemd service and a socket FD can be passed to the process.
-    pub fn listen_uds<F, N: AsRef<str>>(
+    pub fn listen_uds<F, InitErr>(
         mut self,
-        name: N,
+        name: impl AsRef<str>,
         lst: crate::socket::StdUnixListener,
         factory: F,
     ) -> io::Result<Self>
     where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
+        F: ServiceFactory<actix_rt::net::UnixStream, Config = (), InitError = InitErr>
+            + Send
+            + Clone
+            + 'static,
+        InitErr: fmt::Debug + Send + 'static,
     {
         use std::net::{IpAddr, Ipv4Addr};
 

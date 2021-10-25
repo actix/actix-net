@@ -28,6 +28,8 @@ use crate::service::{BoxedServerService, InternalServiceFactory};
 use crate::socket::MioStream;
 use crate::waker_queue::{WakerInterest, WakerQueue};
 
+const DEFAULT_SHUTDOWN_DURATION: Duration = Duration::from_secs(30);
+
 /// Stop worker message. Returns `true` on successful graceful shutdown.
 /// and `false` if some connections still alive when shutdown execute.
 pub(crate) struct Stop {
@@ -244,8 +246,9 @@ impl Default for ServerWorkerConfig {
     fn default() -> Self {
         // 512 is the default max blocking thread count of tokio runtime.
         let max_blocking_threads = std::cmp::max(512 / num_cpus::get(), 1);
+
         Self {
-            shutdown_timeout: Duration::from_secs(30),
+            shutdown_timeout: DEFAULT_SHUTDOWN_DURATION,
             max_blocking_threads,
             max_concurrent_connections: 25_600,
         }
@@ -314,6 +317,7 @@ impl ServerWorker {
                     .await
                     .into_iter()
                     .collect::<Result<Vec<_>, _>>();
+
                 let services = match res {
                     Ok(res) => res
                         .into_iter()
@@ -327,8 +331,9 @@ impl ServerWorker {
                             services
                         })
                         .into_boxed_slice(),
-                    Err(e) => {
-                        error!("Can not start worker: {:?}", e);
+
+                    Err(err) => {
+                        error!("Can not start worker: {:?}", err);
                         Arbiter::current().stop();
                         return;
                     }

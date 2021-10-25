@@ -261,6 +261,91 @@ where
     }
 }
 
+/// `.and_then_send()` service factory combinator
+pub struct AndThenSendServiceFactory<A, B, Req>
+where
+    A: ServiceFactory<Req>,
+    A::Config: Clone,
+    B: ServiceFactory<
+        A::Response,
+        Config = A::Config,
+        Error = A::Error,
+        InitError = A::InitError,
+    >,
+{
+    inner_a: A,
+    inner_b: B,
+    _phantom: PhantomData<Req>,
+}
+
+impl<A, B, Req> AndThenSendServiceFactory<A, B, Req>
+where
+    A: ServiceFactory<Req>,
+    A::Config: Clone,
+    B: ServiceFactory<
+        A::Response,
+        Config = A::Config,
+        Error = A::Error,
+        InitError = A::InitError,
+    >,
+{
+    /// Create new `AndThenFactory` combinator
+    pub(crate) fn new(a: A, b: B) -> Self {
+        Self {
+            inner_a: a,
+            inner_b: b,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<A, B, Req> ServiceFactory<Req> for AndThenSendServiceFactory<A, B, Req>
+where
+    A: ServiceFactory<Req>,
+    A::Config: Clone,
+    B: ServiceFactory<
+        A::Response,
+        Config = A::Config,
+        Error = A::Error,
+        InitError = A::InitError,
+    >,
+{
+    type Response = B::Response;
+    type Error = A::Error;
+
+    type Config = A::Config;
+    type Service = AndThenService<A::Service, B::Service, Req>;
+    type InitError = A::InitError;
+    type Future = AndThenServiceFactoryResponse<A, B, Req>;
+
+    fn new_service(&self, cfg: A::Config) -> Self::Future {
+        AndThenServiceFactoryResponse::new(
+            self.inner_a.new_service(cfg.clone()),
+            self.inner_b.new_service(cfg),
+        )
+    }
+}
+
+impl<A: Clone, B: Clone, Req> Clone for AndThenSendServiceFactory<A, B, Req>
+where
+    A: ServiceFactory<Req>,
+    A::Config: Clone,
+    B: ServiceFactory<
+        A::Response,
+        Config = A::Config,
+        Error = A::Error,
+        InitError = A::InitError,
+    >,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner_a: self.inner_a.clone(),
+            inner_b: self.inner_b.clone(),
+            _phantom: PhantomData,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::rc::Rc;

@@ -6,7 +6,18 @@ use std::task::{Context, Poll};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 
-use crate::signals::Signal;
+use crate::{signals::Signal, ServerBuilder};
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct Server;
+
+impl Server {
+    /// Start server building process.
+    pub fn build() -> ServerBuilder {
+        ServerBuilder::default()
+    }
+}
 
 #[derive(Debug)]
 pub(crate) enum ServerCommand {

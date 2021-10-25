@@ -1,9 +1,10 @@
 use std::sync::mpsc;
-use std::{net, thread};
+use std::{fmt, net, thread};
 
 use actix_rt::{net::TcpStream, System};
+use actix_service::ServiceFactory;
 
-use crate::{Server, ServerBuilder, ServiceFactory};
+use crate::{Server, ServerBuilder};
 
 /// A testing server.
 ///
@@ -64,7 +65,11 @@ impl TestServer {
     }
 
     /// Start new test server with application factory.
-    pub fn with<F: ServiceFactory<TcpStream>>(factory: F) -> TestServerRuntime {
+    pub fn with<F, InitErr>(factory: F) -> TestServerRuntime
+    where
+        F: ServiceFactory<TcpStream, Config = (), InitError = InitErr> + Send + Clone + 'static,
+        InitErr: fmt::Debug + Send + 'static,
+    {
         let (tx, rx) = mpsc::channel();
 
         // run server in separate thread
