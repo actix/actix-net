@@ -87,7 +87,7 @@ async fn main() -> io::Result<()> {
 
             svc2
         })?
-        .workers(1)
+        .workers(2)
         .run()
         .await
 }

@@ -2,7 +2,7 @@ use std::io;
 
 use actix_rt::net::TcpStream;
 use actix_server::Server;
-use actix_service::fn_service;
+use actix_service::{fn_factory, fn_service};
 use log::info;
 
 #[actix_rt::main]
@@ -17,7 +17,15 @@ async fn main() -> io::Result<()> {
         .bind(
             "startup-fail",
             addr,
-            fn_service(move |mut _stream: TcpStream| async move { Ok::<u32, u32>(42) }),
+            fn_factory(|| async move {
+                if 1 > 2 {
+                    Ok(fn_service(move |mut _stream: TcpStream| async move {
+                        Ok::<u32, u32>(0)
+                    }))
+                } else {
+                    Err(42)
+                }
+            }),
         )?
         .workers(2)
         .run()

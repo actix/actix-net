@@ -175,13 +175,13 @@ where
         factory: I,
     ) -> PipelineFactory<
         impl ServiceFactory<
-            Req,
-            Response = SF1::Response,
-            Error = SF::Error,
-            Config = SF::Config,
-            InitError = SF::InitError,
+                Req,
+                Response = SF1::Response,
+                Error = SF::Error,
+                Config = SF::Config,
+                InitError = SF::InitError,
                 Service = impl Service<Req, Response = SF1::Response, Error = SF::Error> + Clone,
-        > + Clone,
+            > + Clone,
         Req,
     >
     where

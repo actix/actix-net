@@ -1,4 +1,10 @@
-use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory, Transform, and_then::{AndThenSendServiceFactory, AndThenService, AndThenServiceFactory}, map::Map, map_err::MapErr, transform_err::TransformMapInitErr};
+use crate::{
+    and_then::{AndThenSendServiceFactory, AndThenService, AndThenServiceFactory},
+    map::Map,
+    map_err::MapErr,
+    transform_err::TransformMapInitErr,
+    IntoService, IntoServiceFactory, Service, ServiceFactory, Transform,
+};
 
 /// An extension trait for [`Service`]s that provides a variety of convenient adapters.
 pub trait ServiceExt<Req>: Service<Req> {
