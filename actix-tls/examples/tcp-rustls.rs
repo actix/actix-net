@@ -30,7 +30,7 @@ use std::{
 };
 
 use actix_rt::net::TcpStream;
-use actix_server::ServerHandle;
+use actix_server::Server;
 use actix_service::ServiceFactoryExt as _;
 use actix_tls::accept::rustls::{Acceptor as RustlsAcceptor, TlsStream};
 use futures_util::future::ok;
@@ -67,15 +67,15 @@ async fn main() -> io::Result<()> {
     let addr = ("127.0.0.1", 8443);
     info!("starting server on port: {}", &addr.0);
 
-    ServerHandle::build()
-        .bind("tls-example", addr, move || {
+    Server::build()
+        .bind("tls-example", addr, {
             let count = Arc::clone(&count);
 
             // Set up TLS service factory
             tls_acceptor
                 .clone()
                 .map_err(|err| println!("Rustls error: {:?}", err))
-                .and_then(move |stream: TlsStream<TcpStream>| {
+                .and_then_send(move |stream: TlsStream<TcpStream>| {
                     let num = count.fetch_add(1, Ordering::Relaxed);
                     info!("[{}] Got TLS connection: {:?}", num, &*stream);
                     ok(())

@@ -19,7 +19,7 @@ use crate::{
     accept::AcceptLoop,
     join_all,
     server::{ServerCommand, ServerHandle},
-    service::{InternalServiceFactory, StreamNewService},
+    service::{ServerServiceFactory, StreamNewService},
     signals::{Signal, Signals},
     socket::{
         MioListener, MioTcpListener, MioTcpSocket, StdSocketAddr, StdTcpListener, ToSocketAddrs,
@@ -34,7 +34,7 @@ pub struct ServerBuilder {
     token: usize,
     backlog: u32,
     handles: Vec<(usize, WorkerHandleServer)>,
-    services: Vec<Box<dyn InternalServiceFactory>>,
+    services: Vec<Box<dyn ServerServiceFactory>>,
     sockets: Vec<(usize, String, MioListener)>,
     accept: AcceptLoop,
     exit: bool,

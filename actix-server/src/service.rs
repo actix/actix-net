@@ -15,11 +15,12 @@ use crate::{
     worker::WorkerCounterGuard,
 };
 
-pub(crate) trait InternalServiceFactory: Send {
+pub(crate) trait ServerServiceFactory: Send {
     fn name(&self, token: usize) -> &str;
 
-    fn clone_factory(&self) -> Box<dyn InternalServiceFactory>;
+    fn clone_factory(&self) -> Box<dyn ServerServiceFactory>;
 
+    /// Initialize Mio stream handler service and return it with its service token.
     fn create(&self) -> LocalBoxFuture<'static, Result<(usize, BoxedServerService), ()>>;
 }
 
@@ -55,7 +56,7 @@ where
 {
     type Response = ();
     type Error = ();
-    type Future = Ready<Result<(), ()>>;
+    type Future = Ready<Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(ctx).map_err(|_| ())
@@ -71,8 +72,8 @@ where
                 });
                 Ok(())
             }
-            Err(e) => {
-                error!("Can not convert to an async tcp stream: {}", e);
+            Err(err) => {
+                error!("Can not convert Mio stream to an async TCP stream: {}", err);
                 Err(())
             }
         })
@@ -98,7 +99,7 @@ where
         token: usize,
         inner: F,
         addr: SocketAddr,
-    ) -> Box<dyn InternalServiceFactory> {
+    ) -> Box<dyn ServerServiceFactory> {
         Box::new(Self {
             name,
             token,
@@ -109,7 +110,7 @@ where
     }
 }
 
-impl<F, Io, InitErr> InternalServiceFactory for StreamNewService<F, Io, InitErr>
+impl<F, Io, InitErr> ServerServiceFactory for StreamNewService<F, Io, InitErr>
 where
     F: ServiceFactory<Io, Config = (), InitError = InitErr> + Send + Clone + 'static,
     InitErr: fmt::Debug + Send + 'static,
@@ -119,7 +120,7 @@ where
         &self.name
     }
 
-    fn clone_factory(&self) -> Box<dyn InternalServiceFactory> {
+    fn clone_factory(&self) -> Box<dyn ServerServiceFactory> {
         Box::new(Self {
             name: self.name.clone(),
             inner: self.inner.clone(),
@@ -134,8 +135,8 @@ where
         let fut = self.inner.new_service(());
         Box::pin(async move {
             match fut.await {
-                Ok(inner) => {
-                    let service = Box::new(StreamService::new(inner)) as _;
+                Ok(svc) => {
+                    let service = Box::new(StreamService::new(svc)) as _;
                     Ok((token, service))
                 }
                 Err(err) => {

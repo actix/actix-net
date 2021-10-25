@@ -24,7 +24,7 @@ use tokio::sync::{
 };
 
 use crate::join_all;
-use crate::service::{BoxedServerService, InternalServiceFactory};
+use crate::service::{BoxedServerService, ServerServiceFactory};
 use crate::socket::MioStream;
 use crate::waker_queue::{WakerInterest, WakerQueue};
 
@@ -198,7 +198,7 @@ impl WorkerHandleServer {
 
 /// Service worker.
 ///
-/// Worker accepts Socket objects via unbounded channel and starts stream processing.
+/// Worker accepts socket objects via unbounded channel and starts stream processing.
 pub(crate) struct ServerWorker {
     // UnboundedReceiver<Conn> should always be the first field.
     // It must be dropped as soon as ServerWorker dropping.
@@ -206,7 +206,7 @@ pub(crate) struct ServerWorker {
     rx2: UnboundedReceiver<Stop>,
     counter: WorkerCounter,
     services: Box<[WorkerService]>,
-    factories: Box<[Box<dyn InternalServiceFactory>]>,
+    factories: Box<[Box<dyn ServerServiceFactory>]>,
     state: WorkerState,
     shutdown_timeout: Duration,
 }
@@ -272,7 +272,7 @@ impl ServerWorkerConfig {
 impl ServerWorker {
     pub(crate) fn start(
         idx: usize,
-        factories: Vec<Box<dyn InternalServiceFactory>>,
+        factories: Vec<Box<dyn ServerServiceFactory>>,
         waker_queue: WakerQueue,
         config: ServerWorkerConfig,
     ) -> (WorkerHandleAccept, WorkerHandleServer) {
