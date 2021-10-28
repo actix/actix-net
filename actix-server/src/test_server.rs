@@ -1,5 +1,4 @@
-use std::sync::mpsc;
-use std::{fmt, net, thread};
+use std::{fmt, net, sync::mpsc, thread};
 
 use actix_rt::{net::TcpStream, System};
 use actix_service::ServiceFactory;
@@ -28,9 +27,10 @@ use crate::{Server, ServerBuilder};
 ///     println!("SOCKET: {:?}", srv.connect());
 /// }
 /// ```
+#[non_exhaustive]
 pub struct TestServer;
 
-/// Test server runtime
+/// Test server runtime.
 pub struct TestServerRuntime {
     addr: net::SocketAddr,
     host: String,
@@ -39,7 +39,7 @@ pub struct TestServerRuntime {
 }
 
 impl TestServer {
-    /// Start new server with server builder.
+    /// Start new server using server builder.
     pub fn start<F>(mut factory: F) -> TestServerRuntime
     where
         F: FnMut(ServerBuilder) -> ServerBuilder + Send + 'static,
@@ -64,7 +64,7 @@ impl TestServer {
         }
     }
 
-    /// Start new test server with application factory.
+    /// Start new test server with default settings using application factory.
     pub fn with<F, InitErr>(factory: F) -> TestServerRuntime
     where
         F: ServiceFactory<TcpStream, Config = (), InitError = InitErr> + Send + Clone + 'static,
