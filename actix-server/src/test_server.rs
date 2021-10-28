@@ -13,8 +13,8 @@ use crate::{Server, ServerBuilder};
 ///
 /// # Examples
 /// ```
-/// use actix_service::fn_service;
 /// use actix_server::TestServer;
+/// use actix_service::fn_service;
 ///
 /// #[actix_rt::main]
 /// async fn main() {
