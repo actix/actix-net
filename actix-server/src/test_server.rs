@@ -18,8 +18,8 @@ use crate::{Server, ServerBuilder};
 ///
 /// #[actix_rt::main]
 /// async fn main() {
-///     let srv = TestServer::with(|| fn_service(
-///         |sock| async move {
+///     let srv = TestServer::with(fn_service(|sock|
+///         async move {
 ///             println!("New connection: {:?}", sock);
 ///             Ok::<_, ()>(())
 ///         }
