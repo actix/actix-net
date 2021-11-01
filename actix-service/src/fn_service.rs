@@ -3,6 +3,7 @@ use core::{future::Future, marker::PhantomData};
 use crate::{ok, IntoService, IntoServiceFactory, Ready, Service, ServiceFactory};
 
 /// Create `ServiceFactory` for function that can act as a `Service`
+// TODO: remove unnecessary Cfg type param
 pub fn fn_service<F, Fut, Req, Res, Err, Cfg>(
     f: F,
 ) -> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
@@ -48,6 +49,7 @@ where
 ///     Ok(())
 /// }
 /// ```
+// TODO: remove unnecessary Cfg type param
 pub fn fn_factory<F, Cfg, Srv, Req, Fut, Err>(
     f: F,
 ) -> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
@@ -160,7 +162,7 @@ where
     Fut: Future<Output = Result<Res, Err>>,
 {
     f: F,
-    _t: PhantomData<(Req, Cfg)>,
+    _t: PhantomData<fn(Cfg, Req)>,
 }
 
 impl<F, Fut, Req, Res, Err, Cfg> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
@@ -237,7 +239,7 @@ where
     Srv: Service<Req>,
 {
     f: F,
-    _t: PhantomData<(Fut, Cfg, Req, Srv, Err)>,
+    _t: PhantomData<fn(Cfg, Req)>,
 }
 
 impl<F, Fut, Cfg, Srv, Req, Err> FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
@@ -293,7 +295,7 @@ where
     Fut: Future<Output = Result<Srv, Err>>,
 {
     f: F,
-    _t: PhantomData<(Cfg, Req)>,
+    _t: PhantomData<fn(Cfg, Req)>,
 }
 
 impl<F, Cfg, Srv, Req, Fut, Err> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
@@ -353,10 +355,11 @@ where
 mod tests {
     use core::task::Poll;
 
+    use alloc::rc::Rc;
     use futures_util::future::lazy;
 
     use super::*;
-    use crate::{ok, Service, ServiceFactory};
+    use crate::{boxed, ok, Service, ServiceExt, ServiceFactory, ServiceFactoryExt};
 
     #[actix_rt::test]
     async fn test_fn_service() {
@@ -390,5 +393,143 @@ mod tests {
         assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), ("srv", 1));
+    }
+
+    // these three properties of a service factory are usually important
+    fn is_static<T: 'static>(_t: &T) {}
+    fn impls_clone<T: Clone>(_t: &T) {}
+    fn impls_send<T: Send>(_t: &T) {}
+
+    #[actix_rt::test]
+    async fn test_fn_factory_impl_send() {
+        let svc_fac = fn_factory_with_config(|cfg: usize| {
+            ok::<_, ()>(fn_service(move |()| ok::<_, ()>(("srv", cfg))))
+        });
+        is_static(&svc_fac);
+        impls_clone(&svc_fac);
+        impls_send(&svc_fac);
+
+        // Cfg type is explicitly !Send
+        let svc_fac = fn_factory_with_config(|cfg: Rc<usize>| {
+            let cfg = Rc::clone(&cfg);
+            ok::<_, ()>(fn_service(move |_: ()| ok::<_, ()>(("srv", *cfg))))
+        });
+        is_static(&svc_fac);
+        impls_clone(&svc_fac);
+        impls_send(&svc_fac);
+
+        let svc_fac = fn_factory::<_, (), _, _, _, _>(|| {
+            ok::<_, ()>(fn_service(move |()| ok::<_, ()>("srv")))
+        });
+        is_static(&svc_fac);
+        impls_clone(&svc_fac);
+        impls_send(&svc_fac);
+
+        // Req type is explicitly !Send
+        let svc_fac = fn_factory::<_, (), _, _, _, _>(|| {
+            ok::<_, ()>(fn_service(move |_: Rc<()>| ok::<_, ()>("srv")))
+        });
+        is_static(&svc_fac);
+        impls_clone(&svc_fac);
+        impls_send(&svc_fac);
+
+        // Service type is explicitly !Send
+        let svc_fac = fn_factory::<_, (), _, _, _, _>(|| {
+            ok::<_, ()>(boxed::rc_service(fn_service(move |_: ()| {
+                ok::<_, ()>("srv")
+            })))
+        });
+        is_static(&svc_fac);
+        impls_clone(&svc_fac);
+        impls_send(&svc_fac);
+    }
+
+    #[actix_rt::test]
+    async fn test_service_combinators_impls() {
+        #[derive(Clone)]
+        struct Ident;
+
+        impl<T: 'static> Service<T> for Ident {
+            type Response = T;
+            type Error = ();
+            type Future = Ready<Result<Self::Response, Self::Error>>;
+
+            crate::always_ready!();
+
+            fn call(&self, req: T) -> Self::Future {
+                ok(req)
+            }
+        }
+
+        let svc = Ident;
+        is_static(&svc);
+        impls_clone(&svc);
+        impls_send(&svc);
+
+        let svc = ServiceExt::map(Ident, core::convert::identity);
+        impls_send(&svc);
+        svc.call(()).await.unwrap();
+
+        let svc = ServiceExt::map_err(Ident, core::convert::identity);
+        impls_send(&svc);
+        svc.call(()).await.unwrap();
+
+        let svc = ServiceExt::and_then(Ident, Ident);
+        // impls_send(&svc); // fails to compile :(
+        svc.call(()).await.unwrap();
+
+        // let svc = ServiceExt::and_then_send(Ident, Ident);
+        // impls_send(&svc);
+        // svc.call(()).await.unwrap();
+    }
+
+    #[actix_rt::test]
+    async fn test_factory_combinators_impls() {
+        #[derive(Clone)]
+        struct Ident;
+
+        impl<T: 'static> ServiceFactory<T> for Ident {
+            type Response = T;
+            type Error = ();
+            type Config = ();
+            // explicitly !Send result service
+            type Service = boxed::RcService<T, Self::Response, Self::Error>;
+            type InitError = ();
+            type Future = Ready<Result<Self::Service, Self::Error>>;
+
+            fn new_service(&self, _cfg: Self::Config) -> Self::Future {
+                ok(boxed::rc_service(fn_service(ok)))
+            }
+        }
+
+        let svc_fac = Ident;
+        is_static(&svc_fac);
+        impls_clone(&svc_fac);
+        impls_send(&svc_fac);
+
+        let svc_fac = ServiceFactoryExt::map(Ident, core::convert::identity);
+        impls_send(&svc_fac);
+        let svc = svc_fac.new_service(()).await.unwrap();
+        svc.call(()).await.unwrap();
+
+        let svc_fac = ServiceFactoryExt::map_err(Ident, core::convert::identity);
+        impls_send(&svc_fac);
+        let svc = svc_fac.new_service(()).await.unwrap();
+        svc.call(()).await.unwrap();
+
+        let svc_fac = ServiceFactoryExt::map_init_err(Ident, core::convert::identity);
+        impls_send(&svc_fac);
+        let svc = svc_fac.new_service(()).await.unwrap();
+        svc.call(()).await.unwrap();
+
+        let svc_fac = ServiceFactoryExt::and_then(Ident, Ident);
+        // impls_send(&svc_fac); // fails to compile :(
+        let svc = svc_fac.new_service(()).await.unwrap();
+        svc.call(()).await.unwrap();
+
+        // let svc_fac = ServiceFactoryExt::and_then_send(Ident, Ident);
+        // impls_send(&svc_fac);
+        // let svc = svc_fac.new_service(()).await.unwrap();
+        // svc.call(()).await.unwrap();
     }
 }

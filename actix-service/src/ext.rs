@@ -1,5 +1,5 @@
 use crate::{
-    and_then::{AndThenSendServiceFactory, AndThenService, AndThenServiceFactory},
+    and_then::{AndThenService, AndThenServiceFactory},
     map::Map,
     map_err::MapErr,
     transform_err::TransformMapInitErr,
@@ -104,22 +104,6 @@ pub trait ServiceFactoryExt<Req>: ServiceFactory<Req> {
         >,
     {
         AndThenServiceFactory::new(self, factory.into_factory())
-    }
-
-    /// Call another service after call to this one has resolved successfully.
-    fn and_then_send<I, SF1>(self, factory: I) -> AndThenSendServiceFactory<Self, SF1, Req>
-    where
-        Self: Sized,
-        Self::Config: Clone,
-        I: IntoServiceFactory<SF1, Self::Response>,
-        SF1: ServiceFactory<
-            Self::Response,
-            Config = Self::Config,
-            Error = Self::Error,
-            InitError = Self::InitError,
-        >,
-    {
-        AndThenSendServiceFactory::new(self, factory.into_factory())
     }
 }
 

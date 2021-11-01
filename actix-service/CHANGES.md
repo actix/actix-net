@@ -1,7 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* Add `.and_then_send()` & `AndThenSendServiceFactory` for creating `Send`able chained services. [#403]
+* `fn_factory[_with_config]` types now impl `Send` even when config, service, request types do not. [#403]
+
+[#403]: https://github.com/actix/actix-net/pull/403
 
 
 ## 2.0.1 - 2021-10-11

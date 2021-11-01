@@ -31,12 +31,15 @@ use std::{
 
 use actix_rt::net::TcpStream;
 use actix_server::Server;
-use actix_service::ServiceFactoryExt as _;
+use actix_service::{fn_factory, fn_service, ServiceExt as _, ServiceFactory};
 use actix_tls::accept::rustls::{Acceptor as RustlsAcceptor, TlsStream};
 use futures_util::future::ok;
 use log::info;
 use rustls::{server::ServerConfig, Certificate, PrivateKey};
 use rustls_pemfile::{certs, rsa_private_keys};
+
+const CERT_PATH: &str = concat![env!("CARGO_MANIFEST_DIR"), "/examples/cert.pem"];
+const KEY_PATH: &str = concat![env!("CARGO_MANIFEST_DIR"), "/examples/key.pem"];
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
@@ -44,8 +47,8 @@ async fn main() -> io::Result<()> {
     env_logger::init();
 
     // Load TLS key and cert files
-    let cert_file = &mut BufReader::new(File::open("./examples/cert.pem").unwrap());
-    let key_file = &mut BufReader::new(File::open("./examples/key.pem").unwrap());
+    let cert_file = &mut BufReader::new(File::open(CERT_PATH).unwrap());
+    let key_file = &mut BufReader::new(File::open(KEY_PATH).unwrap());
 
     let cert_chain = certs(cert_file)
         .unwrap()
@@ -72,14 +75,30 @@ async fn main() -> io::Result<()> {
             let count = Arc::clone(&count);
 
             // Set up TLS service factory
-            tls_acceptor
-                .clone()
-                .map_err(|err| println!("Rustls error: {:?}", err))
-                .and_then_send(move |stream: TlsStream<TcpStream>| {
-                    let num = count.fetch_add(1, Ordering::Relaxed);
-                    info!("[{}] Got TLS connection: {:?}", num, &*stream);
-                    ok(())
-                })
+            // note: moving rustls acceptor into fn_factory scope
+            fn_factory(move || {
+                // manually call new_service so that and_then can be used from ServiceExt
+                // type annotation for inner stream type is required
+                let svc = <RustlsAcceptor as ServiceFactory<TcpStream>>::new_service(
+                    &tls_acceptor,
+                    (),
+                );
+
+                let count = Arc::clone(&count);
+
+                async move {
+                    let svc = svc
+                        .await?
+                        .map_err(|err| println!("Rustls error: {:?}", err))
+                        .and_then(fn_service(move |stream: TlsStream<TcpStream>| {
+                            let num = count.fetch_add(1, Ordering::Relaxed) + 1;
+                            info!("[{}] Got TLS connection: {:?}", num, &*stream);
+                            ok(())
+                        }));
+
+                    Ok::<_, ()>(svc)
+                }
+            })
         })?
         .workers(1)
         .run()
