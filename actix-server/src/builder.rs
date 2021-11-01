@@ -163,6 +163,8 @@ impl ServerBuilder {
     /// Binds to all network interface addresses that resolve from the `addr` argument.
     /// Eg. using `localhost` might bind to both IPv4 and IPv6 addresses. Bind to multiple distinct
     /// interfaces at the same time by passing a list of socket addresses.
+    ///
+    /// This fails only if all addresses fail to bind.
     pub fn bind<F, U, InitErr>(
         mut self,
         name: impl AsRef<str>,
