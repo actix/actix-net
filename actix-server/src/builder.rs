@@ -118,9 +118,18 @@ impl ServerBuilder {
     /// reached for each worker.
     ///
     /// By default max connections is set to a 25k per worker.
-    pub fn maxconn(mut self, num: usize) -> Self {
-        self.worker_config.max_concurrent_connections(num);
+    pub fn max_concurrent_connections(mut self, num: usize) -> Self {
+        self.worker_config
+        
+        
+        .max_concurrent_connections(num);
         self
+    }
+
+    #[doc(hidden)]
+    #[deprecated(since = "2.0.0", note = "Renamed to `max_concurrent_connections`.")]
+    pub fn maxconn(self, num: usize) -> Self {
+        self.max_concurrent_connections(num)
     }
 
     /// Stop Actix system.
