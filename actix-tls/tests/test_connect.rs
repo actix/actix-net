@@ -17,7 +17,7 @@ use actix_tls::connect::{self as actix_connect, Connect};
 #[cfg(feature = "openssl")]
 #[actix_rt::test]
 async fn test_string() {
-    let srv = TestServer::with(|| {
+    let srv = TestServer::with({
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);
             framed.send(Bytes::from_static(b"test")).await?;
@@ -34,7 +34,7 @@ async fn test_string() {
 #[cfg(feature = "rustls")]
 #[actix_rt::test]
 async fn test_rustls_string() {
-    let srv = TestServer::with(|| {
+    let srv = TestServer::with({
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);
             framed.send(Bytes::from_static(b"test")).await?;
@@ -50,13 +50,11 @@ async fn test_rustls_string() {
 
 #[actix_rt::test]
 async fn test_static_str() {
-    let srv = TestServer::with(|| {
-        fn_service(|io: TcpStream| async {
-            let mut framed = Framed::new(io, BytesCodec);
-            framed.send(Bytes::from_static(b"test")).await?;
-            Ok::<_, io::Error>(())
-        })
-    });
+    let srv = TestServer::with(fn_service(|io: TcpStream| async {
+        let mut framed = Framed::new(io, BytesCodec);
+        framed.send(Bytes::from_static(b"test")).await?;
+        Ok::<_, io::Error>(())
+    }));
 
     let conn = actix_connect::default_connector();
 
@@ -75,13 +73,11 @@ async fn test_static_str() {
 
 #[actix_rt::test]
 async fn test_new_service() {
-    let srv = TestServer::with(|| {
-        fn_service(|io: TcpStream| async {
-            let mut framed = Framed::new(io, BytesCodec);
-            framed.send(Bytes::from_static(b"test")).await?;
-            Ok::<_, io::Error>(())
-        })
-    });
+    let srv = TestServer::with(fn_service(|io: TcpStream| async {
+        let mut framed = Framed::new(io, BytesCodec);
+        framed.send(Bytes::from_static(b"test")).await?;
+        Ok::<_, io::Error>(())
+    }));
 
     let factory = actix_connect::default_connector_factory();
 
@@ -98,7 +94,7 @@ async fn test_new_service() {
 async fn test_openssl_uri() {
     use std::convert::TryFrom;
 
-    let srv = TestServer::with(|| {
+    let srv = TestServer::with({
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);
             framed.send(Bytes::from_static(b"test")).await?;
@@ -117,7 +113,7 @@ async fn test_openssl_uri() {
 async fn test_rustls_uri() {
     use std::convert::TryFrom;
 
-    let srv = TestServer::with(|| {
+    let srv = TestServer::with({
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);
             framed.send(Bytes::from_static(b"test")).await?;
@@ -133,7 +129,7 @@ async fn test_rustls_uri() {
 
 #[actix_rt::test]
 async fn test_local_addr() {
-    let srv = TestServer::with(|| {
+    let srv = TestServer::with({
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);
             framed.send(Bytes::from_static(b"test")).await?;

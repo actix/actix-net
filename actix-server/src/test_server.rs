@@ -1,9 +1,9 @@
-use std::sync::mpsc;
-use std::{net, thread};
+use std::{fmt, net, sync::mpsc, thread};
 
 use actix_rt::{net::TcpStream, System};
+use actix_service::ServiceFactory;
 
-use crate::{Server, ServerBuilder, ServiceFactory};
+use crate::{Server, ServerBuilder};
 
 /// A testing server.
 ///
@@ -12,13 +12,13 @@ use crate::{Server, ServerBuilder, ServiceFactory};
 ///
 /// # Examples
 /// ```
-/// use actix_service::fn_service;
 /// use actix_server::TestServer;
+/// use actix_service::fn_service;
 ///
 /// #[actix_rt::main]
 /// async fn main() {
-///     let srv = TestServer::with(|| fn_service(
-///         |sock| async move {
+///     let srv = TestServer::with(fn_service(|sock|
+///         async move {
 ///             println!("New connection: {:?}", sock);
 ///             Ok::<_, ()>(())
 ///         }
@@ -27,9 +27,10 @@ use crate::{Server, ServerBuilder, ServiceFactory};
 ///     println!("SOCKET: {:?}", srv.connect());
 /// }
 /// ```
+#[non_exhaustive]
 pub struct TestServer;
 
-/// Test server runtime
+/// Test server runtime.
 pub struct TestServerRuntime {
     addr: net::SocketAddr,
     host: String,
@@ -38,7 +39,7 @@ pub struct TestServerRuntime {
 }
 
 impl TestServer {
-    /// Start new server with server builder.
+    /// Start new server using server builder.
     pub fn start<F>(mut factory: F) -> TestServerRuntime
     where
         F: FnMut(ServerBuilder) -> ServerBuilder + Send + 'static,
@@ -63,8 +64,12 @@ impl TestServer {
         }
     }
 
-    /// Start new test server with application factory.
-    pub fn with<F: ServiceFactory<TcpStream>>(factory: F) -> TestServerRuntime {
+    /// Start new test server with default settings using application factory.
+    pub fn with<F, InitErr>(factory: F) -> TestServerRuntime
+    where
+        F: ServiceFactory<TcpStream, Config = (), InitError = InitErr> + Send + Clone + 'static,
+        InitErr: fmt::Debug + Send + 'static,
+    {
         let (tx, rx) = mpsc::channel();
 
         // run server in separate thread

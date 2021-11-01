@@ -6,8 +6,18 @@ use std::task::{Context, Poll};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 
-use crate::builder::ServerBuilder;
-use crate::signals::Signal;
+use crate::{signals::Signal, ServerBuilder};
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct Server;
+
+impl Server {
+    /// Start server building process.
+    pub fn build() -> ServerBuilder {
+        ServerBuilder::default()
+    }
+}
 
 #[derive(Debug)]
 pub(crate) enum ServerCommand {
@@ -32,19 +42,14 @@ pub(crate) enum ServerCommand {
 ///
 /// A graceful shutdown will wait for all workers to stop first.
 #[derive(Debug)]
-pub struct Server(
+pub struct ServerHandle(
     UnboundedSender<ServerCommand>,
     Option<oneshot::Receiver<()>>,
 );
 
-impl Server {
+impl ServerHandle {
     pub(crate) fn new(tx: UnboundedSender<ServerCommand>) -> Self {
-        Server(tx, None)
-    }
-
-    /// Start server building process
-    pub fn build() -> ServerBuilder {
-        ServerBuilder::default()
+        ServerHandle(tx, None)
     }
 
     pub(crate) fn signal(&self, sig: Signal) {
@@ -91,13 +96,13 @@ impl Server {
     }
 }
 
-impl Clone for Server {
+impl Clone for ServerHandle {
     fn clone(&self) -> Self {
         Self(self.0.clone(), None)
     }
 }
 
-impl Future for Server {
+impl Future for ServerHandle {
     type Output = io::Result<()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

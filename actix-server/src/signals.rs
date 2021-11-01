@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use crate::server::Server;
+use crate::server::ServerHandle;
 
 /// Types of process signals.
 #[allow(dead_code)]
@@ -20,7 +20,7 @@ pub(crate) enum Signal {
 
 /// Process signal listener.
 pub(crate) struct Signals {
-    srv: Server,
+    srv: ServerHandle,
 
     #[cfg(not(unix))]
     signals: futures_core::future::LocalBoxFuture<'static, std::io::Result<()>>,
@@ -31,7 +31,7 @@ pub(crate) struct Signals {
 
 impl Signals {
     /// Spawns a signal listening future that is able to send commands to the `Server`.
-    pub(crate) fn start(srv: Server) {
+    pub(crate) fn start(srv: ServerHandle) {
         #[cfg(not(unix))]
         {
             actix_rt::spawn(Signals {
