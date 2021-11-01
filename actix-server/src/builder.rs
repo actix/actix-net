@@ -71,8 +71,8 @@ impl ServerBuilder {
 
     /// Set number of workers to start.
     ///
-    /// By default server uses number of available logical cpu as workers
-    /// count. Workers must be greater than 0.
+    /// By default server uses number of available logical CPU as workers count. Workers must be
+    /// greater than 0.
     pub fn workers(mut self, num: usize) -> Self {
         assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;
@@ -99,10 +99,9 @@ impl ServerBuilder {
 
     /// Set the maximum number of pending connections.
     ///
-    /// This refers to the number of clients that can be waiting to be served.
-    /// Exceeding this number results in the client getting an error when
-    /// attempting to connect. It should only affect servers under significant
-    /// load.
+    /// This refers to the number of clients that can be waiting to be served. Exceeding this number
+    /// results in the client getting an error when attempting to connect. It should only affect
+    /// servers under significant load.
     ///
     /// Generally set in the 64-2048 range. Default value is 2048.
     ///
@@ -114,15 +113,12 @@ impl ServerBuilder {
 
     /// Sets the maximum per-worker number of concurrent connections.
     ///
-    /// All socket listeners will stop accepting connections when this limit is
-    /// reached for each worker.
+    /// All socket listeners will stop accepting connections when this limit is reached for
+    /// each worker.
     ///
     /// By default max connections is set to a 25k per worker.
     pub fn max_concurrent_connections(mut self, num: usize) -> Self {
-        self.worker_config
-        
-        
-        .max_concurrent_connections(num);
+        self.worker_config.max_concurrent_connections(num);
         self
     }
 
@@ -200,8 +196,8 @@ impl ServerBuilder {
     }
 
     /// Add new unix domain service to the server.
-    /// Useful when running as a systemd service and
-    /// a socket FD can be acquired using the systemd crate.
+    ///
+    /// Useful when running as a systemd service and a socket FD is acquired externally.
     #[cfg(unix)]
     pub fn listen_uds<F, N: AsRef<str>>(
         mut self,
