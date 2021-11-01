@@ -30,7 +30,7 @@ use std::{
 };
 
 use actix_rt::net::TcpStream;
-use actix_server::Server;
+use actix_server::{Server, ServerHandle};
 use actix_service::ServiceFactoryExt as _;
 use actix_tls::accept::rustls::{Acceptor as RustlsAcceptor, TlsStream};
 use futures_util::future::ok;

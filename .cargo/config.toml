@@ -1,5 +1,6 @@
 [alias]
-lint = "clippy --workspace --all-features --tests --examples --bins -- -Dclippy::todo"
+lint = "clippy --workspace --tests --examples --bins -- -Dclippy::todo"
+lint-all = "clippy --workspace --all-features --tests --examples --bins -- -Dclippy::todo"
 
 ci-doctest = "test --workspace --all-features --doc --no-fail-fast -- --nocapture"
 
