@@ -63,7 +63,7 @@ where
     }
 }
 
-/// Convert `Fn(Config, &Server) -> Future<Service>` fn to NewService\
+/// Convert `Fn(Config, &Server) -> Future<Service>` fn to ServiceFactory.
 struct ApplyConfigService<S1, Req, F, Cfg, Fut, S2, Err>
 where
     S1: Service<Req>,

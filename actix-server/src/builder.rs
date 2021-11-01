@@ -503,15 +503,13 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
 
     if success {
         Ok(sockets)
+    } else if let Some(err) = err.take() {
+        Err(err)
     } else {
-        if let Some(err) = err.take() {
-            Err(err)
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Can not bind to socket address",
-            ))
-        }
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            "Can not bind to socket address",
+        ))
     }
 }
 

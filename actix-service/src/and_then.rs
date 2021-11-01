@@ -14,7 +14,7 @@ use super::{Service, ServiceFactory};
 /// Service for the `and_then` combinator, chaining a computation onto the end of another service
 /// which completes successfully.
 ///
-/// This is created by the `Pipeline::and_then` method.
+/// Created by the `.and_then()` combinator.
 pub struct AndThenService<A, B, Req>(Rc<(A, B)>, PhantomData<Req>);
 
 impl<A, B, Req> AndThenService<A, B, Req> {
@@ -116,7 +116,7 @@ where
     }
 }
 
-/// `.and_then()` service factory combinator
+/// Service factory created by the `.and_then()` combinator.
 pub struct AndThenServiceFactory<A, B, Req>
 where
     A: ServiceFactory<Req>,
@@ -326,16 +326,16 @@ where
     }
 }
 
-impl<A: Clone, B: Clone, Req> Clone for AndThenSendServiceFactory<A, B, Req>
+impl<A, B, Req> Clone for AndThenSendServiceFactory<A, B, Req>
 where
-    A: ServiceFactory<Req>,
+    A: ServiceFactory<Req> + Clone,
     A::Config: Clone,
     B: ServiceFactory<
-        A::Response,
-        Config = A::Config,
-        Error = A::Error,
-        InitError = A::InitError,
-    >,
+            A::Response,
+            Config = A::Config,
+            Error = A::Error,
+            InitError = A::InitError,
+        > + Clone,
 {
     fn clone(&self) -> Self {
         Self {

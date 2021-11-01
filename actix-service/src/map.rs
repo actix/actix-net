@@ -103,7 +103,7 @@ where
     }
 }
 
-/// `MapNewService` new service combinator
+/// `MapServiceFactory` new service combinator.
 pub struct MapServiceFactory<A, F, Req, Res> {
     a: A,
     f: F,

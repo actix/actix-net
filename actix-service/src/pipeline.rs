@@ -238,8 +238,7 @@ where
         }
     }
 
-    /// Map this service's output to a different type, returning a new service
-    /// of the resulting type.
+    /// Map this service's output to a different type, returning a new service.
     pub fn map<F, R>(self, f: F) -> PipelineFactory<MapServiceFactory<SF, F, Req, R>, Req>
     where
         Self: Sized,
@@ -251,7 +250,7 @@ where
         }
     }
 
-    /// Map this service's error to a different error, returning a new service.
+    /// Map this service's error to a different type, returning a new service.
     pub fn map_err<F, E>(
         self,
         f: F,
@@ -266,7 +265,7 @@ where
         }
     }
 
-    /// Map this factory's init error to a different error, returning a new service.
+    /// Map this factory's init error to a different type, returning a new service.
     pub fn map_init_err<F, E>(self, f: F) -> PipelineFactory<MapInitErr<SF, F, Req, E>, Req>
     where
         Self: Sized,
