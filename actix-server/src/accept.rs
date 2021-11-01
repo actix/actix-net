@@ -8,7 +8,7 @@ use actix_rt::{
 use log::{debug, error, info};
 use mio::{Interest, Poll, Token as MioToken};
 
-use crate::server::Server;
+use crate::server::ServerHandle;
 use crate::socket::MioListener;
 use crate::waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN};
 use crate::worker::{Conn, WorkerHandleAccept};
@@ -30,13 +30,13 @@ struct ServerSocketInfo {
 ///
 /// It would also listen to `ServerCommand` and push interests to `WakerQueue`.
 pub(crate) struct AcceptLoop {
-    srv: Option<Server>,
+    srv: Option<ServerHandle>,
     poll: Option<Poll>,
     waker: WakerQueue,
 }
 
 impl AcceptLoop {
-    pub fn new(srv: Server) -> Self {
+    pub fn new(srv: ServerHandle) -> Self {
         let poll = Poll::new().unwrap_or_else(|e| panic!("Can not create `mio::Poll`: {}", e));
         let waker = WakerQueue::new(poll.registry())
             .unwrap_or_else(|e| panic!("Can not create `mio::Waker`: {}", e));
@@ -74,7 +74,7 @@ struct Accept {
     poll: Poll,
     waker: WakerQueue,
     handles: Vec<WorkerHandleAccept>,
-    srv: Server,
+    srv: ServerHandle,
     next: usize,
     avail: Availability,
     paused: bool,
@@ -153,7 +153,7 @@ impl Accept {
         poll: Poll,
         waker: WakerQueue,
         socks: Vec<(usize, MioListener)>,
-        srv: Server,
+        srv: ServerHandle,
         handles: Vec<WorkerHandleAccept>,
     ) {
         // Accept runs in its own thread and would want to spawn additional futures to current
@@ -176,7 +176,7 @@ impl Accept {
         waker: WakerQueue,
         socks: Vec<(usize, MioListener)>,
         handles: Vec<WorkerHandleAccept>,
-        srv: Server,
+        srv: ServerHandle,
     ) -> (Accept, Vec<ServerSocketInfo>) {
         let sockets = socks
             .into_iter()
