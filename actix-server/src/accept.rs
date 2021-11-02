@@ -65,7 +65,7 @@ impl AcceptLoop {
         let poll = self.poll.take().unwrap();
         let waker = self.waker.clone();
 
-        Accept::start(poll, waker, socks, srv, handles);
+        Accept::start(poll, waker, socks, srv, handles).expect("accept failed to start");
     }
 }
 
@@ -155,9 +155,12 @@ impl Accept {
         socks: Vec<(usize, MioListener)>,
         srv: ServerHandle,
         handles: Vec<WorkerHandleAccept>,
-    ) {
+    ) -> io::Result<()> {
         // Accept runs in its own thread and might spawn additional futures to current system
         let sys = System::try_current();
+
+        let (mut accept, mut sockets) =
+            Accept::new_with_sockets(poll, waker, socks, handles, srv)?;
 
         thread::Builder::new()
             .name("actix-server accept loop".to_owned())
@@ -167,12 +170,11 @@ impl Accept {
                     System::set_current(sys);
                 }
 
-                let (mut accept, mut sockets) =
-                    Accept::new_with_sockets(poll, waker, socks, handles, srv);
-
                 accept.poll_with(&mut sockets);
             })
             .unwrap();
+
+        Ok(())
     }
 
     fn new_with_sockets(
@@ -181,22 +183,21 @@ impl Accept {
         socks: Vec<(usize, MioListener)>,
         handles: Vec<WorkerHandleAccept>,
         srv: ServerHandle,
-    ) -> (Accept, Vec<ServerSocketInfo>) {
+    ) -> io::Result<(Accept, Box<[ServerSocketInfo]>)> {
         let sockets = socks
             .into_iter()
             .map(|(token, mut lst)| {
                 // Start listening for incoming connections
                 poll.registry()
-                    .register(&mut lst, MioToken(token), Interest::READABLE)
-                    .unwrap_or_else(|e| panic!("Can not register io: {}", e));
+                    .register(&mut lst, MioToken(token), Interest::READABLE)?;
 
-                ServerSocketInfo {
+                Ok(ServerSocketInfo {
                     token,
                     lst,
                     timeout: None,
-                }
+                })
             })
-            .collect();
+            .collect::<io::Result<_>>()?;
 
         let mut avail = Availability::default();
 
@@ -213,7 +214,7 @@ impl Accept {
             paused: false,
         };
 
-        (accept, sockets)
+        Ok((accept, sockets))
     }
 
     fn poll_with(&mut self, sockets: &mut [ServerSocketInfo]) {
