@@ -10,7 +10,7 @@
 //! the length of each line it echos and the total size of data sent when the connection is closed.
 
 use std::{
-    env, io,
+    io,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -25,10 +25,8 @@ use futures_util::future::ok;
 use log::{error, info};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-#[actix_rt::main]
-async fn main() -> io::Result<()> {
-    env::set_var("RUST_LOG", "info");
-    env_logger::init();
+async fn run() -> io::Result<()> {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let count = Arc::new(AtomicUsize::new(0));
 
@@ -85,6 +83,25 @@ async fn main() -> io::Result<()> {
             })
         })?
         .workers(1)
+        // .system_exit()
         .run()
         .await
 }
+
+fn main() -> io::Result<()> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let ls = tokio::task::LocalSet::new();
+    rt.block_on(ls.run_until(run()))?;
+
+    Ok(())
+}
+
+// #[actix_rt::main]
+// async fn main() -> io::Result<()> {
+//     run().await?;
+//     Ok(())
+// }

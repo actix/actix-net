@@ -130,7 +130,7 @@ impl System {
     ///
     /// Returns `None` if no System has been started.
     ///
-    /// Contrary to `current`, this never panics.
+    /// Contrary to [`current`](Self::current), this never panics.
     pub fn try_current() -> Option<System> {
         CURRENT.with(|cell| cell.borrow().clone())
     }

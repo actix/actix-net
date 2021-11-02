@@ -7,7 +7,7 @@ use std::{
 };
 
 use actix_rt::{self as rt, net::TcpStream, time::sleep, System};
-use log::{error, info};
+use log::{error, info, trace};
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver},
     oneshot,
@@ -160,6 +160,8 @@ impl ServerBuilder {
     {
         let sockets = bind_addr(addr, self.backlog)?;
 
+        trace!("binding server to: {:?}", &sockets);
+
         for lst in sockets {
             let token = self.next_token();
             self.services.push(StreamNewService::create(
@@ -171,6 +173,7 @@ impl ServerBuilder {
             self.sockets
                 .push((token, name.as_ref().to_string(), MioListener::Tcp(lst)));
         }
+
         Ok(self)
     }
 
@@ -255,6 +258,8 @@ impl ServerBuilder {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
+            trace!("start running server");
+
             for (_, name, lst) in &self.sockets {
                 info!(
                     r#"Starting service: "{}", workers: {}, listening on: {}"#,
@@ -263,6 +268,8 @@ impl ServerBuilder {
                     lst.local_addr()
                 );
             }
+
+            trace!("run server");
 
             // start workers
             let handles = (0..self.threads)
@@ -301,8 +308,8 @@ impl ServerBuilder {
         idx: usize,
         waker_queue: WakerQueue,
     ) -> (WorkerHandleAccept, WorkerHandleServer) {
+        trace!("start server worker {}", idx);
         let services = self.services.iter().map(|v| v.clone_factory()).collect();
-
         ServerWorker::start(idx, services, waker_queue, self.worker_config)
     }
 
@@ -384,7 +391,7 @@ impl ServerBuilder {
 
                     if exit {
                         sleep(Duration::from_millis(300)).await;
-                        System::current().stop();
+                        System::try_current().as_ref().map(System::stop);
                     }
                 });
             }

@@ -156,13 +156,17 @@ impl Accept {
         srv: ServerHandle,
         handles: Vec<WorkerHandleAccept>,
     ) {
-        // Accept runs in its own thread and would want to spawn additional futures to current
-        // actix system.
-        let sys = System::current();
+        // Accept runs in its own thread and might spawn additional futures to current system
+        let sys = System::try_current();
+
         thread::Builder::new()
             .name("actix-server accept loop".to_owned())
             .spawn(move || {
-                System::set_current(sys);
+                // forward existing actix system context
+                if let Some(sys) = sys {
+                    System::set_current(sys);
+                }
+
                 let (mut accept, mut sockets) =
                     Accept::new_with_sockets(poll, waker, socks, handles, srv);
 
@@ -479,10 +483,23 @@ impl Accept {
 
                     // after the sleep a Timer interest is sent to Accept Poll
                     let waker = self.waker.clone();
-                    System::current().arbiter().spawn(async move {
-                        sleep(Duration::from_millis(510)).await;
-                        waker.wake(WakerInterest::Timer);
-                    });
+
+                    match System::try_current() {
+                        Some(sys) => {
+                            sys.arbiter().spawn(async move {
+                                sleep(Duration::from_millis(510)).await;
+                                waker.wake(WakerInterest::Timer);
+                            });
+                        }
+
+                        None => {
+                            let rt = tokio::runtime::Handle::current();
+                            rt.spawn(async move {
+                                sleep(Duration::from_millis(510)).await;
+                                waker.wake(WakerInterest::Timer);
+                            });
+                        }
+                    }
 
                     return;
                 }

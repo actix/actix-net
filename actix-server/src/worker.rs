@@ -14,7 +14,7 @@ use std::{
 use actix_rt::{
     spawn,
     time::{sleep, Instant, Sleep},
-    Arbiter,
+    Arbiter, ArbiterHandle, System,
 };
 use futures_core::{future::LocalBoxFuture, ready};
 use log::{error, info, trace};
@@ -23,12 +23,14 @@ use tokio::sync::{
     oneshot,
 };
 
-use crate::join_all;
-use crate::service::{BoxedServerService, InternalServiceFactory};
-use crate::socket::MioStream;
-use crate::waker_queue::{WakerInterest, WakerQueue};
+use crate::{
+    join_all,
+    service::{BoxedServerService, InternalServiceFactory},
+    socket::MioStream,
+    waker_queue::{WakerInterest, WakerQueue},
+};
 
-/// Stop worker message. Returns `true` on successful graceful shutdown.
+/// Stop worker message. Returns `true` on successful graceful shutdown
 /// and `false` if some connections still alive when shutdown execute.
 pub(crate) struct Stop {
     graceful: bool,
@@ -273,6 +275,8 @@ impl ServerWorker {
         waker_queue: WakerQueue,
         config: ServerWorkerConfig,
     ) -> (WorkerHandleAccept, WorkerHandleServer) {
+        trace!("starting server worker {}", idx);
+
         let (tx1, rx) = unbounded_channel();
         let (tx2, rx2) = unbounded_channel();
 
@@ -289,63 +293,77 @@ impl ServerWorker {
             Arbiter::new()
         };
 
-        #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
-        let arbiter = Arbiter::with_tokio_rt(move || {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .max_blocking_threads(config.max_blocking_threads)
-                .build()
-                .unwrap()
-        });
+        // get actix system context if it is set
+        let sys = System::try_current();
 
-        arbiter.spawn(async move {
-            let fut = factories
-                .iter()
-                .enumerate()
-                .map(|(idx, factory)| {
-                    let fut = factory.create();
-                    async move { fut.await.map(|(t, s)| (idx, t, s)) }
-                })
-                .collect::<Vec<_>>();
+        std::thread::Builder::new()
+            .name("eofibef".to_owned())
+            .spawn(move || {
+                // forward existing actix system context
+                if let Some(sys) = sys {
+                    System::set_current(sys);
+                }
 
-            // a second spawn to run !Send future tasks.
-            spawn(async move {
-                let res = join_all(fut)
-                    .await
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>();
-                let services = match res {
-                    Ok(res) => res
-                        .into_iter()
-                        .fold(Vec::new(), |mut services, (factory, token, service)| {
-                            assert_eq!(token, services.len());
-                            services.push(WorkerService {
-                                factory,
-                                service,
-                                status: WorkerServiceStatus::Unavailable,
-                            });
-                            services
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .max_blocking_threads(config.max_blocking_threads)
+                    .build()
+                    .unwrap();
+
+                rt.block_on(tokio::task::LocalSet::new().run_until(async move {
+                    let fut = factories
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, factory)| {
+                            let fut = factory.create();
+                            async move { fut.await.map(|(t, s)| (idx, t, s)) }
                         })
-                        .into_boxed_slice(),
-                    Err(e) => {
-                        error!("Can not start worker: {:?}", e);
-                        Arbiter::current().stop();
-                        return;
-                    }
-                };
+                        .collect::<Vec<_>>();
 
-                // a third spawn to make sure ServerWorker runs as non boxed future.
-                spawn(ServerWorker {
-                    rx,
-                    rx2,
-                    services,
-                    counter: WorkerCounter::new(idx, waker_queue, counter_clone),
-                    factories: factories.into_boxed_slice(),
-                    state: Default::default(),
-                    shutdown_timeout: config.shutdown_timeout,
-                });
-            });
-        });
+                    // a second spawn to run !Send future tasks.
+                    spawn(async move {
+                        let res = join_all(fut)
+                            .await
+                            .into_iter()
+                            .collect::<Result<Vec<_>, _>>();
+                        let services = match res {
+                            Ok(res) => res
+                                .into_iter()
+                                .fold(Vec::new(), |mut services, (factory, token, service)| {
+                                    assert_eq!(token, services.len());
+                                    services.push(WorkerService {
+                                        factory,
+                                        service,
+                                        status: WorkerServiceStatus::Unavailable,
+                                    });
+                                    services
+                                })
+                                .into_boxed_slice(),
+                            Err(e) => {
+                                error!("Can not start worker: {:?}", e);
+                                Arbiter::try_current().as_ref().map(ArbiterHandle::stop);
+                                return;
+                            }
+                        };
+
+                        // a third spawn to make sure ServerWorker runs as non boxed future.
+                        spawn(ServerWorker {
+                            rx,
+                            rx2,
+                            services,
+                            counter: WorkerCounter::new(idx, waker_queue, counter_clone),
+                            factories: factories.into_boxed_slice(),
+                            state: Default::default(),
+                            shutdown_timeout: config.shutdown_timeout,
+                        })
+                        .await
+                        .expect("task 3 panic");
+                    })
+                    .await
+                    .expect("task 2 panic");
+                }))
+            })
+            .expect("worker thread error/panic");
 
         handle_pair(idx, tx1, tx2, counter)
     }
@@ -450,8 +468,9 @@ impl Default for WorkerState {
 
 impl Drop for ServerWorker {
     fn drop(&mut self) {
+        trace!("dropping ServerWorker");
         // Stop the Arbiter ServerWorker runs on on drop.
-        Arbiter::current().stop();
+        Arbiter::try_current().as_ref().map(ArbiterHandle::stop);
     }
 }
 
