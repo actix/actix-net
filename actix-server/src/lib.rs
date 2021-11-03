@@ -23,3 +23,10 @@ pub use self::test_server::TestServer;
 
 #[doc(hidden)]
 pub use self::socket::FromStream;
+
+/// Start server building process
+#[doc(hidden)]
+#[deprecated(since = "2.0.0", note = "Use `Server::build()`.")]
+pub fn new() -> ServerBuilder {
+    ServerBuilder::default()
+}
