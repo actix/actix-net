@@ -7,16 +7,16 @@ use crate::server::ServerCommand;
 /// Server handle.
 #[derive(Debug, Clone)]
 pub struct ServerHandle {
-    tx_cmd: UnboundedSender<ServerCommand>,
+    cmd_tx: UnboundedSender<ServerCommand>,
 }
 
 impl ServerHandle {
-    pub(crate) fn new(tx_cmd: UnboundedSender<ServerCommand>) -> Self {
-        ServerHandle { tx_cmd }
+    pub(crate) fn new(cmd_tx: UnboundedSender<ServerCommand>) -> Self {
+        ServerHandle { cmd_tx }
     }
 
     pub(crate) fn worker_faulted(&self, idx: usize) {
-        let _ = self.tx_cmd.send(ServerCommand::WorkerFaulted(idx));
+        let _ = self.cmd_tx.send(ServerCommand::WorkerFaulted(idx));
     }
 
     /// Pause accepting incoming connections.
@@ -24,7 +24,7 @@ impl ServerHandle {
     /// May drop socket pending connection. All open connections remain active.
     pub fn pause(&self) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.tx_cmd.send(ServerCommand::Pause(tx));
+        let _ = self.cmd_tx.send(ServerCommand::Pause(tx));
         async {
             let _ = rx.await;
         }
@@ -33,7 +33,7 @@ impl ServerHandle {
     /// Resume accepting incoming connections.
     pub fn resume(&self) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.tx_cmd.send(ServerCommand::Resume(tx));
+        let _ = self.cmd_tx.send(ServerCommand::Resume(tx));
         async {
             let _ = rx.await;
         }
@@ -42,7 +42,7 @@ impl ServerHandle {
     /// Stop incoming connection processing, stop all workers and exit.
     pub fn stop(&self, graceful: bool) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.tx_cmd.send(ServerCommand::Stop {
+        let _ = self.cmd_tx.send(ServerCommand::Stop {
             graceful,
             completion: Some(tx),
         });

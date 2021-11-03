@@ -43,20 +43,20 @@ pub(crate) struct Conn {
     pub token: usize,
 }
 
-///
+/// Create accept and server worker handles.
 fn handle_pair(
     idx: usize,
-    tx_conn: UnboundedSender<Conn>,
-    tx_stop: UnboundedSender<Stop>,
+    conn_tx: UnboundedSender<Conn>,
+    stop_tx: UnboundedSender<Stop>,
     counter: Counter,
 ) -> (WorkerHandleAccept, WorkerHandleServer) {
     let accept = WorkerHandleAccept {
         idx,
-        tx_conn,
+        conn_tx,
         counter,
     };
 
-    let server = WorkerHandleServer { idx, tx_stop };
+    let server = WorkerHandleServer { idx, stop_tx };
 
     (accept, server)
 }
@@ -158,7 +158,7 @@ impl Drop for WorkerCounterGuard {
 /// Held by [Accept](crate::accept::Accept).
 pub(crate) struct WorkerHandleAccept {
     idx: usize,
-    tx_conn: UnboundedSender<Conn>,
+    conn_tx: UnboundedSender<Conn>,
     counter: Counter,
 }
 
@@ -170,7 +170,7 @@ impl WorkerHandleAccept {
 
     #[inline(always)]
     pub(crate) fn send(&self, conn: Conn) -> Result<(), Conn> {
-        self.tx_conn.send(conn).map_err(|msg| msg.0)
+        self.conn_tx.send(conn).map_err(|msg| msg.0)
     }
 
     #[inline(always)]
@@ -185,13 +185,13 @@ impl WorkerHandleAccept {
 #[derive(Debug)]
 pub(crate) struct WorkerHandleServer {
     pub(crate) idx: usize,
-    tx_stop: UnboundedSender<Stop>,
+    stop_tx: UnboundedSender<Stop>,
 }
 
 impl WorkerHandleServer {
     pub(crate) fn stop(&self, graceful: bool) -> oneshot::Receiver<bool> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.tx_stop.send(Stop { graceful, tx });
+        let _ = self.stop_tx.send(Stop { graceful, tx });
         rx
     }
 }

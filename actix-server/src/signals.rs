@@ -10,6 +10,7 @@ use log::trace;
 /// Types of process signals.
 // #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)] // variants are never constructed on non-unix
 pub(crate) enum Signal {
     /// `SIGINT`
     Int,
