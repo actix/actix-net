@@ -5,6 +5,7 @@
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
 mod accept;
+mod availability;
 mod builder;
 mod server;
 mod service;

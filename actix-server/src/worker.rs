@@ -1,6 +1,6 @@
 use std::{
     future::Future,
-    mem,
+    io, mem,
     pin::Pin,
     rc::Rc,
     sync::{
@@ -43,19 +43,20 @@ pub(crate) struct Conn {
     pub token: usize,
 }
 
+///
 fn handle_pair(
     idx: usize,
-    tx1: UnboundedSender<Conn>,
-    tx2: UnboundedSender<Stop>,
+    tx_conn: UnboundedSender<Conn>,
+    tx_stop: UnboundedSender<Stop>,
     counter: Counter,
 ) -> (WorkerHandleAccept, WorkerHandleServer) {
     let accept = WorkerHandleAccept {
         idx,
-        tx: tx1,
+        tx_conn,
         counter,
     };
 
-    let server = WorkerHandleServer { idx, tx: tx2 };
+    let server = WorkerHandleServer { idx, tx_stop };
 
     (accept, server)
 }
@@ -151,13 +152,13 @@ impl Drop for WorkerCounterGuard {
     }
 }
 
-/// Handle to worker that can send connection message to worker and share the
-/// availability of worker to other thread.
+/// Handle to worker that can send connection message to worker and share the availability of worker
+/// to other threads.
 ///
 /// Held by [Accept](crate::accept::Accept).
 pub(crate) struct WorkerHandleAccept {
     idx: usize,
-    tx: UnboundedSender<Conn>,
+    tx_conn: UnboundedSender<Conn>,
     counter: Counter,
 }
 
@@ -168,8 +169,8 @@ impl WorkerHandleAccept {
     }
 
     #[inline(always)]
-    pub(crate) fn send(&self, msg: Conn) -> Result<(), Conn> {
-        self.tx.send(msg).map_err(|msg| msg.0)
+    pub(crate) fn send(&self, conn: Conn) -> Result<(), Conn> {
+        self.tx_conn.send(conn).map_err(|msg| msg.0)
     }
 
     #[inline(always)]
@@ -183,15 +184,14 @@ impl WorkerHandleAccept {
 /// Held by [ServerBuilder](crate::builder::ServerBuilder).
 #[derive(Debug)]
 pub(crate) struct WorkerHandleServer {
-    #[allow(dead_code)]
-    idx: usize,
-    tx: UnboundedSender<Stop>,
+    pub(crate) idx: usize,
+    tx_stop: UnboundedSender<Stop>,
 }
 
 impl WorkerHandleServer {
     pub(crate) fn stop(&self, graceful: bool) -> oneshot::Receiver<bool> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.tx.send(Stop { graceful, tx });
+        let _ = self.tx_stop.send(Stop { graceful, tx });
         rx
     }
 }
@@ -274,7 +274,7 @@ impl ServerWorker {
         factories: Vec<Box<dyn InternalServiceFactory>>,
         waker_queue: WakerQueue,
         config: ServerWorkerConfig,
-    ) -> (WorkerHandleAccept, WorkerHandleServer) {
+    ) -> io::Result<(WorkerHandleAccept, WorkerHandleServer)> {
         trace!("starting server worker {}", idx);
 
         let (tx1, rx) = unbounded_channel();
@@ -295,6 +295,8 @@ impl ServerWorker {
 
         // get actix system context if it is set
         let sys = System::try_current();
+
+        // TODO: wait for server startup with sync channel
 
         std::thread::Builder::new()
             .name("eofibef".to_owned())
@@ -339,6 +341,7 @@ impl ServerWorker {
                                     services
                                 })
                                 .into_boxed_slice(),
+
                             Err(e) => {
                                 error!("Can not start worker: {:?}", e);
                                 Arbiter::try_current().as_ref().map(ArbiterHandle::stop);
@@ -365,7 +368,7 @@ impl ServerWorker {
             })
             .expect("worker thread error/panic");
 
-        handle_pair(idx, tx1, tx2, counter)
+        Ok(handle_pair(idx, tx1, tx2, counter))
     }
 
     fn restart_service(&mut self, idx: usize, factory_id: usize) {

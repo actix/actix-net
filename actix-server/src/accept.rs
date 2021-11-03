@@ -1,17 +1,20 @@
 use std::time::Duration;
 use std::{io, thread};
 
-use actix_rt::{
-    time::{sleep, Instant},
-    System,
-};
+use actix_rt::time::Instant;
+use actix_rt::{time::sleep, System};
 use log::{debug, error, info};
 use mio::{Interest, Poll, Token as MioToken};
 
-use crate::server::ServerHandle;
-use crate::socket::MioListener;
-use crate::waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN};
-use crate::worker::{Conn, WorkerHandleAccept};
+use crate::worker::ServerWorker;
+use crate::{
+    availability::Availability,
+    server::ServerHandle,
+    socket::MioListener,
+    waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN},
+    worker::{Conn, WorkerHandleAccept, WorkerHandleServer},
+    ServerBuilder,
+};
 
 struct ServerSocketInfo {
     token: usize,
@@ -20,59 +23,13 @@ struct ServerSocketInfo {
 
     /// Timeout is used to mark the deadline when this socket's listener should be registered again
     /// after an error.
-    timeout: Option<Instant>,
-}
-
-/// Accept loop would live with `ServerBuilder`.
-///
-/// It's tasked with construct `Poll` instance and `WakerQueue` which would be distributed to
-/// `Accept` and `Worker`.
-///
-/// It would also listen to `ServerCommand` and push interests to `WakerQueue`.
-pub(crate) struct AcceptLoop {
-    srv: Option<ServerHandle>,
-    poll: Option<Poll>,
-    waker: WakerQueue,
-}
-
-impl AcceptLoop {
-    pub fn new(srv: ServerHandle) -> Self {
-        let poll = Poll::new().unwrap_or_else(|e| panic!("Can not create `mio::Poll`: {}", e));
-        let waker = WakerQueue::new(poll.registry())
-            .unwrap_or_else(|e| panic!("Can not create `mio::Waker`: {}", e));
-
-        Self {
-            srv: Some(srv),
-            poll: Some(poll),
-            waker,
-        }
-    }
-
-    pub(crate) fn waker_owned(&self) -> WakerQueue {
-        self.waker.clone()
-    }
-
-    pub fn wake(&self, i: WakerInterest) {
-        self.waker.wake(i);
-    }
-
-    pub(crate) fn start(
-        &mut self,
-        socks: Vec<(usize, MioListener)>,
-        handles: Vec<WorkerHandleAccept>,
-    ) {
-        let srv = self.srv.take().expect("Can not re-use AcceptInfo");
-        let poll = self.poll.take().unwrap();
-        let waker = self.waker.clone();
-
-        Accept::start(poll, waker, socks, srv, handles).expect("accept failed to start");
-    }
+    timeout: Option<actix_rt::time::Instant>,
 }
 
 /// poll instance of the server.
-struct Accept {
+pub(crate) struct Accept {
     poll: Poll,
-    waker: WakerQueue,
+    waker_queue: WakerQueue,
     handles: Vec<WorkerHandleAccept>,
     srv: ServerHandle,
     next: usize,
@@ -80,111 +37,58 @@ struct Accept {
     paused: bool,
 }
 
-/// Array of u128 with every bit as marker for a worker handle's availability.
-#[derive(Debug, Default)]
-struct Availability([u128; 4]);
-
-impl Availability {
-    /// Check if any worker handle is available
-    #[inline(always)]
-    fn available(&self) -> bool {
-        self.0.iter().any(|a| *a != 0)
-    }
-
-    /// Check if worker handle is available by index
-    #[inline(always)]
-    fn get_available(&self, idx: usize) -> bool {
-        let (offset, idx) = Self::offset(idx);
-
-        self.0[offset] & (1 << idx as u128) != 0
-    }
-
-    /// Set worker handle available state by index.
-    fn set_available(&mut self, idx: usize, avail: bool) {
-        let (offset, idx) = Self::offset(idx);
-
-        let off = 1 << idx as u128;
-        if avail {
-            self.0[offset] |= off;
-        } else {
-            self.0[offset] &= !off
-        }
-    }
-
-    /// Set all worker handle to available state.
-    /// This would result in a re-check on all workers' availability.
-    fn set_available_all(&mut self, handles: &[WorkerHandleAccept]) {
-        handles.iter().for_each(|handle| {
-            self.set_available(handle.idx(), true);
-        })
-    }
-
-    /// Get offset and adjusted index of given worker handle index.
-    fn offset(idx: usize) -> (usize, usize) {
-        if idx < 128 {
-            (0, idx)
-        } else if idx < 128 * 2 {
-            (1, idx - 128)
-        } else if idx < 128 * 3 {
-            (2, idx - 128 * 2)
-        } else if idx < 128 * 4 {
-            (3, idx - 128 * 3)
-        } else {
-            panic!("Max WorkerHandle count is 512")
-        }
-    }
-}
-
-/// This function defines errors that are per-connection. Which basically
-/// means that if we get this error from `accept()` system call it means
-/// next connection might be ready to be accepted.
-///
-/// All other errors will incur a timeout before next `accept()` is performed.
-/// The timeout is useful to handle resource exhaustion errors like ENFILE
-/// and EMFILE. Otherwise, could enter into tight loop.
-fn connection_error(e: &io::Error) -> bool {
-    e.kind() == io::ErrorKind::ConnectionRefused
-        || e.kind() == io::ErrorKind::ConnectionAborted
-        || e.kind() == io::ErrorKind::ConnectionReset
-}
-
 impl Accept {
     pub(crate) fn start(
-        poll: Poll,
-        waker: WakerQueue,
-        socks: Vec<(usize, MioListener)>,
-        srv: ServerHandle,
-        handles: Vec<WorkerHandleAccept>,
-    ) -> io::Result<()> {
-        // Accept runs in its own thread and might spawn additional futures to current system
-        let sys = System::try_current();
+        sockets: Vec<(usize, MioListener)>,
+        builder: &ServerBuilder,
+    ) -> io::Result<(WakerQueue, Vec<WorkerHandleServer>)> {
+        let handle_server = ServerHandle::new(builder.cmd_tx.clone());
 
-        let (mut accept, mut sockets) =
-            Accept::new_with_sockets(poll, waker, socks, handles, srv)?;
+        // construct poll instance and its waker
+        let poll = Poll::new()?;
+        let waker_queue = WakerQueue::new(poll.registry())?;
+
+        // start workers and collect handles
+        let (handles_accept, handles_server) = (0..builder.threads)
+            .map(|idx| {
+                // clone service factories
+                let factories = builder
+                    .factories
+                    .iter()
+                    .map(|f| f.clone_factory())
+                    .collect::<Vec<_>>();
+
+                // start worker using service factories
+                ServerWorker::start(idx, factories, waker_queue.clone(), builder.worker_config)
+            })
+            .collect::<io::Result<Vec<_>>>()?
+            .into_iter()
+            .unzip();
+
+        let (mut accept, mut sockets) = Accept::new_with_sockets(
+            poll,
+            waker_queue.clone(),
+            sockets,
+            handles_accept,
+            handle_server,
+        )?;
 
         thread::Builder::new()
-            .name("actix-server accept loop".to_owned())
-            .spawn(move || {
-                // forward existing actix system context
-                if let Some(sys) = sys {
-                    System::set_current(sys);
-                }
+            .name("actix-server acceptor".to_owned())
+            .spawn(move || accept.poll_with(&mut sockets))
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
 
-                accept.poll_with(&mut sockets);
-            })
-            .unwrap();
-
-        Ok(())
+        Ok((waker_queue, handles_server))
     }
 
     fn new_with_sockets(
         poll: Poll,
-        waker: WakerQueue,
-        socks: Vec<(usize, MioListener)>,
-        handles: Vec<WorkerHandleAccept>,
-        srv: ServerHandle,
+        waker_queue: WakerQueue,
+        sockets: Vec<(usize, MioListener)>,
+        accept_handles: Vec<WorkerHandleAccept>,
+        server_handle: ServerHandle,
     ) -> io::Result<(Accept, Box<[ServerSocketInfo]>)> {
-        let sockets = socks
+        let sockets = sockets
             .into_iter()
             .map(|(token, mut lst)| {
                 // Start listening for incoming connections
@@ -202,13 +106,13 @@ impl Accept {
         let mut avail = Availability::default();
 
         // Assume all handles are avail at construct time.
-        avail.set_available_all(&handles);
+        avail.set_available_all(&accept_handles);
 
         let accept = Accept {
             poll,
-            waker,
-            handles,
-            srv,
+            waker_queue,
+            handles: accept_handles,
+            srv: server_handle,
             next: 0,
             avail,
             paused: false,
@@ -217,8 +121,9 @@ impl Accept {
         Ok((accept, sockets))
     }
 
+    /// blocking wait for readiness events triggered by mio
     fn poll_with(&mut self, sockets: &mut [ServerSocketInfo]) {
-        let mut events = mio::Events::with_capacity(128);
+        let mut events = mio::Events::with_capacity(256);
 
         loop {
             if let Err(e) = self.poll.poll(&mut events, None) {
@@ -254,7 +159,7 @@ impl Accept {
         loop {
             // take guard with every iteration so no new interest can be added
             // until the current task is done.
-            let mut guard = self.waker.guard();
+            let mut guard = self.waker_queue.guard();
             match guard.pop_front() {
                 // worker notify it becomes available.
                 Some(WakerInterest::WorkerAvailable(idx)) => {
@@ -325,6 +230,7 @@ impl Accept {
 
     fn process_timer(&self, sockets: &mut [ServerSocketInfo]) {
         let now = Instant::now();
+
         sockets
             .iter_mut()
             // Only sockets that had an associated timeout were deregistered.
@@ -387,12 +293,12 @@ impl Accept {
     fn deregister_all(&self, sockets: &mut [ServerSocketInfo]) {
         // This is a best effort implementation with following limitation:
         //
-        // Every ServerSocketInfo with associate timeout will be skipped and it's timeout
-        // is removed in the process.
+        // Every ServerSocketInfo with associated timeout will be skipped and it's timeout is
+        // removed in the process.
         //
-        // Therefore WakerInterest::Pause followed by WakerInterest::Resume in a very short
-        // gap (less than 500ms) would cause all timing out ServerSocketInfos be reregistered
-        // before expected timing.
+        // Therefore WakerInterest::Pause followed by WakerInterest::Resume in a very short gap
+        // (less than 500ms) would cause all timing out ServerSocketInfos be re-registered before
+        // expected timing.
         sockets
             .iter_mut()
             // Take all timeout.
@@ -483,7 +389,7 @@ impl Accept {
                     info.timeout = Some(Instant::now() + Duration::from_millis(500));
 
                     // after the sleep a Timer interest is sent to Accept Poll
-                    let waker = self.waker.clone();
+                    let waker = self.waker_queue.clone();
 
                     match System::try_current() {
                         Some(sys) => {
@@ -539,67 +445,14 @@ impl Accept {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::Availability;
-
-    fn single(aval: &mut Availability, idx: usize) {
-        aval.set_available(idx, true);
-        assert!(aval.available());
-
-        aval.set_available(idx, true);
-
-        aval.set_available(idx, false);
-        assert!(!aval.available());
-
-        aval.set_available(idx, false);
-        assert!(!aval.available());
-    }
-
-    fn multi(aval: &mut Availability, mut idx: Vec<usize>) {
-        idx.iter().for_each(|idx| aval.set_available(*idx, true));
-
-        assert!(aval.available());
-
-        while let Some(idx) = idx.pop() {
-            assert!(aval.available());
-            aval.set_available(idx, false);
-        }
-
-        assert!(!aval.available());
-    }
-
-    #[test]
-    fn availability() {
-        let mut aval = Availability::default();
-
-        single(&mut aval, 1);
-        single(&mut aval, 128);
-        single(&mut aval, 256);
-        single(&mut aval, 511);
-
-        let idx = (0..511).filter(|i| i % 3 == 0 && i % 5 == 0).collect();
-
-        multi(&mut aval, idx);
-
-        multi(&mut aval, (0..511).collect())
-    }
-
-    #[test]
-    #[should_panic]
-    fn overflow() {
-        let mut aval = Availability::default();
-        single(&mut aval, 512);
-    }
-
-    #[test]
-    fn pin_point() {
-        let mut aval = Availability::default();
-
-        aval.set_available(438, true);
-
-        aval.set_available(479, true);
-
-        assert_eq!(aval.0[3], 1 << (438 - 384) | 1 << (479 - 384));
-    }
+/// This function defines errors that are per-connection; if we get this error from the `accept()`
+/// system call it means the next connection might be ready to be accepted.
+///
+/// All other errors will incur a timeout before next `accept()` call is attempted. The timeout is
+/// useful to handle resource exhaustion errors like `ENFILE` and `EMFILE`. Otherwise, it could
+/// enter into a temporary spin loop.
+fn connection_error(e: &io::Error) -> bool {
+    e.kind() == io::ErrorKind::ConnectionRefused
+        || e.kind() == io::ErrorKind::ConnectionAborted
+        || e.kind() == io::ErrorKind::ConnectionReset
 }

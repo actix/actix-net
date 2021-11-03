@@ -30,7 +30,7 @@ fn test_bind() {
                 })?
                 .run();
 
-            let _ = tx.send((srv.clone(), actix_rt::System::current()));
+            let _ = tx.send((srv.handle(), actix_rt::System::current()));
 
             srv.await
         })
@@ -61,7 +61,7 @@ fn test_listen() {
                 })?
                 .run();
 
-            let _ = tx.send((srv.clone(), actix_rt::System::current()));
+            let _ = tx.send((srv.handle(), actix_rt::System::current()));
 
             srv.await
         })
@@ -103,7 +103,7 @@ fn test_start() {
                 })?
                 .run();
 
-            let _ = tx.send((srv.clone(), actix_rt::System::current()));
+            let _ = tx.send((srv.handle(), actix_rt::System::current()));
 
             srv.await
         })
@@ -166,7 +166,7 @@ async fn test_max_concurrent_connections() {
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let srv = Server::build()
                 // Set a relative higher backlog.
                 .backlog(12)
                 // max connection for a worker is 3.
@@ -187,9 +187,9 @@ async fn test_max_concurrent_connections() {
                 })?
                 .run();
 
-            let _ = tx.send((server.clone(), actix_rt::System::current()));
+            let _ = tx.send((srv.handle(), actix_rt::System::current()));
 
-            server.await
+            srv.await
         })
     });
 
@@ -260,7 +260,7 @@ async fn test_service_restart() {
     let h = thread::spawn(move || {
         let num = num.clone();
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let srv = Server::build()
                 .backlog(1)
                 .disable_signals()
                 .bind("addr1", addr1, move || {
@@ -280,12 +280,12 @@ async fn test_service_restart() {
                 .workers(1)
                 .run();
 
-            let _ = tx.send((server.clone(), actix_rt::System::current()));
-            server.await
+            let _ = tx.send((srv.handle(), actix_rt::System::current()));
+            srv.await
         })
     });
 
-    let (server, sys) = rx.recv().unwrap();
+    let (srv, sys) = rx.recv().unwrap();
 
     for _ in 0..5 {
         TcpStream::connect(addr1)
@@ -307,7 +307,7 @@ async fn test_service_restart() {
     assert!(num_clone.load(Ordering::SeqCst) > 5);
     assert!(num2_clone.load(Ordering::SeqCst) > 5);
 
-    let _ = server.stop(false);
+    let _ = srv.stop(false);
     sys.stop();
     h.join().unwrap().unwrap();
 }
@@ -379,19 +379,19 @@ async fn worker_restart() {
     let h = thread::spawn(move || {
         let counter = counter.clone();
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let srv = Server::build()
                 .disable_signals()
                 .bind("addr", addr, move || TestServiceFactory(counter.clone()))?
                 .workers(2)
                 .run();
 
-            let _ = tx.send((server.clone(), actix_rt::System::current()));
+            let _ = tx.send((srv.handle(), actix_rt::System::current()));
 
-            server.await
+            srv.await
         })
     });
 
-    let (server, sys) = rx.recv().unwrap();
+    let (srv, sys) = rx.recv().unwrap();
 
     sleep(Duration::from_secs(3)).await;
 
@@ -448,7 +448,7 @@ async fn worker_restart() {
     assert_eq!("3", id);
     stream.shutdown().await.unwrap();
 
-    let _ = server.stop(false);
+    let _ = srv.stop(false);
     sys.stop();
     h.join().unwrap().unwrap();
 }

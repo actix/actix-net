@@ -88,15 +88,9 @@ async fn run() -> io::Result<()> {
         .await
 }
 
-fn main() -> io::Result<()> {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
-    let ls = tokio::task::LocalSet::new();
-    rt.block_on(ls.run_until(run()))?;
-
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    run().await?;
     Ok(())
 }
 

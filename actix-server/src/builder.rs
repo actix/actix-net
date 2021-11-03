@@ -1,43 +1,31 @@
-use std::{
-    future::Future,
-    io, mem,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::{io, time::Duration};
 
-use actix_rt::{self as rt, net::TcpStream, time::sleep, System};
-use log::{error, info, trace};
-use tokio::sync::{
-    mpsc::{unbounded_channel, UnboundedReceiver},
-    oneshot,
-};
+use actix_rt::net::TcpStream;
+use log::trace;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-use crate::accept::AcceptLoop;
-use crate::join_all;
-use crate::server::{ServerCommand, ServerHandle};
-use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
-use crate::signals::{Signal, Signals};
-use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
-use crate::socket::{MioTcpListener, MioTcpSocket};
-use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleAccept, WorkerHandleServer};
+use crate::{
+    server::{ServerCommand, ServerHandle},
+    service::{InternalServiceFactory, ServiceFactory, StreamNewService},
+    socket::{
+        MioListener, MioTcpListener, MioTcpSocket, StdSocketAddr, StdTcpListener, ToSocketAddrs,
+    },
+    worker::ServerWorkerConfig,
+    Server,
+};
 
 /// Server builder
 pub struct ServerBuilder {
-    threads: usize,
-    token: usize,
-    backlog: u32,
-    handles: Vec<(usize, WorkerHandleServer)>,
-    services: Vec<Box<dyn InternalServiceFactory>>,
-    sockets: Vec<(usize, String, MioListener)>,
-    accept: AcceptLoop,
-    exit: bool,
-    no_signals: bool,
-    cmd: UnboundedReceiver<ServerCommand>,
-    server: ServerHandle,
-    notify: Vec<oneshot::Sender<()>>,
-    worker_config: ServerWorkerConfig,
+    pub(super) threads: usize,
+    pub(super) token: usize,
+    pub(super) backlog: u32,
+    pub(super) factories: Vec<Box<dyn InternalServiceFactory>>,
+    pub(super) sockets: Vec<(usize, String, MioListener)>,
+    pub(super) exit: bool,
+    pub(super) listen_os_signals: bool,
+    pub(super) cmd_tx: UnboundedSender<ServerCommand>,
+    pub(super) cmd_rx: UnboundedReceiver<ServerCommand>,
+    pub(super) worker_config: ServerWorkerConfig,
 }
 
 impl Default for ServerBuilder {
@@ -50,21 +38,18 @@ impl ServerBuilder {
     /// Create new Server builder instance
     pub fn new() -> ServerBuilder {
         let (tx, rx) = unbounded_channel();
-        let server = ServerHandle::new(tx);
+        let _server = ServerHandle::new(tx.clone());
 
         ServerBuilder {
             threads: num_cpus::get(),
             token: 0,
-            handles: Vec::new(),
-            services: Vec::new(),
+            factories: Vec::new(),
             sockets: Vec::new(),
-            accept: AcceptLoop::new(server.clone()),
             backlog: 2048,
             exit: false,
-            no_signals: false,
-            cmd: rx,
-            notify: Vec::new(),
-            server,
+            listen_os_signals: true,
+            cmd_tx: tx,
+            cmd_rx: rx,
             worker_config: ServerWorkerConfig::default(),
         }
     }
@@ -128,15 +113,16 @@ impl ServerBuilder {
         self.max_concurrent_connections(num)
     }
 
+    // TODO: wtf is this for
     /// Stop Actix system.
     pub fn system_exit(mut self) -> Self {
         self.exit = true;
         self
     }
 
-    /// Disable signal handling.
+    /// Disable OS signal handling.
     pub fn disable_signals(mut self) -> Self {
-        self.no_signals = true;
+        self.listen_os_signals = false;
         self
     }
 
@@ -164,7 +150,7 @@ impl ServerBuilder {
 
         for lst in sockets {
             let token = self.next_token();
-            self.services.push(StreamNewService::create(
+            self.factories.push(StreamNewService::create(
                 name.as_ref().to_string(),
                 token,
                 factory.clone(),
@@ -215,7 +201,7 @@ impl ServerBuilder {
         lst.set_nonblocking(true)?;
         let token = self.next_token();
         let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-        self.services.push(StreamNewService::create(
+        self.factories.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
             factory,
@@ -240,7 +226,7 @@ impl ServerBuilder {
         let addr = lst.local_addr()?;
 
         let token = self.next_token();
-        self.services.push(StreamNewService::create(
+        self.factories.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
             factory,
@@ -254,177 +240,11 @@ impl ServerBuilder {
     }
 
     /// Starts processing incoming connections and return server controller.
-    pub fn run(mut self) -> ServerHandle {
+    pub fn run(self) -> Server {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
-            trace!("start running server");
-
-            for (_, name, lst) in &self.sockets {
-                info!(
-                    r#"Starting service: "{}", workers: {}, listening on: {}"#,
-                    name,
-                    self.threads,
-                    lst.local_addr()
-                );
-            }
-
-            trace!("run server");
-
-            // start workers
-            let handles = (0..self.threads)
-                .map(|idx| {
-                    let (handle_accept, handle_server) =
-                        self.start_worker(idx, self.accept.waker_owned());
-                    self.handles.push((idx, handle_server));
-
-                    handle_accept
-                })
-                .collect();
-
-            // start accept thread
-            self.accept.start(
-                mem::take(&mut self.sockets)
-                    .into_iter()
-                    .map(|t| (t.0, t.2))
-                    .collect(),
-                handles,
-            );
-
-            // handle signals
-            if !self.no_signals {
-                Signals::start(self.server.clone());
-            }
-
-            // start http server actor
-            let server = self.server.clone();
-            rt::spawn(self);
-            server
-        }
-    }
-
-    fn start_worker(
-        &self,
-        idx: usize,
-        waker_queue: WakerQueue,
-    ) -> (WorkerHandleAccept, WorkerHandleServer) {
-        trace!("start server worker {}", idx);
-        let services = self.services.iter().map(|v| v.clone_factory()).collect();
-        ServerWorker::start(idx, services, waker_queue, self.worker_config)
-    }
-
-    fn handle_cmd(&mut self, item: ServerCommand) {
-        match item {
-            ServerCommand::Pause(tx) => {
-                self.accept.wake(WakerInterest::Pause);
-                let _ = tx.send(());
-            }
-            ServerCommand::Resume(tx) => {
-                self.accept.wake(WakerInterest::Resume);
-                let _ = tx.send(());
-            }
-            ServerCommand::Signal(sig) => {
-                // Signals support
-                // Handle `SIGINT`, `SIGTERM`, `SIGQUIT` signals and stop actix system
-                match sig {
-                    Signal::Int => {
-                        info!("SIGINT received; starting forced shutdown");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: false,
-                            completion: None,
-                        })
-                    }
-
-                    Signal::Term => {
-                        info!("SIGTERM received; starting graceful shutdown");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: true,
-                            completion: None,
-                        })
-                    }
-
-                    Signal::Quit => {
-                        info!("SIGQUIT received; starting forced shutdown");
-                        self.exit = true;
-                        self.handle_cmd(ServerCommand::Stop {
-                            graceful: false,
-                            completion: None,
-                        })
-                    }
-                }
-            }
-            ServerCommand::Notify(tx) => {
-                self.notify.push(tx);
-            }
-            ServerCommand::Stop {
-                graceful,
-                completion,
-            } => {
-                let exit = self.exit;
-
-                // stop accept thread
-                self.accept.wake(WakerInterest::Stop);
-                let notify = std::mem::take(&mut self.notify);
-
-                // stop workers
-                let stop = self
-                    .handles
-                    .iter()
-                    .map(move |worker| worker.1.stop(graceful))
-                    .collect();
-
-                rt::spawn(async move {
-                    if graceful {
-                        // wait for all workers to shut down
-                        let _ = join_all(stop).await;
-                    }
-
-                    if let Some(tx) = completion {
-                        let _ = tx.send(());
-                    }
-
-                    for tx in notify {
-                        let _ = tx.send(());
-                    }
-
-                    if exit {
-                        sleep(Duration::from_millis(300)).await;
-                        System::try_current().as_ref().map(System::stop);
-                    }
-                });
-            }
-            ServerCommand::WorkerFaulted(idx) => {
-                let mut found = false;
-                for i in 0..self.handles.len() {
-                    if self.handles[i].0 == idx {
-                        self.handles.swap_remove(i);
-                        found = true;
-                        break;
-                    }
-                }
-
-                if found {
-                    error!("Worker {} has died; restarting", idx);
-
-                    let mut new_idx = self.handles.len();
-                    'found: loop {
-                        for i in 0..self.handles.len() {
-                            if self.handles[i].0 == new_idx {
-                                new_idx += 1;
-                                continue 'found;
-                            }
-                        }
-                        break;
-                    }
-
-                    let (handle_accept, handle_server) =
-                        self.start_worker(new_idx, self.accept.waker_owned());
-                    self.handles.push((new_idx, handle_server));
-                    self.accept.wake(WakerInterest::Worker(handle_accept));
-                }
-            }
+            Server::new(self)
         }
     }
 
@@ -432,19 +252,6 @@ impl ServerBuilder {
         let token = self.token;
         self.token += 1;
         token
-    }
-}
-
-impl Future for ServerBuilder {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        loop {
-            match Pin::new(&mut self.cmd).poll_recv(cx) {
-                Poll::Ready(Some(it)) => self.as_mut().get_mut().handle_cmd(it),
-                _ => return Poll::Pending,
-            }
-        }
     }
 }
 

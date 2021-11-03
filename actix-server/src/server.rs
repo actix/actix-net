@@ -1,64 +1,170 @@
 use std::future::Future;
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
+use std::{io, mem};
 
-use tokio::sync::mpsc::UnboundedSender;
+use actix_rt::time::sleep;
+use actix_rt::System;
+use futures_core::future::LocalBoxFuture;
+use log::{error, info, trace};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 
+use crate::accept::Accept;
 use crate::builder::ServerBuilder;
-use crate::signals::Signal;
+use crate::join_all;
+use crate::service::InternalServiceFactory;
+use crate::signals::{Signal, Signals};
+use crate::waker_queue::{WakerInterest, WakerQueue};
+use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleServer};
 
 #[derive(Debug)]
 pub(crate) enum ServerCommand {
     WorkerFaulted(usize),
     Pause(oneshot::Sender<()>),
     Resume(oneshot::Sender<()>),
-    Signal(Signal),
     Stop {
         /// True if shut down should be graceful.
         graceful: bool,
         completion: Option<oneshot::Sender<()>>,
     },
-    /// Notify of server stop
-    Notify(oneshot::Sender<()>),
 }
 
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct Server;
+// TODO: docs + must use
 
-impl Server {
-    /// Start server building process.
-    pub fn build() -> ServerBuilder {
-        ServerBuilder::default()
-    }
-}
-
-/// Server handle.
+/// Server
 ///
 /// # Shutdown Signals
 /// On UNIX systems, `SIGQUIT` will start a graceful shutdown and `SIGTERM` or `SIGINT` will start a
 /// forced shutdown. On Windows, a CTRL-C signal will start a forced shutdown.
 ///
 /// A graceful shutdown will wait for all workers to stop first.
-#[derive(Debug)]
-pub struct ServerHandle(
-    UnboundedSender<ServerCommand>,
-    Option<oneshot::Receiver<()>>,
-);
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub enum Server {
+    Server(ServerInner),
+    Error(Option<io::Error>),
+}
 
-impl ServerHandle {
-    pub(crate) fn new(tx: UnboundedSender<ServerCommand>) -> Self {
-        ServerHandle(tx, None)
+impl Server {
+    /// Start server building process.
+    pub fn build() -> ServerBuilder {
+        ServerBuilder::default()
     }
 
-    pub(crate) fn signal(&self, sig: Signal) {
-        let _ = self.0.send(ServerCommand::Signal(sig));
+    pub(crate) fn new(mut builder: ServerBuilder) -> Self {
+        trace!("start running server");
+
+        let sockets = mem::take(&mut builder.sockets)
+            .into_iter()
+            .map(|t| (t.0, t.2))
+            .collect();
+
+        // Give log information on what runtime will be used.
+        let is_tokio = tokio::runtime::Handle::try_current().is_ok();
+        let is_actix = actix_rt::System::try_current().is_some();
+
+        match (is_tokio, is_actix) {
+            (true, false) => info!("Tokio runtime found. Starting in existing Tokio runtime"),
+            (_, true) => info!("Actix runtime found. Starting in Actix runtime"),
+            (_, _) => info!(
+                "Actix/Tokio runtime not found. Starting in newt Tokio current-thread runtime"
+            ),
+        }
+
+        for (_, name, lst) in &builder.sockets {
+            info!(
+                r#"Starting service: "{}", workers: {}, listening on: {}"#,
+                name,
+                builder.threads,
+                lst.local_addr()
+            );
+        }
+
+        trace!("run server");
+
+        match Accept::start(sockets, &builder) {
+            Ok((waker_queue, worker_handles)) => {
+                // construct OS signals listener future
+                let signals = (!builder.listen_os_signals).then(Signals::new);
+
+                Self::Server(ServerInner {
+                    cmd_tx: builder.cmd_tx.clone(),
+                    cmd_rx: builder.cmd_rx,
+                    signals,
+                    waker_queue,
+                    worker_handles,
+                    worker_config: builder.worker_config,
+                    services: builder.factories,
+                    exit: builder.exit,
+                    stop_task: None,
+                })
+            }
+
+            Err(err) => Self::Error(Some(err)),
+        }
+    }
+
+    pub fn handle(&self) -> ServerHandle {
+        match self {
+            Server::Server(inner) => ServerHandle::new(inner.cmd_tx.clone()),
+            Server::Error(err) => {
+                // TODO: i don't think this is the best way to handle server startup fail
+                panic!(
+                    "server handle can not be obtained because server failed to start up: {:?}",
+                    err
+                );
+            }
+        }
+    }
+}
+
+impl Future for Server {
+    type Output = io::Result<()>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.as_mut().get_mut() {
+            Server::Error(err) => Poll::Ready(Err(err
+                .take()
+                .expect("Server future cannot be polled after error"))),
+
+            Server::Server(inner) => {
+                // poll Signals
+                if let Some(ref mut signals) = inner.signals {
+                    if let Poll::Ready(signal) = Pin::new(signals).poll(cx) {
+                        inner.stop_task = inner.handle_signal(signal);
+                        // drop signals listener
+                        inner.signals = None;
+                    }
+                }
+
+                // eager drain command channel and handle command
+                loop {
+                    match Pin::new(&mut inner.cmd_rx).poll_recv(cx) {
+                        Poll::Ready(Some(cmd)) => {
+                            inner.stop_task = inner.handle_cmd(cmd);
+                        }
+                        _ => return Poll::Pending,
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Server handle.
+#[derive(Debug, Clone)]
+pub struct ServerHandle {
+    tx_cmd: UnboundedSender<ServerCommand>,
+}
+
+impl ServerHandle {
+    pub(crate) fn new(tx_cmd: UnboundedSender<ServerCommand>) -> Self {
+        ServerHandle { tx_cmd }
     }
 
     pub(crate) fn worker_faulted(&self, idx: usize) {
-        let _ = self.0.send(ServerCommand::WorkerFaulted(idx));
+        let _ = self.tx_cmd.send(ServerCommand::WorkerFaulted(idx));
     }
 
     /// Pause accepting incoming connections
@@ -67,7 +173,7 @@ impl ServerHandle {
     /// All opened connection remains active.
     pub fn pause(&self) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.0.send(ServerCommand::Pause(tx));
+        let _ = self.tx_cmd.send(ServerCommand::Pause(tx));
         async {
             let _ = rx.await;
         }
@@ -76,7 +182,7 @@ impl ServerHandle {
     /// Resume accepting incoming connections
     pub fn resume(&self) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.0.send(ServerCommand::Resume(tx));
+        let _ = self.tx_cmd.send(ServerCommand::Resume(tx));
         async {
             let _ = rx.await;
         }
@@ -87,7 +193,7 @@ impl ServerHandle {
     /// If server starts with `spawn()` method, then spawned thread get terminated.
     pub fn stop(&self, graceful: bool) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.0.send(ServerCommand::Stop {
+        let _ = self.tx_cmd.send(ServerCommand::Stop {
             graceful,
             completion: Some(tx),
         });
@@ -97,29 +203,129 @@ impl ServerHandle {
     }
 }
 
-impl Clone for ServerHandle {
-    fn clone(&self) -> Self {
-        Self(self.0.clone(), None)
-    }
+pub struct ServerInner {
+    worker_handles: Vec<WorkerHandleServer>,
+    worker_config: ServerWorkerConfig,
+    services: Vec<Box<dyn InternalServiceFactory>>,
+    exit: bool,
+    cmd_tx: UnboundedSender<ServerCommand>,
+    cmd_rx: UnboundedReceiver<ServerCommand>,
+    signals: Option<Signals>,
+    waker_queue: WakerQueue,
+    stop_task: Option<LocalBoxFuture<'static, ()>>,
 }
 
-impl Future for ServerHandle {
-    type Output = io::Result<()>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-
-        if this.1.is_none() {
-            let (tx, rx) = oneshot::channel();
-            if this.0.send(ServerCommand::Notify(tx)).is_err() {
-                return Poll::Ready(Ok(()));
+impl ServerInner {
+    fn handle_cmd(&mut self, item: ServerCommand) -> Option<LocalBoxFuture<'static, ()>> {
+        match item {
+            ServerCommand::Pause(tx) => {
+                self.waker_queue.wake(WakerInterest::Pause);
+                let _ = tx.send(());
+                None
             }
-            this.1 = Some(rx);
-        }
 
-        match Pin::new(this.1.as_mut().unwrap()).poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(_) => Poll::Ready(Ok(())),
+            ServerCommand::Resume(tx) => {
+                self.waker_queue.wake(WakerInterest::Resume);
+                let _ = tx.send(());
+                None
+            }
+
+            ServerCommand::Stop {
+                graceful,
+                completion,
+            } => {
+                let exit = self.exit;
+
+                // stop accept thread
+                self.waker_queue.wake(WakerInterest::Stop);
+
+                // stop workers
+                let stop = self
+                    .worker_handles
+                    .iter()
+                    .map(|worker| worker.stop(graceful))
+                    .collect::<Vec<_>>();
+
+                Some(Box::pin(async move {
+                    if graceful {
+                        // wait for all workers to shut down
+                        let _ = join_all(stop).await;
+                    }
+
+                    if let Some(tx) = completion {
+                        let _ = tx.send(());
+                    }
+
+                    if exit {
+                        sleep(Duration::from_millis(300)).await;
+                        System::try_current().as_ref().map(System::stop);
+                    }
+                }))
+            }
+
+            ServerCommand::WorkerFaulted(idx) => {
+                // TODO: maybe just return if not found ?
+                assert!(self.worker_handles.iter().any(|wrk| wrk.idx == idx));
+
+                error!("Worker {} has died; restarting", idx);
+
+                let factories = self
+                    .services
+                    .iter()
+                    .map(|service| service.clone_factory())
+                    .collect();
+
+                match ServerWorker::start(
+                    idx,
+                    factories,
+                    self.waker_queue.clone(),
+                    self.worker_config,
+                ) {
+                    Ok((handle_accept, handle_server)) => {
+                        *self
+                            .worker_handles
+                            .iter_mut()
+                            .find(|wrk| wrk.idx == idx)
+                            .unwrap() = handle_server;
+
+                        self.waker_queue.wake(WakerInterest::Worker(handle_accept));
+                    }
+                    Err(_) => todo!(),
+                };
+
+                None
+            }
+        }
+    }
+
+    fn handle_signal(&mut self, signal: Signal) -> Option<LocalBoxFuture<'static, ()>> {
+        match signal {
+            Signal::Int => {
+                info!("SIGINT received; starting forced shutdown");
+                self.exit = true;
+                self.handle_cmd(ServerCommand::Stop {
+                    graceful: false,
+                    completion: None,
+                })
+            }
+
+            Signal::Term => {
+                info!("SIGTERM received; starting graceful shutdown");
+                self.exit = true;
+                self.handle_cmd(ServerCommand::Stop {
+                    graceful: true,
+                    completion: None,
+                })
+            }
+
+            Signal::Quit => {
+                info!("SIGQUIT received; starting forced shutdown");
+                self.exit = true;
+                self.handle_cmd(ServerCommand::Stop {
+                    graceful: false,
+                    completion: None,
+                })
+            }
         }
     }
 }
