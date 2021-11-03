@@ -8,7 +8,7 @@ use std::{
 
 use actix_rt::{time::sleep, System};
 use futures_core::future::BoxFuture;
-use log::{error, info, trace};
+use log::{error, info};
 use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot,
@@ -65,8 +65,6 @@ impl Server {
     }
 
     pub(crate) fn new(mut builder: ServerBuilder) -> Self {
-        trace!("start running server");
-
         let sockets = mem::take(&mut builder.sockets)
             .into_iter()
             .map(|t| (t.0, t.2))
@@ -93,12 +91,10 @@ impl Server {
             );
         }
 
-        trace!("run server");
-
         match Accept::start(sockets, &builder) {
             Ok((waker_queue, worker_handles)) => {
                 // construct OS signals listener future
-                let signals = (!builder.listen_os_signals).then(Signals::new);
+                let signals = (builder.listen_os_signals).then(Signals::new);
 
                 Self::Server(ServerInner {
                     cmd_tx: builder.cmd_tx.clone(),

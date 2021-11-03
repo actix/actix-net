@@ -460,7 +460,7 @@ struct Shutdown {
     /// Start time of shutdown.
     start_from: Instant,
 
-    /// Notify of the shutdown outcome (force/grace) to stop caller.
+    /// Notify caller of the shutdown outcome (graceful/force).
     tx: oneshot::Sender<bool>,
 }
 
@@ -472,8 +472,7 @@ impl Default for WorkerState {
 
 impl Drop for ServerWorker {
     fn drop(&mut self) {
-        trace!("dropping ServerWorker");
-        // Stop the Arbiter ServerWorker runs on on drop.
+        trace!("stopping ServerWorker Arbiter");
         Arbiter::try_current().as_ref().map(ArbiterHandle::stop);
     }
 }

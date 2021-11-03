@@ -1,6 +1,11 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    fmt,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use log::trace;
 
 /// Types of process signals.
 // #[allow(dead_code)]
@@ -16,6 +21,16 @@ pub(crate) enum Signal {
     Quit,
 }
 
+impl fmt::Display for Signal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Signal::Int => "SIGINT",
+            Signal::Term => "SIGTERM",
+            Signal::Quit => "SIGQUIT",
+        })
+    }
+}
+
 /// Process signal listener.
 pub(crate) struct Signals {
     #[cfg(not(unix))]
@@ -28,6 +43,8 @@ pub(crate) struct Signals {
 impl Signals {
     /// Constructs an OS signal listening future.
     pub(crate) fn new() -> Self {
+        trace!("setting up OS signal listener");
+
         #[cfg(not(unix))]
         {
             Signals {
@@ -80,6 +97,7 @@ impl Future for Signals {
             for (sig, fut) in self.signals.iter_mut() {
                 // TODO: match on if let Some ?
                 if Pin::new(fut).poll_recv(cx).is_ready() {
+                    trace!("{} received", sig);
                     return Poll::Ready(*sig);
                 }
             }
