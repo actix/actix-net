@@ -24,7 +24,7 @@ use tokio::sync::{
 };
 
 use crate::{
-    join_all::join_all,
+    join_all::join_all_local,
     service::{BoxedServerService, InternalServiceFactory},
     socket::MioStream,
     waker_queue::{WakerInterest, WakerQueue},
@@ -324,10 +324,11 @@ impl ServerWorker {
 
                     // a second spawn to run !Send future tasks.
                     spawn(async move {
-                        let res = join_all(fut)
+                        let res = join_all_local(fut)
                             .await
                             .into_iter()
                             .collect::<Result<Vec<_>, _>>();
+
                         let services = match res {
                             Ok(res) => res
                                 .into_iter()

@@ -7,7 +7,7 @@ use std::{
 };
 
 use actix_rt::{time::sleep, System};
-use futures_core::future::LocalBoxFuture;
+use futures_core::future::BoxFuture;
 use log::{error, info, trace};
 use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
@@ -44,8 +44,6 @@ pub(crate) enum ServerCommand {
         completion: Option<oneshot::Sender<()>>,
     },
 }
-
-// TODO: docs + must use
 
 /// Server
 ///
@@ -232,11 +230,11 @@ pub struct ServerInner {
     cmd_rx: UnboundedReceiver<ServerCommand>,
     signals: Option<Signals>,
     waker_queue: WakerQueue,
-    stop_task: Option<LocalBoxFuture<'static, ()>>,
+    stop_task: Option<BoxFuture<'static, ()>>,
 }
 
 impl ServerInner {
-    fn handle_cmd(&mut self, item: ServerCommand) -> Option<LocalBoxFuture<'static, ()>> {
+    fn handle_cmd(&mut self, item: ServerCommand) -> Option<BoxFuture<'static, ()>> {
         match item {
             ServerCommand::Pause(tx) => {
                 self.waker_queue.wake(WakerInterest::Pause);
@@ -319,7 +317,7 @@ impl ServerInner {
         }
     }
 
-    fn handle_signal(&mut self, signal: Signal) -> Option<LocalBoxFuture<'static, ()>> {
+    fn handle_signal(&mut self, signal: Signal) -> Option<BoxFuture<'static, ()>> {
         match signal {
             Signal::Int => {
                 info!("SIGINT received; starting forced shutdown");
