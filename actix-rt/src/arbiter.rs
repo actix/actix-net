@@ -244,7 +244,7 @@ impl Arbiter {
     ///
     /// Returns `None` if no Arbiter has been started.
     ///
-    /// Contrary to [`current`](Self::current), this never panics.
+    /// Unlike [`current`](Self::current), this never panics.
     pub fn try_current() -> Option<ArbiterHandle> {
         HANDLE.with(|cell| cell.borrow().clone())
     }

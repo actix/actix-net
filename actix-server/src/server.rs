@@ -260,7 +260,7 @@ impl ServerInner {
                 self.waker_queue.wake(WakerInterest::Stop);
 
                 // stop workers
-                let stop = self
+                let workers_stop = self
                     .worker_handles
                     .iter()
                     .map(|worker| worker.stop(graceful))
@@ -269,7 +269,7 @@ impl ServerInner {
                 Some(Box::pin(async move {
                     if graceful {
                         // wait for all workers to shut down
-                        let _ = join_all(stop).await;
+                        let _ = join_all(workers_stop).await;
                     }
 
                     if let Some(tx) = completion {
