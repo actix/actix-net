@@ -7,6 +7,7 @@
 mod accept;
 mod availability;
 mod builder;
+mod handle;
 mod join_all;
 mod server;
 mod service;
@@ -17,7 +18,8 @@ mod waker_queue;
 mod worker;
 
 pub use self::builder::ServerBuilder;
-pub use self::server::{Server, ServerHandle};
+pub use self::handle::ServerHandle;
+pub use self::server::Server;
 pub use self::service::ServiceFactory;
 pub use self::test_server::TestServer;
 

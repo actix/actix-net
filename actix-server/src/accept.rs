@@ -6,11 +6,10 @@ use mio::{Interest, Poll, Token as MioToken};
 
 use crate::{
     availability::Availability,
-    server::ServerHandle,
     socket::MioListener,
     waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN},
     worker::{Conn, ServerWorker, WorkerHandleAccept, WorkerHandleServer},
-    ServerBuilder,
+    ServerBuilder, ServerHandle,
 };
 
 const TIMEOUT_DURATION_ON_ERROR: Duration = Duration::from_millis(510);

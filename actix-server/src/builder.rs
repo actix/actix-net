@@ -14,7 +14,7 @@ use crate::{
     Server,
 };
 
-/// Server builder.
+/// [Server] builder.
 pub struct ServerBuilder {
     pub(crate) threads: usize,
     pub(crate) token: usize,

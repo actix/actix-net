@@ -23,7 +23,7 @@ use actix_service::{fn_service, ServiceFactoryExt as _};
 use bytes::BytesMut;
 use futures_util::future::ok;
 use log::{error, info};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 async fn run() -> io::Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -83,7 +83,6 @@ async fn run() -> io::Result<()> {
             })
         })?
         .workers(1)
-        // .system_exit()
         .run()
         .await
 }
