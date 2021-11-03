@@ -24,7 +24,7 @@ use tokio::sync::{
 };
 
 use crate::{
-    join_all,
+    join_all::join_all,
     service::{BoxedServerService, InternalServiceFactory},
     socket::MioStream,
     waker_queue::{WakerInterest, WakerQueue},
@@ -224,7 +224,7 @@ impl WorkerService {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WorkerServiceStatus {
     Available,
     Unavailable,
@@ -235,7 +235,7 @@ enum WorkerServiceStatus {
 }
 
 /// Config for worker behavior passed down from server builder.
-#[derive(Copy, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct ServerWorkerConfig {
     shutdown_timeout: Duration,
     max_blocking_threads: usize,

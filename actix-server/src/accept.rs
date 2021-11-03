@@ -1,20 +1,19 @@
-use std::time::Duration;
-use std::{io, thread};
+use std::{io, thread, time::Duration};
 
 use actix_rt::time::Instant;
-use actix_rt::{time::sleep, System};
 use log::{debug, error, info};
 use mio::{Interest, Poll, Token as MioToken};
 
-use crate::worker::ServerWorker;
 use crate::{
     availability::Availability,
     server::ServerHandle,
     socket::MioListener,
     waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN},
-    worker::{Conn, WorkerHandleAccept, WorkerHandleServer},
+    worker::{Conn, ServerWorker, WorkerHandleAccept, WorkerHandleServer},
     ServerBuilder,
 };
+
+const TIMEOUT_DURATION_ON_ERROR: Duration = Duration::from_millis(510);
 
 struct ServerSocketInfo {
     token: usize,
@@ -34,6 +33,8 @@ pub(crate) struct Accept {
     srv: ServerHandle,
     next: usize,
     avail: Availability,
+    /// use the smallest duration from sockets timeout.
+    timeout: Option<Duration>,
     paused: bool,
 }
 
@@ -115,6 +116,7 @@ impl Accept {
             srv: server_handle,
             next: 0,
             avail,
+            timeout: None,
             paused: false,
         };
 
@@ -149,6 +151,9 @@ impl Accept {
                     }
                 }
             }
+
+            // check for timeout and re-register sockets
+            self.process_timeout(sockets);
         }
     }
 
@@ -171,6 +176,7 @@ impl Accept {
                         self.accept_all(sockets);
                     }
                 }
+
                 // a new worker thread is made and it's handle would be added to Accept
                 Some(WakerInterest::Worker(handle)) => {
                     drop(guard);
@@ -182,12 +188,7 @@ impl Accept {
                         self.accept_all(sockets);
                     }
                 }
-                // got timer interest and it's time to try register socket(s) again
-                Some(WakerInterest::Timer) => {
-                    drop(guard);
 
-                    self.process_timer(sockets)
-                }
                 Some(WakerInterest::Pause) => {
                     drop(guard);
 
@@ -197,6 +198,7 @@ impl Accept {
                         self.deregister_all(sockets);
                     }
                 }
+
                 Some(WakerInterest::Resume) => {
                     drop(guard);
 
@@ -210,6 +212,7 @@ impl Accept {
                         self.accept_all(sockets);
                     }
                 }
+
                 Some(WakerInterest::Stop) => {
                     if !self.paused {
                         self.deregister_all(sockets);
@@ -217,6 +220,7 @@ impl Accept {
 
                     return true;
                 }
+
                 // waker queue is drained
                 None => {
                     // Reset the WakerQueue before break so it does not grow infinitely
@@ -228,26 +232,44 @@ impl Accept {
         }
     }
 
-    fn process_timer(&self, sockets: &mut [ServerSocketInfo]) {
-        let now = Instant::now();
+    fn process_timeout(&mut self, sockets: &mut [ServerSocketInfo]) {
+        // always remove old timeouts
+        if self.timeout.take().is_some() {
+            let now = Instant::now();
 
-        sockets
-            .iter_mut()
-            // Only sockets that had an associated timeout were deregistered.
-            .filter(|info| info.timeout.is_some())
-            .for_each(|info| {
-                let inst = info.timeout.take().unwrap();
+            sockets
+                .iter_mut()
+                // Only sockets that had an associated timeout were deregistered.
+                .filter(|info| info.timeout.is_some())
+                .for_each(|info| {
+                    let inst = info.timeout.take().unwrap();
 
-                if now < inst {
-                    info.timeout = Some(inst);
-                } else if !self.paused {
-                    self.register_logged(info);
+                    if now < inst {
+                        // still timed out; try to set new timeout
+                        info.timeout = Some(inst);
+                        self.set_timeout(inst - now);
+                    } else if !self.paused {
+                        // timeout expired; register socket again
+                        self.register_logged(info);
+                    }
+
+                    // Drop the timeout if server is paused and socket timeout is expired.
+                    // When server recovers from pause it will register all sockets without
+                    // a timeout value so this socket register will be delayed till then.
+                });
+        }
+    }
+
+    /// Update accept timeout with `duration` if it is shorter than current timeout.
+    fn set_timeout(&mut self, duration: Duration) {
+        match self.timeout {
+            Some(ref mut timeout) => {
+                if *timeout > duration {
+                    *timeout = duration;
                 }
-
-                // Drop the timeout if server is paused and socket timeout is expired.
-                // When server recovers from pause it will register all sockets without
-                // a timeout value so this socket register will be delayed till then.
-            });
+            }
+            None => self.timeout = Some(duration),
+        }
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -387,26 +409,7 @@ impl Accept {
                     // the poll would need it mark which socket and when it's
                     // listener should be registered
                     info.timeout = Some(Instant::now() + Duration::from_millis(500));
-
-                    // after the sleep a Timer interest is sent to Accept Poll
-                    let waker = self.waker_queue.clone();
-
-                    match System::try_current() {
-                        Some(sys) => {
-                            sys.arbiter().spawn(async move {
-                                sleep(Duration::from_millis(510)).await;
-                                waker.wake(WakerInterest::Timer);
-                            });
-                        }
-
-                        None => {
-                            let rt = tokio::runtime::Handle::current();
-                            rt.spawn(async move {
-                                sleep(Duration::from_millis(510)).await;
-                                waker.wake(WakerInterest::Timer);
-                            });
-                        }
-                    }
+                    self.set_timeout(TIMEOUT_DURATION_ON_ERROR);
 
                     return;
                 }

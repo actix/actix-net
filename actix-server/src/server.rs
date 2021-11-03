@@ -1,32 +1,46 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::Duration;
-use std::{io, mem};
+use std::{
+    future::Future,
+    io, mem,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
-use actix_rt::time::sleep;
-use actix_rt::System;
+use actix_rt::{time::sleep, System};
 use futures_core::future::LocalBoxFuture;
 use log::{error, info, trace};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use tokio::sync::oneshot;
+use tokio::sync::{
+    mpsc::{UnboundedReceiver, UnboundedSender},
+    oneshot,
+};
 
-use crate::accept::Accept;
-use crate::builder::ServerBuilder;
-use crate::join_all;
-use crate::service::InternalServiceFactory;
-use crate::signals::{Signal, Signals};
-use crate::waker_queue::{WakerInterest, WakerQueue};
-use crate::worker::{ServerWorker, ServerWorkerConfig, WorkerHandleServer};
+use crate::{
+    accept::Accept,
+    builder::ServerBuilder,
+    join_all::join_all,
+    service::InternalServiceFactory,
+    signals::{Signal, Signals},
+    waker_queue::{WakerInterest, WakerQueue},
+    worker::{ServerWorker, ServerWorkerConfig, WorkerHandleServer},
+};
 
 #[derive(Debug)]
 pub(crate) enum ServerCommand {
+    /// TODO
     WorkerFaulted(usize),
+
+    /// Contains return channel to notify caller of successful state change.
     Pause(oneshot::Sender<()>),
+
+    /// Contains return channel to notify caller of successful state change.
     Resume(oneshot::Sender<()>),
+
+    /// TODO
     Stop {
         /// True if shut down should be graceful.
         graceful: bool,
+
+        /// Return channel to notify caller that shutdown is complete.
         completion: Option<oneshot::Sender<()>>,
     },
 }
@@ -105,14 +119,17 @@ impl Server {
         }
     }
 
+    /// Get a handle for ServerFuture that can be used to change state of actix server.
+    ///
+    /// See [ServerHandle](ServerHandle) for usage.
     pub fn handle(&self) -> ServerHandle {
         match self {
             Server::Server(inner) => ServerHandle::new(inner.cmd_tx.clone()),
             Server::Error(err) => {
                 // TODO: i don't think this is the best way to handle server startup fail
                 panic!(
-                    "server handle can not be obtained because server failed to start up: {:?}",
-                    err
+                    "server handle can not be obtained because server failed to start up: {}",
+                    err.as_ref().unwrap()
                 );
             }
         }
@@ -138,10 +155,16 @@ impl Future for Server {
                     }
                 }
 
-                // eager drain command channel and handle command
+                // handle stop tasks and eager drain command channel
                 loop {
+                    if let Some(ref mut fut) = inner.stop_task {
+                        // only resolve stop task and exit
+                        return fut.as_mut().poll(cx).map(|_| Ok(()));
+                    }
+
                     match Pin::new(&mut inner.cmd_rx).poll_recv(cx) {
                         Poll::Ready(Some(cmd)) => {
+                            // if stop task is required, set it and loop
                             inner.stop_task = inner.handle_cmd(cmd);
                         }
                         _ => return Poll::Pending,
@@ -167,10 +190,9 @@ impl ServerHandle {
         let _ = self.tx_cmd.send(ServerCommand::WorkerFaulted(idx));
     }
 
-    /// Pause accepting incoming connections
+    /// Pause accepting incoming connections.
     ///
-    /// If socket contains some pending connection, they might be dropped.
-    /// All opened connection remains active.
+    /// May drop socket pending connection. All open connections remain active.
     pub fn pause(&self) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
         let _ = self.tx_cmd.send(ServerCommand::Pause(tx));
@@ -179,7 +201,7 @@ impl ServerHandle {
         }
     }
 
-    /// Resume accepting incoming connections
+    /// Resume accepting incoming connections.
     pub fn resume(&self) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
         let _ = self.tx_cmd.send(ServerCommand::Resume(tx));
@@ -189,8 +211,6 @@ impl ServerHandle {
     }
 
     /// Stop incoming connection processing, stop all workers and exit.
-    ///
-    /// If server starts with `spawn()` method, then spawned thread get terminated.
     pub fn stop(&self, graceful: bool) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
         let _ = self.tx_cmd.send(ServerCommand::Stop {
@@ -264,7 +284,7 @@ impl ServerInner {
             }
 
             ServerCommand::WorkerFaulted(idx) => {
-                // TODO: maybe just return if not found ?
+                // TODO: maybe just return with warning log if not found ?
                 assert!(self.worker_handles.iter().any(|wrk| wrk.idx == idx));
 
                 error!("Worker {} has died; restarting", idx);
@@ -290,7 +310,8 @@ impl ServerInner {
 
                         self.waker_queue.wake(WakerInterest::Worker(handle_accept));
                     }
-                    Err(_) => todo!(),
+
+                    Err(err) => error!("can not restart worker {}: {}", idx, err),
                 };
 
                 None

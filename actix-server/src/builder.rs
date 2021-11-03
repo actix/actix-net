@@ -1,11 +1,11 @@
 use std::{io, time::Duration};
 
 use actix_rt::net::TcpStream;
-use log::trace;
+use log::{info, trace};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::{
-    server::{ServerCommand, ServerHandle},
+    server::ServerCommand,
     service::{InternalServiceFactory, ServiceFactory, StreamNewService},
     socket::{
         MioListener, MioTcpListener, MioTcpSocket, StdSocketAddr, StdTcpListener, ToSocketAddrs,
@@ -14,18 +14,18 @@ use crate::{
     Server,
 };
 
-/// Server builder
+/// Server builder.
 pub struct ServerBuilder {
-    pub(super) threads: usize,
-    pub(super) token: usize,
-    pub(super) backlog: u32,
-    pub(super) factories: Vec<Box<dyn InternalServiceFactory>>,
-    pub(super) sockets: Vec<(usize, String, MioListener)>,
-    pub(super) exit: bool,
-    pub(super) listen_os_signals: bool,
-    pub(super) cmd_tx: UnboundedSender<ServerCommand>,
-    pub(super) cmd_rx: UnboundedReceiver<ServerCommand>,
-    pub(super) worker_config: ServerWorkerConfig,
+    pub(crate) threads: usize,
+    pub(crate) token: usize,
+    pub(crate) backlog: u32,
+    pub(crate) factories: Vec<Box<dyn InternalServiceFactory>>,
+    pub(crate) sockets: Vec<(usize, String, MioListener)>,
+    pub(crate) exit: bool,
+    pub(crate) listen_os_signals: bool,
+    pub(crate) cmd_tx: UnboundedSender<ServerCommand>,
+    pub(crate) cmd_rx: UnboundedReceiver<ServerCommand>,
+    pub(crate) worker_config: ServerWorkerConfig,
 }
 
 impl Default for ServerBuilder {
@@ -37,8 +37,7 @@ impl Default for ServerBuilder {
 impl ServerBuilder {
     /// Create new Server builder instance
     pub fn new() -> ServerBuilder {
-        let (tx, rx) = unbounded_channel();
-        let _server = ServerHandle::new(tx.clone());
+        let (cmd_tx, cmd_rx) = unbounded_channel();
 
         ServerBuilder {
             threads: num_cpus::get(),
@@ -48,8 +47,8 @@ impl ServerBuilder {
             backlog: 2048,
             exit: false,
             listen_os_signals: true,
-            cmd_tx: tx,
-            cmd_rx: rx,
+            cmd_tx,
+            cmd_rx,
             worker_config: ServerWorkerConfig::default(),
         }
     }
@@ -244,6 +243,7 @@ impl ServerBuilder {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
+            info!("Starting {} workers", self.threads);
             Server::new(self)
         }
     }

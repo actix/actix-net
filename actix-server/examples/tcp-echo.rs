@@ -94,6 +94,7 @@ async fn main() -> io::Result<()> {
     Ok(())
 }
 
+// alternatively:
 // #[actix_rt::main]
 // async fn main() -> io::Result<()> {
 //     run().await?;
