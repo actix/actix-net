@@ -112,7 +112,6 @@ impl ServerBuilder {
         self.max_concurrent_connections(num)
     }
 
-    // TODO: wtf is this for
     /// Stop Actix system.
     pub fn system_exit(mut self) -> Self {
         self.exit = true;
@@ -162,55 +161,6 @@ impl ServerBuilder {
         Ok(self)
     }
 
-    /// Add new unix domain service to the server.
-    #[cfg(unix)]
-    pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
-    where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
-        N: AsRef<str>,
-        U: AsRef<std::path::Path>,
-    {
-        // The path must not exist when we try to bind.
-        // Try to remove it to avoid bind error.
-        if let Err(e) = std::fs::remove_file(addr.as_ref()) {
-            // NotFound is expected and not an issue. Anything else is.
-            if e.kind() != std::io::ErrorKind::NotFound {
-                return Err(e);
-            }
-        }
-
-        let lst = crate::socket::StdUnixListener::bind(addr)?;
-        self.listen_uds(name, lst, factory)
-    }
-
-    /// Add new unix domain service to the server.
-    ///
-    /// Useful when running as a systemd service and a socket FD is acquired externally.
-    #[cfg(unix)]
-    pub fn listen_uds<F, N: AsRef<str>>(
-        mut self,
-        name: N,
-        lst: crate::socket::StdUnixListener,
-        factory: F,
-    ) -> io::Result<Self>
-    where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
-    {
-        use std::net::{IpAddr, Ipv4Addr};
-        lst.set_nonblocking(true)?;
-        let token = self.next_token();
-        let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-        self.factories.push(StreamNewService::create(
-            name.as_ref().to_string(),
-            token,
-            factory,
-            addr,
-        ));
-        self.sockets
-            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
-        Ok(self)
-    }
-
     /// Add new service to the server.
     pub fn listen<F, N: AsRef<str>>(
         mut self,
@@ -252,6 +202,56 @@ impl ServerBuilder {
         let token = self.token;
         self.token += 1;
         token
+    }
+}
+
+#[cfg(unix)]
+impl ServerBuilder {
+    /// Add new unix domain service to the server.
+    pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
+    where
+        F: ServiceFactory<actix_rt::net::UnixStream>,
+        N: AsRef<str>,
+        U: AsRef<std::path::Path>,
+    {
+        // The path must not exist when we try to bind.
+        // Try to remove it to avoid bind error.
+        if let Err(e) = std::fs::remove_file(addr.as_ref()) {
+            // NotFound is expected and not an issue. Anything else is.
+            if e.kind() != std::io::ErrorKind::NotFound {
+                return Err(e);
+            }
+        }
+
+        let lst = crate::socket::StdUnixListener::bind(addr)?;
+        self.listen_uds(name, lst, factory)
+    }
+
+    /// Add new unix domain service to the server.
+    ///
+    /// Useful when running as a systemd service and a socket FD is acquired externally.
+    pub fn listen_uds<F, N: AsRef<str>>(
+        mut self,
+        name: N,
+        lst: crate::socket::StdUnixListener,
+        factory: F,
+    ) -> io::Result<Self>
+    where
+        F: ServiceFactory<actix_rt::net::UnixStream>,
+    {
+        use std::net::{IpAddr, Ipv4Addr};
+        lst.set_nonblocking(true)?;
+        let token = self.next_token();
+        let addr = StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        self.factories.push(StreamNewService::create(
+            name.as_ref().to_string(),
+            token,
+            factory,
+            addr,
+        ));
+        self.sockets
+            .push((token, name.as_ref().to_string(), MioListener::from(lst)));
+        Ok(self)
     }
 }
 

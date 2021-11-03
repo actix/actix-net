@@ -312,7 +312,6 @@ async fn test_service_restart() {
     h.join().unwrap().unwrap();
 }
 
-#[ignore]
 #[actix_rt::test]
 async fn worker_restart() {
     use actix_service::{Service, ServiceFactory};
