@@ -312,6 +312,7 @@ async fn test_service_restart() {
     h.join().unwrap().unwrap();
 }
 
+#[cfg_attr(not(target_os = "linux"), ignore)]
 #[actix_rt::test]
 async fn worker_restart() {
     use actix_service::{Service, ServiceFactory};
