@@ -1,11 +1,16 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Server can be started in regular Tokio runtime. [#408]
+* Expose new `Server` type whose `Future` impl resolves when server stops. [#408]
 * Rename `Server` to `ServerHandle`. [#407]
+* Add `Server::handle` to obtain handle to server. [#408]
 * Rename `ServerBuilder::{maxconn => max_concurrent_connections}`. [#407]
+* Deprecate crate-level `new` shortcut for server builder. [#408]
 * Minimum supported Rust version (MSRV) is now 1.52.
 
 [#407]: https://github.com/actix/actix-net/pull/407
+[#408]: https://github.com/actix/actix-net/pull/408
 
 
 ## 2.0.0-beta.6 - 2021-10-11

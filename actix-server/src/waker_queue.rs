@@ -78,12 +78,7 @@ pub(crate) enum WakerInterest {
     Pause,
     Resume,
     Stop,
-    /// `Timer` is an interest sent as a delayed future. When an error happens on accepting
-    /// connection `Accept` would deregister socket listener temporary and wake up the poll and
-    /// register them again after the delayed future resolve.
-    Timer,
-    /// `Worker` is an interest happen after a worker runs into faulted state(This is determined
-    /// by if work can be sent to it successfully).`Accept` would be waked up and add the new
-    /// `WorkerHandleAccept`.
+    /// `Worker` is an interest that is triggered after a worker faults. This is determined by
+    /// trying to send work to it. `Accept` would be waked up and add the new `WorkerHandleAccept`.
     Worker(WorkerHandleAccept),
 }
