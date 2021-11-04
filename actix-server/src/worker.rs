@@ -299,7 +299,7 @@ impl ServerWorker {
         // TODO: wait for server startup with sync channel
 
         std::thread::Builder::new()
-            .name("eofibef".to_owned())
+            .name(format!("actix-server worker {}", idx))
             .spawn(move || {
                 // forward existing actix system context
                 if let Some(sys) = sys {

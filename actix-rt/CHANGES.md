@@ -2,7 +2,9 @@
 
 ## Unreleased - 2021-xx-xx
 * Add `Arbiter::try_current` for situations where thread may or may not have Arbiter context. [#408]
+* Start io-uring with `System::new` when feature is enabled. [#395]
 
+[#395]: https://github.com/actix/actix-net/pull/395
 [#408]: https://github.com/actix/actix-net/pull/408
 
 
