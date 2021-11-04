@@ -170,7 +170,7 @@ async fn test_max_concurrent_connections() {
                 // Set a relative higher backlog.
                 .backlog(12)
                 // max connection for a worker is 3.
-                .maxconn(max_conn)
+                .max_concurrent_connections(max_conn)
                 .workers(1)
                 .disable_signals()
                 .bind("test", addr, move || {

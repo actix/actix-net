@@ -15,7 +15,7 @@ use tokio::sync::{
 
 use crate::accept::AcceptLoop;
 use crate::join_all;
-use crate::server::{Server, ServerCommand};
+use crate::server::{ServerCommand, ServerHandle};
 use crate::service::{InternalServiceFactory, ServiceFactory, StreamNewService};
 use crate::signals::{Signal, Signals};
 use crate::socket::{MioListener, StdSocketAddr, StdTcpListener, ToSocketAddrs};
@@ -35,7 +35,7 @@ pub struct ServerBuilder {
     exit: bool,
     no_signals: bool,
     cmd: UnboundedReceiver<ServerCommand>,
-    server: Server,
+    server: ServerHandle,
     notify: Vec<oneshot::Sender<()>>,
     worker_config: ServerWorkerConfig,
 }
@@ -50,7 +50,7 @@ impl ServerBuilder {
     /// Create new Server builder instance
     pub fn new() -> ServerBuilder {
         let (tx, rx) = unbounded_channel();
-        let server = Server::new(tx);
+        let server = ServerHandle::new(tx);
 
         ServerBuilder {
             threads: num_cpus::get(),
@@ -71,8 +71,8 @@ impl ServerBuilder {
 
     /// Set number of workers to start.
     ///
-    /// By default server uses number of available logical cpu as workers
-    /// count. Workers must be greater than 0.
+    /// By default server uses number of available logical CPU as workers count. Workers must be
+    /// greater than 0.
     pub fn workers(mut self, num: usize) -> Self {
         assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;
@@ -99,10 +99,9 @@ impl ServerBuilder {
 
     /// Set the maximum number of pending connections.
     ///
-    /// This refers to the number of clients that can be waiting to be served.
-    /// Exceeding this number results in the client getting an error when
-    /// attempting to connect. It should only affect servers under significant
-    /// load.
+    /// This refers to the number of clients that can be waiting to be served. Exceeding this number
+    /// results in the client getting an error when attempting to connect. It should only affect
+    /// servers under significant load.
     ///
     /// Generally set in the 64-2048 range. Default value is 2048.
     ///
@@ -114,13 +113,19 @@ impl ServerBuilder {
 
     /// Sets the maximum per-worker number of concurrent connections.
     ///
-    /// All socket listeners will stop accepting connections when this limit is
-    /// reached for each worker.
+    /// All socket listeners will stop accepting connections when this limit is reached for
+    /// each worker.
     ///
     /// By default max connections is set to a 25k per worker.
-    pub fn maxconn(mut self, num: usize) -> Self {
+    pub fn max_concurrent_connections(mut self, num: usize) -> Self {
         self.worker_config.max_concurrent_connections(num);
         self
+    }
+
+    #[doc(hidden)]
+    #[deprecated(since = "2.0.0", note = "Renamed to `max_concurrent_connections`.")]
+    pub fn maxconn(self, num: usize) -> Self {
+        self.max_concurrent_connections(num)
     }
 
     /// Stop Actix system.
@@ -191,8 +196,8 @@ impl ServerBuilder {
     }
 
     /// Add new unix domain service to the server.
-    /// Useful when running as a systemd service and
-    /// a socket FD can be acquired using the systemd crate.
+    ///
+    /// Useful when running as a systemd service and a socket FD is acquired externally.
     #[cfg(unix)]
     pub fn listen_uds<F, N: AsRef<str>>(
         mut self,
@@ -246,7 +251,7 @@ impl ServerBuilder {
     }
 
     /// Starts processing incoming connections and return server controller.
-    pub fn run(mut self) -> Server {
+    pub fn run(mut self) -> ServerHandle {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
@@ -441,29 +446,27 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
     backlog: u32,
 ) -> io::Result<Vec<MioTcpListener>> {
     let mut err = None;
-    let mut succ = false;
+    let mut success = false;
     let mut sockets = Vec::new();
     for addr in addr.to_socket_addrs()? {
         match create_tcp_listener(addr, backlog) {
             Ok(lst) => {
-                succ = true;
+                success = true;
                 sockets.push(lst);
             }
             Err(e) => err = Some(e),
         }
     }
 
-    if !succ {
-        if let Some(e) = err.take() {
-            Err(e)
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Can not bind to address.",
-            ))
-        }
-    } else {
+    if success {
         Ok(sockets)
+    } else if let Some(err) = err.take() {
+        Err(err)
+    } else {
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            "Can not bind to address.",
+        ))
     }
 }
 
