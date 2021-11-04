@@ -296,10 +296,11 @@ impl ServerWorker {
         // get actix system context if it is set
         let sys = System::try_current();
 
-        // TODO: wait for server startup with sync channel
+        // service factories initialization channel
+        let (factory_tx, factory_rx) = std::sync::mpsc::sync_channel(1);
 
         std::thread::Builder::new()
-            .name("eofibef".to_owned())
+            .name(format!("actix-server worker {}", idx))
             .spawn(move || {
                 // forward existing actix system context
                 if let Some(sys) = sys {
@@ -350,6 +351,8 @@ impl ServerWorker {
                             }
                         };
 
+                        factory_tx.send(()).unwrap();
+
                         // a third spawn to make sure ServerWorker runs as non boxed future.
                         spawn(ServerWorker {
                             rx,
@@ -368,6 +371,9 @@ impl ServerWorker {
                 }))
             })
             .expect("worker thread error/panic");
+
+        // wait for service factories initialization
+        factory_rx.recv().unwrap();
 
         Ok(handle_pair(idx, tx1, tx2, counter))
     }
