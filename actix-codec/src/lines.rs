@@ -67,11 +67,9 @@ impl Decoder for LinesCodec {
             Some(frame) => Ok(Some(frame)),
             None if src.is_empty() => Ok(None),
             None => {
-                let len = src.len();
-
                 let buf = match src.last() {
                     // if last line ends in a CR then take everything up to it
-                    Some(b'\r') => src.split_to(len - 1),
+                    Some(b'\r') => src.split_to(src.len() - 1),
 
                     // take all bytes from source
                     _ => src.split(),
@@ -81,7 +79,7 @@ impl Decoder for LinesCodec {
                     return Ok(None);
                 }
 
-                return try_into_utf8(buf.freeze());
+                try_into_utf8(buf.freeze())
             }
         }
     }
