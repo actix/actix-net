@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.7 - 2021-11-05
 * Server can be started in regular Tokio runtime. [#408]
 * Expose new `Server` type whose `Future` impl resolves when server stops. [#408]
 * Rename `Server` to `ServerHandle`. [#407]
