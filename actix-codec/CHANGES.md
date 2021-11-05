@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Added `LinesCodec.` [#338]
+
+[#338]: https://github.com/actix/actix-net/pull/338
 
 
 ## 0.4.0 - 2021-04-20
