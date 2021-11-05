@@ -300,11 +300,11 @@ where
 {
     type Error = U::Error;
 
-    fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.is_write_ready() {
             Poll::Ready(Ok(()))
         } else {
-            Poll::Pending
+            self.flush(cx)
         }
     }
 

@@ -2,8 +2,10 @@
 
 ## Unreleased - 2021-xx-xx
 * Added `LinesCodec.` [#338]
+* `Framed::poll_ready` flushes when the buffer is full. [#409]
 
 [#338]: https://github.com/actix/actix-net/pull/338
+[#409]: https://github.com/actix/actix-net/pull/409
 
 
 ## 0.4.0 - 2021-04-20
