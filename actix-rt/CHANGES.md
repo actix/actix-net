@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.4.0 - 2021-11-05
 * Add `Arbiter::try_current` for situations where thread may or may not have Arbiter context. [#408]
 * Start io-uring with `System::new` when feature is enabled. [#395]
 

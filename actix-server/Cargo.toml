@@ -21,7 +21,7 @@ default = []
 io-uring = ["actix-rt/io-uring"]
 
 [dependencies]
-actix-rt = { version = "2.0.0", default-features = false }
+actix-rt = { version = "2.4.0", default-features = false }
 actix-service = "2.0.0"
 actix-utils = "3.0.0"
 
