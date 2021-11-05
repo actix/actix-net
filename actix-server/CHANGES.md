@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.8 - 2021-11-05
 * Fix non-unix signal handler. [#410]
 
 [#410]: https://github.com/actix/actix-net/pull/410
