@@ -190,23 +190,24 @@ pub struct SystemRunner {
 impl SystemRunner {
     /// Starts event loop and will return once [System] is [stopped](System::stop).
     pub fn run(self) -> io::Result<()> {
+        // run loop
+        let code = self.run_until_stop()?;
+        match code {
+            0 => Ok(()),
+            nonzero => Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Non-zero exit code: {}", nonzero),
+            )),
+        }
+    }
+
+    /// Runs the event loop until [stopped](System::stop_with_code), returning the exit code.
+    pub fn run_until_stop(self) -> io::Result<i32> {
         let SystemRunner { rt, stop_rx, .. } = self;
 
         // run loop
-        match rt.block_on(stop_rx) {
-            Ok(code) => {
-                if code != 0 {
-                    Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Non-zero exit code: {}", code),
-                    ))
-                } else {
-                    Ok(())
-                }
-            }
-
-            Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
-        }
+        rt.block_on(stop_rx)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 
     /// Runs the provided future, blocking the current thread until the future completes.
