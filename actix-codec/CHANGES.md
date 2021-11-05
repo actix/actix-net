@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 0.4.1 - 2021-11-05
 * Added `LinesCodec.` [#338]
 * `Framed::poll_ready` flushes when the buffer is full. [#409]
 
