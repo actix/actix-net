@@ -35,7 +35,7 @@ impl fmt::Display for Signal {
 /// Process signal listener.
 pub(crate) struct Signals {
     #[cfg(not(unix))]
-    signals: futures_core::future::LocalBoxFuture<'static, std::io::Result<()>>,
+    signals: futures_core::future::BoxFuture<'static, std::io::Result<()>>,
 
     #[cfg(unix)]
     signals: Vec<(Signal, actix_rt::signal::unix::Signal)>,
