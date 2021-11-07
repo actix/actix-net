@@ -2,7 +2,7 @@ pub(crate) use std::net::{
     SocketAddr as StdSocketAddr, TcpListener as StdTcpListener, ToSocketAddrs,
 };
 
-pub(crate) use mio::net::{TcpListener as MioTcpListener, TcpSocket as MioTcpSocket};
+pub(crate) use mio::net::TcpListener as MioTcpListener;
 #[cfg(unix)]
 pub(crate) use {
     mio::net::UnixListener as MioUnixListener,
@@ -223,6 +223,22 @@ mod unix_impl {
     }
 }
 
+pub(crate) fn create_mio_tcp_listener(
+    addr: StdSocketAddr,
+    backlog: u32,
+) -> io::Result<MioTcpListener> {
+    use socket2::{Domain, Protocol, Socket, Type};
+
+    let socket = Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP))?;
+
+    socket.set_reuse_address(true)?;
+    socket.set_nonblocking(true)?;
+    socket.bind(&addr.into())?;
+    socket.listen(backlog as i32)?;
+
+    Ok(MioTcpListener::from_std(StdTcpListener::from(socket)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,11 +250,8 @@ mod tests {
         assert_eq!(format!("{}", addr), "127.0.0.1:8080");
 
         let addr: StdSocketAddr = "127.0.0.1:0".parse().unwrap();
-        let socket = MioTcpSocket::new_v4().unwrap();
-        socket.set_reuseaddr(true).unwrap();
-        socket.bind(addr).unwrap();
-        let tcp = socket.listen(128).unwrap();
-        let lst = MioListener::Tcp(tcp);
+        let lst = create_mio_tcp_listener(addr, 128).unwrap();
+        let lst = MioListener::Tcp(lst);
         assert!(format!("{:?}", lst).contains("TcpListener"));
         assert!(format!("{}", lst).contains("127.0.0.1"));
     }
