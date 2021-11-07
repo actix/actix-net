@@ -8,7 +8,8 @@ use crate::{
     server::ServerCommand,
     service::{InternalServiceFactory, ServiceFactory, StreamNewService},
     socket::{
-        MioListener, MioTcpListener, MioTcpSocket, StdSocketAddr, StdTcpListener, ToSocketAddrs,
+        create_mio_tcp_listener, MioListener, MioTcpListener, StdSocketAddr, StdTcpListener,
+        ToSocketAddrs,
     },
     worker::ServerWorkerConfig,
     Server,
@@ -263,7 +264,7 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
     let mut success = false;
     let mut sockets = Vec::new();
     for addr in addr.to_socket_addrs()? {
-        match create_tcp_listener(addr, backlog) {
+        match create_mio_tcp_listener(addr, backlog) {
             Ok(lst) => {
                 success = true;
                 sockets.push(lst);
@@ -282,15 +283,4 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
             "Can not bind to address.",
         ))
     }
-}
-
-fn create_tcp_listener(addr: StdSocketAddr, backlog: u32) -> io::Result<MioTcpListener> {
-    let socket = match addr {
-        StdSocketAddr::V4(_) => MioTcpSocket::new_v4()?,
-        StdSocketAddr::V6(_) => MioTcpSocket::new_v6()?,
-    };
-
-    socket.set_reuseaddr(true)?;
-    socket.bind(addr)?;
-    socket.listen(backlog)
 }
