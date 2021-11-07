@@ -196,19 +196,6 @@ jobs:
       - name: Cache Dependencies
         uses: Swatinem/rust-cache@v1.3.0
 
-      - name: Install cargo-hack
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-hack
-
-      - name: doc tests
-        if: matrix.target.os != "ubuntu-latest"
-        uses: actions-rs/cargo@v1
-        timeout-minutes: 40
-        with: { command: ci-doctest }
-
       - name: doc tests io-uring
-        if: matrix.target.os == 'ubuntu-latest'
         run: |
           sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-doctest"
