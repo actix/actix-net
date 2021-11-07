@@ -29,6 +29,7 @@ futures-core = { version = "0.3.7", default-features = false, features = ["alloc
 log = "0.4"
 mio = { version = "0.7.6", features = ["os-poll", "net"] }
 num_cpus = "1.13"
+socket2 = "0.4.2"
 tokio = { version = "1.5.1", features = ["sync"] }
 
 [dev-dependencies]
