@@ -552,6 +552,14 @@ impl Future for ServerWorker {
                 self.poll(cx)
             }
             WorkerState::Shutdown(ref mut shutdown) => {
+                // drop all pending connections in rx channel.
+                while let Poll::Ready(Some(conn)) = Pin::new(&mut this.rx).poll_recv(cx) {
+                    // WorkerCounterGuard is needed as Accept thread has incremented counter.
+                    // It's guard's job to decrement the counter together with drop of Conn.
+                    let guard = this.counter.guard();
+                    drop((conn, guard));
+                }
+
                 // wait for 1 second
                 ready!(shutdown.timer.as_mut().poll(cx));
 

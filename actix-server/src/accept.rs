@@ -127,7 +127,7 @@ impl Accept {
         let mut events = mio::Events::with_capacity(256);
 
         loop {
-            if let Err(e) = self.poll.poll(&mut events, None) {
+            if let Err(e) = self.poll.poll(&mut events, self.timeout) {
                 match e.kind() {
                     io::ErrorKind::Interrupted => {}
                     _ => panic!("Poll error: {}", e),
