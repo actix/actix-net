@@ -196,13 +196,6 @@ jobs:
       - name: Cache Dependencies
         uses: Swatinem/rust-cache@v1.3.0
 
-      - name: Install cargo-hack
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-hack
-
-      - name: doc tests
-        uses: actions-rs/cargo@v1
-        timeout-minutes: 40
-        with: { command: ci-doctest }
+      - name: doc tests io-uring
+        run: |
+          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=nightly cargo ci-doctest"

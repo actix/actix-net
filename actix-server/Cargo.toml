@@ -18,7 +18,7 @@ path = "src/lib.rs"
 
 [features]
 default = []
-io-uring = ["actix-rt/io-uring"]
+io-uring = ["tokio-uring"]
 
 [dependencies]
 actix-rt = { version = "2.4.0", default-features = false }
@@ -31,6 +31,9 @@ mio = { version = "0.7.6", features = ["os-poll", "net"] }
 num_cpus = "1.13"
 socket2 = "0.4.2"
 tokio = { version = "1.5.1", features = ["sync"] }
+
+# runtime for io-uring feature
+tokio-uring = { version = "0.1", optional = true }
 
 [dev-dependencies]
 actix-codec = "0.4.0"

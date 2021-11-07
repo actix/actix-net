@@ -283,15 +283,6 @@ impl ServerWorker {
         let counter = Counter::new(config.max_concurrent_connections);
 
         let counter_clone = counter.clone();
-        // every worker runs in it's own arbiter.
-        // use a custom tokio runtime builder to change the settings of runtime.
-        #[cfg(all(target_os = "linux", feature = "io-uring"))]
-        let arbiter = {
-            // TODO: pass max blocking thread config when tokio-uring enable configuration
-            // on building runtime.
-            let _ = config.max_blocking_threads;
-            Arbiter::new()
-        };
 
         // get actix system context if it is set
         let sys = System::try_current();
@@ -299,6 +290,8 @@ impl ServerWorker {
         // service factories initialization channel
         let (factory_tx, factory_rx) = std::sync::mpsc::sync_channel(1);
 
+        // every worker runs in it's own thread and tokio runtime.
+        // use a custom tokio runtime builder to change the settings of runtime.
         std::thread::Builder::new()
             .name(format!("actix-server worker {}", idx))
             .spawn(move || {
@@ -307,13 +300,7 @@ impl ServerWorker {
                     System::set_current(sys);
                 }
 
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .max_blocking_threads(config.max_blocking_threads)
-                    .build()
-                    .unwrap();
-
-                rt.block_on(tokio::task::LocalSet::new().run_until(async move {
+                let worker_fut = async move {
                     let fut = factories
                         .iter()
                         .enumerate()
@@ -368,7 +355,26 @@ impl ServerWorker {
                     })
                     .await
                     .expect("task 2 panic");
-                }))
+                };
+
+                #[cfg(all(target_os = "linux", feature = "io-uring"))]
+                {
+                    // TODO: pass max blocking thread config when tokio-uring enable configuration
+                    // on building runtime.
+                    let _ = config.max_blocking_threads;
+                    tokio_uring::start(worker_fut)
+                }
+
+                #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
+                {
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .max_blocking_threads(config.max_blocking_threads)
+                        .build()
+                        .unwrap();
+
+                    rt.block_on(tokio::task::LocalSet::new().run_until(worker_fut))
+                }
             })
             .expect("worker thread error/panic");
 
