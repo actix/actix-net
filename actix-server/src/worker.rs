@@ -281,8 +281,7 @@ impl ServerWorker {
         let (tx2, rx2) = unbounded_channel();
 
         let counter = Counter::new(config.max_concurrent_connections);
-
-        let counter_clone = counter.clone();
+        let pair = handle_pair(idx, tx1, tx2, counter.clone());
 
         // get actix system context if it is set
         let sys = System::try_current();
@@ -345,7 +344,7 @@ impl ServerWorker {
                             rx,
                             rx2,
                             services,
-                            counter: WorkerCounter::new(idx, waker_queue, counter_clone),
+                            counter: WorkerCounter::new(idx, waker_queue, counter),
                             factories: factories.into_boxed_slice(),
                             state: Default::default(),
                             shutdown_timeout: config.shutdown_timeout,
@@ -381,7 +380,7 @@ impl ServerWorker {
         // wait for service factories initialization
         factory_rx.recv().unwrap();
 
-        Ok(handle_pair(idx, tx1, tx2, counter))
+        Ok(pair)
     }
 
     fn restart_service(&mut self, idx: usize, factory_id: usize) {
