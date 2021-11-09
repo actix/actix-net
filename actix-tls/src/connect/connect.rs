@@ -155,6 +155,11 @@ impl<T: Address> Connect<T> {
             ConnectAddrs::Multi(addrs) => ConnectAddrsIter::MultiOwned(addrs.into_iter()),
         }
     }
+
+    /// Get request.
+    pub fn request(&self) -> &T {
+        &self.req
+    }
 }
 
 impl<T: Address> From<T> for Connect<T> {
