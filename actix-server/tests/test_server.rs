@@ -33,28 +33,28 @@ fn test_bind() {
                 })?
                 .run();
 
-            let _ = tx.send((srv.handle(), actix_rt::System::current()));
+            let _ = tx.send(srv.handle());
 
             srv.await
         })
     });
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
 
     let _ = srv.stop(true);
-    sys.stop();
     h.join().unwrap().unwrap();
 }
 
 #[test]
 fn test_listen() {
     let addr = unused_addr();
+    let lst = net::TcpListener::bind(addr).unwrap();
+
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let lst = net::TcpListener::bind(addr)?;
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
                 .disable_signals()
@@ -64,19 +64,18 @@ fn test_listen() {
                 })?
                 .run();
 
-            let _ = tx.send((srv.handle(), actix_rt::System::current()));
+            let _ = tx.send(srv.handle());
 
             srv.await
         })
     });
 
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
 
     let _ = srv.stop(true);
-    sys.stop();
     h.join().unwrap().unwrap();
 }
 
@@ -283,12 +282,12 @@ async fn test_service_restart() {
                 .workers(1)
                 .run();
 
-            let _ = tx.send((srv.handle(), actix_rt::System::current()));
+            let _ = tx.send(srv.handle());
             srv.await
         })
     });
 
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     for _ in 0..5 {
         TcpStream::connect(addr1)
@@ -311,7 +310,6 @@ async fn test_service_restart() {
     assert!(num2_clone.load(Ordering::SeqCst) > 5);
 
     let _ = srv.stop(false);
-    sys.stop();
     h.join().unwrap().unwrap();
 }
 
@@ -388,13 +386,13 @@ async fn worker_restart() {
                 .workers(2)
                 .run();
 
-            let _ = tx.send((srv.handle(), actix_rt::System::current()));
+            let _ = tx.send(srv.handle());
 
             srv.await
         })
     });
 
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     sleep(Duration::from_secs(3)).await;
 
@@ -452,6 +450,5 @@ async fn worker_restart() {
     stream.shutdown().await.unwrap();
 
     let _ = srv.stop(false);
-    sys.stop();
     h.join().unwrap().unwrap();
 }
