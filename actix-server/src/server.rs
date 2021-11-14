@@ -132,12 +132,12 @@ impl Server {
             .collect();
 
         // Give log information on what runtime will be used.
-        let is_tokio = tokio::runtime::Handle::try_current().is_ok();
         let is_actix = actix_rt::System::try_current().is_some();
+        let is_tokio = tokio::runtime::Handle::try_current().is_ok();
 
-        match (is_tokio, is_actix) {
-            (true, false) => info!("Tokio runtime found. Starting in existing Tokio runtime"),
-            (_, true) => info!("Actix runtime found. Starting in Actix runtime"),
+        match (is_actix, is_tokio) {
+            (false, true) => info!("Tokio runtime found. Starting in existing Tokio runtime"),
+            (true, _) => info!("Actix runtime found. Starting in Actix runtime"),
             (_, _) => info!(
                 "Actix/Tokio runtime not found. Starting in newt Tokio current-thread runtime"
             ),

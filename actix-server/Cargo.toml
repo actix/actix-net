@@ -18,7 +18,7 @@ path = "src/lib.rs"
 
 [features]
 default = []
-io-uring = ["tokio-uring"]
+io-uring = ["tokio-uring", "actix-rt/io-uring"]
 
 [dependencies]
 actix-rt = { version = "2.4.0", default-features = false }
@@ -26,6 +26,7 @@ actix-service = "2.0.0"
 actix-utils = "3.0.0"
 
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
+futures-util = { version = "0.3.7", default-features = false, features = ["alloc"] }
 log = "0.4"
 mio = { version = "0.7.6", features = ["os-poll", "net"] }
 num_cpus = "1.13"
