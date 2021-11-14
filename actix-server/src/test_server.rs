@@ -147,3 +147,16 @@ impl Drop for TestServerRuntime {
         self.stop()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use actix_service::fn_service;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn plain_tokio_runtime() {
+        let srv = TestServer::with(|| fn_service(|_sock| async move { Ok::<_, ()>(()) }));
+        assert!(srv.connect().is_ok());
+    }
+}
