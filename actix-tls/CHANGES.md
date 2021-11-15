@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 3.0.0-beta.8 - 2021-11-15
 * Add `Connect::request` for getting a reference to the connection request. [#415]
 
 [#415]: https://github.com/actix/actix-net/pull/415
