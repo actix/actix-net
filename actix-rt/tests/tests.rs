@@ -25,6 +25,14 @@ fn await_for_timer() {
 }
 
 #[test]
+fn run_with_code() {
+    let sys = System::new();
+    System::current().stop_with_code(42);
+    let exit_code = sys.run_with_code().expect("system stop should not error");
+    assert_eq!(exit_code, 42);
+}
+
+#[test]
 fn join_another_arbiter() {
     let time = Duration::from_secs(1);
     let instant = Instant::now();

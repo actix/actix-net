@@ -1,8 +1,7 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-
-* Add `System::run_until_stop` to allow retrieving the exit code on stop. [#411]
+* Add `System::run_with_code` to allow retrieving the exit code on stop. [#411]
 
 [#411]: https://github.com/actix/actix-net/pull/411
 

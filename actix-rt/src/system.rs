@@ -175,8 +175,8 @@ impl System {
     }
 }
 
-#[cfg(not(feature = "io-uring"))]
 /// Runner that keeps a [System]'s event loop alive until stop message is received.
+#[cfg(not(feature = "io-uring"))]
 #[must_use = "A SystemRunner does nothing unless `run` is called."]
 #[derive(Debug)]
 pub struct SystemRunner {
@@ -190,9 +190,9 @@ pub struct SystemRunner {
 impl SystemRunner {
     /// Starts event loop and will return once [System] is [stopped](System::stop).
     pub fn run(self) -> io::Result<()> {
-        // run loop
-        let code = self.run_until_stop()?;
-        match code {
+        let exit_code = self.run_with_code()?;
+
+        match exit_code {
             0 => Ok(()),
             nonzero => Err(io::Error::new(
                 io::ErrorKind::Other,
@@ -202,12 +202,12 @@ impl SystemRunner {
     }
 
     /// Runs the event loop until [stopped](System::stop_with_code), returning the exit code.
-    pub fn run_until_stop(self) -> io::Result<i32> {
+    pub fn run_with_code(self) -> io::Result<i32> {
         let SystemRunner { rt, stop_rx, .. } = self;
 
         // run loop
         rt.block_on(stop_rx)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
     }
 
     /// Runs the provided future, blocking the current thread until the future completes.
@@ -217,8 +217,8 @@ impl SystemRunner {
     }
 }
 
-#[cfg(feature = "io-uring")]
 /// Runner that keeps a [System]'s event loop alive until stop message is received.
+#[cfg(feature = "io-uring")]
 #[must_use = "A SystemRunner does nothing unless `run` is called."]
 #[derive(Debug)]
 pub struct SystemRunner;
@@ -227,7 +227,14 @@ pub struct SystemRunner;
 impl SystemRunner {
     /// Starts event loop and will return once [System] is [stopped](System::stop).
     pub fn run(self) -> io::Result<()> {
-        unimplemented!("SystemRunner::run is not implemented yet")
+        unimplemented!("SystemRunner::run is not implemented for io-uring feature yet");
+    }
+
+    /// Runs the event loop until [stopped](System::stop_with_code), returning the exit code.
+    pub fn run_with_code(self) -> io::Result<i32> {
+        unimplemented!(
+            "SystemRunner::run_with_code is not implemented for io-uring feature yet"
+        );
     }
 
     /// Runs the provided future, blocking the current thread until the future completes.
