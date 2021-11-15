@@ -1,6 +1,11 @@
 //! Use Rustls connector to test OpenSSL acceptor.
 
-#![cfg(all(feature = "accept", feature = "rustls", feature = "openssl"))]
+#![cfg(all(
+    feature = "accept",
+    feature = "connect",
+    feature = "rustls",
+    feature = "openssl"
+))]
 
 use std::{convert::TryFrom, io::Write, sync::Arc};
 
