@@ -113,7 +113,7 @@ impl ServerBuilder {
         self.max_concurrent_connections(num)
     }
 
-    /// Stop Actix system.
+    /// Stop Actix `System` after server shutdown.
     pub fn system_exit(mut self) -> Self {
         self.exit = true;
         self

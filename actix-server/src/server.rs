@@ -196,11 +196,11 @@ impl Future for Server {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.as_mut().get_mut() {
-            Server::Error(err) => Poll::Ready(Err(err
+            Self::Error(err) => Poll::Ready(Err(err
                 .take()
                 .expect("Server future cannot be polled after error"))),
 
-            Server::Server(inner) => {
+            Self::Server(inner) => {
                 // poll Signals
                 if let Some(ref mut signals) = inner.signals {
                     if let Poll::Ready(signal) = Pin::new(signals).poll(cx) {
