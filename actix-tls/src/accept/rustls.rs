@@ -1,4 +1,5 @@
 use std::{
+    convert::Infallible,
     future::Future,
     io::{self, IoSlice},
     ops::{Deref, DerefMut},
@@ -21,7 +22,7 @@ use tokio_rustls::{Accept, TlsAcceptor};
 
 pub use tokio_rustls::rustls::ServerConfig;
 
-use super::MAX_CONN_COUNTER;
+use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 
 /// Wrapper type for `tokio_openssl::SslStream` in order to impl `ActixStream` trait.
 pub struct TlsStream<T>(tokio_rustls::server::TlsStream<T>);
@@ -101,6 +102,7 @@ impl<T: ActixStream> ActixStream for TlsStream<T> {
 /// `rustls` feature enables this `Acceptor` type.
 pub struct Acceptor {
     config: Arc<ServerConfig>,
+    handshake_timeout: Duration,
 }
 
 impl Acceptor {
@@ -109,7 +111,16 @@ impl Acceptor {
     pub fn new(config: ServerConfig) -> Self {
         Acceptor {
             config: Arc::new(config),
+            handshake_timeout: DEFAULT_TLS_HANDSHAKE_TIMEOUT,
         }
+    }
+
+    /// Limit the amount of time that the acceptor will wait for a TLS handshake to complete.
+    ///
+    /// Default timeout is 3 seconds.
+    pub fn set_handshake_timeout(&mut self, handshake_timeout: Duration) -> &mut Self {
+        self.handshake_timeout = handshake_timeout;
+        self
     }
 }
 
@@ -118,13 +129,14 @@ impl Clone for Acceptor {
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),
+            handshake_timeout: self.handshake_timeout,
         }
     }
 }
 
 impl<T: ActixStream> ServiceFactory<T> for Acceptor {
     type Response = TlsStream<T>;
-    type Error = io::Error;
+    type Error = TlsError<io::Error, Infallible>;
     type Config = ();
 
     type Service = AcceptorService;
@@ -136,8 +148,10 @@ impl<T: ActixStream> ServiceFactory<T> for Acceptor {
             Ok(AcceptorService {
                 acceptor: self.config.clone().into(),
                 conns: conns.clone(),
+                handshake_timeout: self.handshake_timeout,
             })
         });
+
         Box::pin(async { res })
     }
 }
@@ -146,11 +160,12 @@ impl<T: ActixStream> ServiceFactory<T> for Acceptor {
 pub struct AcceptorService {
     acceptor: TlsAcceptor,
     conns: Counter,
+    handshake_timeout: Duration,
 }
 
 impl<T: ActixStream> Service<T> for AcceptorService {
     type Response = TlsStream<T>;
-    type Error = io::Error;
+    type Error = TlsError<io::Error, Infallible>;
     type Future = AcceptorServiceFut<T>;
 
     fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -164,9 +179,7 @@ impl<T: ActixStream> Service<T> for AcceptorService {
     fn call(&self, req: T) -> Self::Future {
         AcceptorServiceFut {
             fut: self.acceptor.accept(req),
-            // default tls accept timeout is 3 seconds.
-            // TODO: make it configurable with service builder.
-            timeout: sleep(Duration::from_secs(3)),
+            timeout: sleep(self.handshake_timeout),
             _guard: self.conns.get(),
         }
     }
@@ -182,21 +195,14 @@ pin_project! {
 }
 
 impl<T: ActixStream> Future for AcceptorServiceFut<T> {
-    type Output = Result<TlsStream<T>, io::Error>;
+    type Output = Result<TlsStream<T>, TlsError<io::Error, Infallible>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
         match Pin::new(&mut this.fut).poll(cx) {
-            Poll::Ready(res) => Poll::Ready(res.map(TlsStream)),
-            Poll::Pending => {
-                this.timeout.poll(cx).map(|_| {
-                    // TODO: make the error message typed.
-                    Err(io::Error::new(
-                        io::ErrorKind::TimedOut,
-                        "Tls Handshake timedout",
-                    ))
-                })
-            }
+            Poll::Ready(Ok(stream)) => Poll::Ready(Ok(TlsStream(stream))),
+            Poll::Ready(Err(err)) => Poll::Ready(Err(TlsError::Tls(err))),
+            Poll::Pending => this.timeout.poll(cx).map(|_| Err(TlsError::Timeout)),
         }
     }
 }

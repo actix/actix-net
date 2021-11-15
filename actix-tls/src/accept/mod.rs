@@ -1,9 +1,4 @@
-//! TLS acceptor services for Actix ecosystem.
-//!
-//! ## Crate Features
-//! * `openssl` - TLS acceptor using the `openssl` crate.
-//! * `rustls` - TLS acceptor using the `rustls` crate.
-//! * `native-tls` - TLS acceptor using the `native-tls` crate.
+//! TLS acceptor services.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -19,6 +14,10 @@ pub mod rustls;
 pub mod native_tls;
 
 pub(crate) static MAX_CONN: AtomicUsize = AtomicUsize::new(256);
+
+#[cfg(any(feature = "openssl", feature = "rustls", feature = "native-tls"))]
+pub(crate) const DEFAULT_TLS_HANDSHAKE_TIMEOUT: std::time::Duration =
+    std::time::Duration::from_secs(3);
 
 thread_local! {
     static MAX_CONN_COUNTER: Counter = Counter::new(MAX_CONN.load(Ordering::Relaxed));
@@ -36,7 +35,8 @@ pub fn max_concurrent_tls_connect(num: usize) {
 
 /// TLS error combined with service error.
 #[derive(Debug)]
-pub enum TlsError<E1, E2> {
-    Tls(E1),
-    Service(E2),
+pub enum TlsError<TlsErr, SvcErr> {
+    Tls(TlsErr),
+    Timeout,
+    Service(SvcErr),
 }

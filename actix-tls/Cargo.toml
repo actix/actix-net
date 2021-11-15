@@ -68,7 +68,9 @@ bytes = "1"
 env_logger = "0.9"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
 log = "0.4"
+rcgen = "0.8"
 rustls-pemfile = "0.2.1"
+tokio-rustls = { version = "0.23", features = ["dangerous_configuration"] }
 trust-dns-resolver = "0.20.0"
 
 [[example]]
