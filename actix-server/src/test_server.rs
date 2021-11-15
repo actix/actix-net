@@ -1,9 +1,8 @@
-use std::sync::mpsc;
-use std::{net, thread};
+use std::{io, net, sync::mpsc, thread};
 
 use actix_rt::{net::TcpStream, System};
 
-use crate::{Server, ServerBuilder, ServiceFactory};
+use crate::{Server, ServerBuilder, ServerHandle, ServiceFactory};
 
 /// A testing server.
 ///
@@ -34,7 +33,8 @@ pub struct TestServerRuntime {
     addr: net::SocketAddr,
     host: String,
     port: u16,
-    system: System,
+    server_handle: ServerHandle,
+    thread_handle: Option<thread::JoinHandle<io::Result<()>>>,
 }
 
 impl TestServer {
@@ -46,20 +46,22 @@ impl TestServer {
         let (tx, rx) = mpsc::channel();
 
         // run server in separate thread
-        thread::spawn(move || {
-            let sys = System::new();
-            factory(Server::build()).workers(1).disable_signals().run();
-
-            tx.send(System::current()).unwrap();
-            sys.run()
+        let thread_handle = thread::spawn(move || {
+            System::new().block_on(async {
+                let server = factory(Server::build()).workers(1).disable_signals().run();
+                tx.send(server.handle()).unwrap();
+                server.await
+            })
         });
-        let system = rx.recv().unwrap();
+
+        let server_handle = rx.recv().unwrap();
 
         TestServerRuntime {
-            system,
             addr: "127.0.0.1:0".parse().unwrap(),
             host: "127.0.0.1".to_string(),
             port: 0,
+            server_handle,
+            thread_handle: Some(thread_handle),
         }
     }
 
@@ -68,24 +70,25 @@ impl TestServer {
         let (tx, rx) = mpsc::channel();
 
         // run server in separate thread
-        thread::spawn(move || {
+        let thread_handle = thread::spawn(move || {
             let sys = System::new();
             let tcp = net::TcpListener::bind("127.0.0.1:0").unwrap();
             let local_addr = tcp.local_addr().unwrap();
 
             sys.block_on(async {
-                Server::build()
+                let server = Server::build()
                     .listen("test", tcp, factory)
                     .unwrap()
                     .workers(1)
                     .disable_signals()
                     .run();
-                tx.send((System::current(), local_addr)).unwrap();
-            });
-            sys.run()
+
+                tx.send((server.handle(), local_addr)).unwrap();
+                server.await
+            })
         });
 
-        let (system, addr) = rx.recv().unwrap();
+        let (server_handle, addr) = rx.recv().unwrap();
 
         let host = format!("{}", addr.ip());
         let port = addr.port();
@@ -94,18 +97,23 @@ impl TestServer {
             addr,
             host,
             port,
-            system,
+            server_handle,
+            thread_handle: Some(thread_handle),
         }
     }
 
     /// Get first available unused local address.
     pub fn unused_addr() -> net::SocketAddr {
+        use socket2::{Domain, Protocol, Socket, Type};
+
         let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-        let socket = mio::net::TcpSocket::new_v4().unwrap();
-        socket.bind(addr).unwrap();
-        socket.set_reuseaddr(true).unwrap();
-        let tcp = socket.listen(1024).unwrap();
-        tcp.local_addr().unwrap()
+        let socket =
+            Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP)).unwrap();
+        socket.set_reuse_address(true).unwrap();
+        socket.set_nonblocking(true).unwrap();
+        socket.bind(&addr.into()).unwrap();
+        socket.listen(1024).unwrap();
+        net::TcpListener::from(socket).local_addr().unwrap()
     }
 }
 
@@ -127,7 +135,8 @@ impl TestServerRuntime {
 
     /// Stop server.
     fn stop(&mut self) {
-        self.system.stop();
+        let _ = self.server_handle.stop(false);
+        self.thread_handle.take().unwrap().join().unwrap().unwrap();
     }
 
     /// Connect to server, returning a Tokio `TcpStream`.
@@ -139,5 +148,18 @@ impl TestServerRuntime {
 impl Drop for TestServerRuntime {
     fn drop(&mut self) {
         self.stop()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use actix_service::fn_service;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn plain_tokio_runtime() {
+        let srv = TestServer::with(|| fn_service(|_sock| async move { Ok::<_, ()>(()) }));
+        assert!(srv.connect().is_ok());
     }
 }

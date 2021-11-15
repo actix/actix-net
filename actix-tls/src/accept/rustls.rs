@@ -19,7 +19,7 @@ use futures_core::future::LocalBoxFuture;
 use pin_project_lite::pin_project;
 use tokio_rustls::{Accept, TlsAcceptor};
 
-pub use tokio_rustls::rustls::{ServerConfig, Session};
+pub use tokio_rustls::rustls::ServerConfig;
 
 use super::MAX_CONN_COUNTER;
 

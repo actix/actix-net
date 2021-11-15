@@ -240,6 +240,15 @@ impl Arbiter {
         })
     }
 
+    /// Try to get current running arbiter handle.
+    ///
+    /// Returns `None` if no Arbiter has been started.
+    ///
+    /// Unlike [`current`](Self::current), this never panics.
+    pub fn try_current() -> Option<ArbiterHandle> {
+        HANDLE.with(|cell| cell.borrow().clone())
+    }
+
     /// Stop Arbiter from continuing it's event loop.
     ///
     /// Returns true if stop message was sent successfully and false if the Arbiter has been dropped.

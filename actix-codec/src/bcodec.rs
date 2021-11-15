@@ -1,11 +1,10 @@
-use bytes::{Buf, Bytes, BytesMut};
 use std::io;
+
+use bytes::{Buf, Bytes, BytesMut};
 
 use super::{Decoder, Encoder};
 
-/// Bytes codec.
-///
-/// Reads/Writes chunks of bytes from a stream.
+/// Bytes codec. Reads/writes chunks of bytes from a stream.
 #[derive(Debug, Copy, Clone)]
 pub struct BytesCodec;
 
