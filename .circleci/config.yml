@@ -1,0 +1,22 @@
+version: 2.1
+
+jobs:
+  test-io-uring-features:
+    machine:
+      image: ubuntu-2004:202107-02
+    resource_class: large
+    environment:
+      CI: '1'
+      CARGO_INCREMENTAL: '0'
+      RUST_BACKTRACE: '1'
+    steps:
+      - checkout
+      - run: uname -a
+      - run: apt-get update; apt-get install -y liburing-dev
+      - run: cargo test -p=actix-rt --features=io-uring
+      - run: cargo test -p=actix-server --features=io-uring
+
+workflows:
+  test:
+    jobs:
+      - test-io-uring-features

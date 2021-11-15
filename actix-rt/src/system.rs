@@ -175,9 +175,9 @@ impl System {
     }
 }
 
-#[cfg(not(feature = "io-uring"))]
 /// Runner that keeps a [System]'s event loop alive until stop message is received.
-#[must_use = "A SystemRunner does nothing unless `run` is called."]
+#[cfg(not(feature = "io-uring"))]
+#[must_use = "A SystemRunner does nothing unless `run` or `block_on` is called."]
 #[derive(Debug)]
 pub struct SystemRunner {
     rt: crate::runtime::Runtime,
@@ -216,9 +216,9 @@ impl SystemRunner {
     }
 }
 
-#[cfg(feature = "io-uring")]
 /// Runner that keeps a [System]'s event loop alive until stop message is received.
-#[must_use = "A SystemRunner does nothing unless `run` is called."]
+#[cfg(feature = "io-uring")]
+#[must_use = "A SystemRunner does nothing unless `run` or `block_on` is called."]
 #[derive(Debug)]
 pub struct SystemRunner;
 
