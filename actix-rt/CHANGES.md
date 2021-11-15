@@ -111,7 +111,7 @@
 [#129]: https://github.com/actix/actix-net/issues/129
 
 
-## 1.1.0 - 2020-04-08 (YANKED)
+## 1.1.0 - 2020-04-08 _(YANKED)_
 * Expose `System::is_set` to check if current system has ben started [#99]
 * Add `Arbiter::is_running` to check if event loop is running [#124]
 * Add `Arbiter::local_join` associated function

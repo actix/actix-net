@@ -42,10 +42,12 @@ impl ServerHandle {
     /// Stop incoming connection processing, stop all workers and exit.
     pub fn stop(&self, graceful: bool) -> impl Future<Output = ()> {
         let (tx, rx) = oneshot::channel();
+
         let _ = self.cmd_tx.send(ServerCommand::Stop {
             graceful,
             completion: Some(tx),
         });
+
         async {
             let _ = rx.await;
         }

@@ -5,14 +5,17 @@ use std::{net, thread, time::Duration};
 use actix_rt::{net::TcpStream, time::sleep};
 use actix_server::Server;
 use actix_service::fn_service;
+use socket2::{Domain, Protocol, Socket, Type};
 
 fn unused_addr() -> net::SocketAddr {
     let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-    let socket = mio::net::TcpSocket::new_v4().unwrap();
-    socket.bind(addr).unwrap();
-    socket.set_reuseaddr(true).unwrap();
-    let tcp = socket.listen(32).unwrap();
-    tcp.local_addr().unwrap()
+    let socket =
+        Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP)).unwrap();
+    socket.set_reuse_address(true).unwrap();
+    socket.set_nonblocking(true).unwrap();
+    socket.bind(&addr.into()).unwrap();
+    socket.listen(32).unwrap();
+    net::TcpListener::from(socket).local_addr().unwrap()
 }
 
 #[test]
@@ -30,28 +33,63 @@ fn test_bind() {
                 })?
                 .run();
 
-            let _ = tx.send((srv.handle(), actix_rt::System::current()));
+            let _ = tx.send(srv.handle());
 
             srv.await
         })
     });
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
 
     let _ = srv.stop(true);
-    sys.stop();
+    h.join().unwrap().unwrap();
+}
+
+#[test]
+fn plain_tokio_runtime() {
+    let addr = unused_addr();
+    let (tx, rx) = mpsc::channel();
+
+    let h = thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            let srv = Server::build()
+                .workers(1)
+                .disable_signals()
+                .bind("test", addr, move || {
+                    fn_service(|_| async { Ok::<_, ()>(()) })
+                })?
+                .run();
+
+            tx.send(srv.handle()).unwrap();
+
+            srv.await
+        })
+    });
+
+    let srv = rx.recv().unwrap();
+
+    thread::sleep(Duration::from_millis(500));
+    assert!(net::TcpStream::connect(addr).is_ok());
+
+    let _ = srv.stop(true);
     h.join().unwrap().unwrap();
 }
 
 #[test]
 fn test_listen() {
     let addr = unused_addr();
+    let lst = net::TcpListener::bind(addr).unwrap();
+
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let lst = net::TcpListener::bind(addr)?;
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
                 .disable_signals()
@@ -61,19 +99,18 @@ fn test_listen() {
                 })?
                 .run();
 
-            let _ = tx.send((srv.handle(), actix_rt::System::current()));
+            let _ = tx.send(srv.handle());
 
             srv.await
         })
     });
 
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
 
     let _ = srv.stop(true);
-    sys.stop();
     h.join().unwrap().unwrap();
 }
 
@@ -280,12 +317,12 @@ async fn test_service_restart() {
                 .workers(1)
                 .run();
 
-            let _ = tx.send((srv.handle(), actix_rt::System::current()));
+            let _ = tx.send(srv.handle());
             srv.await
         })
     });
 
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     for _ in 0..5 {
         TcpStream::connect(addr1)
@@ -308,7 +345,6 @@ async fn test_service_restart() {
     assert!(num2_clone.load(Ordering::SeqCst) > 5);
 
     let _ = srv.stop(false);
-    sys.stop();
     h.join().unwrap().unwrap();
 }
 
@@ -385,13 +421,13 @@ async fn worker_restart() {
                 .workers(2)
                 .run();
 
-            let _ = tx.send((srv.handle(), actix_rt::System::current()));
+            let _ = tx.send(srv.handle());
 
             srv.await
         })
     });
 
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     sleep(Duration::from_secs(3)).await;
 
@@ -449,6 +485,5 @@ async fn worker_restart() {
     stream.shutdown().await.unwrap();
 
     let _ = srv.stop(false);
-    sys.stop();
     h.join().unwrap().unwrap();
 }

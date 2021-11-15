@@ -3,6 +3,12 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.0-beta.8 - 2021-11-15
+* Add `Connect::request` for getting a reference to the connection request. [#415]
+
+[#415]: https://github.com/actix/actix-net/pull/415
+
+
 ## 3.0.0-beta.7 - 2021-10-20
 * Add `webpki_roots_cert_store()` to get rustls compatible webpki roots cert store. [#401]
 * Alias `connect::ssl` to `connect::tls`. [#401]

@@ -1,12 +1,21 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-beta.9 - 2021-11-15
+* Restore `Arbiter` support lost in `beta.8`. [#417]
+
+[#417]: https://github.com/actix/actix-net/pull/417
+
+
+## 2.0.0-beta.8 - 2021-11-05 _(YANKED)_
 * Fix non-unix signal handler. [#410]
 
 [#410]: https://github.com/actix/actix-net/pull/410
 
 
-## 2.0.0-beta.7 - 2021-11-05
+## 2.0.0-beta.7 - 2021-11-05 _(YANKED)_
 * Server can be started in regular Tokio runtime. [#408]
 * Expose new `Server` type whose `Future` impl resolves when server stops. [#408]
 * Rename `Server` to `ServerHandle`. [#407]
