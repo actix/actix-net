@@ -63,16 +63,16 @@ impl From<Option<SocketAddr>> for ConnectAddrs {
 
 /// Connection info.
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Connect<T> {
-    pub(crate) req: T,
+pub struct Connect<R> {
+    pub(crate) req: R,
     pub(crate) port: u16,
     pub(crate) addr: ConnectAddrs,
     pub(crate) local_addr: Option<IpAddr>,
 }
 
-impl<T: Address> Connect<T> {
+impl<R: Address> Connect<R> {
     /// Create `Connect` instance by splitting the string by ':' and convert the second part to u16
-    pub fn new(req: T) -> Connect<T> {
+    pub fn new(req: R) -> Connect<R> {
         let (_, port) = parse_host(req.hostname());
 
         Connect {
@@ -85,7 +85,7 @@ impl<T: Address> Connect<T> {
 
     /// Create new `Connect` instance from host and address. Connector skips name resolution stage
     /// for such connect messages.
-    pub fn with_addr(req: T, addr: SocketAddr) -> Connect<T> {
+    pub fn with_addr(req: R, addr: SocketAddr) -> Connect<R> {
         Connect {
             req,
             port: 0,
@@ -156,19 +156,19 @@ impl<T: Address> Connect<T> {
         }
     }
 
-    /// Get request.
-    pub fn request(&self) -> &T {
+    /// Returns a reference to the connection request.
+    pub fn request(&self) -> &R {
         &self.req
     }
 }
 
-impl<T: Address> From<T> for Connect<T> {
-    fn from(addr: T) -> Self {
+impl<R: Address> From<R> for Connect<R> {
+    fn from(addr: R) -> Self {
         Connect::new(addr)
     }
 }
 
-impl<T: Address> fmt::Display for Connect<T> {
+impl<R: Address> fmt::Display for Connect<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.hostname(), self.port())
     }
@@ -351,5 +351,11 @@ mod tests {
             conn.local_addr.unwrap(),
             IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
         )
+    }
+
+    #[test]
+    fn request_ref() {
+        let conn = Connect::new("hello");
+        assert_eq!(conn.request(), &"hello")
     }
 }
