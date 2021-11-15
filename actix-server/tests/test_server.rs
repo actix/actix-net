@@ -1,21 +1,19 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{mpsc, Arc};
-use std::{net, thread, time::Duration};
+use std::{
+    net,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        mpsc, Arc,
+    },
+    thread,
+    time::Duration,
+};
 
 use actix_rt::{net::TcpStream, time::sleep};
-use actix_server::Server;
+use actix_server::{Server, TestServer};
 use actix_service::fn_service;
-use socket2::{Domain, Protocol, Socket, Type};
 
 fn unused_addr() -> net::SocketAddr {
-    let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-    let socket =
-        Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP)).unwrap();
-    socket.set_reuse_address(true).unwrap();
-    socket.set_nonblocking(true).unwrap();
-    socket.bind(&addr.into()).unwrap();
-    socket.listen(32).unwrap();
-    net::TcpListener::from(socket).local_addr().unwrap()
+    TestServer::unused_addr()
 }
 
 #[test]
