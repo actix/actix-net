@@ -24,6 +24,15 @@ fn await_for_timer() {
     );
 }
 
+#[cfg(not(feature = "io-uring"))]
+#[test]
+fn run_with_code() {
+    let sys = System::new();
+    System::current().stop_with_code(42);
+    let exit_code = sys.run_with_code().expect("system stop should not error");
+    assert_eq!(exit_code, 42);
+}
+
 #[test]
 fn join_another_arbiter() {
     let time = Duration::from_secs(1);
@@ -99,8 +108,8 @@ fn wait_for_spawns() {
 
     let handle = rt.spawn(async {
         println!("running on the runtime");
-        // assertion panic is caught at task boundary
-        assert_eq!(1, 2);
+        // panic is caught at task boundary
+        panic!("intentional test panic");
     });
 
     assert!(rt.block_on(handle).is_err());
