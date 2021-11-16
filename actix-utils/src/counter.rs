@@ -26,7 +26,7 @@ impl Counter {
         CounterGuard::new(self.0.clone())
     }
 
-    /// Notify current task and return true if counter is at capacity.
+    /// Returns true if counter is below capacity. Otherwise, register to wake task when it is.
     pub fn available(&self, cx: &mut task::Context<'_>) -> bool {
         self.0.available(cx)
     }

@@ -1,6 +1,11 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Add configurable timeout for accepting TLS connection. [#393]
+* Added `TlsError::Timeout` variant. [#393]
+* All TLS acceptor services now use `TlsError` for their error types. [#393]
+
+[#393]: https://github.com/actix/actix-net/pull/393
 
 
 ## 3.0.0-beta.8 - 2021-11-15

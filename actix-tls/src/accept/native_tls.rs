@@ -1,20 +1,24 @@
 use std::{
+    convert::Infallible,
     io::{self, IoSlice},
     ops::{Deref, DerefMut},
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
-use actix_rt::net::{ActixStream, Ready};
+use actix_rt::{
+    net::{ActixStream, Ready},
+    time::timeout,
+};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
 
-pub use tokio_native_tls::native_tls::Error;
-pub use tokio_native_tls::TlsAcceptor;
+pub use tokio_native_tls::{native_tls::Error, TlsAcceptor};
 
-use super::MAX_CONN_COUNTER;
+use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 
 /// Wrapper type for `tokio_native_tls::TlsStream` in order to impl `ActixStream` trait.
 pub struct TlsStream<T>(tokio_native_tls::TlsStream<T>);
@@ -94,13 +98,25 @@ impl<T: ActixStream> ActixStream for TlsStream<T> {
 /// `native-tls` feature enables this `Acceptor` type.
 pub struct Acceptor {
     acceptor: TlsAcceptor,
+    handshake_timeout: Duration,
 }
 
 impl Acceptor {
     /// Create `native-tls` based `Acceptor` service factory.
     #[inline]
     pub fn new(acceptor: TlsAcceptor) -> Self {
-        Acceptor { acceptor }
+        Acceptor {
+            acceptor,
+            handshake_timeout: DEFAULT_TLS_HANDSHAKE_TIMEOUT,
+        }
+    }
+
+    /// Limit the amount of time that the acceptor will wait for a TLS handshake to complete.
+    ///
+    /// Default timeout is 3 seconds.
+    pub fn set_handshake_timeout(&mut self, handshake_timeout: Duration) -> &mut Self {
+        self.handshake_timeout = handshake_timeout;
+        self
     }
 }
 
@@ -109,13 +125,14 @@ impl Clone for Acceptor {
     fn clone(&self) -> Self {
         Self {
             acceptor: self.acceptor.clone(),
+            handshake_timeout: self.handshake_timeout,
         }
     }
 }
 
 impl<T: ActixStream + 'static> ServiceFactory<T> for Acceptor {
     type Response = TlsStream<T>;
-    type Error = Error;
+    type Error = TlsError<Error, Infallible>;
     type Config = ();
 
     type Service = NativeTlsAcceptorService;
@@ -127,8 +144,10 @@ impl<T: ActixStream + 'static> ServiceFactory<T> for Acceptor {
             Ok(NativeTlsAcceptorService {
                 acceptor: self.acceptor.clone(),
                 conns: conns.clone(),
+                handshake_timeout: self.handshake_timeout,
             })
         });
+
         Box::pin(async { res })
     }
 }
@@ -136,12 +155,13 @@ impl<T: ActixStream + 'static> ServiceFactory<T> for Acceptor {
 pub struct NativeTlsAcceptorService {
     acceptor: TlsAcceptor,
     conns: Counter,
+    handshake_timeout: Duration,
 }
 
 impl<T: ActixStream + 'static> Service<T> for NativeTlsAcceptorService {
     type Response = TlsStream<T>;
-    type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<TlsStream<T>, Error>>;
+    type Error = TlsError<Error, Infallible>;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(cx) {
@@ -154,10 +174,18 @@ impl<T: ActixStream + 'static> Service<T> for NativeTlsAcceptorService {
     fn call(&self, io: T) -> Self::Future {
         let guard = self.conns.get();
         let acceptor = self.acceptor.clone();
+
+        let dur = self.handshake_timeout;
+
         Box::pin(async move {
-            let io = acceptor.accept(io).await;
-            drop(guard);
-            io.map(Into::into)
+            match timeout(dur, acceptor.accept(io)).await {
+                Ok(Ok(io)) => {
+                    drop(guard);
+                    Ok(TlsStream(io))
+                }
+                Ok(Err(err)) => Err(TlsError::Tls(err)),
+                Err(_timeout) => Err(TlsError::Timeout),
+            }
         })
     }
 }
