@@ -67,11 +67,7 @@ impl System {
         let sys_ctrl = SystemController::new(sys_rx, stop_tx);
         rt.spawn(sys_ctrl);
 
-        SystemRunner {
-            rt,
-            stop_rx,
-            system,
-        }
+        SystemRunner { rt, stop_rx }
     }
 }
 
@@ -94,7 +90,7 @@ impl System {
     where
         F: Fn() -> tokio::runtime::Runtime,
     {
-        unimplemented!("System::with_tokio_rt is not implemented yet")
+        unimplemented!("System::with_tokio_rt is not implemented for io-uring feature yet")
     }
 }
 
@@ -182,8 +178,6 @@ impl System {
 pub struct SystemRunner {
     rt: crate::runtime::Runtime,
     stop_rx: oneshot::Receiver<i32>,
-    #[allow(dead_code)]
-    system: System,
 }
 
 #[cfg(not(feature = "io-uring"))]
