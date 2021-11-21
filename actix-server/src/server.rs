@@ -136,11 +136,9 @@ impl Server {
         let is_tokio = tokio::runtime::Handle::try_current().is_ok();
 
         match (is_actix, is_tokio) {
-            (false, true) => info!("Tokio runtime found. Starting in existing Tokio runtime"),
-            (true, _) => info!("Actix runtime found. Starting in Actix runtime"),
-            (_, _) => info!(
-                "Actix/Tokio runtime not found. Starting in newt Tokio current-thread runtime"
-            ),
+            (true, _) => info!("Actix runtime found; starting in Actix runtime"),
+            (_, true) => info!("Tokio runtime found; starting in existing Tokio runtime"),
+            (_, false) => panic!("Actix or Tokio runtime not found; halting"),
         }
 
         for (_, name, lst) in &builder.sockets {

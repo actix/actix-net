@@ -485,3 +485,29 @@ async fn worker_restart() {
     let _ = srv.stop(false);
     h.join().unwrap().unwrap();
 }
+
+#[test]
+#[should_panic]
+fn no_runtime() {
+    // test set up in a way that would prevent time out if support for runtime-less init was added
+
+    let addr = unused_addr();
+
+    let srv = Server::build()
+        .workers(1)
+        .disable_signals()
+        .bind("test", addr, move || {
+            fn_service(|_| async { Ok::<_, ()>(()) })
+        })
+        .unwrap()
+        .run();
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let _ = srv.handle().stop(true);
+
+    rt.block_on(async { srv.await }).unwrap();
+}
