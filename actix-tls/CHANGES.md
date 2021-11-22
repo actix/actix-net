@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 3.0.0-beta.9 - 2021-11-22
 * Add configurable timeout for accepting TLS connection. [#393]
 * Added `TlsError::Timeout` variant. [#393]
 * All TLS acceptor services now use `TlsError` for their error types. [#393]
