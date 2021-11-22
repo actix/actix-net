@@ -1,6 +1,9 @@
 //! TLS acceptor services.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    convert::Infallible,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use actix_utils::counter::Counter;
 
@@ -36,7 +39,29 @@ pub fn max_concurrent_tls_connect(num: usize) {
 /// TLS error combined with service error.
 #[derive(Debug)]
 pub enum TlsError<TlsErr, SvcErr> {
-    Tls(TlsErr),
     Timeout,
+    Tls(TlsErr),
     Service(SvcErr),
+}
+
+impl<TlsErr> TlsError<TlsErr, Infallible> {
+    /// Casts the infallible service error type returned from acceptors into caller's type.
+    pub fn into_service_error<SvcErr>(self) -> TlsError<TlsErr, SvcErr> {
+        match self {
+            Self::Timeout => TlsError::Timeout,
+            Self::Tls(err) => TlsError::Tls(err),
+            Self::Service(_) => unreachable!(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tls_service_error_inference() {
+        let a: TlsError<u32, Infallible> = TlsError::Tls(42);
+        let _b: TlsError<u32, u64> = a.into_service_error();
+    }
 }

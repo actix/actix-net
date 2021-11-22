@@ -138,7 +138,6 @@ impl<T: ActixStream> ServiceFactory<T> for Acceptor {
     type Response = TlsStream<T>;
     type Error = TlsError<io::Error, Infallible>;
     type Config = ();
-
     type Service = AcceptorService;
     type InitError = ();
     type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;

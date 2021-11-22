@@ -115,7 +115,7 @@ where
 }
 
 pub enum RustlsConnectorServiceFuture<T, U> {
-    /// See issue https://github.com/briansmith/webpki/issues/54
+    /// See issue <https://github.com/briansmith/webpki/issues/54>
     InvalidDns,
     Future {
         connect: Connect<U>,
