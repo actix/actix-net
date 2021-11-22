@@ -1,9 +1,10 @@
 [package]
 name = "actix-rt"
-version = "2.4.0"
+version = "2.5.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
+    "fakeshadow <24548779@qq.com>",
 ]
 description = "Tokio-based single-threaded async runtime for the Actix ecosystem"
 keywords = ["async", "futures", "io", "runtime"]
