@@ -19,7 +19,7 @@ use crate::{
     builder::ServerBuilder,
     join_all::join_all,
     service::InternalServiceFactory,
-    signals::{Signal, Signals},
+    signals::{SignalKind, Signals},
     waker_queue::{WakerInterest, WakerQueue},
     worker::{ServerWorker, ServerWorkerConfig, WorkerHandleServer},
     ServerHandle,
@@ -27,16 +27,22 @@ use crate::{
 
 #[derive(Debug)]
 pub(crate) enum ServerCommand {
-    /// TODO
+    /// Worker failed to accept connection, indicating a probable panic.
+    ///
+    /// Contains index of faulted worker.
     WorkerFaulted(usize),
 
+    /// Pause accepting connections.
+    ///
     /// Contains return channel to notify caller of successful state change.
     Pause(oneshot::Sender<()>),
 
+    /// Resume accepting connections.
+    ///
     /// Contains return channel to notify caller of successful state change.
     Resume(oneshot::Sender<()>),
 
-    /// TODO
+    /// Stop accepting connections and begin shutdown procedure.
     Stop {
         /// True if shut down should be graceful.
         graceful: bool,
@@ -324,9 +330,9 @@ impl ServerInner {
         }
     }
 
-    fn handle_signal(&mut self, signal: Signal) -> Option<BoxFuture<'static, ()>> {
+    fn handle_signal(&mut self, signal: SignalKind) -> Option<BoxFuture<'static, ()>> {
         match signal {
-            Signal::Int => {
+            SignalKind::Int => {
                 info!("SIGINT received; starting forced shutdown");
                 self.exit = true;
                 self.handle_cmd(ServerCommand::Stop {
@@ -335,7 +341,7 @@ impl ServerInner {
                 })
             }
 
-            Signal::Term => {
+            SignalKind::Term => {
                 info!("SIGTERM received; starting graceful shutdown");
                 self.exit = true;
                 self.handle_cmd(ServerCommand::Stop {
@@ -344,7 +350,7 @@ impl ServerInner {
                 })
             }
 
-            Signal::Quit => {
+            SignalKind::Quit => {
                 info!("SIGQUIT received; starting forced shutdown");
                 self.exit = true;
                 self.handle_cmd(ServerCommand::Stop {
