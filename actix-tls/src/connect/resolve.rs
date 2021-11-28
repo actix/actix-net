@@ -16,17 +16,19 @@ use log::trace;
 use super::connect::{Address, Connect};
 use super::error::ConnectError;
 
-/// DNS Resolver Service Factory
+/// DNS resolver service factory.
 #[derive(Clone)]
 pub struct ResolverFactory {
     resolver: Resolver,
 }
 
 impl ResolverFactory {
+    /// Constructs a new resolver factory with the given resolver.
     pub fn new(resolver: Resolver) -> Self {
         Self { resolver }
     }
 
+    /// Returns a reference to the inner resolver.
     pub fn service(&self) -> Resolver {
         self.resolver.clone()
     }
@@ -44,13 +46,6 @@ impl<T: Address> ServiceFactory<Connect<T>> for ResolverFactory {
         let service = self.resolver.clone();
         Box::pin(async { Ok(service) })
     }
-}
-
-/// DNS Resolver Service
-#[derive(Clone)]
-pub enum Resolver {
-    Default,
-    Custom(Rc<dyn Resolve>),
 }
 
 /// An interface for custom async DNS resolvers.
@@ -97,7 +92,7 @@ pub enum Resolver {
 /// let resolver = Resolver::new_custom(resolver);
 ///
 /// // pass custom resolver to connector builder.
-/// // connector would then be usable as a service or awc's connector.
+/// // connector would then be usable as a service or `awc`'s connector.
 /// let connector = actix_tls::connect::new_connector::<&str>(resolver.clone());
 ///
 /// // resolver can be passed to connector factory where returned service factory
@@ -105,11 +100,30 @@ pub enum Resolver {
 /// let factory = actix_tls::connect::new_connector_factory::<&str>(resolver);
 /// ```
 pub trait Resolve {
+    /// Given DNS lookup information, returns a futures that completes with socket information.
     fn lookup<'a>(
         &'a self,
         host: &'a str,
         port: u16,
     ) -> LocalBoxFuture<'a, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>>;
+}
+
+/// DNS resolver service
+#[derive(Clone)]
+pub enum Resolver {
+    /// Built-in DNS resolver.
+    ///
+    /// See [`std::net::ToSocketAddrs`] trait.
+    Default,
+
+    /// Custom, user-provided DNS resolver.
+    Custom(Rc<dyn Resolve>),
+}
+
+impl Default for Resolver {
+    fn default() -> Self {
+        Self::Default
+    }
 }
 
 impl Resolver {
@@ -118,20 +132,24 @@ impl Resolver {
         Self::Custom(Rc::new(resolver))
     }
 
-    // look up with default resolver variant.
+    // look up with default resolver
     fn look_up<T: Address>(req: &Connect<T>) -> JoinHandle<io::Result<IntoIter<SocketAddr>>> {
         let host = req.hostname();
-        // TODO: Connect should always return host with port if possible.
+        // TODO: Connect should always return host(name?) with port if possible; basically try to
+        // reduce ability to create conflicting lookup info by having port in host string being
+        // different from numeric port in connect
+
         let host = if req
             .hostname()
-            .splitn(2, ':')
-            .last()
-            .and_then(|p| p.parse::<u16>().ok())
-            .map(|p| p == req.port())
+            .split_once(':')
+            .and_then(|(_, port)| port.parse::<u16>().ok())
+            .map(|port| port == req.port())
             .unwrap_or(false)
         {
+            // if hostname contains port and also matches numeric port then just use the hostname
             host.to_string()
         } else {
+            // concatenate domain-only hostname and port together
             format!("{}:{}", host, req.port())
         };
 

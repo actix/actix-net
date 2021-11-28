@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* `impl Default` for `connect::Resolver`. [#???]
+
+[#???]: https://github.com/actix/actix-net/pull/???
 
 
 ## 3.0.0-beta.9 - 2021-11-22
