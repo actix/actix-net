@@ -231,10 +231,7 @@ mod serde {
 #[cfg(test)]
 mod test {
     use alloc::borrow::ToOwned;
-    use core::{
-        hash::{Hash, Hasher},
-        panic::{RefUnwindSafe, UnwindSafe},
-    };
+    use core::hash::{Hash, Hasher};
 
     use ahash::AHasher;
     use static_assertions::assert_impl_all;
@@ -242,9 +239,18 @@ mod test {
     use super::*;
 
     assert_impl_all!(ByteString: Send, Sync, Unpin, Sized);
-    assert_impl_all!(ByteString: UnwindSafe, RefUnwindSafe);
     assert_impl_all!(ByteString: Clone, Default, Eq, PartialOrd, Ord);
     assert_impl_all!(ByteString: fmt::Debug, fmt::Display);
+
+    #[rustversion::since(1.56)]
+    mod above_1_56_impls {
+        // `[Ref]UnwindSafe` traits were only in std until rust 1.56
+
+        use core::panic::{RefUnwindSafe, UnwindSafe};
+
+        use super::*;
+        assert_impl_all!(ByteString: UnwindSafe, RefUnwindSafe);
+    }
 
     #[test]
     fn test_partial_eq() {
