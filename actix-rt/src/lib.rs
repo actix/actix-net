@@ -41,8 +41,8 @@
 //! In particular, when running a `System`, only `System::block_on` is supported.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
-#![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
+#![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 

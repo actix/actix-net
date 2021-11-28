@@ -36,21 +36,38 @@ pub fn max_concurrent_tls_connect(num: usize) {
     MAX_CONN.store(num, Ordering::Relaxed);
 }
 
-/// TLS error combined with service error.
+/// TLS handshake error, TLS timeout, or inner service error.
+///
+/// All TLS acceptors from this crate will return the `SvcErr` type parameter as [`Infallible`],
+/// which can be cast to your own service type, inferred or otherwise,
+/// using [`into_service_error`](Self::into_service_error).
 #[derive(Debug)]
 pub enum TlsError<TlsErr, SvcErr> {
+    /// TLS handshake has timed-out.
     Timeout,
+
+    /// Wraps TLS service errors.
     Tls(TlsErr),
+
+    /// Wraps inner service errors.
     Service(SvcErr),
 }
 
 impl<TlsErr> TlsError<TlsErr, Infallible> {
     /// Casts the infallible service error type returned from acceptors into caller's type.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::convert::Infallible;
+    /// # use actix_tls::accept::TlsError;
+    /// let a: TlsError<u32, Infallible> = TlsError::Tls(42);
+    /// let _b: TlsError<u32, u64> = a.into_service_error();
+    /// ```
     pub fn into_service_error<SvcErr>(self) -> TlsError<TlsErr, SvcErr> {
         match self {
             Self::Timeout => TlsError::Timeout,
             Self::Tls(err) => TlsError::Tls(err),
-            Self::Service(_) => unreachable!(),
+            Self::Service(err) => match err {},
         }
     }
 }

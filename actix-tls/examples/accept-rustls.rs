@@ -1,4 +1,4 @@
-//! TLS Acceptor Server
+//! No-Op TLS Acceptor Server
 //!
 //! Using either HTTPie (`http`) or cURL:
 //!
