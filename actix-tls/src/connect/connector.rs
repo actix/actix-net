@@ -18,7 +18,7 @@ use super::{
 
 /// Combined resolver and TCP connector service factory.
 ///
-/// Used to create [`ConnectService`]s which receive connection information, resolve DNS if
+/// Used to create [`ConnectorService`]s which receive connection information, resolve DNS if
 /// required, and return a TCP stream.
 #[derive(Clone, Default)]
 pub struct Connector {

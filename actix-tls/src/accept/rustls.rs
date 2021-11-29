@@ -24,10 +24,16 @@ use actix_utils::{
 };
 use derive_more::{Deref, DerefMut, From};
 use pin_project_lite::pin_project;
-pub use tokio_rustls::rustls::ServerConfig;
+use tokio_rustls::rustls::ServerConfig;
 use tokio_rustls::{Accept, TlsAcceptor};
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
+
+pub mod reexports {
+    //! Re-exports from `rustls` that are useful for acceptors.
+
+    pub use tokio_rustls::rustls::ServerConfig;
+}
 
 /// Wraps a `rustls` based async TLS stream in order to implement [`ActixStream`].
 #[derive(Deref, DerefMut, From)]

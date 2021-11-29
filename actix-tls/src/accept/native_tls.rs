@@ -22,9 +22,15 @@ use actix_utils::{
 };
 use derive_more::{Deref, DerefMut, From};
 use futures_core::future::LocalBoxFuture;
-pub use tokio_native_tls::{native_tls::Error, TlsAcceptor};
+use tokio_native_tls::{native_tls::Error, TlsAcceptor};
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
+
+pub mod reexports {
+    //! Re-exports from `native-tls` that are useful for acceptors.
+
+    pub use tokio_native_tls::{native_tls::Error, TlsAcceptor};
+}
 
 /// Wraps a `native-tls` based async TLS stream in order to implement [`ActixStream`].
 #[derive(Deref, DerefMut, From)]

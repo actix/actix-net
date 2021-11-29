@@ -1,23 +1,30 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* There are now no default features. [#422]
-* Implement `Default` for `connect::Resolver`. [#422]
+### Added
 * Derive `Debug` for `connect::Connection`. [#422]
-* Remove redundant `connect::Connection::from_parts` method. [#422]
-* Rename TLS acceptor service future types and hide from docs. [#422]
+* Implement `Default` for `connect::Resolver`. [#422]
+* Implement `Display` for `TlsError`. [#422]
 * Implement `Error` for `ConnectError`. [#422]
 * Implement `Error` for `TlsError` where both types also implement `Error`. [#422]
-* Rename `accept::native_tls::{NativeTlsAcceptorService => AcceptorService}`. [#422]
+
+### Changed
+* There are now no default features. [#422]
+* Useful re-exports from underlying TLS crates are exposed in a `reexports` modules in all acceptors and connectors.
+* Convert `connect::ResolverService` from enum to struct. [#422]
 * Make `ConnectAddrsIter` private. [#422]
+* Rename `accept::native_tls::{NativeTlsAcceptorService => AcceptorService}`. [#422]
+* Rename `connect::{Address => Host}` trait. [#422]
 * Rename method `connect::Connection::{host => hostname}`. [#422]
 * Rename struct `connect::{Connect => ConnectionInfo}`. [#422]
-* Rename struct `connect::{ConnectServiceFactory => Connector}`. [#422]
 * Rename struct `connect::{ConnectService => ConnectorService}`. [#422]
+* Rename struct `connect::{ConnectServiceFactory => Connector}`. [#422]
+* Rename TLS acceptor service future types and hide from docs. [#422]
+
+### Removed
 * Remove `connect::{new_connector, new_connector_factory, default_connector, default_connector_factory}` methods. [#422]
-* Convert `connect::ResolverService` from enum to struct. [#422]
 * Remove `connect::native_tls::Connector::service` method. [#422]
-* Rename `connect::{Address => Host}` trait. [#422]
+* Remove redundant `connect::Connection::from_parts` method. [#422]
 
 [#422]: https://github.com/actix/actix-net/pull/422
 

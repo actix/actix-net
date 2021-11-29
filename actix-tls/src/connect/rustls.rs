@@ -1,6 +1,6 @@
 //! Rustls based connector service.
 //!
-//! See [`Connector`] for main connector service factory docs.
+//! See [`TlsConnector`] for main connector service factory docs.
 
 use std::{
     convert::TryFrom,
@@ -48,23 +48,23 @@ pub fn webpki_roots_cert_store() -> RootCertStore {
 
 /// Connector service factory using `rustls`.
 #[derive(Clone)]
-pub struct Connector {
+pub struct TlsConnector {
     connector: Arc<ClientConfig>,
 }
 
-impl Connector {
+impl TlsConnector {
     /// Constructs new connector service factory from a `rustls` client configuration.
     pub fn new(connector: Arc<ClientConfig>) -> Self {
-        Connector { connector }
+        TlsConnector { connector }
     }
 
     /// Constructs new connector service from a `rustls` client configuration.
-    pub fn service(connector: Arc<ClientConfig>) -> ConnectorService {
-        ConnectorService { connector }
+    pub fn service(connector: Arc<ClientConfig>) -> TlsConnectorService {
+        TlsConnectorService { connector }
     }
 }
 
-impl<R, IO> ServiceFactory<Connection<R, IO>> for Connector
+impl<R, IO> ServiceFactory<Connection<R, IO>> for TlsConnector
 where
     R: Host,
     IO: ActixStream + 'static,
@@ -72,12 +72,12 @@ where
     type Response = Connection<R, TlsStream<IO>>;
     type Error = io::Error;
     type Config = ();
-    type Service = ConnectorService;
+    type Service = TlsConnectorService;
     type InitError = ();
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(ConnectorService {
+        ok(TlsConnectorService {
             connector: self.connector.clone(),
         })
     }
@@ -85,11 +85,11 @@ where
 
 /// Connector service using `rustls`.
 #[derive(Clone)]
-pub struct ConnectorService {
+pub struct TlsConnectorService {
     connector: Arc<ClientConfig>,
 }
 
-impl<R, IO> Service<Connection<R, IO>> for ConnectorService
+impl<R, IO> Service<Connection<R, IO>> for TlsConnectorService
 where
     R: Host,
     IO: ActixStream,

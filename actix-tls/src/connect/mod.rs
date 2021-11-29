@@ -7,11 +7,9 @@
 //! # Stages of TLS connector services:
 //! 1. Resolve DNS and establish a [`TcpStream`] with the TCP connector service.
 //! 1. Wrap the stream and perform connect handshake with remote peer.
-//! 1. Return wrapped stream type that implements [`AsyncRead`] and [`AsyncWrite`].
+//! 1. Return wrapped stream type that implements `AsyncRead` and `AsyncWrite`.
 //!
 //! [`TcpStream`]: actix_rt::net::TcpStream
-//! [`AsyncRead`]: actix_rt::net::AsyncRead
-//! [`AsyncWrite`]: actix_rt::net::AsyncWrite
 
 mod connect_addrs;
 mod connection;

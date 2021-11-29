@@ -1,6 +1,6 @@
 //! OpenSSL based connector service.
 //!
-//! See [`Connector`] for main connector service factory docs.
+//! See [`TlsConnector`] for main connector service factory docs.
 
 use std::{
     future::Future,
@@ -26,23 +26,23 @@ pub mod reexports {
 }
 
 /// Connector service factory using `openssl`.
-pub struct Connector {
+pub struct TlsConnector {
     connector: SslConnector,
 }
 
-impl Connector {
+impl TlsConnector {
     /// Constructs new connector service factory from an `openssl` connector.
     pub fn new(connector: SslConnector) -> Self {
-        Connector { connector }
+        TlsConnector { connector }
     }
 
     /// Constructs new connector service from an `openssl` connector.
-    pub fn service(connector: SslConnector) -> ConnectorService {
-        ConnectorService { connector }
+    pub fn service(connector: SslConnector) -> TlsConnectorService {
+        TlsConnectorService { connector }
     }
 }
 
-impl Clone for Connector {
+impl Clone for TlsConnector {
     fn clone(&self) -> Self {
         Self {
             connector: self.connector.clone(),
@@ -50,7 +50,7 @@ impl Clone for Connector {
     }
 }
 
-impl<R, IO> ServiceFactory<Connection<R, IO>> for Connector
+impl<R, IO> ServiceFactory<Connection<R, IO>> for TlsConnector
 where
     R: Host,
     IO: ActixStream + 'static,
@@ -58,23 +58,23 @@ where
     type Response = Connection<R, SslStream<IO>>;
     type Error = io::Error;
     type Config = ();
-    type Service = ConnectorService;
+    type Service = TlsConnectorService;
     type InitError = ();
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(ConnectorService {
+        ok(TlsConnectorService {
             connector: self.connector.clone(),
         })
     }
 }
 
 /// Connector service using `openssl`.
-pub struct ConnectorService {
+pub struct TlsConnectorService {
     connector: SslConnector,
 }
 
-impl Clone for ConnectorService {
+impl Clone for TlsConnectorService {
     fn clone(&self) -> Self {
         Self {
             connector: self.connector.clone(),
@@ -82,7 +82,7 @@ impl Clone for ConnectorService {
     }
 }
 
-impl<R, IO> Service<Connection<R, IO>> for ConnectorService
+impl<R, IO> Service<Connection<R, IO>> for TlsConnectorService
 where
     R: Host,
     IO: ActixStream,

@@ -1,6 +1,6 @@
 //! Native-TLS based connector service.
 //!
-//! See [`Connector`] for main connector service factory docs.
+//! See [`TlsConnector`] for main connector service factory docs.
 
 use std::io;
 

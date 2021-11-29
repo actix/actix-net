@@ -22,12 +22,18 @@ use actix_utils::{
     future::{ready, Ready as FutReady},
 };
 use derive_more::{Deref, DerefMut, From};
-pub use openssl::ssl::{
-    AlpnError, Error, HandshakeError, Ssl, SslAcceptor, SslAcceptorBuilder,
-};
+use openssl::ssl::{Error, Ssl, SslAcceptor};
 use pin_project_lite::pin_project;
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
+
+pub mod reexports {
+    //! Re-exports from `openssl` that are useful for acceptors.
+
+    pub use openssl::ssl::{
+        AlpnError, Error, HandshakeError, Ssl, SslAcceptor, SslAcceptorBuilder,
+    };
+}
 
 /// Wraps an `openssl` based async TLS stream in order to implement [`ActixStream`].
 #[derive(Deref, DerefMut, From)]
