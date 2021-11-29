@@ -1,4 +1,4 @@
-//! [`Resolve`] trait.
+//! The [`Resolve`] trait.
 
 use std::{error::Error as StdError, net::SocketAddr};
 
@@ -6,7 +6,7 @@ use futures_core::future::LocalBoxFuture;
 
 /// Custom async DNS resolvers.
 ///
-/// # Usage
+/// # Examples
 /// ```
 /// use std::net::SocketAddr;
 ///
@@ -40,20 +40,17 @@ use futures_core::future::LocalBoxFuture;
 ///     }
 /// }
 ///
-/// let resolver = MyResolver {
+/// let my_resolver = MyResolver {
 ///     trust_dns: TokioAsyncResolver::tokio_from_system_conf().unwrap(),
 /// };
 ///
-/// // construct custom resolver
-/// let resolver = Resolver::new_custom(resolver);
-///
-/// // pass custom resolver to connector builder.
-/// // connector would then be usable as a service or an `awc` connector.
-/// let connector = actix_tls::connect::new_connector::<&str>(resolver.clone());
+/// // wrap custom resolver
+/// let resolver = Resolver::custom(my_resolver);
 ///
 /// // resolver can be passed to connector factory where returned service factory
-/// // can be used to construct new connector services.
-/// let factory = actix_tls::connect::new_connector_factory::<&str>(resolver);
+/// // can be used to construct new connector services for use in clients
+/// let factory = actix_tls::connect::Connector::new(resolver);
+/// let connector = factory.service();
 /// ```
 pub trait Resolve {
     /// Given DNS lookup information, returns a future that completes with socket information.

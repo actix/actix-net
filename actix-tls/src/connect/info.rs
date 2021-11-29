@@ -10,7 +10,7 @@ use std::{
 
 use super::{
     connect_addrs::{ConnectAddrs, ConnectAddrsIter},
-    Address,
+    Host,
 };
 
 /// Connection request information.
@@ -18,45 +18,47 @@ use super::{
 /// May contain known/pre-resolved socket address(es) or a host that needs resolving with DNS.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ConnectionInfo<R> {
-    pub(crate) req: R,
+    pub(crate) request: R,
     pub(crate) port: u16,
     pub(crate) addr: ConnectAddrs,
     pub(crate) local_addr: Option<IpAddr>,
 }
 
-impl<R: Address> ConnectionInfo<R> {
-    /// Create `Connect` instance by splitting the host at ':' and convert the second part to u16.
-    // TODO: assess usage and find nicer API
-    pub fn new(req: R) -> ConnectionInfo<R> {
-        let (_, port) = parse_host(req.hostname());
+impl<R: Host> ConnectionInfo<R> {
+    /// Constructs new connection info using a request.
+    pub fn new(request: R) -> ConnectionInfo<R> {
+        let port = request.port();
 
         ConnectionInfo {
-            req,
+            request,
             port: port.unwrap_or(0),
             addr: ConnectAddrs::None,
             local_addr: None,
         }
     }
 
-    /// Create new `Connect` instance from host and socket address.
+    /// Constructs new connection info from request and known socket address.
     ///
-    /// Since socket address is known, Connector will skip name resolution stage.
-    pub fn with_addr(req: R, addr: SocketAddr) -> ConnectionInfo<R> {
+    /// Since socket address is known, [`Connector`](super::Connector) will skip the DNS
+    /// resolution step.
+    pub fn with_addr(request: R, addr: SocketAddr) -> ConnectionInfo<R> {
         ConnectionInfo {
-            req,
+            request,
             port: 0,
             addr: ConnectAddrs::One(addr),
             local_addr: None,
         }
     }
 
-    /// Set port if address does not provide one.
+    /// Set connection port.
+    ///
+    /// If request provided a port, this will override it.
     pub fn set_port(mut self, port: u16) -> Self {
         self.port = port;
         self
     }
 
-    /// Set connect address.
+    /// Set connection socket address.
     pub fn set_addr(mut self, addr: impl Into<Option<SocketAddr>>) -> Self {
         self.addr = ConnectAddrs::from(addr.into());
         self
@@ -76,36 +78,46 @@ impl<R: Address> ConnectionInfo<R> {
         self
     }
 
-    /// Set local_addr of connect.
+    /// Set local address to connection with.
+    ///
+    /// Useful in situations where you know the IP address bound to a particular network interface
+    /// and want to make sure the socket is opened through that interface.
     pub fn set_local_addr(mut self, addr: impl Into<IpAddr>) -> Self {
         self.local_addr = Some(addr.into());
         self
     }
 
-    /// Get hostname.
+    /// Returns a reference to the connection request.
+    pub fn request(&self) -> &R {
+        &self.request
+    }
+
+    /// Returns request hostname.
     pub fn hostname(&self) -> &str {
-        self.req.hostname()
+        self.request.hostname()
     }
 
-    /// Get request port.
+    /// Returns request port.
     pub fn port(&self) -> u16 {
-        self.req.port().unwrap_or(self.port)
+        self.request.port().unwrap_or(self.port)
     }
 
-    /**
-    Get resolved request addresses.
-
-    # Examples
-    ```
-    # use std::net::SocketAddr;
-    # use actix_tls::connect::ConnectionInfo;
-    let addr = SocketAddr::from(([127, 0, 0, 1], 4242));
-
-    let conn = ConnectionInfo::with_addr("localhost").set_addr(None);
-    let mut addrs = conn.addrs();
-    assert!(addrs.next().is_none());
-    ```
-    */
+    /// Get borrowed iterator of resolved request addresses.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::net::SocketAddr;
+    /// # use actix_tls::connect::ConnectionInfo;
+    /// let addr = SocketAddr::from(([127, 0, 0, 1], 4242));
+    ///
+    /// let conn = ConnectionInfo::new("localhost");
+    /// let mut addrs = conn.addrs();
+    /// assert!(addrs.next().is_none());
+    ///
+    /// let conn = ConnectionInfo::with_addr("localhost", addr);
+    /// let mut addrs = conn.addrs();
+    /// assert_eq!(addrs.next().unwrap(), addr);
+    /// ```
     pub fn addrs(
         &self,
     ) -> impl Iterator<Item = SocketAddr>
@@ -121,14 +133,22 @@ impl<R: Address> ConnectionInfo<R> {
         }
     }
 
-    /**
-    Take resolved request addresses.
-
-    # Examples
-    ```
-
-    ```
-    */
+    /// Take owned iterator resolved request addresses.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::net::SocketAddr;
+    /// # use actix_tls::connect::ConnectionInfo;
+    /// let addr = SocketAddr::from(([127, 0, 0, 1], 4242));
+    ///
+    /// let mut conn = ConnectionInfo::new("localhost");
+    /// let mut addrs = conn.take_addrs();
+    /// assert!(addrs.next().is_none());
+    ///
+    /// let mut conn = ConnectionInfo::with_addr("localhost", addr);
+    /// let mut addrs = conn.take_addrs();
+    /// assert_eq!(addrs.next().unwrap(), addr);
+    /// ```
     pub fn take_addrs(
         &mut self,
     ) -> impl Iterator<Item = SocketAddr>
@@ -143,36 +163,17 @@ impl<R: Address> ConnectionInfo<R> {
             ConnectAddrs::Multi(addrs) => ConnectAddrsIter::MultiOwned(addrs.into_iter()),
         }
     }
-
-    /// Returns a reference to the connection request.
-    pub fn request(&self) -> &R {
-        &self.req
-    }
 }
 
-impl<R: Address> From<R> for ConnectionInfo<R> {
+impl<R: Host> From<R> for ConnectionInfo<R> {
     fn from(addr: R) -> Self {
         ConnectionInfo::new(addr)
     }
 }
 
-impl<R: Address> fmt::Display for ConnectionInfo<R> {
+impl<R: Host> fmt::Display for ConnectionInfo<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.hostname(), self.port())
-    }
-}
-
-fn parse_host(host: &str) -> (&str, Option<u16>) {
-    let mut parts_iter = host.splitn(2, ':');
-
-    match parts_iter.next() {
-        Some(hostname) => {
-            let port_str = parts_iter.next().unwrap_or("");
-            let port = port_str.parse::<u16>().ok();
-            (hostname, port)
-        }
-
-        None => (host, None),
     }
 }
 
@@ -181,15 +182,6 @@ mod tests {
     use std::net::Ipv4Addr;
 
     use super::*;
-
-    #[test]
-    fn test_host_parser() {
-        assert_eq!(parse_host("example.com"), ("example.com", None));
-        assert_eq!(parse_host("example.com:8080"), ("example.com", Some(8080)));
-        assert_eq!(parse_host("example:8080"), ("example", Some(8080)));
-        assert_eq!(parse_host("example.com:false"), ("example.com", None));
-        assert_eq!(parse_host("example.com:false:false"), ("example.com", None));
-    }
 
     #[test]
     fn test_addr_iter_multi() {

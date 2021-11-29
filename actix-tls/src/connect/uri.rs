@@ -1,8 +1,8 @@
 use http::Uri;
 
-use super::Address;
+use super::Host;
 
-impl Address for Uri {
+impl Host for Uri {
     fn hostname(&self) -> &str {
         self.host().unwrap_or("")
     }
@@ -35,8 +35,17 @@ fn scheme_to_port(scheme: Option<&str>) -> Option<u16> {
         Some("mqtts") => Some(8883),
 
         // File Transfer Protocol (FTP)
-        Some("ftp") => Some(1883),
+        Some("ftp") => Some(21),
         Some("ftps") => Some(990),
+
+        // Redis
+        Some("redis") => Some(6379),
+
+        // MySQL
+        Some("mysql") => Some(3306),
+
+        // PostgreSQL
+        Some("postgres") => Some(5432),
 
         _ => None,
     }

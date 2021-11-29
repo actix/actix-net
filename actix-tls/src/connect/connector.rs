@@ -6,71 +6,50 @@ use std::{
 
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
-use futures_core::{future::LocalBoxFuture, ready};
+use actix_utils::future::{ok, Ready};
+use futures_core::ready;
 
 use super::{
     error::ConnectError,
     resolver::{Resolver, ResolverService},
     tcp::{TcpConnector, TcpConnectorService},
-    Address, Connection, ConnectionInfo,
+    Connection, ConnectionInfo, Host,
 };
 
 /// Combined resolver and TCP connector service factory.
 ///
 /// Used to create [`ConnectService`]s which receive connection information, resolve DNS if
 /// required, and return a TCP stream.
+#[derive(Clone, Default)]
 pub struct Connector {
-    tcp: TcpConnector,
     resolver: Resolver,
 }
 
 impl Connector {
-    /// Constructs new connector factory.
+    /// Constructs new connector factory with the given resolver.
     pub fn new(resolver: Resolver) -> Self {
-        Connector {
-            tcp: TcpConnector,
-            resolver,
-        }
+        Connector { resolver }
     }
 
     /// Build connector service.
     pub fn service(&self) -> ConnectorService {
         ConnectorService {
-            tcp: self.tcp.service(),
+            tcp: TcpConnector.service(),
             resolver: self.resolver.service(),
         }
     }
 }
 
-impl Clone for Connector {
-    fn clone(&self) -> Self {
-        Connector {
-            tcp: self.tcp,
-            resolver: self.resolver.clone(),
-        }
-    }
-}
-
-impl Default for Connector {
-    fn default() -> Self {
-        Self {
-            tcp: TcpConnector,
-            resolver: Resolver::default(),
-        }
-    }
-}
-
-impl<R: Address> ServiceFactory<ConnectionInfo<R>> for Connector {
+impl<R: Host> ServiceFactory<ConnectionInfo<R>> for Connector {
     type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
     type Config = ();
     type Service = ConnectorService;
     type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        let service = self.service();
-        Box::pin(async { Ok(service) })
+        ok(self.service())
     }
 }
 
@@ -84,7 +63,7 @@ pub struct ConnectorService {
     resolver: ResolverService,
 }
 
-impl<R: Address> Service<ConnectionInfo<R>> for ConnectorService {
+impl<R: Host> Service<ConnectionInfo<R>> for ConnectorService {
     type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
     type Future = ConnectServiceResponse<R>;
@@ -100,18 +79,18 @@ impl<R: Address> Service<ConnectionInfo<R>> for ConnectorService {
 }
 
 // helper enum to generic over futures of resolve and connect phase.
-pub(crate) enum ConnectFuture<R: Address> {
+pub(crate) enum ConnectFuture<R: Host> {
     Resolve(<ResolverService as Service<ConnectionInfo<R>>>::Future),
     Connect(<TcpConnectorService as Service<ConnectionInfo<R>>>::Future),
 }
 
 /// Helper enum to contain the future output of `ConnectFuture`.
-pub(crate) enum ConnectOutput<R: Address> {
+pub(crate) enum ConnectOutput<R: Host> {
     Resolved(ConnectionInfo<R>),
     Connected(Connection<R, TcpStream>),
 }
 
-impl<R: Address> ConnectFuture<R> {
+impl<R: Host> ConnectFuture<R> {
     fn poll_connect(
         &mut self,
         cx: &mut Context<'_>,
@@ -127,12 +106,12 @@ impl<R: Address> ConnectFuture<R> {
     }
 }
 
-pub struct ConnectServiceResponse<R: Address> {
+pub struct ConnectServiceResponse<R: Host> {
     fut: ConnectFuture<R>,
     tcp: TcpConnectorService,
 }
 
-impl<R: Address> Future for ConnectServiceResponse<R> {
+impl<R: Host> Future for ConnectServiceResponse<R> {
     type Output = Result<Connection<R, TcpStream>, ConnectError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

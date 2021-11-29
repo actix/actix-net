@@ -16,7 +16,10 @@ use actix_rt::{
     time::timeout,
 };
 use actix_service::{Service, ServiceFactory};
-use actix_utils::counter::Counter;
+use actix_utils::{
+    counter::Counter,
+    future::{ready, Ready as FutReady},
+};
 use derive_more::{Deref, DerefMut, From};
 use futures_core::future::LocalBoxFuture;
 pub use tokio_native_tls::{native_tls::Error, TlsAcceptor};
@@ -117,7 +120,7 @@ impl<IO: ActixStream + 'static> ServiceFactory<IO> for Acceptor {
     type Config = ();
     type Service = AcceptorService;
     type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+    type Future = FutReady<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         let res = MAX_CONN_COUNTER.with(|conns| {
@@ -128,7 +131,7 @@ impl<IO: ActixStream + 'static> ServiceFactory<IO> for Acceptor {
             })
         });
 
-        Box::pin(async { res })
+        ready(res)
     }
 }
 

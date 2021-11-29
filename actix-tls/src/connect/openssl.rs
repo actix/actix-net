@@ -14,10 +14,10 @@ use actix_service::{Service, ServiceFactory};
 use actix_utils::future::{ok, Ready};
 use futures_core::ready;
 use log::trace;
-use openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
+use openssl::ssl::SslConnector;
 use tokio_openssl::SslStream;
 
-use crate::connect::{Address, Connection};
+use crate::connect::{Connection, Host};
 
 pub mod reexports {
     //! Re-exports from `openssl` that are useful for connectors.
@@ -52,7 +52,7 @@ impl Clone for Connector {
 
 impl<R, IO> ServiceFactory<Connection<R, IO>> for Connector
 where
-    R: Address,
+    R: Host,
     IO: ActixStream + 'static,
 {
     type Response = Connection<R, SslStream<IO>>;
@@ -84,7 +84,7 @@ impl Clone for ConnectorService {
 
 impl<R, IO> Service<Connection<R, IO>> for ConnectorService
 where
-    R: Address,
+    R: Host,
     IO: ActixStream,
 {
     type Response = Connection<R, SslStream<IO>>;
@@ -121,9 +121,9 @@ pub struct ConnectFut<R, IO> {
     stream: Option<Connection<R, ()>>,
 }
 
-impl<R: Address, IO> Future for ConnectFut<R, IO>
+impl<R: Host, IO> Future for ConnectFut<R, IO>
 where
-    R: Address,
+    R: Host,
     IO: ActixStream,
 {
     type Output = Result<Connection<R, SslStream<IO>>, io::Error>;

@@ -1,7 +1,7 @@
 //! TCP and TLS connector services.
 //!
 //! # Stages of the TCP connector service:
-//! 1. Resolve [`Address`] with given [`Resolver`] and collect list of socket addresses.
+//! 1. Resolve [`Host`] (if needed) with given [`Resolver`] and collect list of socket addresses.
 //! 1. Establish TCP connection and return [`TcpStream`].
 //!
 //! # Stages of TLS connector services:
@@ -13,11 +13,11 @@
 //! [`AsyncRead`]: actix_rt::net::AsyncRead
 //! [`AsyncWrite`]: actix_rt::net::AsyncWrite
 
-mod address;
 mod connect_addrs;
 mod connection;
 mod connector;
 mod error;
+mod host;
 mod info;
 mod resolve;
 mod resolver;
@@ -39,10 +39,10 @@ pub mod rustls;
 #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
 pub mod native_tls;
 
-pub use self::address::Address;
 pub use self::connection::Connection;
 pub use self::connector::{Connector, ConnectorService};
 pub use self::error::ConnectError;
+pub use self::host::Host;
 pub use self::info::ConnectionInfo;
 pub use self::resolve::Resolve;
 pub use self::resolver::{Resolver, ResolverService};

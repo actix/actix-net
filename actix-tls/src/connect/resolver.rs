@@ -14,7 +14,7 @@ use actix_utils::future::{ok, Ready};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::trace;
 
-use super::{Address, ConnectError, ConnectionInfo, Resolve};
+use super::{ConnectError, ConnectionInfo, Host, Resolve};
 
 /// DNS resolver service factory.
 #[derive(Clone, Default)]
@@ -36,7 +36,7 @@ impl Resolver {
     }
 }
 
-impl<R: Address> ServiceFactory<ConnectionInfo<R>> for Resolver {
+impl<R: Host> ServiceFactory<ConnectionInfo<R>> for Resolver {
     type Response = ConnectionInfo<R>;
     type Error = ConnectError;
     type Config = ();
@@ -81,7 +81,7 @@ impl ResolverService {
     }
 
     /// Resolve DNS with default resolver.
-    fn look_up<R: Address>(
+    fn look_up<R: Host>(
         req: &ConnectionInfo<R>,
     ) -> JoinHandle<io::Result<IntoIter<SocketAddr>>> {
         let host = req.hostname();
@@ -109,32 +109,33 @@ impl ResolverService {
     }
 }
 
-impl<R: Address> Service<ConnectionInfo<R>> for ResolverService {
+impl<R: Host> Service<ConnectionInfo<R>> for ResolverService {
     type Response = ConnectionInfo<R>;
     type Error = ConnectError;
-    type Future = ResolverFuture<R>;
+    type Future = ResolverFut<R>;
 
     actix_service::always_ready!();
 
     fn call(&self, req: ConnectionInfo<R>) -> Self::Future {
         if req.addr.is_some() {
-            ResolverFuture::Connected(Some(req))
+            ResolverFut::Connected(Some(req))
         } else if let Ok(ip) = req.hostname().parse() {
             let addr = SocketAddr::new(ip, req.port());
             let req = req.set_addr(Some(addr));
-            ResolverFuture::Connected(Some(req))
+            ResolverFut::Connected(Some(req))
         } else {
             trace!("DNS resolver: resolving host {:?}", req.hostname());
 
             match &self.kind {
                 ResolverKind::Default => {
                     let fut = Self::look_up(&req);
-                    ResolverFuture::LookUp(fut, Some(req))
+                    ResolverFut::LookUp(fut, Some(req))
                 }
 
                 ResolverKind::Custom(resolver) => {
                     let resolver = Rc::clone(resolver);
-                    ResolverFuture::LookupCustom(Box::pin(async move {
+
+                    ResolverFut::LookupCustom(Box::pin(async move {
                         let addrs = resolver
                             .lookup(req.hostname(), req.port())
                             .await
@@ -154,7 +155,8 @@ impl<R: Address> Service<ConnectionInfo<R>> for ResolverService {
     }
 }
 
-pub enum ResolverFuture<R: Address> {
+/// Future for resolver service.
+pub enum ResolverFut<R: Host> {
     Connected(Option<ConnectionInfo<R>>),
     LookUp(
         JoinHandle<io::Result<IntoIter<SocketAddr>>>,
@@ -163,7 +165,7 @@ pub enum ResolverFuture<R: Address> {
     LookupCustom(LocalBoxFuture<'static, Result<ConnectionInfo<R>, ConnectError>>),
 }
 
-impl<R: Address> Future for ResolverFuture<R> {
+impl<R: Host> Future for ResolverFut<R> {
     type Output = Result<ConnectionInfo<R>, ConnectError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

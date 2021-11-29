@@ -21,7 +21,7 @@ use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
 use tokio_rustls::{Connect as RustlsConnect, TlsConnector as RustlsTlsConnector};
 use webpki_roots::TLS_SERVER_ROOTS;
 
-use crate::connect::{Address, Connection};
+use crate::connect::{Connection, Host};
 
 pub mod reexports {
     //! Re-exports from `rustls` and `webpki_roots` that are useful for connectors.
@@ -66,7 +66,7 @@ impl Connector {
 
 impl<R, IO> ServiceFactory<Connection<R, IO>> for Connector
 where
-    R: Address,
+    R: Host,
     IO: ActixStream + 'static,
 {
     type Response = Connection<R, TlsStream<IO>>;
@@ -91,7 +91,7 @@ pub struct ConnectorService {
 
 impl<R, IO> Service<Connection<R, IO>> for ConnectorService
 where
-    R: Address,
+    R: Host,
     IO: ActixStream,
 {
     type Response = Connection<R, TlsStream<IO>>;
@@ -127,7 +127,7 @@ pub enum ConnectFut<R, IO> {
 
 impl<R, IO> Future for ConnectFut<R, IO>
 where
-    R: Address,
+    R: Host,
     IO: ActixStream,
 {
     type Output = Result<Connection<R, TlsStream<IO>>, io::Error>;

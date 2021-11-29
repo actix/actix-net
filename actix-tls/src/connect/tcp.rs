@@ -13,12 +13,13 @@ use std::{
 
 use actix_rt::net::{TcpSocket, TcpStream};
 use actix_service::{Service, ServiceFactory};
-use futures_core::{future::LocalBoxFuture, ready};
+use actix_utils::future::{ok, Ready};
+use futures_core::ready;
 use log::{error, trace};
 use tokio_util::sync::ReusableBoxFuture;
 
 use super::{
-    connect_addrs::ConnectAddrs, error::ConnectError, Address, Connection, ConnectionInfo,
+    connect_addrs::ConnectAddrs, error::ConnectError, Connection, ConnectionInfo, Host,
 };
 
 /// TCP connector service factory.
@@ -26,23 +27,22 @@ use super::{
 pub struct TcpConnector;
 
 impl TcpConnector {
-    /// Create TCP connector service
+    /// Returns a new TCP connector service.
     pub fn service(&self) -> TcpConnectorService {
         TcpConnectorService
     }
 }
 
-impl<R: Address> ServiceFactory<ConnectionInfo<R>> for TcpConnector {
+impl<R: Host> ServiceFactory<ConnectionInfo<R>> for TcpConnector {
     type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
     type Config = ();
     type Service = TcpConnectorService;
     type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        let service = self.service();
-        Box::pin(async move { Ok(service) })
+        ok(self.service())
     }
 }
 
@@ -50,7 +50,7 @@ impl<R: Address> ServiceFactory<ConnectionInfo<R>> for TcpConnector {
 #[derive(Debug, Copy, Clone)]
 pub struct TcpConnectorService;
 
-impl<R: Address> Service<ConnectionInfo<R>> for TcpConnectorService {
+impl<R: Host> Service<ConnectionInfo<R>> for TcpConnectorService {
     type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
     type Future = TcpConnectorFut<R>;
@@ -59,8 +59,9 @@ impl<R: Address> Service<ConnectionInfo<R>> for TcpConnectorService {
 
     fn call(&self, req: ConnectionInfo<R>) -> Self::Future {
         let port = req.port();
+
         let ConnectionInfo {
-            req,
+            request: req,
             addr,
             local_addr,
             ..
@@ -84,7 +85,7 @@ pub enum TcpConnectorFut<R> {
     Error(Option<ConnectError>),
 }
 
-impl<R: Address> TcpConnectorFut<R> {
+impl<R: Host> TcpConnectorFut<R> {
     pub(crate) fn new(
         req: R,
         port: u16,
@@ -130,7 +131,7 @@ impl<R: Address> TcpConnectorFut<R> {
     }
 }
 
-impl<R: Address> Future for TcpConnectorFut<R> {
+impl<R: Host> Future for TcpConnectorFut<R> {
     type Output = Result<Connection<R, TcpStream>, ConnectError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

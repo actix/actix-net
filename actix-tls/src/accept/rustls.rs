@@ -18,9 +18,11 @@ use actix_rt::{
     time::{sleep, Sleep},
 };
 use actix_service::{Service, ServiceFactory};
-use actix_utils::counter::{Counter, CounterGuard};
+use actix_utils::{
+    counter::{Counter, CounterGuard},
+    future::{ready, Ready as FutReady},
+};
 use derive_more::{Deref, DerefMut, From};
-use futures_core::future::LocalBoxFuture;
 use pin_project_lite::pin_project;
 pub use tokio_rustls::rustls::ServerConfig;
 use tokio_rustls::{Accept, TlsAcceptor};
@@ -120,7 +122,7 @@ impl<IO: ActixStream> ServiceFactory<IO> for Acceptor {
     type Config = ();
     type Service = AcceptorService;
     type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+    type Future = FutReady<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         let res = MAX_CONN_COUNTER.with(|conns| {
@@ -131,7 +133,7 @@ impl<IO: ActixStream> ServiceFactory<IO> for Acceptor {
             })
         });
 
-        Box::pin(async { res })
+        ready(res)
     }
 }
 

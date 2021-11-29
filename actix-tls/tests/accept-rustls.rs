@@ -7,13 +7,15 @@
     feature = "openssl"
 ))]
 
+extern crate tls_openssl as openssl;
+
 use std::io::{BufReader, Write};
 
 use actix_rt::net::TcpStream;
 use actix_server::TestServer;
 use actix_service::ServiceFactoryExt as _;
 use actix_tls::accept::rustls::{Acceptor, TlsStream};
-use actix_tls::connect::tls::openssl::SslConnector;
+use actix_tls::connect::openssl::reexports::SslConnector;
 use actix_utils::future::ok;
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use tls_openssl::ssl::SslVerifyMode;
@@ -53,13 +55,13 @@ fn rustls_server_config(cert: String, key: String) -> rustls::ServerConfig {
 }
 
 fn openssl_connector(cert: String, key: String) -> SslConnector {
-    use actix_tls::connect::tls::openssl::{SslConnector as OpensslConnector, SslMethod};
-    use tls_openssl::{pkey::PKey, x509::X509};
+    use actix_tls::connect::openssl::reexports::SslMethod;
+    use openssl::{pkey::PKey, x509::X509};
 
     let cert = X509::from_pem(cert.as_bytes()).unwrap();
     let key = PKey::private_key_from_pem(key.as_bytes()).unwrap();
 
-    let mut ssl = OpensslConnector::builder(SslMethod::tls()).unwrap();
+    let mut ssl = SslConnector::builder(SslMethod::tls()).unwrap();
     ssl.set_verify(SslVerifyMode::NONE);
     ssl.set_certificate(&cert).unwrap();
     ssl.set_private_key(&key).unwrap();

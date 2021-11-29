@@ -16,6 +16,7 @@
 * Remove `connect::{new_connector, new_connector_factory, default_connector, default_connector_factory}` methods. [#422]
 * Convert `connect::ResolverService` from enum to struct. [#422]
 * Remove `connect::native_tls::Connector::service` method. [#422]
+* Rename `connect::{Address => Host}` trait. [#422]
 
 [#422]: https://github.com/actix/actix-net/pull/422
 

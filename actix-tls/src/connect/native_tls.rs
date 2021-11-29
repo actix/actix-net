@@ -14,7 +14,7 @@ use tokio_native_tls::{
     TlsStream,
 };
 
-use crate::connect::{Address, Connection};
+use crate::connect::{Connection, Host};
 
 pub mod reexports {
     //! Re-exports from `native-tls` that are useful for connectors.
@@ -39,7 +39,7 @@ impl TlsConnector {
     }
 }
 
-impl<R: Address, IO> ServiceFactory<Connection<R, IO>> for TlsConnector
+impl<R: Host, IO> ServiceFactory<Connection<R, IO>> for TlsConnector
 where
     IO: ActixStream + 'static,
 {
@@ -59,7 +59,7 @@ where
 /// As the factory and service share the same type and state.
 impl<R, IO> Service<Connection<R, IO>> for TlsConnector
 where
-    R: Address,
+    R: Host,
     IO: ActixStream + 'static,
 {
     type Response = Connection<R, TlsStream<IO>>;

@@ -1,6 +1,6 @@
 use derive_more::{Deref, DerefMut};
 
-use super::Address;
+use super::Host;
 
 /// Wraps underlying I/O and the connection request that initiated it.
 #[derive(Debug, Deref, DerefMut)]
@@ -46,7 +46,7 @@ impl<R, IO> Connection<R, IO> {
     }
 }
 
-impl<R: Address, IO> Connection<R, IO> {
+impl<R: Host, IO> Connection<R, IO> {
     /// Get hostname.
     pub fn hostname(&self) -> &str {
         self.req.hostname()
