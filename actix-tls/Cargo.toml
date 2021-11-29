@@ -21,7 +21,7 @@ name = "actix_tls"
 path = "src/lib.rs"
 
 [features]
-default = ["accept", "connect", "uri", "rustls", "openssl", "native-tls"]
+default = []
 
 # enable acceptor services
 accept = []
