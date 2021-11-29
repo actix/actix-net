@@ -1,4 +1,4 @@
-//! TLS acceptor services.
+//! TLS connection acceptor services.
 
 use std::{
     convert::Infallible,
@@ -6,14 +6,18 @@ use std::{
 };
 
 use actix_utils::counter::Counter;
+use derive_more::{Display, Error};
 
 #[cfg(feature = "openssl")]
+#[cfg_attr(docsrs, doc(cfg(feature = "openssl")))]
 pub mod openssl;
 
 #[cfg(feature = "rustls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rustls")))]
 pub mod rustls;
 
 #[cfg(feature = "native-tls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
 pub mod native_tls;
 
 pub(crate) static MAX_CONN: AtomicUsize = AtomicUsize::new(256);
@@ -41,15 +45,18 @@ pub fn max_concurrent_tls_connect(num: usize) {
 /// All TLS acceptors from this crate will return the `SvcErr` type parameter as [`Infallible`],
 /// which can be cast to your own service type, inferred or otherwise,
 /// using [`into_service_error`](Self::into_service_error).
-#[derive(Debug)]
+#[derive(Debug, Display, Error)]
 pub enum TlsError<TlsErr, SvcErr> {
     /// TLS handshake has timed-out.
+    #[display(fmt = "TLS handshake has timed-out")]
     Timeout,
 
     /// Wraps TLS service errors.
+    #[display(fmt = "TLS handshake error")]
     Tls(TlsErr),
 
-    /// Wraps inner service errors.
+    /// Wraps service errors.
+    #[display(fmt = "Service error")]
     Service(SvcErr),
 }
 

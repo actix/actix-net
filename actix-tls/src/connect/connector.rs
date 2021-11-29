@@ -1,194 +1,127 @@
 use std::{
-    collections::VecDeque,
     future::Future,
-    io,
-    net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
     pin::Pin,
     task::{Context, Poll},
 };
 
-use actix_rt::net::{TcpSocket, TcpStream};
+use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
-use futures_core::{future::LocalBoxFuture, ready};
-use log::{error, trace};
-use tokio_util::sync::ReusableBoxFuture;
+use actix_utils::future::{ok, Ready};
+use futures_core::ready;
 
-use super::connect::{Address, Connect, ConnectAddrs, Connection};
-use super::error::ConnectError;
+use super::{
+    error::ConnectError,
+    resolver::{Resolver, ResolverService},
+    tcp::{TcpConnector, TcpConnectorService},
+    ConnectInfo, Connection, Host,
+};
 
-/// TCP connector service factory
-#[derive(Debug, Copy, Clone)]
-pub struct TcpConnectorFactory;
+/// Combined resolver and TCP connector service factory.
+///
+/// Used to create [`ConnectorService`]s which receive connection information, resolve DNS if
+/// required, and return a TCP stream.
+#[derive(Clone, Default)]
+pub struct Connector {
+    resolver: Resolver,
+}
 
-impl TcpConnectorFactory {
-    /// Create TCP connector service
-    pub fn service(&self) -> TcpConnector {
-        TcpConnector
+impl Connector {
+    /// Constructs new connector factory with the given resolver.
+    pub fn new(resolver: Resolver) -> Self {
+        Connector { resolver }
+    }
+
+    /// Build connector service.
+    pub fn service(&self) -> ConnectorService {
+        ConnectorService {
+            tcp: TcpConnector.service(),
+            resolver: self.resolver.service(),
+        }
     }
 }
 
-impl<T: Address> ServiceFactory<Connect<T>> for TcpConnectorFactory {
-    type Response = Connection<T, TcpStream>;
+impl<R: Host> ServiceFactory<ConnectInfo<R>> for Connector {
+    type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
     type Config = ();
-    type Service = TcpConnector;
+    type Service = ConnectorService;
     type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        let service = self.service();
-        Box::pin(async move { Ok(service) })
+        ok(self.service())
     }
 }
 
-/// TCP connector service
-#[derive(Debug, Copy, Clone)]
-pub struct TcpConnector;
+/// Combined resolver and TCP connector service.
+///
+/// Service implementation receives connection information, resolves DNS if required, and returns
+/// a TCP stream.
+#[derive(Clone)]
+pub struct ConnectorService {
+    tcp: TcpConnectorService,
+    resolver: ResolverService,
+}
 
-impl<T: Address> Service<Connect<T>> for TcpConnector {
-    type Response = Connection<T, TcpStream>;
+impl<R: Host> Service<ConnectInfo<R>> for ConnectorService {
+    type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
-    type Future = TcpConnectorResponse<T>;
+    type Future = ConnectServiceResponse<R>;
 
     actix_service::always_ready!();
 
-    fn call(&self, req: Connect<T>) -> Self::Future {
-        let port = req.port();
-        let Connect {
-            req,
-            addr,
-            local_addr,
-            ..
-        } = req;
-
-        TcpConnectorResponse::new(req, port, local_addr, addr)
+    fn call(&self, req: ConnectInfo<R>) -> Self::Future {
+        ConnectServiceResponse {
+            fut: ConnectFut::Resolve(self.resolver.call(req)),
+            tcp: self.tcp,
+        }
     }
 }
 
-/// TCP stream connector response future
-pub enum TcpConnectorResponse<T> {
-    Response {
-        req: Option<T>,
-        port: u16,
-        local_addr: Option<IpAddr>,
-        addrs: Option<VecDeque<SocketAddr>>,
-        stream: ReusableBoxFuture<Result<TcpStream, io::Error>>,
-    },
-    Error(Option<ConnectError>),
+/// Helper enum to generic over futures of resolve and connect steps.
+pub(crate) enum ConnectFut<R: Host> {
+    Resolve(<ResolverService as Service<ConnectInfo<R>>>::Future),
+    Connect(<TcpConnectorService as Service<ConnectInfo<R>>>::Future),
 }
 
-impl<T: Address> TcpConnectorResponse<T> {
-    pub(crate) fn new(
-        req: T,
-        port: u16,
-        local_addr: Option<IpAddr>,
-        addr: ConnectAddrs,
-    ) -> TcpConnectorResponse<T> {
-        if addr.is_none() {
-            error!("TCP connector: unresolved connection address");
-            return TcpConnectorResponse::Error(Some(ConnectError::Unresolved));
-        }
+/// Helper enum to contain the future output of `ConnectFuture`.
+pub(crate) enum ConnectOutput<R: Host> {
+    Resolved(ConnectInfo<R>),
+    Connected(Connection<R, TcpStream>),
+}
 
-        trace!(
-            "TCP connector: connecting to {} on port {}",
-            req.hostname(),
-            port
-        );
-
-        match addr {
-            ConnectAddrs::None => unreachable!("none variant already checked"),
-
-            ConnectAddrs::One(addr) => TcpConnectorResponse::Response {
-                req: Some(req),
-                port,
-                local_addr,
-                addrs: None,
-                stream: ReusableBoxFuture::new(connect(addr, local_addr)),
-            },
-
-            // when resolver returns multiple socket addr for request they would be popped from
-            // front end of queue and returns with the first successful tcp connection.
-            ConnectAddrs::Multi(mut addrs) => {
-                let addr = addrs.pop_front().unwrap();
-
-                TcpConnectorResponse::Response {
-                    req: Some(req),
-                    port,
-                    local_addr,
-                    addrs: Some(addrs),
-                    stream: ReusableBoxFuture::new(connect(addr, local_addr)),
-                }
+impl<R: Host> ConnectFut<R> {
+    fn poll_connect(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<ConnectOutput<R>, ConnectError>> {
+        match self {
+            ConnectFut::Resolve(ref mut fut) => {
+                Pin::new(fut).poll(cx).map_ok(ConnectOutput::Resolved)
+            }
+            ConnectFut::Connect(ref mut fut) => {
+                Pin::new(fut).poll(cx).map_ok(ConnectOutput::Connected)
             }
         }
     }
 }
 
-impl<T: Address> Future for TcpConnectorResponse<T> {
-    type Output = Result<Connection<T, TcpStream>, ConnectError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.get_mut() {
-            TcpConnectorResponse::Error(err) => Poll::Ready(Err(err.take().unwrap())),
-
-            TcpConnectorResponse::Response {
-                req,
-                port,
-                local_addr,
-                addrs,
-                stream,
-            } => loop {
-                match ready!(stream.poll(cx)) {
-                    Ok(sock) => {
-                        let req = req.take().unwrap();
-                        trace!(
-                            "TCP connector: successfully connected to {:?} - {:?}",
-                            req.hostname(),
-                            sock.peer_addr()
-                        );
-                        return Poll::Ready(Ok(Connection::new(sock, req)));
-                    }
-
-                    Err(err) => {
-                        trace!(
-                            "TCP connector: failed to connect to {:?} port: {}",
-                            req.as_ref().unwrap().hostname(),
-                            port,
-                        );
-
-                        if let Some(addr) = addrs.as_mut().and_then(|addrs| addrs.pop_front()) {
-                            stream.set(connect(addr, *local_addr));
-                        } else {
-                            return Poll::Ready(Err(ConnectError::Io(err)));
-                        }
-                    }
-                }
-            },
-        }
-    }
+pub struct ConnectServiceResponse<R: Host> {
+    fut: ConnectFut<R>,
+    tcp: TcpConnectorService,
 }
 
-async fn connect(addr: SocketAddr, local_addr: Option<IpAddr>) -> io::Result<TcpStream> {
-    // use local addr if connect asks for it.
-    match local_addr {
-        Some(ip_addr) => {
-            let socket = match ip_addr {
-                IpAddr::V4(ip_addr) => {
-                    let socket = TcpSocket::new_v4()?;
-                    let addr = SocketAddr::V4(SocketAddrV4::new(ip_addr, 0));
-                    socket.bind(addr)?;
-                    socket
-                }
-                IpAddr::V6(ip_addr) => {
-                    let socket = TcpSocket::new_v6()?;
-                    let addr = SocketAddr::V6(SocketAddrV6::new(ip_addr, 0, 0, 0));
-                    socket.bind(addr)?;
-                    socket
-                }
-            };
+impl<R: Host> Future for ConnectServiceResponse<R> {
+    type Output = Result<Connection<R, TcpStream>, ConnectError>;
 
-            socket.connect(addr).await
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        loop {
+            match ready!(self.fut.poll_connect(cx))? {
+                ConnectOutput::Resolved(res) => {
+                    self.fut = ConnectFut::Connect(self.tcp.call(res));
+                }
+                ConnectOutput::Connected(res) => return Poll::Ready(Ok(res)),
+            }
         }
-
-        None => TcpStream::connect(addr).await,
     }
 }

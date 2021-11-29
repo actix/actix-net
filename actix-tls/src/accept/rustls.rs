@@ -1,8 +1,11 @@
+//! `rustls` based TLS connection acceptor service.
+//!
+//! See [`Acceptor`] for main service factory docs.
+
 use std::{
     convert::Infallible,
     future::Future,
     io::{self, IoSlice},
-    ops::{Deref, DerefMut},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -15,39 +18,28 @@ use actix_rt::{
     time::{sleep, Sleep},
 };
 use actix_service::{Service, ServiceFactory};
-use actix_utils::counter::{Counter, CounterGuard};
-use futures_core::future::LocalBoxFuture;
+use actix_utils::{
+    counter::{Counter, CounterGuard},
+    future::{ready, Ready as FutReady},
+};
+use derive_more::{Deref, DerefMut, From};
 use pin_project_lite::pin_project;
+use tokio_rustls::rustls::ServerConfig;
 use tokio_rustls::{Accept, TlsAcceptor};
-
-pub use tokio_rustls::rustls::ServerConfig;
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 
-/// Wrapper type for `tokio_openssl::SslStream` in order to impl `ActixStream` trait.
-pub struct TlsStream<T>(tokio_rustls::server::TlsStream<T>);
+pub mod reexports {
+    //! Re-exports from `rustls` that are useful for acceptors.
 
-impl<T> From<tokio_rustls::server::TlsStream<T>> for TlsStream<T> {
-    fn from(stream: tokio_rustls::server::TlsStream<T>) -> Self {
-        Self(stream)
-    }
+    pub use tokio_rustls::rustls::ServerConfig;
 }
 
-impl<T> Deref for TlsStream<T> {
-    type Target = tokio_rustls::server::TlsStream<T>;
+/// Wraps a `rustls` based async TLS stream in order to implement [`ActixStream`].
+#[derive(Deref, DerefMut, From)]
+pub struct TlsStream<IO>(tokio_rustls::server::TlsStream<IO>);
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T> DerefMut for TlsStream<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<T: ActixStream> AsyncRead for TlsStream<T> {
+impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -57,7 +49,7 @@ impl<T: ActixStream> AsyncRead for TlsStream<T> {
     }
 }
 
-impl<T: ActixStream> AsyncWrite for TlsStream<T> {
+impl<IO: ActixStream> AsyncWrite for TlsStream<IO> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -87,27 +79,24 @@ impl<T: ActixStream> AsyncWrite for TlsStream<T> {
     }
 }
 
-impl<T: ActixStream> ActixStream for TlsStream<T> {
+impl<IO: ActixStream> ActixStream for TlsStream<IO> {
     fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        T::poll_read_ready((&**self).get_ref().0, cx)
+        IO::poll_read_ready((&**self).get_ref().0, cx)
     }
 
     fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        T::poll_write_ready((&**self).get_ref().0, cx)
+        IO::poll_write_ready((&**self).get_ref().0, cx)
     }
 }
 
-/// Accept TLS connections via `rustls` package.
-///
-/// `rustls` feature enables this `Acceptor` type.
+/// Accept TLS connections via the `rustls` crate.
 pub struct Acceptor {
     config: Arc<ServerConfig>,
     handshake_timeout: Duration,
 }
 
 impl Acceptor {
-    /// Create Rustls based `Acceptor` service factory.
-    #[inline]
+    /// Constructs Rustls based acceptor service factory.
     pub fn new(config: ServerConfig) -> Self {
         Acceptor {
             config: Arc::new(config),
@@ -125,7 +114,6 @@ impl Acceptor {
 }
 
 impl Clone for Acceptor {
-    #[inline]
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),
@@ -134,13 +122,13 @@ impl Clone for Acceptor {
     }
 }
 
-impl<T: ActixStream> ServiceFactory<T> for Acceptor {
-    type Response = TlsStream<T>;
+impl<IO: ActixStream> ServiceFactory<IO> for Acceptor {
+    type Response = TlsStream<IO>;
     type Error = TlsError<io::Error, Infallible>;
     type Config = ();
     type Service = AcceptorService;
     type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+    type Future = FutReady<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         let res = MAX_CONN_COUNTER.with(|conns| {
@@ -151,21 +139,21 @@ impl<T: ActixStream> ServiceFactory<T> for Acceptor {
             })
         });
 
-        Box::pin(async { res })
+        ready(res)
     }
 }
 
-/// Rustls based `Acceptor` service
+/// Rustls based acceptor service.
 pub struct AcceptorService {
     acceptor: TlsAcceptor,
     conns: Counter,
     handshake_timeout: Duration,
 }
 
-impl<T: ActixStream> Service<T> for AcceptorService {
-    type Response = TlsStream<T>;
+impl<IO: ActixStream> Service<IO> for AcceptorService {
+    type Response = TlsStream<IO>;
     type Error = TlsError<io::Error, Infallible>;
-    type Future = AcceptorServiceFut<T>;
+    type Future = AcceptFut<IO>;
 
     fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(cx) {
@@ -175,8 +163,8 @@ impl<T: ActixStream> Service<T> for AcceptorService {
         }
     }
 
-    fn call(&self, req: T) -> Self::Future {
-        AcceptorServiceFut {
+    fn call(&self, req: IO) -> Self::Future {
+        AcceptFut {
             fut: self.acceptor.accept(req),
             timeout: sleep(self.handshake_timeout),
             _guard: self.conns.get(),
@@ -185,16 +173,18 @@ impl<T: ActixStream> Service<T> for AcceptorService {
 }
 
 pin_project! {
-    pub struct AcceptorServiceFut<T: ActixStream> {
-        fut: Accept<T>,
+    /// Accept future for Rustls service.
+    #[doc(hidden)]
+    pub struct AcceptFut<IO: ActixStream> {
+        fut: Accept<IO>,
         #[pin]
         timeout: Sleep,
         _guard: CounterGuard,
     }
 }
 
-impl<T: ActixStream> Future for AcceptorServiceFut<T> {
-    type Output = Result<TlsStream<T>, TlsError<io::Error, Infallible>>;
+impl<IO: ActixStream> Future for AcceptFut<IO> {
+    type Output = Result<TlsStream<IO>, TlsError<io::Error, Infallible>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
