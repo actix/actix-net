@@ -1,9 +1,10 @@
-//! Native-TLS based acceptor service.
+//! `native-tls` based TLS connection acceptor service.
+//!
+//! See [`Acceptor`] for main service factory docs.
 
 use std::{
     convert::Infallible,
     io::{self, IoSlice},
-    ops::{Deref, DerefMut},
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -16,34 +17,15 @@ use actix_rt::{
 };
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::Counter;
+use derive_more::{Deref, DerefMut, From};
 use futures_core::future::LocalBoxFuture;
-
 pub use tokio_native_tls::{native_tls::Error, TlsAcceptor};
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 
-/// Wraps a [`tokio_native_tls::TlsStream`] in order to impl [`ActixStream`] trait.
+/// Wraps a `native-tls` based async TLS stream in order to implement [`ActixStream`].
+#[derive(Deref, DerefMut, From)]
 pub struct TlsStream<IO>(tokio_native_tls::TlsStream<IO>);
-
-impl<IO> From<tokio_native_tls::TlsStream<IO>> for TlsStream<IO> {
-    fn from(stream: tokio_native_tls::TlsStream<IO>) -> Self {
-        Self(stream)
-    }
-}
-
-impl<IO: ActixStream> Deref for TlsStream<IO> {
-    type Target = tokio_native_tls::TlsStream<IO>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<IO: ActixStream> DerefMut for TlsStream<IO> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
@@ -95,17 +77,14 @@ impl<IO: ActixStream> ActixStream for TlsStream<IO> {
     }
 }
 
-/// Accept TLS connections via `native-tls` package.
-///
-/// `native-tls` feature enables this `Acceptor` type.
+/// Accept TLS connections via the `native-tls` crate.
 pub struct Acceptor {
     acceptor: TlsAcceptor,
     handshake_timeout: Duration,
 }
 
 impl Acceptor {
-    /// Create `native-tls` based `Acceptor` service factory.
-    #[inline]
+    /// Constructs `native-tls` based `Acceptor` service factory.
     pub fn new(acceptor: TlsAcceptor) -> Self {
         Acceptor {
             acceptor,
@@ -136,13 +115,13 @@ impl<IO: ActixStream + 'static> ServiceFactory<IO> for Acceptor {
     type Response = TlsStream<IO>;
     type Error = TlsError<Error, Infallible>;
     type Config = ();
-    type Service = NativeTlsAcceptorService;
+    type Service = AcceptorService;
     type InitError = ();
     type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         let res = MAX_CONN_COUNTER.with(|conns| {
-            Ok(NativeTlsAcceptorService {
+            Ok(AcceptorService {
                 acceptor: self.acceptor.clone(),
                 conns: conns.clone(),
                 handshake_timeout: self.handshake_timeout,
@@ -154,13 +133,13 @@ impl<IO: ActixStream + 'static> ServiceFactory<IO> for Acceptor {
 }
 
 /// Native-TLS based acceptor service.
-pub struct NativeTlsAcceptorService {
+pub struct AcceptorService {
     acceptor: TlsAcceptor,
     conns: Counter,
     handshake_timeout: Duration,
 }
 
-impl<IO: ActixStream + 'static> Service<IO> for NativeTlsAcceptorService {
+impl<IO: ActixStream + 'static> Service<IO> for AcceptorService {
     type Response = TlsStream<IO>;
     type Error = TlsError<Error, Infallible>;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;

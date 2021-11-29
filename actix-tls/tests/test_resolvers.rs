@@ -10,7 +10,7 @@ use actix_server::TestServer;
 use actix_service::{fn_service, Service, ServiceFactory};
 use futures_core::future::LocalBoxFuture;
 
-use actix_tls::connect::{new_connector_factory, Connect, Resolve, Resolver};
+use actix_tls::connect::{new_connector_factory, ConnectionInfo, Resolve, ResolverService};
 
 #[actix_rt::test]
 async fn custom_resolver() {
@@ -68,12 +68,12 @@ async fn custom_resolver_connect() {
         trust_dns: TokioAsyncResolver::tokio_from_system_conf().unwrap(),
     };
 
-    let resolver = Resolver::new_custom(resolver);
+    let resolver = ResolverService::custom(resolver);
     let factory = new_connector_factory(resolver);
 
     let conn = factory.new_service(()).await.unwrap();
     let con = conn
-        .call(Connect::with_addr("example.com", srv.addr()))
+        .call(ConnectionInfo::with_addr("example.com", srv.addr()))
         .await
         .unwrap();
     assert_eq!(con.peer_addr().unwrap(), srv.addr());

@@ -1,35 +1,48 @@
 //! TCP and TLS connector services.
 //!
 //! # Stages of the TCP connector service:
-//! - Resolve [`Address`] with given [`Resolver`] and collect list of socket addresses.
-//! - Establish TCP connection and return [`TcpStream`].
+//! 1. Resolve [`Address`] with given [`Resolver`] and collect list of socket addresses.
+//! 1. Establish TCP connection and return [`TcpStream`].
 //!
 //! # Stages of TLS connector services:
-//! - Establish [`TcpStream`] with connector service.
-//! - Wrap the stream and perform connect handshake with remote peer.
-//! - Return certain stream type that impls `AsyncRead` and `AsyncWrite`.
+//! 1. Resolve DNS and establish a [`TcpStream`] with the TCP connector service.
+//! 1. Wrap the stream and perform connect handshake with remote peer.
+//! 1. Return wrapped stream type that implements [`AsyncRead`] and [`AsyncWrite`].
 //!
 //! [`TcpStream`]: actix_rt::net::TcpStream
+//! [`AsyncRead`]: actix_rt::net::AsyncRead
+//! [`AsyncWrite`]: actix_rt::net::AsyncWrite
 
-#[allow(clippy::module_inception)]
-mod connect;
+mod address;
+mod connect_addrs;
+mod connection;
 mod connector;
 mod error;
+mod info;
 mod resolve;
-mod service;
-pub mod tls;
-// TODO: remove `ssl` mod re-export in next break change
-#[doc(hidden)]
-pub use tls as ssl;
-mod tcp;
+mod resolver;
+pub mod tcp;
+
 #[cfg(feature = "uri")]
+#[cfg_attr(docsrs, doc(cfg(feature = "uri")))]
 mod uri;
 
-pub use self::connect::{Address, Connect, Connection};
-pub use self::connector::{TcpConnector, TcpConnectorFactory};
+#[cfg(feature = "openssl")]
+#[cfg_attr(docsrs, doc(cfg(feature = "openssl")))]
+pub mod openssl;
+
+#[cfg(feature = "rustls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rustls")))]
+pub mod rustls;
+
+#[cfg(feature = "native-tls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
+pub mod native_tls;
+
+pub use self::address::Address;
+pub use self::connection::Connection;
+pub use self::connector::{Connector, ConnectorService};
 pub use self::error::ConnectError;
-pub use self::resolve::{Resolve, Resolver, ResolverFactory};
-pub use self::service::{ConnectService, ConnectServiceFactory};
-pub use self::tcp::{
-    default_connector, default_connector_factory, new_connector, new_connector_factory,
-};
+pub use self::info::ConnectionInfo;
+pub use self::resolve::Resolve;
+pub use self::resolver::{Resolver, ResolverService};

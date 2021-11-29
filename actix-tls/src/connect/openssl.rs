@@ -1,3 +1,7 @@
+//! OpenSSL based connector service.
+//!
+//! See [`Connector`] for main connector service factory docs.
+
 use std::{
     future::Future,
     io,
@@ -7,30 +11,38 @@ use std::{
 
 use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
-use futures_core::{future::LocalBoxFuture, ready};
+use actix_utils::future::{ok, Ready};
+use futures_core::ready;
 use log::trace;
-
-pub use openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
-pub use tokio_openssl::SslStream;
+use openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
+use tokio_openssl::SslStream;
 
 use crate::connect::{Address, Connection};
 
-/// OpenSSL connector factory
-pub struct OpensslConnector {
+pub mod reexports {
+    //! Re-exports from `openssl` that are useful for connectors.
+
+    pub use openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
+}
+
+/// Connector service factory using `openssl`.
+pub struct Connector {
     connector: SslConnector,
 }
 
-impl OpensslConnector {
+impl Connector {
+    /// Constructs new connector service factory from an `openssl` connector.
     pub fn new(connector: SslConnector) -> Self {
-        OpensslConnector { connector }
+        Connector { connector }
     }
 
-    pub fn service(connector: SslConnector) -> OpensslConnectorService {
-        OpensslConnectorService { connector }
+    /// Constructs new connector service from an `openssl` connector.
+    pub fn service(connector: SslConnector) -> ConnectorService {
+        ConnectorService { connector }
     }
 }
 
-impl Clone for OpensslConnector {
+impl Clone for Connector {
     fn clone(&self) -> Self {
         Self {
             connector: self.connector.clone(),
@@ -38,7 +50,7 @@ impl Clone for OpensslConnector {
     }
 }
 
-impl<R, IO> ServiceFactory<Connection<R, IO>> for OpensslConnector
+impl<R, IO> ServiceFactory<Connection<R, IO>> for Connector
 where
     R: Address,
     IO: ActixStream + 'static,
@@ -46,21 +58,23 @@ where
     type Response = Connection<R, SslStream<IO>>;
     type Error = io::Error;
     type Config = ();
-    type Service = OpensslConnectorService;
+    type Service = ConnectorService;
     type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        let connector = self.connector.clone();
-        Box::pin(async { Ok(OpensslConnectorService { connector }) })
+        ok(ConnectorService {
+            connector: self.connector.clone(),
+        })
     }
 }
 
-pub struct OpensslConnectorService {
+/// Connector service using `openssl`.
+pub struct ConnectorService {
     connector: SslConnector,
 }
 
-impl Clone for OpensslConnectorService {
+impl Clone for ConnectorService {
     fn clone(&self) -> Self {
         Self {
             connector: self.connector.clone(),
@@ -68,21 +82,21 @@ impl Clone for OpensslConnectorService {
     }
 }
 
-impl<R, IO> Service<Connection<R, IO>> for OpensslConnectorService
+impl<R, IO> Service<Connection<R, IO>> for ConnectorService
 where
     R: Address,
     IO: ActixStream,
 {
     type Response = Connection<R, SslStream<IO>>;
     type Error = io::Error;
-    type Future = ConnectAsyncExt<R, IO>;
+    type Future = ConnectFut<R, IO>;
 
     actix_service::always_ready!();
 
     fn call(&self, stream: Connection<R, IO>) -> Self::Future {
-        trace!("SSL Handshake start for: {:?}", stream.host());
+        trace!("SSL Handshake start for: {:?}", stream.hostname());
         let (io, stream) = stream.replace_io(());
-        let host = stream.host();
+        let host = stream.hostname();
 
         let config = self
             .connector
@@ -93,19 +107,21 @@ where
             .into_ssl(host)
             .expect("SSL connect configuration was invalid.");
 
-        ConnectAsyncExt {
+        ConnectFut {
             io: Some(SslStream::new(ssl, io).unwrap()),
             stream: Some(stream),
         }
     }
 }
 
-pub struct ConnectAsyncExt<R, IO> {
+/// Connect future for OpenSSL service.
+#[doc(hidden)]
+pub struct ConnectFut<R, IO> {
     io: Option<SslStream<IO>>,
     stream: Option<Connection<R, ()>>,
 }
 
-impl<R: Address, IO> Future for ConnectAsyncExt<R, IO>
+impl<R: Address, IO> Future for ConnectFut<R, IO>
 where
     R: Address,
     IO: ActixStream,
@@ -118,7 +134,7 @@ where
         match ready!(Pin::new(this.io.as_mut().unwrap()).poll_connect(cx)) {
             Ok(_) => {
                 let stream = this.stream.take().unwrap();
-                trace!("SSL Handshake success: {:?}", stream.host());
+                trace!("SSL Handshake success: {:?}", stream.hostname());
                 Poll::Ready(Ok(stream.replace_io(this.io.take().unwrap()).1))
             }
             Err(e) => {

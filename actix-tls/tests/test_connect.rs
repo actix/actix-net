@@ -12,7 +12,7 @@ use actix_service::{fn_service, Service, ServiceFactory};
 use bytes::Bytes;
 use futures_util::sink::SinkExt;
 
-use actix_tls::connect::{self as actix_connect, Connect};
+use actix_tls::connect::{self as actix_connect, ConnectionInfo};
 
 #[cfg(feature = "openssl")]
 #[actix_rt::test]
@@ -61,12 +61,12 @@ async fn test_static_str() {
     let conn = actix_connect::default_connector();
 
     let con = conn
-        .call(Connect::with_addr("10", srv.addr()))
+        .call(ConnectionInfo::with_addr("10", srv.addr()))
         .await
         .unwrap();
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 
-    let connect = Connect::new(srv.host().to_owned());
+    let connect = ConnectionInfo::new(srv.host().to_owned());
 
     let conn = actix_connect::default_connector();
     let con = conn.call(connect).await;
@@ -87,7 +87,7 @@ async fn test_new_service() {
 
     let conn = factory.new_service(()).await.unwrap();
     let con = conn
-        .call(Connect::with_addr("10", srv.addr()))
+        .call(ConnectionInfo::with_addr("10", srv.addr()))
         .await
         .unwrap();
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
@@ -145,7 +145,7 @@ async fn test_local_addr() {
     let local = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 3));
 
     let (con, _) = conn
-        .call(Connect::with_addr("10", srv.addr()).set_local_addr(local))
+        .call(ConnectionInfo::with_addr("10", srv.addr()).set_local_addr(local))
         .await
         .unwrap()
         .into_parts();

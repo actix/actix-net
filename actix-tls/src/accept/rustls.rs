@@ -1,10 +1,11 @@
-//! Rustls based acceptor service.
+//! `rustls` based TLS connection acceptor service.
+//!
+//! See [`Acceptor`] for main service factory docs.
 
 use std::{
     convert::Infallible,
     future::Future,
     io::{self, IoSlice},
-    ops::{Deref, DerefMut},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -18,6 +19,7 @@ use actix_rt::{
 };
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
+use derive_more::{Deref, DerefMut, From};
 use futures_core::future::LocalBoxFuture;
 use pin_project_lite::pin_project;
 pub use tokio_rustls::rustls::ServerConfig;
@@ -25,28 +27,9 @@ use tokio_rustls::{Accept, TlsAcceptor};
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 
-/// Wraps a [`tokio_rustls::server::TlsStream`] in order to impl [`ActixStream`] trait.
+/// Wraps a `rustls` based async TLS stream in order to implement [`ActixStream`].
+#[derive(Deref, DerefMut, From)]
 pub struct TlsStream<IO>(tokio_rustls::server::TlsStream<IO>);
-
-impl<IO> From<tokio_rustls::server::TlsStream<IO>> for TlsStream<IO> {
-    fn from(stream: tokio_rustls::server::TlsStream<IO>) -> Self {
-        Self(stream)
-    }
-}
-
-impl<IO> Deref for TlsStream<IO> {
-    type Target = tokio_rustls::server::TlsStream<IO>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<IO> DerefMut for TlsStream<IO> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
@@ -98,17 +81,14 @@ impl<IO: ActixStream> ActixStream for TlsStream<IO> {
     }
 }
 
-/// Accept TLS connections via `rustls` package.
-///
-/// `rustls` feature enables this `Acceptor` type.
+/// Accept TLS connections via the `rustls` crate.
 pub struct Acceptor {
     config: Arc<ServerConfig>,
     handshake_timeout: Duration,
 }
 
 impl Acceptor {
-    /// Create Rustls based `Acceptor` service factory.
-    #[inline]
+    /// Constructs Rustls based acceptor service factory.
     pub fn new(config: ServerConfig) -> Self {
         Acceptor {
             config: Arc::new(config),
@@ -126,7 +106,6 @@ impl Acceptor {
 }
 
 impl Clone for Acceptor {
-    #[inline]
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),

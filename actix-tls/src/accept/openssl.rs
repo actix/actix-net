@@ -1,10 +1,11 @@
-//! OpenSSL based acceptor service.
+//! `openssl` based TLS acceptor service.
+//!
+//! See [`Acceptor`] for main service factory docs.
 
 use std::{
     convert::Infallible,
     future::Future,
     io::{self, IoSlice},
-    ops::{Deref, DerefMut},
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -17,36 +18,18 @@ use actix_rt::{
 };
 use actix_service::{Service, ServiceFactory};
 use actix_utils::counter::{Counter, CounterGuard};
+use derive_more::{Deref, DerefMut, From};
 use futures_core::future::LocalBoxFuture;
 pub use openssl::ssl::{
-    AlpnError, Error as SslError, HandshakeError, Ssl, SslAcceptor, SslAcceptorBuilder,
+    AlpnError, Error, HandshakeError, Ssl, SslAcceptor, SslAcceptorBuilder,
 };
 use pin_project_lite::pin_project;
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 
-/// Wraps a [`tokio_openssl::SslStream`] in order to impl [`ActixStream`] trait.
+/// Wraps an `openssl` based async TLS stream in order to implement [`ActixStream`].
+#[derive(Deref, DerefMut, From)]
 pub struct TlsStream<IO>(tokio_openssl::SslStream<IO>);
-
-impl<IO> From<tokio_openssl::SslStream<IO>> for TlsStream<IO> {
-    fn from(stream: tokio_openssl::SslStream<IO>) -> Self {
-        Self(stream)
-    }
-}
-
-impl<IO> Deref for TlsStream<IO> {
-    type Target = tokio_openssl::SslStream<IO>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<IO> DerefMut for TlsStream<IO> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
@@ -98,9 +81,7 @@ impl<IO: ActixStream> ActixStream for TlsStream<IO> {
     }
 }
 
-/// Accept TLS connections via `openssl` package.
-///
-/// `openssl` feature enables this `Acceptor` type.
+/// Accept TLS connections via the `openssl` crate.
 pub struct Acceptor {
     acceptor: SslAcceptor,
     handshake_timeout: Duration,
@@ -137,7 +118,7 @@ impl Clone for Acceptor {
 
 impl<IO: ActixStream> ServiceFactory<IO> for Acceptor {
     type Response = TlsStream<IO>;
-    type Error = TlsError<SslError, Infallible>;
+    type Error = TlsError<Error, Infallible>;
     type Config = ();
     type Service = AcceptorService;
     type InitError = ();
@@ -165,7 +146,7 @@ pub struct AcceptorService {
 
 impl<IO: ActixStream> Service<IO> for AcceptorService {
     type Response = TlsStream<IO>;
-    type Error = TlsError<SslError, Infallible>;
+    type Error = TlsError<Error, Infallible>;
     type Future = AcceptFut<IO>;
 
     fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -189,7 +170,7 @@ impl<IO: ActixStream> Service<IO> for AcceptorService {
 }
 
 pin_project! {
-    /// Accept future for Rustls service.
+    /// Accept future for OpenSSL service.
     #[doc(hidden)]
     pub struct AcceptFut<IO: ActixStream> {
         stream: Option<tokio_openssl::SslStream<IO>>,
@@ -200,7 +181,7 @@ pin_project! {
 }
 
 impl<IO: ActixStream> Future for AcceptFut<IO> {
-    type Output = Result<TlsStream<IO>, TlsError<SslError, Infallible>>;
+    type Output = Result<TlsStream<IO>, TlsError<Error, Infallible>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();

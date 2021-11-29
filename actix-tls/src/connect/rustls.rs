@@ -1,3 +1,7 @@
+//! Rustls based connector service.
+//!
+//! See [`Connector`] for main connector service factory docs.
+
 use std::{
     convert::TryFrom,
     future::Future,
@@ -7,17 +11,25 @@ use std::{
     task::{Context, Poll},
 };
 
-pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
-pub use webpki_roots::TLS_SERVER_ROOTS;
-
 use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
-use futures_core::{future::LocalBoxFuture, ready};
+use actix_utils::future::{ok, Ready};
+use futures_core::ready;
 use log::trace;
 use tokio_rustls::rustls::{client::ServerName, OwnedTrustAnchor, RootCertStore};
+use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
 use tokio_rustls::{Connect as RustlsConnect, TlsConnector as RustlsTlsConnector};
+use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::connect::{Address, Connection};
+
+pub mod reexports {
+    //! Re-exports from `rustls` and `webpki_roots` that are useful for connectors.
+
+    pub use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
+
+    pub use webpki_roots::TLS_SERVER_ROOTS;
+}
 
 /// Returns standard root certificates from `webpki-roots` crate as a rustls certificate store.
 pub fn webpki_roots_cert_store() -> RootCertStore {
@@ -34,32 +46,25 @@ pub fn webpki_roots_cert_store() -> RootCertStore {
     root_certs
 }
 
-/// Rustls connector factory
-pub struct RustlsConnector {
+/// Connector service factory using `rustls`.
+#[derive(Clone)]
+pub struct Connector {
     connector: Arc<ClientConfig>,
 }
 
-impl RustlsConnector {
+impl Connector {
+    /// Constructs new connector service factory from a `rustls` client configuration.
     pub fn new(connector: Arc<ClientConfig>) -> Self {
-        RustlsConnector { connector }
+        Connector { connector }
+    }
+
+    /// Constructs new connector service from a `rustls` client configuration.
+    pub fn service(connector: Arc<ClientConfig>) -> ConnectorService {
+        ConnectorService { connector }
     }
 }
 
-impl RustlsConnector {
-    pub fn service(connector: Arc<ClientConfig>) -> RustlsConnectorService {
-        RustlsConnectorService { connector }
-    }
-}
-
-impl Clone for RustlsConnector {
-    fn clone(&self) -> Self {
-        Self {
-            connector: self.connector.clone(),
-        }
-    }
-}
-
-impl<R, IO> ServiceFactory<Connection<R, IO>> for RustlsConnector
+impl<R, IO> ServiceFactory<Connection<R, IO>> for Connector
 where
     R: Address,
     IO: ActixStream + 'static,
@@ -67,54 +72,51 @@ where
     type Response = Connection<R, TlsStream<IO>>;
     type Error = io::Error;
     type Config = ();
-    type Service = RustlsConnectorService;
+    type Service = ConnectorService;
     type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+    type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        let connector = self.connector.clone();
-        Box::pin(async { Ok(RustlsConnectorService { connector }) })
+        ok(ConnectorService {
+            connector: self.connector.clone(),
+        })
     }
 }
 
-pub struct RustlsConnectorService {
+/// Connector service using `rustls`.
+#[derive(Clone)]
+pub struct ConnectorService {
     connector: Arc<ClientConfig>,
 }
 
-impl Clone for RustlsConnectorService {
-    fn clone(&self) -> Self {
-        Self {
-            connector: self.connector.clone(),
-        }
-    }
-}
-
-impl<R, IO> Service<Connection<R, IO>> for RustlsConnectorService
+impl<R, IO> Service<Connection<R, IO>> for ConnectorService
 where
     R: Address,
     IO: ActixStream,
 {
     type Response = Connection<R, TlsStream<IO>>;
     type Error = io::Error;
-    type Future = RustlsConnectorServiceFuture<R, IO>;
+    type Future = ConnectFut<R, IO>;
 
     actix_service::always_ready!();
 
     fn call(&self, connection: Connection<R, IO>) -> Self::Future {
-        trace!("SSL Handshake start for: {:?}", connection.host());
+        trace!("SSL Handshake start for: {:?}", connection.hostname());
         let (stream, connection) = connection.replace_io(());
 
-        match ServerName::try_from(connection.host()) {
-            Ok(host) => RustlsConnectorServiceFuture::Future {
+        match ServerName::try_from(connection.hostname()) {
+            Ok(host) => ConnectFut::Future {
                 connect: RustlsTlsConnector::from(self.connector.clone()).connect(host, stream),
                 connection: Some(connection),
             },
-            Err(_) => RustlsConnectorServiceFuture::InvalidDns,
+            Err(_) => ConnectFut::InvalidDns,
         }
     }
 }
 
-pub enum RustlsConnectorServiceFuture<R, IO> {
+/// Connect future for Rustls service.
+#[doc(hidden)]
+pub enum ConnectFut<R, IO> {
     /// See issue <https://github.com/briansmith/webpki/issues/54>
     InvalidDns,
     Future {
@@ -123,7 +125,7 @@ pub enum RustlsConnectorServiceFuture<R, IO> {
     },
 }
 
-impl<R, IO> Future for RustlsConnectorServiceFuture<R, IO>
+impl<R, IO> Future for ConnectFut<R, IO>
 where
     R: Address,
     IO: ActixStream,
@@ -138,7 +140,7 @@ where
             Self::Future { connect, connection } => {
                 let stream = ready!(Pin::new(connect).poll(cx))?;
                 let connection = connection.take().unwrap();
-                trace!("SSL Handshake success: {:?}", connection.host());
+                trace!("SSL Handshake success: {:?}", connection.hostname());
                 Poll::Ready(Ok(connection.replace_io(stream).1))
             }
         }
