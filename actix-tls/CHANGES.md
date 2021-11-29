@@ -1,6 +1,7 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* There are now no default features. [#422]
 * Implement `Default` for `connect::Resolver`. [#422]
 * Derive `Debug` for `connect::Connection`. [#422]
 * Remove redundant `connect::Connection::from_parts` method. [#422]
