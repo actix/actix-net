@@ -13,12 +13,12 @@ pub(crate) enum ConnectAddrs {
 }
 
 impl ConnectAddrs {
-    pub(crate) fn is_none(&self) -> bool {
+    pub(crate) fn is_unresolved(&self) -> bool {
         matches!(self, Self::None)
     }
 
-    pub(crate) fn is_some(&self) -> bool {
-        !self.is_none()
+    pub(crate) fn is_resolved(&self) -> bool {
+        !self.is_unresolved()
     }
 }
 

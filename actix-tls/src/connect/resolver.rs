@@ -101,12 +101,14 @@ impl<R: Host> Service<ConnectInfo<R>> for ResolverService {
     actix_service::always_ready!();
 
     fn call(&self, req: ConnectInfo<R>) -> Self::Future {
-        if req.addr.is_some() {
-            ResolverFut::Connected(Some(req))
+        if req.addr.is_resolved() {
+            // socket address(es) already resolved; return existing connection request
+            ResolverFut::Resolved(Some(req))
         } else if let Ok(ip) = req.hostname().parse() {
+            // request hostname is valid ip address; add address to request and return
             let addr = SocketAddr::new(ip, req.port());
             let req = req.set_addr(Some(addr));
-            ResolverFut::Connected(Some(req))
+            ResolverFut::Resolved(Some(req))
         } else {
             trace!("DNS resolver: resolving host {:?}", req.hostname());
 
@@ -127,7 +129,7 @@ impl<R: Host> Service<ConnectInfo<R>> for ResolverService {
 
                         let req = req.set_addrs(addrs);
 
-                        if req.addr.is_none() {
+                        if req.addr.is_unresolved() {
                             Err(ConnectError::NoRecords)
                         } else {
                             Ok(req)
@@ -140,8 +142,9 @@ impl<R: Host> Service<ConnectInfo<R>> for ResolverService {
 }
 
 /// Future for resolver service.
+#[doc(hidden)]
 pub enum ResolverFut<R: Host> {
-    Connected(Option<ConnectInfo<R>>),
+    Resolved(Option<ConnectInfo<R>>),
     LookUp(
         JoinHandle<io::Result<IntoIter<SocketAddr>>>,
         Option<ConnectInfo<R>>,
@@ -154,7 +157,7 @@ impl<R: Host> Future for ResolverFut<R> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.get_mut() {
-            Self::Connected(conn) => Poll::Ready(Ok(conn
+            Self::Resolved(conn) => Poll::Ready(Ok(conn
                 .take()
                 .expect("ResolverFuture polled after finished"))),
 
@@ -185,7 +188,7 @@ impl<R: Host> Future for ResolverFut<R> {
                     req.addrs()
                 );
 
-                if req.addr.is_none() {
+                if req.addr.is_unresolved() {
                     Poll::Ready(Err(ConnectError::NoRecords))
                 } else {
                     Poll::Ready(Ok(req))

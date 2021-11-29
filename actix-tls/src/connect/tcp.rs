@@ -90,7 +90,7 @@ impl<R: Host> TcpConnectorFut<R> {
         local_addr: Option<IpAddr>,
         addr: ConnectAddrs,
     ) -> TcpConnectorFut<R> {
-        if addr.is_none() {
+        if addr.is_unresolved() {
             error!("TCP connector: unresolved connection address");
             return TcpConnectorFut::Error(Some(ConnectError::Unresolved));
         }

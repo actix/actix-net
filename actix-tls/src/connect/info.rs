@@ -80,8 +80,8 @@ impl<R: Host> ConnectInfo<R> {
 
     /// Set local address to connection with.
     ///
-    /// Useful in situations where you know the IP address bound to a particular network interface
-    /// and want to make sure the socket is opened through that interface.
+    /// Useful in situations where the IP address bound to a particular network interface is known.
+    /// This would make sure the socket is opened through that interface.
     pub fn set_local_addr(mut self, addr: impl Into<IpAddr>) -> Self {
         self.local_addr = Some(addr.into());
         self
