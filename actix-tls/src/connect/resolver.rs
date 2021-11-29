@@ -81,25 +81,11 @@ impl ResolverService {
     }
 
     /// Resolve DNS with default resolver.
-    fn look_up<R: Host>(req: &ConnectInfo<R>) -> JoinHandle<io::Result<IntoIter<SocketAddr>>> {
-        let host = req.hostname();
-        // TODO: Connect should always return host(name?) with port if possible; basically try to
-        // reduce ability to create conflicting lookup info by having port in host string being
-        // different from numeric port in connect
-
-        let host = if req
-            .hostname()
-            .split_once(':')
-            .and_then(|(_, port)| port.parse::<u16>().ok())
-            .map(|port| port == req.port())
-            .unwrap_or(false)
-        {
-            // if hostname contains port and also matches numeric port then just use the hostname
-            host.to_string()
-        } else {
-            // concatenate domain-only hostname and port together
-            format!("{}:{}", host, req.port())
-        };
+    fn default_lookup<R: Host>(
+        req: &ConnectInfo<R>,
+    ) -> JoinHandle<io::Result<IntoIter<SocketAddr>>> {
+        // reconstruct host; concatenate hostname and port together
+        let host = format!("{}:{}", req.hostname(), req.port());
 
         // run blocking DNS lookup in thread pool since DNS lookups can take upwards of seconds on
         // some platforms if conditions are poor and OS-level cache is not populated
@@ -126,7 +112,7 @@ impl<R: Host> Service<ConnectInfo<R>> for ResolverService {
 
             match &self.kind {
                 ResolverKind::Default => {
-                    let fut = Self::look_up(&req);
+                    let fut = Self::default_lookup(&req);
                     ResolverFut::LookUp(fut, Some(req))
                 }
 

@@ -25,7 +25,7 @@ impl<R, IO> Connection<R, IO> {
         (self.io, self.req)
     }
 
-    /// Replaces underlying IO, returning old UI and new `Connection`.
+    /// Replaces underlying IO, returning old IO and new `Connection`.
     pub fn replace_io<IO2>(self, io: IO2) -> (IO, Connection<R, IO2>) {
         (self.io, Connection { io, req: self.req })
     }

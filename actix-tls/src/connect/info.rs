@@ -107,14 +107,14 @@ impl<R: Host> ConnectInfo<R> {
     /// # Examples
     /// ```
     /// # use std::net::SocketAddr;
-    /// # use actix_tls::connect::ConnectionInfo;
+    /// # use actix_tls::connect::ConnectInfo;
     /// let addr = SocketAddr::from(([127, 0, 0, 1], 4242));
     ///
-    /// let conn = ConnectionInfo::new("localhost");
+    /// let conn = ConnectInfo::new("localhost");
     /// let mut addrs = conn.addrs();
     /// assert!(addrs.next().is_none());
     ///
-    /// let conn = ConnectionInfo::with_addr("localhost", addr);
+    /// let conn = ConnectInfo::with_addr("localhost", addr);
     /// let mut addrs = conn.addrs();
     /// assert_eq!(addrs.next().unwrap(), addr);
     /// ```
@@ -138,14 +138,14 @@ impl<R: Host> ConnectInfo<R> {
     /// # Examples
     /// ```
     /// # use std::net::SocketAddr;
-    /// # use actix_tls::connect::ConnectionInfo;
+    /// # use actix_tls::connect::ConnectInfo;
     /// let addr = SocketAddr::from(([127, 0, 0, 1], 4242));
     ///
-    /// let mut conn = ConnectionInfo::new("localhost");
+    /// let mut conn = ConnectInfo::new("localhost");
     /// let mut addrs = conn.take_addrs();
     /// assert!(addrs.next().is_none());
     ///
-    /// let mut conn = ConnectionInfo::with_addr("localhost", addr);
+    /// let mut conn = ConnectInfo::with_addr("localhost", addr);
     /// let mut addrs = conn.take_addrs();
     /// assert_eq!(addrs.next().unwrap(), addr);
     /// ```
