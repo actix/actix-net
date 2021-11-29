@@ -13,8 +13,10 @@ use futures_core::{future::LocalBoxFuture, ready};
 use log::{error, trace};
 use tokio_util::sync::ReusableBoxFuture;
 
-use super::connect::{Address, Connect, ConnectAddrs, Connection};
-use super::error::ConnectError;
+use super::{
+    connect::{Address, Connect, ConnectAddrs, Connection},
+    error::ConnectError,
+};
 
 /// TCP connector service factory
 #[derive(Debug, Copy, Clone)]
@@ -27,8 +29,8 @@ impl TcpConnectorFactory {
     }
 }
 
-impl<T: Address> ServiceFactory<Connect<T>> for TcpConnectorFactory {
-    type Response = Connection<T, TcpStream>;
+impl<R: Address> ServiceFactory<Connect<R>> for TcpConnectorFactory {
+    type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
     type Config = ();
     type Service = TcpConnector;
@@ -41,18 +43,18 @@ impl<T: Address> ServiceFactory<Connect<T>> for TcpConnectorFactory {
     }
 }
 
-/// TCP connector service
+/// TCP connector service.
 #[derive(Debug, Copy, Clone)]
 pub struct TcpConnector;
 
-impl<T: Address> Service<Connect<T>> for TcpConnector {
-    type Response = Connection<T, TcpStream>;
+impl<R: Address> Service<Connect<R>> for TcpConnector {
+    type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
-    type Future = TcpConnectorResponse<T>;
+    type Future = TcpConnectorResponse<R>;
 
     actix_service::always_ready!();
 
-    fn call(&self, req: Connect<T>) -> Self::Future {
+    fn call(&self, req: Connect<R>) -> Self::Future {
         let port = req.port();
         let Connect {
             req,
@@ -66,9 +68,9 @@ impl<T: Address> Service<Connect<T>> for TcpConnector {
 }
 
 /// TCP stream connector response future
-pub enum TcpConnectorResponse<T> {
+pub enum TcpConnectorResponse<R> {
     Response {
-        req: Option<T>,
+        req: Option<R>,
         port: u16,
         local_addr: Option<IpAddr>,
         addrs: Option<VecDeque<SocketAddr>>,
@@ -77,13 +79,13 @@ pub enum TcpConnectorResponse<T> {
     Error(Option<ConnectError>),
 }
 
-impl<T: Address> TcpConnectorResponse<T> {
+impl<R: Address> TcpConnectorResponse<R> {
     pub(crate) fn new(
-        req: T,
+        req: R,
         port: u16,
         local_addr: Option<IpAddr>,
         addr: ConnectAddrs,
-    ) -> TcpConnectorResponse<T> {
+    ) -> TcpConnectorResponse<R> {
         if addr.is_none() {
             error!("TCP connector: unresolved connection address");
             return TcpConnectorResponse::Error(Some(ConnectError::Unresolved));
@@ -123,8 +125,8 @@ impl<T: Address> TcpConnectorResponse<T> {
     }
 }
 
-impl<T: Address> Future for TcpConnectorResponse<T> {
-    type Output = Result<Connection<T, TcpStream>, ConnectError>;
+impl<R: Address> Future for TcpConnectorResponse<R> {
+    type Output = Result<Connection<R, TcpStream>, ConnectError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.get_mut() {

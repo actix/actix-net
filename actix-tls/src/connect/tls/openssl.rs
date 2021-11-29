@@ -38,12 +38,12 @@ impl Clone for OpensslConnector {
     }
 }
 
-impl<T, U> ServiceFactory<Connection<T, U>> for OpensslConnector
+impl<R, IO> ServiceFactory<Connection<R, IO>> for OpensslConnector
 where
-    T: Address,
-    U: ActixStream + 'static,
+    R: Address,
+    IO: ActixStream + 'static,
 {
-    type Response = Connection<T, SslStream<U>>;
+    type Response = Connection<R, SslStream<IO>>;
     type Error = io::Error;
     type Config = ();
     type Service = OpensslConnectorService;
@@ -68,18 +68,18 @@ impl Clone for OpensslConnectorService {
     }
 }
 
-impl<T, U> Service<Connection<T, U>> for OpensslConnectorService
+impl<R, IO> Service<Connection<R, IO>> for OpensslConnectorService
 where
-    T: Address,
-    U: ActixStream,
+    R: Address,
+    IO: ActixStream,
 {
-    type Response = Connection<T, SslStream<U>>;
+    type Response = Connection<R, SslStream<IO>>;
     type Error = io::Error;
-    type Future = ConnectAsyncExt<T, U>;
+    type Future = ConnectAsyncExt<R, IO>;
 
     actix_service::always_ready!();
 
-    fn call(&self, stream: Connection<T, U>) -> Self::Future {
+    fn call(&self, stream: Connection<R, IO>) -> Self::Future {
         trace!("SSL Handshake start for: {:?}", stream.host());
         let (io, stream) = stream.replace_io(());
         let host = stream.host();
@@ -100,17 +100,17 @@ where
     }
 }
 
-pub struct ConnectAsyncExt<T, U> {
-    io: Option<SslStream<U>>,
-    stream: Option<Connection<T, ()>>,
+pub struct ConnectAsyncExt<R, IO> {
+    io: Option<SslStream<IO>>,
+    stream: Option<Connection<R, ()>>,
 }
 
-impl<T: Address, U> Future for ConnectAsyncExt<T, U>
+impl<R: Address, IO> Future for ConnectAsyncExt<R, IO>
 where
-    T: Address,
-    U: ActixStream,
+    R: Address,
+    IO: ActixStream,
 {
-    type Output = Result<Connection<T, SslStream<U>>, io::Error>;
+    type Output = Result<Connection<R, SslStream<IO>>, io::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();

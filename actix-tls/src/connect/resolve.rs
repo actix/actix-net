@@ -34,8 +34,8 @@ impl ResolverFactory {
     }
 }
 
-impl<T: Address> ServiceFactory<Connect<T>> for ResolverFactory {
-    type Response = Connect<T>;
+impl<R: Address> ServiceFactory<Connect<R>> for ResolverFactory {
+    type Response = Connect<R>;
     type Error = ConnectError;
     type Config = ();
     type Service = Resolver;
@@ -92,7 +92,7 @@ impl<T: Address> ServiceFactory<Connect<T>> for ResolverFactory {
 /// let resolver = Resolver::new_custom(resolver);
 ///
 /// // pass custom resolver to connector builder.
-/// // connector would then be usable as a service or `awc`'s connector.
+/// // connector would then be usable as a service or an `awc` connector.
 /// let connector = actix_tls::connect::new_connector::<&str>(resolver.clone());
 ///
 /// // resolver can be passed to connector factory where returned service factory
@@ -100,7 +100,7 @@ impl<T: Address> ServiceFactory<Connect<T>> for ResolverFactory {
 /// let factory = actix_tls::connect::new_connector_factory::<&str>(resolver);
 /// ```
 pub trait Resolve {
-    /// Given DNS lookup information, returns a futures that completes with socket information.
+    /// Given DNS lookup information, returns a future that completes with socket information.
     fn lookup<'a>(
         &'a self,
         host: &'a str,
@@ -132,8 +132,8 @@ impl Resolver {
         Self::Custom(Rc::new(resolver))
     }
 
-    // look up with default resolver
-    fn look_up<T: Address>(req: &Connect<T>) -> JoinHandle<io::Result<IntoIter<SocketAddr>>> {
+    /// Resolve DNS with default resolver.
+    fn look_up<R: Address>(req: &Connect<R>) -> JoinHandle<io::Result<IntoIter<SocketAddr>>> {
         let host = req.hostname();
         // TODO: Connect should always return host(name?) with port if possible; basically try to
         // reduce ability to create conflicting lookup info by having port in host string being
@@ -153,19 +153,20 @@ impl Resolver {
             format!("{}:{}", host, req.port())
         };
 
-        // run blocking DNS lookup in thread pool
+        // run blocking DNS lookup in thread pool since DNS lookups can take upwards of seconds on
+        // some platforms if conditions are poor and OS-level cache is not populated
         spawn_blocking(move || std::net::ToSocketAddrs::to_socket_addrs(&host))
     }
 }
 
-impl<T: Address> Service<Connect<T>> for Resolver {
-    type Response = Connect<T>;
+impl<R: Address> Service<Connect<R>> for Resolver {
+    type Response = Connect<R>;
     type Error = ConnectError;
-    type Future = ResolverFuture<T>;
+    type Future = ResolverFuture<R>;
 
     actix_service::always_ready!();
 
-    fn call(&self, req: Connect<T>) -> Self::Future {
+    fn call(&self, req: Connect<R>) -> Self::Future {
         if req.addr.is_some() {
             ResolverFuture::Connected(Some(req))
         } else if let Ok(ip) = req.hostname().parse() {
@@ -203,17 +204,17 @@ impl<T: Address> Service<Connect<T>> for Resolver {
     }
 }
 
-pub enum ResolverFuture<T: Address> {
-    Connected(Option<Connect<T>>),
+pub enum ResolverFuture<R: Address> {
+    Connected(Option<Connect<R>>),
     LookUp(
         JoinHandle<io::Result<IntoIter<SocketAddr>>>,
-        Option<Connect<T>>,
+        Option<Connect<R>>,
     ),
-    LookupCustom(LocalBoxFuture<'static, Result<Connect<T>, ConnectError>>),
+    LookupCustom(LocalBoxFuture<'static, Result<Connect<R>, ConnectError>>),
 }
 
-impl<T: Address> Future for ResolverFuture<T> {
-    type Output = Result<Connect<T>, ConnectError>;
+impl<R: Address> Future for ResolverFuture<R> {
+    type Output = Result<Connect<R>, ConnectError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.get_mut() {

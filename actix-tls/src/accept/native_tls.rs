@@ -1,3 +1,5 @@
+//! Native-TLS based acceptor service.
+
 use std::{
     convert::Infallible,
     io::{self, IoSlice},
@@ -20,30 +22,30 @@ pub use tokio_native_tls::{native_tls::Error, TlsAcceptor};
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 
-/// Wrapper type for `tokio_native_tls::TlsStream` in order to impl `ActixStream` trait.
-pub struct TlsStream<T>(tokio_native_tls::TlsStream<T>);
+/// Wraps a [`tokio_native_tls::TlsStream`] in order to impl [`ActixStream`] trait.
+pub struct TlsStream<IO>(tokio_native_tls::TlsStream<IO>);
 
-impl<T> From<tokio_native_tls::TlsStream<T>> for TlsStream<T> {
-    fn from(stream: tokio_native_tls::TlsStream<T>) -> Self {
+impl<IO> From<tokio_native_tls::TlsStream<IO>> for TlsStream<IO> {
+    fn from(stream: tokio_native_tls::TlsStream<IO>) -> Self {
         Self(stream)
     }
 }
 
-impl<T: ActixStream> Deref for TlsStream<T> {
-    type Target = tokio_native_tls::TlsStream<T>;
+impl<IO: ActixStream> Deref for TlsStream<IO> {
+    type Target = tokio_native_tls::TlsStream<IO>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<T: ActixStream> DerefMut for TlsStream<T> {
+impl<IO: ActixStream> DerefMut for TlsStream<IO> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T: ActixStream> AsyncRead for TlsStream<T> {
+impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -53,7 +55,7 @@ impl<T: ActixStream> AsyncRead for TlsStream<T> {
     }
 }
 
-impl<T: ActixStream> AsyncWrite for TlsStream<T> {
+impl<IO: ActixStream> AsyncWrite for TlsStream<IO> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -83,13 +85,13 @@ impl<T: ActixStream> AsyncWrite for TlsStream<T> {
     }
 }
 
-impl<T: ActixStream> ActixStream for TlsStream<T> {
+impl<IO: ActixStream> ActixStream for TlsStream<IO> {
     fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        T::poll_read_ready((&**self).get_ref().get_ref().get_ref(), cx)
+        IO::poll_read_ready((&**self).get_ref().get_ref().get_ref(), cx)
     }
 
     fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        T::poll_write_ready((&**self).get_ref().get_ref().get_ref(), cx)
+        IO::poll_write_ready((&**self).get_ref().get_ref().get_ref(), cx)
     }
 }
 
@@ -130,8 +132,8 @@ impl Clone for Acceptor {
     }
 }
 
-impl<T: ActixStream + 'static> ServiceFactory<T> for Acceptor {
-    type Response = TlsStream<T>;
+impl<IO: ActixStream + 'static> ServiceFactory<IO> for Acceptor {
+    type Response = TlsStream<IO>;
     type Error = TlsError<Error, Infallible>;
     type Config = ();
     type Service = NativeTlsAcceptorService;
@@ -151,14 +153,15 @@ impl<T: ActixStream + 'static> ServiceFactory<T> for Acceptor {
     }
 }
 
+/// Native-TLS based acceptor service.
 pub struct NativeTlsAcceptorService {
     acceptor: TlsAcceptor,
     conns: Counter,
     handshake_timeout: Duration,
 }
 
-impl<T: ActixStream + 'static> Service<T> for NativeTlsAcceptorService {
-    type Response = TlsStream<T>;
+impl<IO: ActixStream + 'static> Service<IO> for NativeTlsAcceptorService {
+    type Response = TlsStream<IO>;
     type Error = TlsError<Error, Infallible>;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -170,7 +173,7 @@ impl<T: ActixStream + 'static> Service<T> for NativeTlsAcceptorService {
         }
     }
 
-    fn call(&self, io: T) -> Self::Future {
+    fn call(&self, io: IO) -> Self::Future {
         let guard = self.conns.get();
         let acceptor = self.acceptor.clone();
 

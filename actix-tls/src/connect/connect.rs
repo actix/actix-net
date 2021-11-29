@@ -4,6 +4,7 @@ use std::{
     iter::{self, FromIterator as _},
     mem,
     net::{IpAddr, SocketAddr},
+    ops,
 };
 
 /// Parse a host into parts (hostname and port).
@@ -218,68 +219,65 @@ impl iter::ExactSizeIterator for ConnectAddrsIter<'_> {}
 
 impl iter::FusedIterator for ConnectAddrsIter<'_> {}
 
-pub struct Connection<T, U> {
-    io: U,
-    req: T,
+/// Holds underlying I/O and original connection request.
+#[derive(Debug)]
+pub struct Connection<R, IO> {
+    req: R,
+    io: IO,
 }
 
-impl<T, U> Connection<T, U> {
-    pub fn new(io: U, req: T) -> Self {
+impl<R, IO> Connection<R, IO> {
+    /// Construct new `Connection` from
+    pub fn new(io: IO, req: R) -> Self {
         Self { io, req }
     }
 }
 
-impl<T, U> Connection<T, U> {
-    /// Reconstruct from a parts.
-    pub fn from_parts(io: U, req: T) -> Self {
-        Self { io, req }
-    }
-
-    /// Deconstruct into a parts.
-    pub fn into_parts(self) -> (U, T) {
+impl<R, IO> Connection<R, IO> {
+    /// Deconstructs into parts.
+    pub fn into_parts(self) -> (IO, R) {
         (self.io, self.req)
     }
 
-    /// Replace inclosed object, return new Stream and old object
-    pub fn replace_io<Y>(self, io: Y) -> (U, Connection<T, Y>) {
+    /// Replaces underlying IO, returning old UI and new `Connection`.
+    pub fn replace_io<IO2>(self, io: IO2) -> (IO, Connection<R, IO2>) {
         (self.io, Connection { io, req: self.req })
     }
 
-    /// Returns a shared reference to the underlying stream.
-    pub fn io_ref(&self) -> &U {
+    /// Returns a shared reference to the underlying IO.
+    pub fn io_ref(&self) -> &IO {
         &self.io
     }
 
-    /// Returns a mutable reference to the underlying stream.
-    pub fn io_mut(&mut self) -> &mut U {
+    /// Returns a mutable reference to the underlying IO.
+    pub fn io_mut(&mut self) -> &mut IO {
         &mut self.io
+    }
+
+    /// Returns a reference to the connection request.
+    pub fn request(&self) -> &R {
+        &self.req
     }
 }
 
-impl<T: Address, U> Connection<T, U> {
+impl<R: Address, IO> Connection<R, IO> {
     /// Get hostname.
     pub fn host(&self) -> &str {
         self.req.hostname()
     }
 }
 
-impl<T, U> std::ops::Deref for Connection<T, U> {
-    type Target = U;
+impl<R, IO> ops::Deref for Connection<R, IO> {
+    type Target = IO;
 
-    fn deref(&self) -> &U {
+    fn deref(&self) -> &IO {
         &self.io
     }
 }
 
-impl<T, U> std::ops::DerefMut for Connection<T, U> {
-    fn deref_mut(&mut self) -> &mut U {
+impl<R, IO> ops::DerefMut for Connection<R, IO> {
+    fn deref_mut(&mut self) -> &mut IO {
         &mut self.io
-    }
-}
-
-impl<T, U: fmt::Debug> fmt::Debug for Connection<T, U> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Stream {{{:?}}}", self.io)
     }
 }
 

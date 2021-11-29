@@ -37,11 +37,11 @@ impl Clone for NativetlsConnector {
     }
 }
 
-impl<T: Address, U> ServiceFactory<Connection<T, U>> for NativetlsConnector
+impl<R: Address, IO> ServiceFactory<Connection<R, IO>> for NativetlsConnector
 where
-    U: ActixStream + 'static,
+    IO: ActixStream + 'static,
 {
-    type Response = Connection<T, TlsStream<U>>;
+    type Response = Connection<R, TlsStream<IO>>;
     type Error = io::Error;
     type Config = ();
     type Service = Self;
@@ -56,20 +56,21 @@ where
 
 // NativetlsConnector is both it's ServiceFactory and Service impl type.
 // As the factory and service share the same type and state.
-impl<T, U> Service<Connection<T, U>> for NativetlsConnector
+impl<R, IO> Service<Connection<R, IO>> for NativetlsConnector
 where
-    T: Address,
-    U: ActixStream + 'static,
+    R: Address,
+    IO: ActixStream + 'static,
 {
-    type Response = Connection<T, TlsStream<U>>;
+    type Response = Connection<R, TlsStream<IO>>;
     type Error = io::Error;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     actix_service::always_ready!();
 
-    fn call(&self, stream: Connection<T, U>) -> Self::Future {
+    fn call(&self, stream: Connection<R, IO>) -> Self::Future {
         let (io, stream) = stream.replace_io(());
         let connector = self.connector.clone();
+
         Box::pin(async move {
             trace!("SSL Handshake start for: {:?}", stream.host());
             connector

@@ -1,9 +1,13 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-* `impl Default` for `connect::Resolver`. [#???]
+* Implement `Default` for `connect::Resolver`. [#422]
+* Derive `Debug` for `connect::Connection`. [#422]
+* Remove redundant `connect::Connection::from_parts` method. [#422]
+* Rename TLS acceptor service future types and hide from docs. [#422]
+* Implement `Error` for `ConnectError`. [#422]
 
-[#???]: https://github.com/actix/actix-net/pull/???
+[#422]: https://github.com/actix/actix-net/pull/422
 
 
 ## 3.0.0-beta.9 - 2021-11-22
@@ -44,7 +48,7 @@
 * Remove `connect::ssl::openssl::OpensslConnectService`. [#297]
 * Add `connect::ssl::native_tls` module for native tls support. [#295]
 * Rename `accept::{nativetls => native_tls}`. [#295]
-* Remove `connect::TcpConnectService` type. service caller expect a `TcpStream` should use
+* Remove `connect::TcpConnectService` type. Service caller expecting a `TcpStream` should use
   `connect::ConnectService` instead and call `Connection<T, TcpStream>::into_parts`. [#299]
 
 [#295]: https://github.com/actix/actix-net/pull/295
