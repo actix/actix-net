@@ -13,14 +13,14 @@ pub struct Connection<R, IO> {
 }
 
 impl<R, IO> Connection<R, IO> {
-    /// Construct new `Connection` from
-    pub(crate) fn new(io: IO, req: R) -> Self {
-        Self { io, req }
+    /// Construct new `Connection` from request and IO parts.
+    pub(crate) fn new(req: R, io: IO) -> Self {
+        Self { req, io }
     }
 }
 
 impl<R, IO> Connection<R, IO> {
-    /// Deconstructs into parts.
+    /// Deconstructs into IO and request parts.
     pub fn into_parts(self) -> (IO, R) {
         (self.io, self.req)
     }
@@ -47,7 +47,7 @@ impl<R, IO> Connection<R, IO> {
 }
 
 impl<R: Host, IO> Connection<R, IO> {
-    /// Get hostname.
+    /// Returns hostname.
     pub fn hostname(&self) -> &str {
         self.req.hostname()
     }

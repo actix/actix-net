@@ -148,12 +148,14 @@ impl<R: Host> Future for TcpConnectorFut<R> {
                 match ready!(stream.poll(cx)) {
                     Ok(sock) => {
                         let req = req.take().unwrap();
+
                         trace!(
                             "TCP connector: successfully connected to {:?} - {:?}",
                             req.hostname(),
                             sock.peer_addr()
                         );
-                        return Poll::Ready(Ok(Connection::new(sock, req)));
+
+                        return Poll::Ready(Ok(Connection::new(req, sock)));
                     }
 
                     Err(err) => {

@@ -4,10 +4,11 @@ use std::{
     net::SocketAddr,
 };
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) enum ConnectAddrs {
     None,
     One(SocketAddr),
+    // TODO: consider using smallvec
     Multi(VecDeque<SocketAddr>),
 }
 
