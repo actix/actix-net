@@ -41,6 +41,6 @@ pub use self::connection::Connection;
 pub use self::connector::{Connector, ConnectorService};
 pub use self::error::ConnectError;
 pub use self::host::Host;
-pub use self::info::ConnectionInfo;
+pub use self::info::ConnectInfo;
 pub use self::resolve::Resolve;
 pub use self::resolver::{Resolver, ResolverService};

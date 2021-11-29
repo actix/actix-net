@@ -14,7 +14,7 @@ use actix_utils::future::{ok, Ready};
 use futures_core::{future::LocalBoxFuture, ready};
 use log::trace;
 
-use super::{ConnectError, ConnectionInfo, Host, Resolve};
+use super::{ConnectError, ConnectInfo, Host, Resolve};
 
 /// DNS resolver service factory.
 #[derive(Clone, Default)]
@@ -36,8 +36,8 @@ impl Resolver {
     }
 }
 
-impl<R: Host> ServiceFactory<ConnectionInfo<R>> for Resolver {
-    type Response = ConnectionInfo<R>;
+impl<R: Host> ServiceFactory<ConnectInfo<R>> for Resolver {
+    type Response = ConnectInfo<R>;
     type Error = ConnectError;
     type Config = ();
     type Service = ResolverService;
@@ -81,9 +81,7 @@ impl ResolverService {
     }
 
     /// Resolve DNS with default resolver.
-    fn look_up<R: Host>(
-        req: &ConnectionInfo<R>,
-    ) -> JoinHandle<io::Result<IntoIter<SocketAddr>>> {
+    fn look_up<R: Host>(req: &ConnectInfo<R>) -> JoinHandle<io::Result<IntoIter<SocketAddr>>> {
         let host = req.hostname();
         // TODO: Connect should always return host(name?) with port if possible; basically try to
         // reduce ability to create conflicting lookup info by having port in host string being
@@ -109,14 +107,14 @@ impl ResolverService {
     }
 }
 
-impl<R: Host> Service<ConnectionInfo<R>> for ResolverService {
-    type Response = ConnectionInfo<R>;
+impl<R: Host> Service<ConnectInfo<R>> for ResolverService {
+    type Response = ConnectInfo<R>;
     type Error = ConnectError;
     type Future = ResolverFut<R>;
 
     actix_service::always_ready!();
 
-    fn call(&self, req: ConnectionInfo<R>) -> Self::Future {
+    fn call(&self, req: ConnectInfo<R>) -> Self::Future {
         if req.addr.is_some() {
             ResolverFut::Connected(Some(req))
         } else if let Ok(ip) = req.hostname().parse() {
@@ -157,16 +155,16 @@ impl<R: Host> Service<ConnectionInfo<R>> for ResolverService {
 
 /// Future for resolver service.
 pub enum ResolverFut<R: Host> {
-    Connected(Option<ConnectionInfo<R>>),
+    Connected(Option<ConnectInfo<R>>),
     LookUp(
         JoinHandle<io::Result<IntoIter<SocketAddr>>>,
-        Option<ConnectionInfo<R>>,
+        Option<ConnectInfo<R>>,
     ),
-    LookupCustom(LocalBoxFuture<'static, Result<ConnectionInfo<R>, ConnectError>>),
+    LookupCustom(LocalBoxFuture<'static, Result<ConnectInfo<R>, ConnectError>>),
 }
 
 impl<R: Host> Future for ResolverFut<R> {
-    type Output = Result<ConnectionInfo<R>, ConnectError>;
+    type Output = Result<ConnectInfo<R>, ConnectError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.get_mut() {

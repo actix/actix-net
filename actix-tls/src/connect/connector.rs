@@ -13,7 +13,7 @@ use super::{
     error::ConnectError,
     resolver::{Resolver, ResolverService},
     tcp::{TcpConnector, TcpConnectorService},
-    Connection, ConnectionInfo, Host,
+    ConnectInfo, Connection, Host,
 };
 
 /// Combined resolver and TCP connector service factory.
@@ -40,7 +40,7 @@ impl Connector {
     }
 }
 
-impl<R: Host> ServiceFactory<ConnectionInfo<R>> for Connector {
+impl<R: Host> ServiceFactory<ConnectInfo<R>> for Connector {
     type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
     type Config = ();
@@ -63,43 +63,43 @@ pub struct ConnectorService {
     resolver: ResolverService,
 }
 
-impl<R: Host> Service<ConnectionInfo<R>> for ConnectorService {
+impl<R: Host> Service<ConnectInfo<R>> for ConnectorService {
     type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
     type Future = ConnectServiceResponse<R>;
 
     actix_service::always_ready!();
 
-    fn call(&self, req: ConnectionInfo<R>) -> Self::Future {
+    fn call(&self, req: ConnectInfo<R>) -> Self::Future {
         ConnectServiceResponse {
-            fut: ConnectFuture::Resolve(self.resolver.call(req)),
+            fut: ConnectFut::Resolve(self.resolver.call(req)),
             tcp: self.tcp,
         }
     }
 }
 
-// helper enum to generic over futures of resolve and connect phase.
-pub(crate) enum ConnectFuture<R: Host> {
-    Resolve(<ResolverService as Service<ConnectionInfo<R>>>::Future),
-    Connect(<TcpConnectorService as Service<ConnectionInfo<R>>>::Future),
+/// Helper enum to generic over futures of resolve and connect steps.
+pub(crate) enum ConnectFut<R: Host> {
+    Resolve(<ResolverService as Service<ConnectInfo<R>>>::Future),
+    Connect(<TcpConnectorService as Service<ConnectInfo<R>>>::Future),
 }
 
 /// Helper enum to contain the future output of `ConnectFuture`.
 pub(crate) enum ConnectOutput<R: Host> {
-    Resolved(ConnectionInfo<R>),
+    Resolved(ConnectInfo<R>),
     Connected(Connection<R, TcpStream>),
 }
 
-impl<R: Host> ConnectFuture<R> {
+impl<R: Host> ConnectFut<R> {
     fn poll_connect(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Result<ConnectOutput<R>, ConnectError>> {
         match self {
-            ConnectFuture::Resolve(ref mut fut) => {
+            ConnectFut::Resolve(ref mut fut) => {
                 Pin::new(fut).poll(cx).map_ok(ConnectOutput::Resolved)
             }
-            ConnectFuture::Connect(ref mut fut) => {
+            ConnectFut::Connect(ref mut fut) => {
                 Pin::new(fut).poll(cx).map_ok(ConnectOutput::Connected)
             }
         }
@@ -107,7 +107,7 @@ impl<R: Host> ConnectFuture<R> {
 }
 
 pub struct ConnectServiceResponse<R: Host> {
-    fut: ConnectFuture<R>,
+    fut: ConnectFut<R>,
     tcp: TcpConnectorService,
 }
 
@@ -118,7 +118,7 @@ impl<R: Host> Future for ConnectServiceResponse<R> {
         loop {
             match ready!(self.fut.poll_connect(cx))? {
                 ConnectOutput::Resolved(res) => {
-                    self.fut = ConnectFuture::Connect(self.tcp.call(res));
+                    self.fut = ConnectFut::Connect(self.tcp.call(res));
                 }
                 ConnectOutput::Connected(res) => return Poll::Ready(Ok(res)),
             }

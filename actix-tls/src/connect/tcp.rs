@@ -18,9 +18,7 @@ use futures_core::ready;
 use log::{error, trace};
 use tokio_util::sync::ReusableBoxFuture;
 
-use super::{
-    connect_addrs::ConnectAddrs, error::ConnectError, Connection, ConnectionInfo, Host,
-};
+use super::{connect_addrs::ConnectAddrs, error::ConnectError, ConnectInfo, Connection, Host};
 
 /// TCP connector service factory.
 #[derive(Debug, Copy, Clone)]
@@ -33,7 +31,7 @@ impl TcpConnector {
     }
 }
 
-impl<R: Host> ServiceFactory<ConnectionInfo<R>> for TcpConnector {
+impl<R: Host> ServiceFactory<ConnectInfo<R>> for TcpConnector {
     type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
     type Config = ();
@@ -50,17 +48,17 @@ impl<R: Host> ServiceFactory<ConnectionInfo<R>> for TcpConnector {
 #[derive(Debug, Copy, Clone)]
 pub struct TcpConnectorService;
 
-impl<R: Host> Service<ConnectionInfo<R>> for TcpConnectorService {
+impl<R: Host> Service<ConnectInfo<R>> for TcpConnectorService {
     type Response = Connection<R, TcpStream>;
     type Error = ConnectError;
     type Future = TcpConnectorFut<R>;
 
     actix_service::always_ready!();
 
-    fn call(&self, req: ConnectionInfo<R>) -> Self::Future {
+    fn call(&self, req: ConnectInfo<R>) -> Self::Future {
         let port = req.port();
 
-        let ConnectionInfo {
+        let ConnectInfo {
             request: req,
             addr,
             local_addr,
@@ -178,7 +176,7 @@ impl<R: Host> Future for TcpConnectorFut<R> {
 }
 
 async fn connect(addr: SocketAddr, local_addr: Option<IpAddr>) -> io::Result<TcpStream> {
-    // use local addr if connect asks for it.
+    // use local addr if connect asks for it
     match local_addr {
         Some(ip_addr) => {
             let socket = match ip_addr {

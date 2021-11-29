@@ -11,7 +11,7 @@ use actix_service::{fn_service, Service, ServiceFactory};
 use futures_core::future::LocalBoxFuture;
 
 use actix_tls::connect::{
-    ConnectError, Connection, ConnectionInfo, Connector, Host, Resolve, Resolver,
+    ConnectError, ConnectInfo, Connection, Connector, Host, Resolve, Resolver,
 };
 
 #[actix_rt::test]
@@ -41,7 +41,7 @@ async fn custom_resolver_connect() {
     pub fn connector_factory<T: Host + 'static>(
         resolver: Resolver,
     ) -> impl ServiceFactory<
-        ConnectionInfo<T>,
+        ConnectInfo<T>,
         Config = (),
         Response = Connection<T, TcpStream>,
         Error = ConnectError,
@@ -86,7 +86,7 @@ async fn custom_resolver_connect() {
 
     let conn = factory.new_service(()).await.unwrap();
     let con = conn
-        .call(ConnectionInfo::with_addr("example.com", srv.addr()))
+        .call(ConnectInfo::with_addr("example.com", srv.addr()))
         .await
         .unwrap();
     assert_eq!(con.peer_addr().unwrap(), srv.addr());

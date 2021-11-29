@@ -16,7 +16,7 @@
 * Rename `accept::native_tls::{NativeTlsAcceptorService => AcceptorService}`. [#422]
 * Rename `connect::{Address => Host}` trait. [#422]
 * Rename method `connect::Connection::{host => hostname}`. [#422]
-* Rename struct `connect::{Connect => ConnectionInfo}`. [#422]
+* Rename struct `connect::{Connect => ConnectInfo}`. [#422]
 * Rename struct `connect::{ConnectService => ConnectorService}`. [#422]
 * Rename struct `connect::{ConnectServiceFactory => Connector}`. [#422]
 * Rename TLS acceptor service future types and hide from docs. [#422]

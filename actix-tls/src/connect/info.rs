@@ -17,19 +17,19 @@ use super::{
 ///
 /// May contain known/pre-resolved socket address(es) or a host that needs resolving with DNS.
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ConnectionInfo<R> {
+pub struct ConnectInfo<R> {
     pub(crate) request: R,
     pub(crate) port: u16,
     pub(crate) addr: ConnectAddrs,
     pub(crate) local_addr: Option<IpAddr>,
 }
 
-impl<R: Host> ConnectionInfo<R> {
+impl<R: Host> ConnectInfo<R> {
     /// Constructs new connection info using a request.
-    pub fn new(request: R) -> ConnectionInfo<R> {
+    pub fn new(request: R) -> ConnectInfo<R> {
         let port = request.port();
 
-        ConnectionInfo {
+        ConnectInfo {
             request,
             port: port.unwrap_or(0),
             addr: ConnectAddrs::None,
@@ -41,8 +41,8 @@ impl<R: Host> ConnectionInfo<R> {
     ///
     /// Since socket address is known, [`Connector`](super::Connector) will skip the DNS
     /// resolution step.
-    pub fn with_addr(request: R, addr: SocketAddr) -> ConnectionInfo<R> {
-        ConnectionInfo {
+    pub fn with_addr(request: R, addr: SocketAddr) -> ConnectInfo<R> {
+        ConnectInfo {
             request,
             port: 0,
             addr: ConnectAddrs::One(addr),
@@ -165,13 +165,13 @@ impl<R: Host> ConnectionInfo<R> {
     }
 }
 
-impl<R: Host> From<R> for ConnectionInfo<R> {
+impl<R: Host> From<R> for ConnectInfo<R> {
     fn from(addr: R) -> Self {
-        ConnectionInfo::new(addr)
+        ConnectInfo::new(addr)
     }
 }
 
-impl<R: Host> fmt::Display for ConnectionInfo<R> {
+impl<R: Host> fmt::Display for ConnectInfo<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.hostname(), self.port())
     }
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_local_addr() {
-        let conn = ConnectionInfo::new("hello").set_local_addr([127, 0, 0, 1]);
+        let conn = ConnectInfo::new("hello").set_local_addr([127, 0, 0, 1]);
         assert_eq!(
             conn.local_addr.unwrap(),
             IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn request_ref() {
-        let conn = ConnectionInfo::new("hello");
+        let conn = ConnectInfo::new("hello");
         assert_eq!(conn.request(), &"hello")
     }
 
@@ -234,15 +234,15 @@ mod tests {
     fn set_connect_addr_into_option() {
         let addr = SocketAddr::from(([127, 0, 0, 1], 4242));
 
-        let conn = ConnectionInfo::new("hello").set_addr(None);
+        let conn = ConnectInfo::new("hello").set_addr(None);
         let mut addrs = conn.addrs();
         assert!(addrs.next().is_none());
 
-        let conn = ConnectionInfo::new("hello").set_addr(addr);
+        let conn = ConnectInfo::new("hello").set_addr(addr);
         let mut addrs = conn.addrs();
         assert_eq!(addrs.next().unwrap(), addr);
 
-        let conn = ConnectionInfo::new("hello").set_addr(Some(addr));
+        let conn = ConnectInfo::new("hello").set_addr(Some(addr));
         let mut addrs = conn.addrs();
         assert_eq!(addrs.next().unwrap(), addr);
     }
