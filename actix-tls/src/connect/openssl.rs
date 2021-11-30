@@ -20,9 +20,11 @@ use tokio_openssl::SslStream;
 use crate::connect::{Connection, Host};
 
 pub mod reexports {
-    //! Re-exports from `openssl` that are useful for connectors.
+    //! Re-exports from `openssl` and `tokio-openssl` that are useful for connectors.
 
-    pub use openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
+    pub use openssl::ssl::{Error, HandshakeError, SslConnector, SslMethod, SslStream};
+
+    pub use tokio_openssl::SslStream as AsyncSslStream;
 }
 
 /// Connector service factory using `openssl`.

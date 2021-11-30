@@ -10,22 +10,24 @@ use actix_utils::future::{ok, Ready};
 use futures_core::future::LocalBoxFuture;
 use log::trace;
 use tokio_native_tls::{
-    native_tls::TlsConnector as NativeTlsConnector, TlsConnector as TokioNativeTlsConnector,
+    native_tls::TlsConnector as NativeTlsConnector, TlsConnector as AsyncNativeTlsConnector,
     TlsStream,
 };
 
 use crate::connect::{Connection, Host};
 
 pub mod reexports {
-    //! Re-exports from `native-tls` that are useful for connectors.
+    //! Re-exports from `native-tls` and `tokio-native-tls` that are useful for connectors.
 
     pub use tokio_native_tls::native_tls::TlsConnector;
+
+    pub use tokio_native_tls::TlsStream as AsyncTlsStream;
 }
 
 /// Connector service and factory using `native-tls`.
 #[derive(Clone)]
 pub struct TlsConnector {
-    connector: TokioNativeTlsConnector,
+    connector: AsyncNativeTlsConnector,
 }
 
 impl TlsConnector {
@@ -34,7 +36,7 @@ impl TlsConnector {
     /// This type is it's own service factory, so it can be used in that setting, too.
     pub fn new(connector: NativeTlsConnector) -> Self {
         Self {
-            connector: TokioNativeTlsConnector::from(connector),
+            connector: AsyncNativeTlsConnector::from(connector),
         }
     }
 }
