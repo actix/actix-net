@@ -22,7 +22,7 @@ use crate::connect::{Connection, Host};
 pub mod reexports {
     //! Re-exports from `openssl` and `tokio-openssl` that are useful for connectors.
 
-    pub use openssl::ssl::{Error, HandshakeError, SslConnector, SslMethod, SslStream};
+    pub use openssl::ssl::{Error, HandshakeError, SslConnector, SslMethod};
 
     pub use tokio_openssl::SslStream as AsyncSslStream;
 }
