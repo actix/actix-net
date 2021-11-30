@@ -57,7 +57,7 @@ impl<R: Host> ServiceFactory<ConnectInfo<R>> for Connector {
 ///
 /// Service implementation receives connection information, resolves DNS if required, and returns
 /// a TCP stream.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct ConnectorService {
     tcp: TcpConnectorService,
     resolver: ResolverService,

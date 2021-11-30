@@ -10,7 +10,8 @@
 * Implement `Error` for `accept::TlsError` where both types also implement `Error`. [#422]
 * Implement `Default` for `connect::Resolver`. [#422]
 * Implement `Error` for `connect::ConnectError`. [#422]
-* Implement `Default` for `tcp::{TcpConnector, TcpConnectorService}`. [#423]
+* Implement `Default` for `connect::tcp::{TcpConnector, TcpConnectorService}`. [#423]
+* Implement `Default` for `connect::ConnectorService`. [#423]
 
 ### Changed
 * The crate's default features flags no longer include `uri`. [#422]
