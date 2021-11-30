@@ -17,7 +17,7 @@ use actix_utils::future::{ok, Ready};
 use futures_core::ready;
 use log::trace;
 use tokio_rustls::rustls::{client::ServerName, OwnedTrustAnchor, RootCertStore};
-use tokio_rustls::{client::TlsStream, rustls::ClientConfig};
+use tokio_rustls::{client::TlsStream as AsyncTlsStream, rustls::ClientConfig};
 use tokio_rustls::{Connect as RustlsConnect, TlsConnector as RustlsTlsConnector};
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -71,7 +71,7 @@ where
     R: Host,
     IO: ActixStream + 'static,
 {
-    type Response = Connection<R, TlsStream<IO>>;
+    type Response = Connection<R, AsyncTlsStream<IO>>;
     type Error = io::Error;
     type Config = ();
     type Service = TlsConnectorService;
@@ -96,7 +96,7 @@ where
     R: Host,
     IO: ActixStream,
 {
-    type Response = Connection<R, TlsStream<IO>>;
+    type Response = Connection<R, AsyncTlsStream<IO>>;
     type Error = io::Error;
     type Future = ConnectFut<R, IO>;
 
@@ -132,7 +132,7 @@ where
     R: Host,
     IO: ActixStream,
 {
-    type Output = Result<Connection<R, TlsStream<IO>>, io::Error>;
+    type Output = Result<Connection<R, AsyncTlsStream<IO>>, io::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.get_mut() {

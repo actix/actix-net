@@ -11,7 +11,7 @@ use futures_core::future::LocalBoxFuture;
 use log::trace;
 use tokio_native_tls::{
     native_tls::TlsConnector as NativeTlsConnector, TlsConnector as AsyncNativeTlsConnector,
-    TlsStream,
+    TlsStream as AsyncTlsStream,
 };
 
 use crate::connect::{Connection, Host};
@@ -45,7 +45,7 @@ impl<R: Host, IO> ServiceFactory<Connection<R, IO>> for TlsConnector
 where
     IO: ActixStream + 'static,
 {
-    type Response = Connection<R, TlsStream<IO>>;
+    type Response = Connection<R, AsyncTlsStream<IO>>;
     type Error = io::Error;
     type Config = ();
     type Service = Self;
@@ -64,7 +64,7 @@ where
     R: Host,
     IO: ActixStream + 'static,
 {
-    type Response = Connection<R, TlsStream<IO>>;
+    type Response = Connection<R, AsyncTlsStream<IO>>;
     type Error = io::Error;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
