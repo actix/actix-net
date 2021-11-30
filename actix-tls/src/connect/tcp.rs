@@ -21,13 +21,14 @@ use tokio_util::sync::ReusableBoxFuture;
 use super::{connect_addrs::ConnectAddrs, error::ConnectError, ConnectInfo, Connection, Host};
 
 /// TCP connector service factory.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
 pub struct TcpConnector;
 
 impl TcpConnector {
     /// Returns a new TCP connector service.
     pub fn service(&self) -> TcpConnectorService {
-        TcpConnectorService
+        TcpConnectorService::default()
     }
 }
 
@@ -45,7 +46,8 @@ impl<R: Host> ServiceFactory<ConnectInfo<R>> for TcpConnector {
 }
 
 /// TCP connector service.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
+#[non_exhaustive]
 pub struct TcpConnectorService;
 
 impl<R: Host> Service<ConnectInfo<R>> for TcpConnectorService {

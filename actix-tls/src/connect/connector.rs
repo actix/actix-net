@@ -34,7 +34,7 @@ impl Connector {
     /// Build connector service.
     pub fn service(&self) -> ConnectorService {
         ConnectorService {
-            tcp: TcpConnector.service(),
+            tcp: TcpConnector::default().service(),
             resolver: self.resolver.service(),
         }
     }

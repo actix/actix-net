@@ -10,12 +10,14 @@
 * Implement `Error` for `accept::TlsError` where both types also implement `Error`. [#422]
 * Implement `Default` for `connect::Resolver`. [#422]
 * Implement `Error` for `connect::ConnectError`. [#422]
+* Implement `Default` for `tcp::{TcpConnector, TcpConnectorService}`. [#423]
 
 ### Changed
 * The crate's default features flags no longer include `uri`. [#422]
 * Useful re-exports from underlying TLS crates are exposed in a `reexports` modules in all acceptors and connectors.
 * Convert `connect::ResolverService` from enum to struct. [#422]
 * Make `ConnectAddrsIter` private. [#422]
+* Mark `tcp::{TcpConnector, TcpConnectorService}` structs `#[non_exhaustive]`. [#423]
 * Rename `accept::native_tls::{NativeTlsAcceptorService => AcceptorService}`. [#422]
 * Rename `connect::{Address => Host}` trait. [#422]
 * Rename method `connect::Connection::{host => hostname}`. [#422]
@@ -32,6 +34,7 @@
 * Remove redundant `connect::Connection::from_parts` method. [#422]
 
 [#422]: https://github.com/actix/actix-net/pull/422
+[#423]: https://github.com/actix/actix-net/pull/423
 
 
 ### Added
