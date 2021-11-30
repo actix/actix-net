@@ -34,7 +34,7 @@ impl Connector {
     /// Build connector service.
     pub fn service(&self) -> ConnectorService {
         ConnectorService {
-            tcp: TcpConnector.service(),
+            tcp: TcpConnector::default().service(),
             resolver: self.resolver.service(),
         }
     }
@@ -57,7 +57,7 @@ impl<R: Host> ServiceFactory<ConnectInfo<R>> for Connector {
 ///
 /// Service implementation receives connection information, resolves DNS if required, and returns
 /// a TCP stream.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct ConnectorService {
     tcp: TcpConnectorService,
     resolver: ResolverService,
@@ -78,14 +78,14 @@ impl<R: Host> Service<ConnectInfo<R>> for ConnectorService {
     }
 }
 
-/// Helper enum to generic over futures of resolve and connect steps.
+/// Chains futures of resolve and connect steps.
 pub(crate) enum ConnectFut<R: Host> {
     Resolve(<ResolverService as Service<ConnectInfo<R>>>::Future),
     Connect(<TcpConnectorService as Service<ConnectInfo<R>>>::Future),
 }
 
-/// Helper enum to contain the future output of `ConnectFuture`.
-pub(crate) enum ConnectOutput<R: Host> {
+/// Container for the intermediate states of [`ConnectFut`].
+pub(crate) enum ConnectFutState<R: Host> {
     Resolved(ConnectInfo<R>),
     Connected(Connection<R, TcpStream>),
 }
@@ -94,13 +94,14 @@ impl<R: Host> ConnectFut<R> {
     fn poll_connect(
         &mut self,
         cx: &mut Context<'_>,
-    ) -> Poll<Result<ConnectOutput<R>, ConnectError>> {
+    ) -> Poll<Result<ConnectFutState<R>, ConnectError>> {
         match self {
             ConnectFut::Resolve(ref mut fut) => {
-                Pin::new(fut).poll(cx).map_ok(ConnectOutput::Resolved)
+                Pin::new(fut).poll(cx).map_ok(ConnectFutState::Resolved)
             }
+
             ConnectFut::Connect(ref mut fut) => {
-                Pin::new(fut).poll(cx).map_ok(ConnectOutput::Connected)
+                Pin::new(fut).poll(cx).map_ok(ConnectFutState::Connected)
             }
         }
     }
@@ -117,10 +118,10 @@ impl<R: Host> Future for ConnectServiceResponse<R> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
             match ready!(self.fut.poll_connect(cx))? {
-                ConnectOutput::Resolved(res) => {
+                ConnectFutState::Resolved(res) => {
                     self.fut = ConnectFut::Connect(self.tcp.call(res));
                 }
-                ConnectOutput::Connected(res) => return Poll::Ready(Ok(res)),
+                ConnectFutState::Connected(res) => return Poll::Ready(Ok(res)),
             }
         }
     }

@@ -96,7 +96,7 @@ pub struct Acceptor {
 }
 
 impl Acceptor {
-    /// Create OpenSSL based `Acceptor` service factory.
+    /// Create `openssl` based acceptor service factory.
     #[inline]
     pub fn new(acceptor: SslAcceptor) -> Self {
         Acceptor {

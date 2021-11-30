@@ -1,6 +1,6 @@
 [package]
 name = "actix-tls"
-version = "3.0.0-beta.9"
+version = "3.0.0-rc.1"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
@@ -21,7 +21,7 @@ name = "actix_tls"
 path = "src/lib.rs"
 
 [features]
-default = []
+default = ["accept", "connect"]
 
 # enable acceptor services
 accept = []

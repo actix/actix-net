@@ -15,14 +15,16 @@ use actix_utils::future::{ok, Ready};
 use futures_core::ready;
 use log::trace;
 use openssl::ssl::SslConnector;
-use tokio_openssl::SslStream;
+use tokio_openssl::SslStream as AsyncSslStream;
 
 use crate::connect::{Connection, Host};
 
 pub mod reexports {
-    //! Re-exports from `openssl` that are useful for connectors.
+    //! Re-exports from `openssl` and `tokio-openssl` that are useful for connectors.
 
-    pub use openssl::ssl::{Error as SslError, HandshakeError, SslConnector, SslMethod};
+    pub use openssl::ssl::{Error, HandshakeError, SslConnector, SslMethod};
+
+    pub use tokio_openssl::SslStream as AsyncSslStream;
 }
 
 /// Connector service factory using `openssl`.
@@ -55,7 +57,7 @@ where
     R: Host,
     IO: ActixStream + 'static,
 {
-    type Response = Connection<R, SslStream<IO>>;
+    type Response = Connection<R, AsyncSslStream<IO>>;
     type Error = io::Error;
     type Config = ();
     type Service = TlsConnectorService;
@@ -87,7 +89,7 @@ where
     R: Host,
     IO: ActixStream,
 {
-    type Response = Connection<R, SslStream<IO>>;
+    type Response = Connection<R, AsyncSslStream<IO>>;
     type Error = io::Error;
     type Future = ConnectFut<R, IO>;
 
@@ -108,7 +110,7 @@ where
             .expect("SSL connect configuration was invalid.");
 
         ConnectFut {
-            io: Some(SslStream::new(ssl, io).unwrap()),
+            io: Some(AsyncSslStream::new(ssl, io).unwrap()),
             stream: Some(stream),
         }
     }
@@ -117,7 +119,7 @@ where
 /// Connect future for OpenSSL service.
 #[doc(hidden)]
 pub struct ConnectFut<R, IO> {
-    io: Option<SslStream<IO>>,
+    io: Option<AsyncSslStream<IO>>,
     stream: Option<Connection<R, ()>>,
 }
 
@@ -126,7 +128,7 @@ where
     R: Host,
     IO: ActixStream,
 {
-    type Output = Result<Connection<R, SslStream<IO>>, io::Error>;
+    type Output = Result<Connection<R, AsyncSslStream<IO>>, io::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();

@@ -93,7 +93,7 @@ pub struct Acceptor {
 }
 
 impl Acceptor {
-    /// Constructs `native-tls` based `Acceptor` service factory.
+    /// Constructs `native-tls` based acceptor service factory.
     pub fn new(acceptor: TlsAcceptor) -> Self {
         Acceptor {
             acceptor,

@@ -96,7 +96,7 @@ pub struct Acceptor {
 }
 
 impl Acceptor {
-    /// Constructs Rustls based acceptor service factory.
+    /// Constructs `rustls` based acceptor service factory.
     pub fn new(config: ServerConfig) -> Self {
         Acceptor {
             config: Arc::new(config),
