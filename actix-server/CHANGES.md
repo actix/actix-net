@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* `Server` now runs only after awaiting it. [#425]
+
+[#425]: https://github.com/actix/actix-net/pull/425
 
 
 ## 2.0.0-beta.9 - 2021-11-15
