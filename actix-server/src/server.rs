@@ -57,8 +57,8 @@ pub(crate) enum ServerCommand {
 /// Creates a worker per CPU core (or the number specified in [`ServerBuilder::workers`]) and
 /// distributes connections with a round-robin strategy.
 ///
-/// The [Server] must be awaited to process stop commands and listen for OS signals. It will resolve
-/// when the server has fully shut down.
+/// The [Server] must be awaited in order to run.
+/// It will resolve when the server has fully shut down.
 ///
 /// # Shutdown Signals
 /// On UNIX systems, `SIGQUIT` will start a graceful shutdown and `SIGTERM` or `SIGINT` will start a
