@@ -487,27 +487,46 @@ async fn worker_restart() {
 }
 
 #[test]
-#[should_panic]
-fn no_runtime() {
-    // test set up in a way that would prevent time out if support for runtime-less init was added
+fn no_runtime_on_init() {
+    use std::{thread::sleep, time::Duration};
 
     let addr = unused_addr();
+    let counter = Arc::new(AtomicUsize::new(0));
 
-    let srv = Server::build()
-        .workers(1)
+    let mut srv = Server::build()
+        .workers(2)
         .disable_signals()
-        .bind("test", addr, move || {
-            fn_service(|_| async { Ok::<_, ()>(()) })
+        .bind("test", addr, {
+            let counter = counter.clone();
+            move || {
+                counter.fetch_add(1, Ordering::SeqCst);
+                fn_service(|_| async { Ok::<_, ()>(()) })
+            }
         })
         .unwrap()
         .run();
+
+    fn is_send<T: Send>(_: &T) {}
+    is_send(&srv);
+    is_send(&srv.handle());
+
+    sleep(Duration::from_millis(1_000));
+    assert_eq!(counter.load(Ordering::SeqCst), 0);
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    let _ = srv.handle().stop(true);
+    rt.block_on(async move {
+        let _ = futures_util::poll!(&mut srv);
 
-    rt.block_on(async { srv.await }).unwrap();
+        // available after the first poll
+        sleep(Duration::from_millis(500));
+        assert_eq!(counter.load(Ordering::SeqCst), 2);
+
+        let _ = srv.handle().stop(true);
+        srv.await
+    })
+    .unwrap();
 }

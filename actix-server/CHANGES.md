@@ -2,8 +2,10 @@
 
 ## Unreleased - 2021-xx-xx
 * Hide implementation details of `Server`. [#424]
+* `Server` now runs only after awaiting it. [#425]
 
 [#424]: https://github.com/actix/actix-net/pull/424
+[#425]: https://github.com/actix/actix-net/pull/425
 
 
 ## 2.0.0-beta.9 - 2021-11-15
