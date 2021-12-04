@@ -15,7 +15,7 @@ use super::{Service, ServiceFactory};
 pub struct Map<A, F, Req, Res> {
     service: A,
     f: F,
-    _t: PhantomData<fn(Req, Res)>,
+    _t: PhantomData<fn(Req) -> Res>,
 }
 
 impl<A, F, Req, Res> Map<A, F, Req, Res> {
@@ -107,7 +107,7 @@ where
 pub struct MapServiceFactory<A, F, Req, Res> {
     a: A,
     f: F,
-    r: PhantomData<fn(Res, Req)>,
+    r: PhantomData<fn(Req) -> Res>,
 }
 
 impl<A, F, Req, Res> MapServiceFactory<A, F, Req, Res> {
