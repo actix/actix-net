@@ -28,7 +28,7 @@ where
 pub struct MapConfig<SF, Req, F, Cfg> {
     factory: SF,
     cfg_mapper: F,
-    e: PhantomData<(Cfg, Req)>,
+    e: PhantomData<fn(Cfg, Req)>,
 }
 
 impl<SF, Req, F, Cfg> MapConfig<SF, Req, F, Cfg> {
@@ -82,7 +82,7 @@ where
 /// `unit_config()` config combinator
 pub struct UnitConfig<SF, Cfg, Req> {
     factory: SF,
-    _phantom: PhantomData<(Cfg, Req)>,
+    _phantom: PhantomData<fn(Cfg, Req)>,
 }
 
 impl<SF, Cfg, Req> UnitConfig<SF, Cfg, Req>

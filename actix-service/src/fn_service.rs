@@ -105,7 +105,7 @@ where
     Fut: Future<Output = Result<Res, Err>>,
 {
     f: F,
-    _t: PhantomData<Req>,
+    _t: PhantomData<fn(Req)>,
 }
 
 impl<F, Fut, Req, Res, Err> FnService<F, Fut, Req, Res, Err>
@@ -160,7 +160,7 @@ where
     Fut: Future<Output = Result<Res, Err>>,
 {
     f: F,
-    _t: PhantomData<(Req, Cfg)>,
+    _t: PhantomData<fn(Req, Cfg)>,
 }
 
 impl<F, Fut, Req, Res, Err, Cfg> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
@@ -237,7 +237,7 @@ where
     Srv: Service<Req>,
 {
     f: F,
-    _t: PhantomData<(Fut, Cfg, Req, Srv, Err)>,
+    _t: PhantomData<fn(Cfg, Req) -> (Fut, Srv, Err)>,
 }
 
 impl<F, Fut, Cfg, Srv, Req, Err> FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
@@ -293,7 +293,7 @@ where
     Fut: Future<Output = Result<Srv, Err>>,
 {
     f: F,
-    _t: PhantomData<(Cfg, Req)>,
+    _t: PhantomData<fn(Cfg, Req)>,
 }
 
 impl<F, Cfg, Srv, Req, Fut, Err> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
@@ -390,5 +390,41 @@ mod tests {
         assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), ("srv", 1));
+    }
+
+    #[actix_rt::test]
+    async fn test_auto_impl_send() {
+        use crate::{map_config, ServiceExt, ServiceFactoryExt};
+        use alloc::rc::Rc;
+
+        let srv_1 = fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8)));
+
+        let fac_1 = fn_factory_with_config(|_: Rc<u8>| {
+            ok::<_, Rc<u8>>(fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8))))
+        });
+
+        let fac_2 = fn_factory(|| {
+            ok::<_, Rc<u8>>(fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8))))
+        });
+
+        fn is_send<T: Send + Sync + Clone>(_: &T) {}
+
+        is_send(&fac_1);
+        is_send(&map_config(fac_1.clone(), |_: Rc<u8>| Rc::new(0u8)));
+        is_send(&fac_1.clone().map_err(|_| Rc::new(0u8)));
+        is_send(&fac_1.clone().map(|_| Rc::new(0u8)));
+        is_send(&fac_1.clone().map_init_err(|_| Rc::new(0u8)));
+        // `and_then` is always !Send
+        // is_send(&fac_1.clone().and_then(fac_1.clone()));
+        is_send(&fac_1.new_service(Rc::new(0u8)).await.unwrap());
+
+        is_send(&fac_2);
+        is_send(&fac_2.new_service(Rc::new(0u8)).await.unwrap());
+
+        is_send(&srv_1);
+        is_send(&ServiceExt::map(srv_1.clone(), |_| Rc::new(0u8)));
+        is_send(&ServiceExt::map_err(srv_1.clone(), |_| Rc::new(0u8)));
+        // `and_then` is always !Send
+        // is_send(&ServiceExt::and_then(srv_1.clone(), srv_1.clone()));
     }
 }

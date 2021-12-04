@@ -13,7 +13,7 @@ use super::ServiceFactory;
 pub struct MapInitErr<A, F, Req, Err> {
     a: A,
     f: F,
-    e: PhantomData<(Req, Err)>,
+    e: PhantomData<fn(Req) -> Err>,
 }
 
 impl<A, F, Req, Err> MapInitErr<A, F, Req, Err>
