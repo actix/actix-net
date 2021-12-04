@@ -38,36 +38,6 @@
 [#423]: https://github.com/actix/actix-net/pull/423
 
 
-### Added
-* Derive `Debug` for `connect::Connection`. [#422]
-* Implement `Display` for `accept::TlsError`. [#422]
-* Implement `Error` for `accept::TlsError` where both types also implement `Error`. [#422]
-* Implement `Default` for `connect::Resolver`. [#422]
-* Implement `Error` for `connect::ConnectError`. [#422]
-
-### Changed
-* The crate's default features flags no longer include `uri`. [#422]
-* Useful re-exports from underlying TLS crates are exposed in a `reexports` modules in all acceptors and connectors.
-* Convert `connect::ResolverService` from enum to struct. [#422]
-* Make `ConnectAddrsIter` private. [#422]
-* Rename `accept::native_tls::{NativeTlsAcceptorService => AcceptorService}`. [#422]
-* Rename `connect::{Address => Host}` trait. [#422]
-* Rename method `connect::Connection::{host => hostname}`. [#422]
-* Rename struct `connect::{Connect => ConnectInfo}`. [#422]
-* Rename struct `connect::{ConnectService => ConnectorService}`. [#422]
-* Rename struct `connect::{ConnectServiceFactory => Connector}`. [#422]
-* Rename TLS acceptor service future types and hide from docs. [#422]
-* Unbox some service futures types. [#422]
-* Inline modules in `connect::tls` to `connect` module. [#422]
-
-### Removed
-* Remove `connect::{new_connector, new_connector_factory, default_connector, default_connector_factory}` methods. [#422]
-* Remove `connect::native_tls::Connector::service` method. [#422]
-* Remove redundant `connect::Connection::from_parts` method. [#422]
-
-[#422]: https://github.com/actix/actix-net/pull/422
-
-
 ## 3.0.0-beta.9 - 2021-11-22
 * Add configurable timeout for accepting TLS connection. [#393]
 * Added `TlsError::Timeout` variant. [#393]
