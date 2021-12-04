@@ -2,7 +2,7 @@ pub(crate) use std::net::{
     SocketAddr as StdSocketAddr, TcpListener as StdTcpListener, ToSocketAddrs,
 };
 
-pub(crate) use mio::net::{TcpListener as MioTcpListener, TcpSocket as MioTcpSocket};
+pub(crate) use mio::net::TcpListener as MioTcpListener;
 #[cfg(unix)]
 pub(crate) use {
     mio::net::UnixListener as MioUnixListener,
@@ -159,24 +159,24 @@ pub enum MioStream {
     Uds(mio::net::UnixStream),
 }
 
-/// helper trait for converting mio stream to tokio stream.
+/// Helper trait for converting a Mio stream into a Tokio stream.
 pub trait FromStream: Sized {
     fn from_mio(sock: MioStream) -> io::Result<Self>;
 }
 
 #[cfg(windows)]
 mod win_impl {
-    use super::*;
-
     use std::os::windows::io::{FromRawSocket, IntoRawSocket};
 
-    // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
+    use super::*;
+
+    // TODO: This is a workaround and we need an efficient way to convert between Mio and Tokio stream
     impl FromStream for TcpStream {
         fn from_mio(sock: MioStream) -> io::Result<Self> {
             match sock {
                 MioStream::Tcp(mio) => {
                     let raw = IntoRawSocket::into_raw_socket(mio);
-                    // SAFETY: This is a in place conversion from mio stream to tokio stream.
+                    // SAFETY: This is an in-place conversion from Mio stream to Tokio stream.
                     TcpStream::from_std(unsafe { FromRawSocket::from_raw_socket(raw) })
                 }
             }
@@ -186,19 +186,19 @@ mod win_impl {
 
 #[cfg(unix)]
 mod unix_impl {
-    use super::*;
-
     use std::os::unix::io::{FromRawFd, IntoRawFd};
 
     use actix_rt::net::UnixStream;
 
-    // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
+    use super::*;
+
+    // HACK: This is a workaround and we need an efficient way to convert between Mio and Tokio stream
     impl FromStream for TcpStream {
         fn from_mio(sock: MioStream) -> io::Result<Self> {
             match sock {
                 MioStream::Tcp(mio) => {
                     let raw = IntoRawFd::into_raw_fd(mio);
-                    // SAFETY: This is a in place conversion from mio stream to tokio stream.
+                    // SAFETY: This is an in-place conversion from Mio stream to Tokio stream.
                     TcpStream::from_std(unsafe { FromRawFd::from_raw_fd(raw) })
                 }
                 MioStream::Uds(_) => {
@@ -208,19 +208,35 @@ mod unix_impl {
         }
     }
 
-    // FIXME: This is a workaround and we need an efficient way to convert between mio and tokio stream
+    // HACK: This is a workaround and we need an efficient way to convert between Mio and Tokio stream
     impl FromStream for UnixStream {
         fn from_mio(sock: MioStream) -> io::Result<Self> {
             match sock {
                 MioStream::Tcp(_) => panic!("Should not happen, bug in server impl"),
                 MioStream::Uds(mio) => {
                     let raw = IntoRawFd::into_raw_fd(mio);
-                    // SAFETY: This is a in place conversion from mio stream to tokio stream.
+                    // SAFETY: This is an in-place conversion from Mio stream to Tokio stream.
                     UnixStream::from_std(unsafe { FromRawFd::from_raw_fd(raw) })
                 }
             }
         }
     }
+}
+
+pub(crate) fn create_mio_tcp_listener(
+    addr: StdSocketAddr,
+    backlog: u32,
+) -> io::Result<MioTcpListener> {
+    use socket2::{Domain, Protocol, Socket, Type};
+
+    let socket = Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP))?;
+
+    socket.set_reuse_address(true)?;
+    socket.set_nonblocking(true)?;
+    socket.bind(&addr.into())?;
+    socket.listen(backlog as i32)?;
+
+    Ok(MioTcpListener::from_std(StdTcpListener::from(socket)))
 }
 
 #[cfg(test)]
@@ -234,11 +250,8 @@ mod tests {
         assert_eq!(format!("{}", addr), "127.0.0.1:8080");
 
         let addr: StdSocketAddr = "127.0.0.1:0".parse().unwrap();
-        let socket = MioTcpSocket::new_v4().unwrap();
-        socket.set_reuseaddr(true).unwrap();
-        socket.bind(addr).unwrap();
-        let tcp = socket.listen(128).unwrap();
-        let lst = MioListener::Tcp(tcp);
+        let lst = create_mio_tcp_listener(addr, 128).unwrap();
+        let lst = MioListener::Tcp(lst);
         assert!(format!("{:?}", lst).contains("TcpListener"));
         assert!(format!("{}", lst).contains("127.0.0.1"));
     }

@@ -112,9 +112,7 @@ jobs:
       - name: tests
         if: matrix.target.os == 'ubuntu-latest'
         run: |
-          cargo ci-test
-          cargo ci-test-rt-linux
-          cargo ci-test-server-linux
+          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rt-linux && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-server-linux"
 
       - name: Clear the cargo caches
         run: |
@@ -141,7 +139,8 @@ jobs:
           args: cargo-hack
 
       - name: tests
-        run: cargo ci-test-lower-msrv
+        run: |
+          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=1.46 cargo ci-test-lower-msrv"
 
       - name: Clear the cargo caches
         run: |
@@ -197,13 +196,6 @@ jobs:
       - name: Cache Dependencies
         uses: Swatinem/rust-cache@v1.3.0
 
-      - name: Install cargo-hack
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-hack
-
-      - name: doc tests
-        uses: actions-rs/cargo@v1
-        timeout-minutes: 40
-        with: { command: ci-doctest }
+      - name: doc tests io-uring
+        run: |
+          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=nightly cargo ci-doctest"

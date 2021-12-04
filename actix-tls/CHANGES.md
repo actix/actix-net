@@ -3,6 +3,94 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.0-rc.1 - 2021-11-29
+### Added
+* Derive `Debug` for `connect::Connection`. [#422]
+* Implement `Display` for `accept::TlsError`. [#422]
+* Implement `Error` for `accept::TlsError` where both types also implement `Error`. [#422]
+* Implement `Default` for `connect::Resolver`. [#422]
+* Implement `Error` for `connect::ConnectError`. [#422]
+* Implement `Default` for `connect::tcp::{TcpConnector, TcpConnectorService}`. [#423]
+* Implement `Default` for `connect::ConnectorService`. [#423]
+
+### Changed
+* The crate's default features flags no longer include `uri`. [#422]
+* Useful re-exports from underlying TLS crates are exposed in a `reexports` modules in all acceptors and connectors.
+* Convert `connect::ResolverService` from enum to struct. [#422]
+* Make `ConnectAddrsIter` private. [#422]
+* Mark `tcp::{TcpConnector, TcpConnectorService}` structs `#[non_exhaustive]`. [#423]
+* Rename `accept::native_tls::{NativeTlsAcceptorService => AcceptorService}`. [#422]
+* Rename `connect::{Address => Host}` trait. [#422]
+* Rename method `connect::Connection::{host => hostname}`. [#422]
+* Rename struct `connect::{Connect => ConnectInfo}`. [#422]
+* Rename struct `connect::{ConnectService => ConnectorService}`. [#422]
+* Rename struct `connect::{ConnectServiceFactory => Connector}`. [#422]
+* Rename TLS acceptor service future types and hide from docs. [#422]
+* Unbox some service futures types. [#422]
+* Inline modules in `connect::tls` to `connect` module. [#422]
+
+### Removed
+* Remove `connect::{new_connector, new_connector_factory, default_connector, default_connector_factory}` methods. [#422]
+* Remove `connect::native_tls::Connector::service` method. [#422]
+* Remove redundant `connect::Connection::from_parts` method. [#422]
+
+[#422]: https://github.com/actix/actix-net/pull/422
+[#423]: https://github.com/actix/actix-net/pull/423
+
+
+### Added
+* Derive `Debug` for `connect::Connection`. [#422]
+* Implement `Display` for `accept::TlsError`. [#422]
+* Implement `Error` for `accept::TlsError` where both types also implement `Error`. [#422]
+* Implement `Default` for `connect::Resolver`. [#422]
+* Implement `Error` for `connect::ConnectError`. [#422]
+
+### Changed
+* The crate's default features flags no longer include `uri`. [#422]
+* Useful re-exports from underlying TLS crates are exposed in a `reexports` modules in all acceptors and connectors.
+* Convert `connect::ResolverService` from enum to struct. [#422]
+* Make `ConnectAddrsIter` private. [#422]
+* Rename `accept::native_tls::{NativeTlsAcceptorService => AcceptorService}`. [#422]
+* Rename `connect::{Address => Host}` trait. [#422]
+* Rename method `connect::Connection::{host => hostname}`. [#422]
+* Rename struct `connect::{Connect => ConnectInfo}`. [#422]
+* Rename struct `connect::{ConnectService => ConnectorService}`. [#422]
+* Rename struct `connect::{ConnectServiceFactory => Connector}`. [#422]
+* Rename TLS acceptor service future types and hide from docs. [#422]
+* Unbox some service futures types. [#422]
+* Inline modules in `connect::tls` to `connect` module. [#422]
+
+### Removed
+* Remove `connect::{new_connector, new_connector_factory, default_connector, default_connector_factory}` methods. [#422]
+* Remove `connect::native_tls::Connector::service` method. [#422]
+* Remove redundant `connect::Connection::from_parts` method. [#422]
+
+[#422]: https://github.com/actix/actix-net/pull/422
+
+
+## 3.0.0-beta.9 - 2021-11-22
+* Add configurable timeout for accepting TLS connection. [#393]
+* Added `TlsError::Timeout` variant. [#393]
+* All TLS acceptor services now use `TlsError` for their error types. [#393]
+* Added `TlsError::into_service_error`. [#420]
+
+[#393]: https://github.com/actix/actix-net/pull/393
+[#420]: https://github.com/actix/actix-net/pull/420
+
+
+## 3.0.0-beta.8 - 2021-11-15
+* Add `Connect::request` for getting a reference to the connection request. [#415]
+
+[#415]: https://github.com/actix/actix-net/pull/415
+
+
+## 3.0.0-beta.7 - 2021-10-20
+* Add `webpki_roots_cert_store()` to get rustls compatible webpki roots cert store. [#401]
+* Alias `connect::ssl` to `connect::tls`. [#401]
+
+[#401]: https://github.com/actix/actix-net/pull/401
+
+
 ## 3.0.0-beta.6 - 2021-10-19
 * Update `tokio-rustls` to `0.23` which uses `rustls` `0.20`. [#396]
 * Removed a re-export of `Session` from `rustls` as it no longer exist. [#396]
@@ -18,8 +106,7 @@
 * Remove `connect::ssl::openssl::OpensslConnectService`. [#297]
 * Add `connect::ssl::native_tls` module for native tls support. [#295]
 * Rename `accept::{nativetls => native_tls}`. [#295]
-* Remove `connect::TcpConnectService` type. service caller expect a `TcpStream` should use
-  `connect::ConnectService` instead and call `Connection<T, TcpStream>::into_parts`. [#299]
+* Remove `connect::TcpConnectService` type. Service caller expecting a `TcpStream` should use `connect::ConnectService` instead and call `Connection<T, TcpStream>::into_parts`. [#299]
 
 [#295]: https://github.com/actix/actix-net/pull/295
 [#296]: https://github.com/actix/actix-net/pull/296

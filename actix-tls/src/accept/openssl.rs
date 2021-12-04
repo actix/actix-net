@@ -1,47 +1,45 @@
+//! `openssl` based TLS acceptor service.
+//!
+//! See [`Acceptor`] for main service factory docs.
+
 use std::{
+    convert::Infallible,
     future::Future,
     io::{self, IoSlice},
-    ops::{Deref, DerefMut},
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
-use actix_rt::net::{ActixStream, Ready};
-use actix_service::{Service, ServiceFactory};
-use actix_utils::counter::{Counter, CounterGuard};
-use futures_core::{future::LocalBoxFuture, ready};
-
-pub use openssl::ssl::{
-    AlpnError, Error as SslError, HandshakeError, Ssl, SslAcceptor, SslAcceptorBuilder,
+use actix_rt::{
+    net::{ActixStream, Ready},
+    time::{sleep, Sleep},
 };
+use actix_service::{Service, ServiceFactory};
+use actix_utils::{
+    counter::{Counter, CounterGuard},
+    future::{ready, Ready as FutReady},
+};
+use derive_more::{Deref, DerefMut, From};
+use openssl::ssl::{Error, Ssl, SslAcceptor};
+use pin_project_lite::pin_project;
 
-use super::MAX_CONN_COUNTER;
+use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 
-/// Wrapper type for `tokio_openssl::SslStream` in order to impl `ActixStream` trait.
-pub struct TlsStream<T>(tokio_openssl::SslStream<T>);
+pub mod reexports {
+    //! Re-exports from `openssl` that are useful for acceptors.
 
-impl<T> From<tokio_openssl::SslStream<T>> for TlsStream<T> {
-    fn from(stream: tokio_openssl::SslStream<T>) -> Self {
-        Self(stream)
-    }
+    pub use openssl::ssl::{
+        AlpnError, Error, HandshakeError, Ssl, SslAcceptor, SslAcceptorBuilder,
+    };
 }
 
-impl<T> Deref for TlsStream<T> {
-    type Target = tokio_openssl::SslStream<T>;
+/// Wraps an `openssl` based async TLS stream in order to implement [`ActixStream`].
+#[derive(Deref, DerefMut, From)]
+pub struct TlsStream<IO>(tokio_openssl::SslStream<IO>);
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T> DerefMut for TlsStream<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<T: ActixStream> AsyncRead for TlsStream<T> {
+impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -51,7 +49,7 @@ impl<T: ActixStream> AsyncRead for TlsStream<T> {
     }
 }
 
-impl<T: ActixStream> AsyncWrite for TlsStream<T> {
+impl<IO: ActixStream> AsyncWrite for TlsStream<IO> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -81,28 +79,38 @@ impl<T: ActixStream> AsyncWrite for TlsStream<T> {
     }
 }
 
-impl<T: ActixStream> ActixStream for TlsStream<T> {
+impl<IO: ActixStream> ActixStream for TlsStream<IO> {
     fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        T::poll_read_ready((&**self).get_ref(), cx)
+        IO::poll_read_ready((&**self).get_ref(), cx)
     }
 
     fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        T::poll_write_ready((&**self).get_ref(), cx)
+        IO::poll_write_ready((&**self).get_ref(), cx)
     }
 }
 
-/// Accept TLS connections via `openssl` package.
-///
-/// `openssl` feature enables this `Acceptor` type.
+/// Accept TLS connections via the `openssl` crate.
 pub struct Acceptor {
     acceptor: SslAcceptor,
+    handshake_timeout: Duration,
 }
 
 impl Acceptor {
-    /// Create OpenSSL based `Acceptor` service factory.
+    /// Create `openssl` based acceptor service factory.
     #[inline]
     pub fn new(acceptor: SslAcceptor) -> Self {
-        Acceptor { acceptor }
+        Acceptor {
+            acceptor,
+            handshake_timeout: DEFAULT_TLS_HANDSHAKE_TIMEOUT,
+        }
+    }
+
+    /// Limit the amount of time that the acceptor will wait for a TLS handshake to complete.
+    ///
+    /// Default timeout is 3 seconds.
+    pub fn set_handshake_timeout(&mut self, handshake_timeout: Duration) -> &mut Self {
+        self.handshake_timeout = handshake_timeout;
+        self
     }
 }
 
@@ -111,38 +119,43 @@ impl Clone for Acceptor {
     fn clone(&self) -> Self {
         Self {
             acceptor: self.acceptor.clone(),
+            handshake_timeout: self.handshake_timeout,
         }
     }
 }
 
-impl<T: ActixStream> ServiceFactory<T> for Acceptor {
-    type Response = TlsStream<T>;
-    type Error = SslError;
+impl<IO: ActixStream> ServiceFactory<IO> for Acceptor {
+    type Response = TlsStream<IO>;
+    type Error = TlsError<Error, Infallible>;
     type Config = ();
     type Service = AcceptorService;
     type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+    type Future = FutReady<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         let res = MAX_CONN_COUNTER.with(|conns| {
             Ok(AcceptorService {
                 acceptor: self.acceptor.clone(),
                 conns: conns.clone(),
+                handshake_timeout: self.handshake_timeout,
             })
         });
-        Box::pin(async { res })
+
+        ready(res)
     }
 }
 
+/// OpenSSL based acceptor service.
 pub struct AcceptorService {
     acceptor: SslAcceptor,
     conns: Counter,
+    handshake_timeout: Duration,
 }
 
-impl<T: ActixStream> Service<T> for AcceptorService {
-    type Response = TlsStream<T>;
-    type Error = SslError;
-    type Future = AcceptorServiceResponse<T>;
+impl<IO: ActixStream> Service<IO> for AcceptorService {
+    type Response = TlsStream<IO>;
+    type Error = TlsError<Error, Infallible>;
+    type Future = AcceptFut<IO>;
 
     fn poll_ready(&self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(ctx) {
@@ -152,30 +165,43 @@ impl<T: ActixStream> Service<T> for AcceptorService {
         }
     }
 
-    fn call(&self, io: T) -> Self::Future {
+    fn call(&self, io: IO) -> Self::Future {
         let ssl_ctx = self.acceptor.context();
         let ssl = Ssl::new(ssl_ctx).expect("Provided SSL acceptor was invalid.");
-        AcceptorServiceResponse {
+
+        AcceptFut {
             _guard: self.conns.get(),
+            timeout: sleep(self.handshake_timeout),
             stream: Some(tokio_openssl::SslStream::new(ssl, io).unwrap()),
         }
     }
 }
 
-pub struct AcceptorServiceResponse<T: ActixStream> {
-    stream: Option<tokio_openssl::SslStream<T>>,
-    _guard: CounterGuard,
+pin_project! {
+    /// Accept future for OpenSSL service.
+    #[doc(hidden)]
+    pub struct AcceptFut<IO: ActixStream> {
+        stream: Option<tokio_openssl::SslStream<IO>>,
+        #[pin]
+        timeout: Sleep,
+        _guard: CounterGuard,
+    }
 }
 
-impl<T: ActixStream> Future for AcceptorServiceResponse<T> {
-    type Output = Result<TlsStream<T>, SslError>;
+impl<IO: ActixStream> Future for AcceptFut<IO> {
+    type Output = Result<TlsStream<IO>, TlsError<Error, Infallible>>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        ready!(Pin::new(self.stream.as_mut().unwrap()).poll_accept(cx))?;
-        Poll::Ready(Ok(self
-            .stream
-            .take()
-            .expect("SSL connect has resolved.")
-            .into()))
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+
+        match Pin::new(this.stream.as_mut().unwrap()).poll_accept(cx) {
+            Poll::Ready(Ok(())) => Poll::Ready(Ok(this
+                .stream
+                .take()
+                .expect("Acceptor should not be polled after it has completed.")
+                .into())),
+            Poll::Ready(Err(err)) => Poll::Ready(Err(TlsError::Tls(err))),
+            Poll::Pending => this.timeout.poll(cx).map(|_| Err(TlsError::Timeout)),
+        }
     }
 }

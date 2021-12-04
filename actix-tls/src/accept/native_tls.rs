@@ -1,45 +1,42 @@
+//! `native-tls` based TLS connection acceptor service.
+//!
+//! See [`Acceptor`] for main service factory docs.
+
 use std::{
+    convert::Infallible,
     io::{self, IoSlice},
-    ops::{Deref, DerefMut},
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
-use actix_rt::net::{ActixStream, Ready};
+use actix_rt::{
+    net::{ActixStream, Ready},
+    time::timeout,
+};
 use actix_service::{Service, ServiceFactory};
-use actix_utils::counter::Counter;
+use actix_utils::{
+    counter::Counter,
+    future::{ready, Ready as FutReady},
+};
+use derive_more::{Deref, DerefMut, From};
 use futures_core::future::LocalBoxFuture;
+use tokio_native_tls::{native_tls::Error, TlsAcceptor};
 
-pub use tokio_native_tls::native_tls::Error;
-pub use tokio_native_tls::TlsAcceptor;
+use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 
-use super::MAX_CONN_COUNTER;
+pub mod reexports {
+    //! Re-exports from `native-tls` that are useful for acceptors.
 
-/// Wrapper type for `tokio_native_tls::TlsStream` in order to impl `ActixStream` trait.
-pub struct TlsStream<T>(tokio_native_tls::TlsStream<T>);
-
-impl<T> From<tokio_native_tls::TlsStream<T>> for TlsStream<T> {
-    fn from(stream: tokio_native_tls::TlsStream<T>) -> Self {
-        Self(stream)
-    }
+    pub use tokio_native_tls::{native_tls::Error, TlsAcceptor};
 }
 
-impl<T: ActixStream> Deref for TlsStream<T> {
-    type Target = tokio_native_tls::TlsStream<T>;
+/// Wraps a `native-tls` based async TLS stream in order to implement [`ActixStream`].
+#[derive(Deref, DerefMut, From)]
+pub struct TlsStream<IO>(tokio_native_tls::TlsStream<IO>);
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T: ActixStream> DerefMut for TlsStream<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<T: ActixStream> AsyncRead for TlsStream<T> {
+impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -49,7 +46,7 @@ impl<T: ActixStream> AsyncRead for TlsStream<T> {
     }
 }
 
-impl<T: ActixStream> AsyncWrite for TlsStream<T> {
+impl<IO: ActixStream> AsyncWrite for TlsStream<IO> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -79,28 +76,37 @@ impl<T: ActixStream> AsyncWrite for TlsStream<T> {
     }
 }
 
-impl<T: ActixStream> ActixStream for TlsStream<T> {
+impl<IO: ActixStream> ActixStream for TlsStream<IO> {
     fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        T::poll_read_ready((&**self).get_ref().get_ref().get_ref(), cx)
+        IO::poll_read_ready((&**self).get_ref().get_ref().get_ref(), cx)
     }
 
     fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        T::poll_write_ready((&**self).get_ref().get_ref().get_ref(), cx)
+        IO::poll_write_ready((&**self).get_ref().get_ref().get_ref(), cx)
     }
 }
 
-/// Accept TLS connections via `native-tls` package.
-///
-/// `native-tls` feature enables this `Acceptor` type.
+/// Accept TLS connections via the `native-tls` crate.
 pub struct Acceptor {
     acceptor: TlsAcceptor,
+    handshake_timeout: Duration,
 }
 
 impl Acceptor {
-    /// Create `native-tls` based `Acceptor` service factory.
-    #[inline]
+    /// Constructs `native-tls` based acceptor service factory.
     pub fn new(acceptor: TlsAcceptor) -> Self {
-        Acceptor { acceptor }
+        Acceptor {
+            acceptor,
+            handshake_timeout: DEFAULT_TLS_HANDSHAKE_TIMEOUT,
+        }
+    }
+
+    /// Limit the amount of time that the acceptor will wait for a TLS handshake to complete.
+    ///
+    /// Default timeout is 3 seconds.
+    pub fn set_handshake_timeout(&mut self, handshake_timeout: Duration) -> &mut Self {
+        self.handshake_timeout = handshake_timeout;
+        self
     }
 }
 
@@ -109,39 +115,43 @@ impl Clone for Acceptor {
     fn clone(&self) -> Self {
         Self {
             acceptor: self.acceptor.clone(),
+            handshake_timeout: self.handshake_timeout,
         }
     }
 }
 
-impl<T: ActixStream + 'static> ServiceFactory<T> for Acceptor {
-    type Response = TlsStream<T>;
-    type Error = Error;
+impl<IO: ActixStream + 'static> ServiceFactory<IO> for Acceptor {
+    type Response = TlsStream<IO>;
+    type Error = TlsError<Error, Infallible>;
     type Config = ();
-
-    type Service = NativeTlsAcceptorService;
+    type Service = AcceptorService;
     type InitError = ();
-    type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
+    type Future = FutReady<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
         let res = MAX_CONN_COUNTER.with(|conns| {
-            Ok(NativeTlsAcceptorService {
+            Ok(AcceptorService {
                 acceptor: self.acceptor.clone(),
                 conns: conns.clone(),
+                handshake_timeout: self.handshake_timeout,
             })
         });
-        Box::pin(async { res })
+
+        ready(res)
     }
 }
 
-pub struct NativeTlsAcceptorService {
+/// Native-TLS based acceptor service.
+pub struct AcceptorService {
     acceptor: TlsAcceptor,
     conns: Counter,
+    handshake_timeout: Duration,
 }
 
-impl<T: ActixStream + 'static> Service<T> for NativeTlsAcceptorService {
-    type Response = TlsStream<T>;
-    type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<TlsStream<T>, Error>>;
+impl<IO: ActixStream + 'static> Service<IO> for AcceptorService {
+    type Response = TlsStream<IO>;
+    type Error = TlsError<Error, Infallible>;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.conns.available(cx) {
@@ -151,13 +161,21 @@ impl<T: ActixStream + 'static> Service<T> for NativeTlsAcceptorService {
         }
     }
 
-    fn call(&self, io: T) -> Self::Future {
+    fn call(&self, io: IO) -> Self::Future {
         let guard = self.conns.get();
         let acceptor = self.acceptor.clone();
+
+        let dur = self.handshake_timeout;
+
         Box::pin(async move {
-            let io = acceptor.accept(io).await;
-            drop(guard);
-            io.map(Into::into)
+            match timeout(dur, acceptor.accept(io)).await {
+                Ok(Ok(io)) => {
+                    drop(guard);
+                    Ok(TlsStream(io))
+                }
+                Ok(Err(err)) => Err(TlsError::Tls(err)),
+                Err(_timeout) => Err(TlsError::Timeout),
+            }
         })
     }
 }

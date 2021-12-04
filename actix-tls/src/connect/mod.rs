@@ -1,74 +1,46 @@
-//! TCP connector services for Actix ecosystem.
+//! TCP and TLS connector services.
 //!
 //! # Stages of the TCP connector service:
-//! - Resolve [`Address`] with given [`Resolver`] and collect list of socket addresses.
-//! - Establish TCP connection and return [`TcpStream`].
+//! 1. Resolve [`Host`] (if needed) with given [`Resolver`] and collect list of socket addresses.
+//! 1. Establish TCP connection and return [`TcpStream`].
 //!
 //! # Stages of TLS connector services:
-//! - Establish [`TcpStream`] with connector service.
-//! - Wrap the stream and perform connect handshake with remote peer.
-//! - Return certain stream type that impls `AsyncRead` and `AsyncWrite`.
-//!
-//! # Package feature
-//! * `openssl` - enables TLS support via `openssl` crate
-//! * `rustls` - enables TLS support via `rustls` crate
+//! 1. Resolve DNS and establish a [`TcpStream`] with the TCP connector service.
+//! 1. Wrap the stream and perform connect handshake with remote peer.
+//! 1. Return wrapped stream type that implements `AsyncRead` and `AsyncWrite`.
 //!
 //! [`TcpStream`]: actix_rt::net::TcpStream
 
-#[allow(clippy::module_inception)]
-mod connect;
+mod connect_addrs;
+mod connection;
 mod connector;
 mod error;
+mod host;
+mod info;
 mod resolve;
-mod service;
-pub mod ssl;
+mod resolver;
+pub mod tcp;
+
 #[cfg(feature = "uri")]
+#[cfg_attr(docsrs, doc(cfg(feature = "uri")))]
 mod uri;
 
-use actix_rt::net::TcpStream;
-use actix_service::{Service, ServiceFactory};
+#[cfg(feature = "openssl")]
+#[cfg_attr(docsrs, doc(cfg(feature = "openssl")))]
+pub mod openssl;
 
-pub use self::connect::{Address, Connect, Connection};
-pub use self::connector::{TcpConnector, TcpConnectorFactory};
+#[cfg(feature = "rustls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rustls")))]
+pub mod rustls;
+
+#[cfg(feature = "native-tls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
+pub mod native_tls;
+
+pub use self::connection::Connection;
+pub use self::connector::{Connector, ConnectorService};
 pub use self::error::ConnectError;
-pub use self::resolve::{Resolve, Resolver, ResolverFactory};
-pub use self::service::{ConnectService, ConnectServiceFactory};
-
-/// Create TCP connector service.
-pub fn new_connector<T: Address + 'static>(
-    resolver: Resolver,
-) -> impl Service<Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError> + Clone
-{
-    ConnectServiceFactory::new(resolver).service()
-}
-
-/// Create TCP connector service factory.
-pub fn new_connector_factory<T: Address + 'static>(
-    resolver: Resolver,
-) -> impl ServiceFactory<
-    Connect<T>,
-    Config = (),
-    Response = Connection<T, TcpStream>,
-    Error = ConnectError,
-    InitError = (),
-> + Clone {
-    ConnectServiceFactory::new(resolver)
-}
-
-/// Create connector service with default parameters.
-pub fn default_connector<T: Address + 'static>(
-) -> impl Service<Connect<T>, Response = Connection<T, TcpStream>, Error = ConnectError> + Clone
-{
-    new_connector(Resolver::Default)
-}
-
-/// Create connector service factory with default parameters.
-pub fn default_connector_factory<T: Address + 'static>() -> impl ServiceFactory<
-    Connect<T>,
-    Config = (),
-    Response = Connection<T, TcpStream>,
-    Error = ConnectError,
-    InitError = (),
-> + Clone {
-    new_connector_factory(Resolver::Default)
-}
+pub use self::host::Host;
+pub use self::info::ConnectInfo;
+pub use self::resolve::Resolve;
+pub use self::resolver::{Resolver, ResolverService};

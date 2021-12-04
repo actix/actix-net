@@ -2,8 +2,7 @@
 
 #![no_std]
 #![deny(rust_2018_idioms, nonstandard_style)]
-#![doc(html_logo_url = "https://actix.rs/img/logo.png")]
-#![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
+#![warn(missing_docs)]
 
 extern crate alloc;
 
@@ -217,6 +216,16 @@ mod serde {
             String::deserialize(deserializer).map(ByteString::from)
         }
     }
+
+    #[cfg(test)]
+    mod serde_impl_tests {
+        use super::*;
+
+        use serde::de::DeserializeOwned;
+        use static_assertions::assert_impl_all;
+
+        assert_impl_all!(ByteString: Serialize, DeserializeOwned);
+    }
 }
 
 #[cfg(test)]
@@ -225,8 +234,23 @@ mod test {
     use core::hash::{Hash, Hasher};
 
     use ahash::AHasher;
+    use static_assertions::assert_impl_all;
 
     use super::*;
+
+    assert_impl_all!(ByteString: Send, Sync, Unpin, Sized);
+    assert_impl_all!(ByteString: Clone, Default, Eq, PartialOrd, Ord);
+    assert_impl_all!(ByteString: fmt::Debug, fmt::Display);
+
+    #[rustversion::since(1.56)]
+    mod above_1_56_impls {
+        // `[Ref]UnwindSafe` traits were only in std until rust 1.56
+
+        use core::panic::{RefUnwindSafe, UnwindSafe};
+
+        use super::*;
+        assert_impl_all!(ByteString: UnwindSafe, RefUnwindSafe);
+    }
 
     #[test]
     fn test_partial_eq() {

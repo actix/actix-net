@@ -3,6 +3,20 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 2.5.0 - 2021-11-22
+* Add `System::run_with_code` to allow retrieving the exit code on stop. [#411]
+
+[#411]: https://github.com/actix/actix-net/pull/411
+
+
+## 2.4.0 - 2021-11-05
+* Add `Arbiter::try_current` for situations where thread may or may not have Arbiter context. [#408]
+* Start io-uring with `System::new` when feature is enabled. [#395]
+
+[#395]: https://github.com/actix/actix-net/pull/395
+[#408]: https://github.com/actix/actix-net/pull/408
+
+
 ## 2.3.0 - 2021-10-11
 * The `spawn` method can now resolve with non-unit outputs. [#369]
 * Add experimental (semver-exempt) `io-uring` feature for enabling async file I/O on linux. [#374]
@@ -100,7 +114,7 @@
 [#129]: https://github.com/actix/actix-net/issues/129
 
 
-## 1.1.0 - 2020-04-08 (YANKED)
+## 1.1.0 - 2020-04-08 _(YANKED)_
 * Expose `System::is_set` to check if current system has ben started [#99]
 * Add `Arbiter::is_running` to check if event loop is running [#124]
 * Add `Arbiter::local_join` associated function

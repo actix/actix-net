@@ -1,20 +1,19 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{mpsc, Arc};
-use std::{net, thread, time::Duration};
+use std::{
+    net,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        mpsc, Arc,
+    },
+    thread,
+    time::Duration,
+};
 
 use actix_rt::{net::TcpStream, time::sleep};
-use actix_server::Server;
+use actix_server::{Server, TestServer};
 use actix_service::fn_service;
-use actix_utils::future::ok;
-use futures_util::future::lazy;
 
 fn unused_addr() -> net::SocketAddr {
-    let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-    let socket = mio::net::TcpSocket::new_v4().unwrap();
-    socket.bind(addr).unwrap();
-    socket.set_reuseaddr(true).unwrap();
-    let tcp = socket.listen(32).unwrap();
-    tcp.local_addr().unwrap()
+    TestServer::unused_addr()
 }
 
 #[test]
@@ -23,52 +22,94 @@ fn test_bind() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
-            Server::build()
+        actix_rt::System::new().block_on(async {
+            let srv = Server::build()
                 .workers(1)
                 .disable_signals()
-                .bind("test", addr, move || fn_service(|_| ok::<_, ()>(())))
-                .unwrap()
-                .run()
-        }));
+                .bind("test", addr, move || {
+                    fn_service(|_| async { Ok::<_, ()>(()) })
+                })?
+                .run();
 
-        let _ = tx.send((srv, actix_rt::System::current()));
-        let _ = sys.run();
+            let _ = tx.send(srv.handle());
+
+            srv.await
+        })
     });
-    let (_, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
-    sys.stop();
-    let _ = h.join();
+
+    let _ = srv.stop(true);
+    h.join().unwrap().unwrap();
+}
+
+#[test]
+fn plain_tokio_runtime() {
+    let addr = unused_addr();
+    let (tx, rx) = mpsc::channel();
+
+    let h = thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            let srv = Server::build()
+                .workers(1)
+                .disable_signals()
+                .bind("test", addr, move || {
+                    fn_service(|_| async { Ok::<_, ()>(()) })
+                })?
+                .run();
+
+            tx.send(srv.handle()).unwrap();
+
+            srv.await
+        })
+    });
+
+    let srv = rx.recv().unwrap();
+
+    thread::sleep(Duration::from_millis(500));
+    assert!(net::TcpStream::connect(addr).is_ok());
+
+    let _ = srv.stop(true);
+    h.join().unwrap().unwrap();
 }
 
 #[test]
 fn test_listen() {
     let addr = unused_addr();
+    let lst = net::TcpListener::bind(addr).unwrap();
+
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
-        let lst = net::TcpListener::bind(addr).unwrap();
-        sys.block_on(async {
-            Server::build()
+        actix_rt::System::new().block_on(async {
+            let srv = Server::build()
                 .disable_signals()
                 .workers(1)
-                .listen("test", lst, move || fn_service(|_| ok::<_, ()>(())))
-                .unwrap()
+                .listen("test", lst, move || {
+                    fn_service(|_| async { Ok::<_, ()>(()) })
+                })?
                 .run();
-            let _ = tx.send(actix_rt::System::current());
-        });
-        let _ = sys.run();
+
+            let _ = tx.send(srv.handle());
+
+            srv.await
+        })
     });
-    let sys = rx.recv().unwrap();
+
+    let srv = rx.recv().unwrap();
 
     thread::sleep(Duration::from_millis(500));
     assert!(net::TcpStream::connect(addr).is_ok());
-    sys.stop();
-    let _ = h.join();
+
+    let _ = srv.stop(true);
+    h.join().unwrap().unwrap();
 }
 
 #[test]
@@ -84,9 +125,8 @@ fn test_start() {
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
-        let sys = actix_rt::System::new();
-        let srv = sys.block_on(lazy(|_| {
-            Server::build()
+        actix_rt::System::new().block_on(async {
+            let srv = Server::build()
                 .backlog(100)
                 .disable_signals()
                 .bind("test", addr, move || {
@@ -95,13 +135,13 @@ fn test_start() {
                         f.send(Bytes::from_static(b"test")).await.unwrap();
                         Ok::<_, ()>(())
                     })
-                })
-                .unwrap()
-                .run()
-        }));
+                })?
+                .run();
 
-        let _ = tx.send((srv, actix_rt::System::current()));
-        let _ = sys.run();
+            let _ = tx.send((srv.handle(), actix_rt::System::current()));
+
+            srv.await
+        })
     });
 
     let (srv, sys) = rx.recv().unwrap();
@@ -134,12 +174,11 @@ fn test_start() {
 
     // stop
     let _ = srv.stop(false);
-    thread::sleep(Duration::from_millis(100));
-    assert!(net::TcpStream::connect(addr).is_err());
-
-    thread::sleep(Duration::from_millis(100));
     sys.stop();
-    let _ = h.join();
+    h.join().unwrap().unwrap();
+
+    thread::sleep(Duration::from_secs(1));
+    assert!(net::TcpStream::connect(addr).is_err());
 }
 
 #[actix_rt::test]
@@ -162,11 +201,11 @@ async fn test_max_concurrent_connections() {
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let srv = Server::build()
                 // Set a relative higher backlog.
                 .backlog(12)
                 // max connection for a worker is 3.
-                .maxconn(max_conn)
+                .max_concurrent_connections(max_conn)
                 .workers(1)
                 .disable_signals()
                 .bind("test", addr, move || {
@@ -183,9 +222,9 @@ async fn test_max_concurrent_connections() {
                 })?
                 .run();
 
-            let _ = tx.send((server.clone(), actix_rt::System::current()));
+            let _ = tx.send((srv.handle(), actix_rt::System::current()));
 
-            server.await
+            srv.await
         })
     });
 
@@ -209,9 +248,8 @@ async fn test_max_concurrent_connections() {
     }
 
     srv.stop(false).await;
-
     sys.stop();
-    let _ = h.join().unwrap();
+    h.join().unwrap().unwrap();
 }
 
 #[actix_rt::test]
@@ -257,7 +295,7 @@ async fn test_service_restart() {
     let h = thread::spawn(move || {
         let num = num.clone();
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let srv = Server::build()
                 .backlog(1)
                 .disable_signals()
                 .bind("addr1", addr1, move || {
@@ -266,25 +304,23 @@ async fn test_service_restart() {
                         let num = num.clone();
                         async move { Ok::<_, ()>(TestService(num)) }
                     })
-                })
-                .unwrap()
+                })?
                 .bind("addr2", addr2, move || {
                     let num2 = num2.clone();
                     fn_factory(move || {
                         let num2 = num2.clone();
                         async move { Ok::<_, ()>(TestService(num2)) }
                     })
-                })
-                .unwrap()
+                })?
                 .workers(1)
                 .run();
 
-            let _ = tx.send((server.clone(), actix_rt::System::current()));
-            server.await
+            let _ = tx.send(srv.handle());
+            srv.await
         })
     });
 
-    let (server, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     for _ in 0..5 {
         TcpStream::connect(addr1)
@@ -306,12 +342,11 @@ async fn test_service_restart() {
     assert!(num_clone.load(Ordering::SeqCst) > 5);
     assert!(num2_clone.load(Ordering::SeqCst) > 5);
 
-    sys.stop();
-    let _ = server.stop(false);
-    let _ = h.join().unwrap();
+    let _ = srv.stop(false);
+    h.join().unwrap().unwrap();
 }
 
-#[ignore]
+#[ignore] // non-deterministic on CI
 #[actix_rt::test]
 async fn worker_restart() {
     use actix_service::{Service, ServiceFactory};
@@ -378,19 +413,19 @@ async fn worker_restart() {
     let h = thread::spawn(move || {
         let counter = counter.clone();
         actix_rt::System::new().block_on(async {
-            let server = Server::build()
+            let srv = Server::build()
                 .disable_signals()
-                .bind("addr", addr, move || TestServiceFactory(counter.clone()))
-                .unwrap()
+                .bind("addr", addr, move || TestServiceFactory(counter.clone()))?
                 .workers(2)
                 .run();
 
-            let _ = tx.send((server.clone(), actix_rt::System::current()));
-            server.await
+            let _ = tx.send(srv.handle());
+
+            srv.await
         })
     });
 
-    let (server, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     sleep(Duration::from_secs(3)).await;
 
@@ -447,7 +482,32 @@ async fn worker_restart() {
     assert_eq!("3", id);
     stream.shutdown().await.unwrap();
 
-    sys.stop();
-    let _ = server.stop(false);
-    let _ = h.join().unwrap();
+    let _ = srv.stop(false);
+    h.join().unwrap().unwrap();
+}
+
+#[test]
+#[should_panic]
+fn no_runtime() {
+    // test set up in a way that would prevent time out if support for runtime-less init was added
+
+    let addr = unused_addr();
+
+    let srv = Server::build()
+        .workers(1)
+        .disable_signals()
+        .bind("test", addr, move || {
+            fn_service(|_| async { Ok::<_, ()>(()) })
+        })
+        .unwrap()
+        .run();
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let _ = srv.handle().stop(true);
+
+    rt.block_on(async { srv.await }).unwrap();
 }

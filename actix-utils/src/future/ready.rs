@@ -103,9 +103,15 @@ pub fn err<T, E>(err: E) -> Ready<Result<T, E>> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use futures_util::task::noop_waker;
+    use static_assertions::{assert_impl_all, assert_not_impl_all};
 
     use super::*;
+
+    assert_impl_all!(Ready<()>: Send, Sync, Clone);
+    assert_not_impl_all!(Ready<Rc<()>>: Send, Sync);
 
     #[test]
     #[should_panic]

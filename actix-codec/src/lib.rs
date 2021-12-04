@@ -14,9 +14,11 @@
 
 mod bcodec;
 mod framed;
+mod lines;
 
 pub use self::bcodec::BytesCodec;
 pub use self::framed::{Framed, FramedParts};
+pub use self::lines::LinesCodec;
 
 pub use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 pub use tokio_util::codec::{Decoder, Encoder};

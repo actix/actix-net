@@ -1,13 +1,13 @@
 //! A non-thread-safe multi-producer, single-consumer, futures-aware, FIFO queue.
 
+use alloc::{collections::VecDeque, rc::Rc};
 use core::{
     cell::RefCell,
     fmt,
     pin::Pin,
     task::{Context, Poll},
 };
-
-use std::{collections::VecDeque, error::Error, rc::Rc};
+use std::error::Error;
 
 use futures_core::stream::Stream;
 use futures_sink::Sink;
