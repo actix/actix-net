@@ -120,10 +120,7 @@ pub(crate) enum ServerCommand {
 /// }
 /// ```
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub enum Server {
-    Server(ServerInner),
-    Error(Option<io::Error>),
-}
+pub struct Server(Result<ServerInner, Option<io::Error>>);
 
 impl Server {
     /// Create server build.
@@ -131,60 +128,17 @@ impl Server {
         ServerBuilder::default()
     }
 
-    pub(crate) fn new(mut builder: ServerBuilder) -> Self {
-        let sockets = mem::take(&mut builder.sockets)
-            .into_iter()
-            .map(|t| (t.0, t.2))
-            .collect();
-
-        // Give log information on what runtime will be used.
-        let is_actix = actix_rt::System::try_current().is_some();
-        let is_tokio = tokio::runtime::Handle::try_current().is_ok();
-
-        match (is_actix, is_tokio) {
-            (true, _) => info!("Actix runtime found; starting in Actix runtime"),
-            (_, true) => info!("Tokio runtime found; starting in existing Tokio runtime"),
-            (_, false) => panic!("Actix or Tokio runtime not found; halting"),
-        }
-
-        for (_, name, lst) in &builder.sockets {
-            info!(
-                r#"Starting service: "{}", workers: {}, listening on: {}"#,
-                name,
-                builder.threads,
-                lst.local_addr()
-            );
-        }
-
-        match Accept::start(sockets, &builder) {
-            Ok((waker_queue, worker_handles)) => {
-                // construct OS signals listener future
-                let signals = (builder.listen_os_signals).then(Signals::new);
-
-                Self::Server(ServerInner {
-                    cmd_tx: builder.cmd_tx.clone(),
-                    cmd_rx: builder.cmd_rx,
-                    signals,
-                    waker_queue,
-                    worker_handles,
-                    worker_config: builder.worker_config,
-                    services: builder.factories,
-                    exit: builder.exit,
-                    stop_task: None,
-                })
-            }
-
-            Err(err) => Self::Error(Some(err)),
-        }
+    pub(crate) fn new(builder: ServerBuilder) -> Self {
+        Server(ServerInner::new(builder).map_err(Some))
     }
 
     /// Get a handle for ServerFuture that can be used to change state of actix server.
     ///
     /// See [ServerHandle](ServerHandle) for usage.
     pub fn handle(&self) -> ServerHandle {
-        match self {
-            Server::Server(inner) => ServerHandle::new(inner.cmd_tx.clone()),
-            Server::Error(err) => {
+        match &self.0 {
+            Ok(inner) => ServerHandle::new(inner.cmd_tx.clone()),
+            Err(err) => {
                 // TODO: i don't think this is the best way to handle server startup fail
                 panic!(
                     "server handle can not be obtained because server failed to start up: {}",
@@ -199,12 +153,12 @@ impl Future for Server {
     type Output = io::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.as_mut().get_mut() {
-            Self::Error(err) => Poll::Ready(Err(err
+        match &mut self.as_mut().get_mut().0 {
+            Err(err) => Poll::Ready(Err(err
                 .take()
                 .expect("Server future cannot be polled after error"))),
 
-            Self::Server(inner) => {
+            Ok(inner) => {
                 // poll Signals
                 if let Some(ref mut signals) = inner.signals {
                     if let Poll::Ready(signal) = Pin::new(signals).poll(cx) {
@@ -247,6 +201,49 @@ pub struct ServerInner {
 }
 
 impl ServerInner {
+    fn new(mut builder: ServerBuilder) -> io::Result<Self> {
+        let sockets = mem::take(&mut builder.sockets)
+            .into_iter()
+            .map(|t| (t.0, t.2))
+            .collect();
+
+        // Give log information on what runtime will be used.
+        let is_actix = actix_rt::System::try_current().is_some();
+        let is_tokio = tokio::runtime::Handle::try_current().is_ok();
+
+        match (is_actix, is_tokio) {
+            (true, _) => info!("Actix runtime found; starting in Actix runtime"),
+            (_, true) => info!("Tokio runtime found; starting in existing Tokio runtime"),
+            (_, false) => panic!("Actix or Tokio runtime not found; halting"),
+        }
+
+        for (_, name, lst) in &builder.sockets {
+            info!(
+                r#"Starting service: "{}", workers: {}, listening on: {}"#,
+                name,
+                builder.threads,
+                lst.local_addr()
+            );
+        }
+
+        let (waker_queue, worker_handles) = Accept::start(sockets, &builder)?;
+
+        // construct OS signals listener future
+        let signals = (builder.listen_os_signals).then(Signals::new);
+
+        Ok(ServerInner {
+            cmd_tx: builder.cmd_tx.clone(),
+            cmd_rx: builder.cmd_rx,
+            signals,
+            waker_queue,
+            worker_handles,
+            worker_config: builder.worker_config,
+            services: builder.factories,
+            exit: builder.exit,
+            stop_task: None,
+        })
+    }
+
     fn handle_cmd(&mut self, item: ServerCommand) -> Option<BoxFuture<'static, ()>> {
         match item {
             ServerCommand::Pause(tx) => {

@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+* Hide implementation details of `Server`. [#424]
+
+[#424]: https://github.com/actix/actix-net/pull/424
 
 
 ## 2.0.0-beta.9 - 2021-11-15
