@@ -8,7 +8,7 @@ use std::{
 
 use actix_rt::{time::sleep, System};
 use futures_core::{future::BoxFuture, Stream};
-use futures_util::stream::StreamExt;
+use futures_util::stream::StreamExt as _;
 use log::{error, info};
 use tokio::sync::{mpsc::UnboundedReceiver, oneshot};
 
@@ -48,8 +48,8 @@ pub(crate) enum ServerCommand {
         /// Return channel to notify caller that shutdown is complete.
         completion: Option<oneshot::Sender<()>>,
 
-        /// Force system exit, overriding `ServerBuilder::system_exit()`.
-        force_exit: bool,
+        /// Force System exit when true, overriding `ServerBuilder::system_exit()` if it is false.
+        force_system_stop: bool,
     },
 }
 
@@ -61,8 +61,8 @@ pub(crate) enum ServerCommand {
 /// Creates a worker per CPU core (or the number specified in [`ServerBuilder::workers`]) and
 /// distributes connections with a round-robin strategy.
 ///
-/// The [Server] must be awaited in order to run.
-/// It will resolve when the server has fully shut down.
+/// The [Server] must be awaited or polled in order to start running. It will resolve when the
+/// server has fully shut down.
 ///
 /// # Shutdown Signals
 /// On UNIX systems, `SIGQUIT` will start a graceful shutdown and `SIGTERM` or `SIGINT` will start a
@@ -120,7 +120,7 @@ pub(crate) enum ServerCommand {
 ///         .await
 /// }
 /// ```
-#[must_use = "futures do nothing unless you `.await` or poll them"]
+#[must_use = "Server does nothing unless you `.await` or poll it"]
 pub struct Server {
     handle: ServerHandle,
     fut: BoxFuture<'static, io::Result<()>>,
@@ -139,7 +139,7 @@ impl Server {
         }
     }
 
-    /// Get a handle for ServerFuture that can be used to change state of actix server.
+    /// Get a `Server` handle that can be used issue commands and change it's state.
     ///
     /// See [ServerHandle](ServerHandle) for usage.
     pub fn handle(&self) -> ServerHandle {
@@ -160,9 +160,9 @@ pub struct ServerInner {
     worker_handles: Vec<WorkerHandleServer>,
     worker_config: ServerWorkerConfig,
     services: Vec<Box<dyn InternalServiceFactory>>,
-    exit: bool,
     waker_queue: WakerQueue,
-    stopped: bool,
+    system_stop: bool,
+    stopping: bool,
 }
 
 impl ServerInner {
@@ -171,7 +171,8 @@ impl ServerInner {
 
         while let Some(cmd) = mux.next().await {
             this.handle_cmd(cmd).await;
-            if this.stopped {
+
+            if this.stopping {
                 break;
             }
         }
@@ -216,8 +217,8 @@ impl ServerInner {
             worker_handles,
             worker_config: builder.worker_config,
             services: builder.factories,
-            exit: builder.exit,
-            stopped: false,
+            system_stop: builder.exit,
+            stopping: false,
         };
 
         Ok((server, mux))
@@ -238,9 +239,9 @@ impl ServerInner {
             ServerCommand::Stop {
                 graceful,
                 completion,
-                force_exit,
+                force_system_stop,
             } => {
-                self.stopped = true;
+                self.stopping = true;
 
                 // stop accept thread
                 self.waker_queue.wake(WakerInterest::Stop);
@@ -261,7 +262,7 @@ impl ServerInner {
                     let _ = tx.send(());
                 }
 
-                if self.exit || force_exit {
+                if self.system_stop || force_system_stop {
                     sleep(Duration::from_millis(300)).await;
                     System::try_current().as_ref().map(System::stop);
                 }
@@ -308,7 +309,7 @@ impl ServerInner {
                 ServerCommand::Stop {
                     graceful: false,
                     completion: None,
-                    force_exit: true,
+                    force_system_stop: true,
                 }
             }
 
@@ -317,7 +318,7 @@ impl ServerInner {
                 ServerCommand::Stop {
                     graceful: true,
                     completion: None,
-                    force_exit: true,
+                    force_system_stop: true,
                 }
             }
 
@@ -326,7 +327,7 @@ impl ServerInner {
                 ServerCommand::Stop {
                     graceful: false,
                     completion: None,
-                    force_exit: true,
+                    force_system_stop: true,
                 }
             }
         }

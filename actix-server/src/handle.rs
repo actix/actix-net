@@ -46,7 +46,7 @@ impl ServerHandle {
         let _ = self.cmd_tx.send(ServerCommand::Stop {
             graceful,
             completion: Some(tx),
-            force_exit: false,
+            force_system_stop: false,
         });
 
         async {

@@ -82,7 +82,7 @@ async fn run() -> io::Result<()> {
                 ok(size)
             })
         })?
-        .workers(1)
+        .workers(2)
         .run()
         .await
 }
