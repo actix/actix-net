@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-rc.1 - 2021-12-05
 * Hide implementation details of `Server`. [#424]
 * `Server` now runs only after awaiting it. [#425]
 
