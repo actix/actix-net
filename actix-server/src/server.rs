@@ -245,13 +245,15 @@ impl ServerInner {
                 // stop accept thread
                 self.waker_queue.wake(WakerInterest::Stop);
 
+                // send stop signal to workers
+                let workers_stop = self
+                    .worker_handles
+                    .iter()
+                    .map(|worker| worker.stop(graceful))
+                    .collect::<Vec<_>>();
+
                 if graceful {
                     // wait for all workers to shut down
-                    let workers_stop = self
-                        .worker_handles
-                        .iter()
-                        .map(|worker| worker.stop(graceful))
-                        .collect::<Vec<_>>();
                     let _ = join_all(workers_stop).await;
                 }
 
