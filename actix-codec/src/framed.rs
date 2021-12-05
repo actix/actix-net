@@ -1,10 +1,14 @@
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::{fmt, io};
+use std::{
+    fmt, io,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
+use bitflags::bitflags;
 use bytes::{Buf, BytesMut};
 use futures_core::{ready, Stream};
 use futures_sink::Sink;
+use pin_project_lite::pin_project;
 
 use crate::{AsyncRead, AsyncWrite, Decoder, Encoder};
 
@@ -13,14 +17,14 @@ const LW: usize = 1024;
 /// High-water mark
 const HW: usize = 8 * 1024;
 
-bitflags::bitflags! {
+bitflags! {
     struct Flags: u8 {
         const EOF = 0b0001;
         const READABLE = 0b0010;
     }
 }
 
-pin_project_lite::pin_project! {
+pin_project! {
     /// A unified `Stream` and `Sink` interface to an underlying I/O object, using the `Encoder` and
     /// `Decoder` traits to encode and decode frames.
     ///

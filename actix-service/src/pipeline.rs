@@ -40,7 +40,7 @@ where
 /// Pipeline service - pipeline allows to compose multiple service into one service.
 pub(crate) struct Pipeline<S, Req> {
     service: S,
-    _phantom: PhantomData<Req>,
+    _phantom: PhantomData<fn(Req)>,
 }
 
 impl<S, Req> Pipeline<S, Req>
@@ -162,7 +162,7 @@ impl<S: Service<Req>, Req> Service<Req> for Pipeline<S, Req> {
 /// Pipeline factory
 pub(crate) struct PipelineFactory<SF, Req> {
     factory: SF,
-    _phantom: PhantomData<Req>,
+    _phantom: PhantomData<fn(Req)>,
 }
 
 impl<SF, Req> PipelineFactory<SF, Req>
