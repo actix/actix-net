@@ -42,5 +42,5 @@ actix-rt = "2.4.0"
 
 bytes = "1"
 env_logger = "0.9"
-futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
+futures-util = { version = "0.3.7", default-features = false, features = ["sink", "async-await-macro"] }
 tokio = { version = "1.5.1", features = ["io-util", "rt-multi-thread", "macros"] }
