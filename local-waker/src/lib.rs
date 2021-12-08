@@ -4,7 +4,7 @@
 
 #![no_std]
 #![deny(rust_2018_idioms, nonstandard_style)]
-#![warn(missing_docs)]
+#![warn(future_incompatible, missing_docs)]
 
 use core::{cell::Cell, fmt, marker::PhantomData, task::Waker};
 

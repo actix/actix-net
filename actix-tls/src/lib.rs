@@ -1,9 +1,10 @@
 //! TLS acceptor and connector services for the Actix ecosystem.
 
 #![deny(rust_2018_idioms, nonstandard_style)]
-#![warn(missing_docs)]
+#![warn(future_incompatible, missing_docs)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
+// enable unstable doc_cfg feature only on on docs.rs where nightly compiler is used
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "openssl")]
