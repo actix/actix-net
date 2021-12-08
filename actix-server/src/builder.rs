@@ -40,7 +40,7 @@ impl ServerBuilder {
         let (cmd_tx, cmd_rx) = unbounded_channel();
 
         ServerBuilder {
-            threads: num_cpus::get(),
+            threads: num_cpus::get_physical(),
             token: 0,
             factories: Vec::new(),
             sockets: Vec::new(),
@@ -55,8 +55,11 @@ impl ServerBuilder {
 
     /// Set number of workers to start.
     ///
-    /// By default server uses number of available logical CPU as workers count. Workers must be
-    /// greater than 0.
+    /// `num` must be greater than 0.
+    ///
+    /// The default worker count is the number of physical CPU cores available. If your benchmark
+    /// testing indicates that simultaneous multi-threading is beneficial to your app, you can use
+    /// the [`num_cpus`] crate to acquire the _logical_ core count instead.
     pub fn workers(mut self, num: usize) -> Self {
         assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;

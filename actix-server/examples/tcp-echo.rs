@@ -33,9 +33,9 @@ async fn run() -> io::Result<()> {
     let addr = ("127.0.0.1", 8080);
     info!("starting server on port: {}", &addr.0);
 
-    // Bind socket address and start worker(s). By default, the server uses the number of available
-    // logical CPU cores as the worker count. For this reason, the closure passed to bind needs
-    // to return a service *factory*; so it can be created once per worker.
+    // Bind socket address and start worker(s). By default, the server uses the number of physical
+    // CPU cores as the worker count. For this reason, the closure passed to bind needs to return
+    // a service *factory*; so it can be created once per worker.
     Server::build()
         .bind("echo", addr, move || {
             let count = Arc::clone(&count);
