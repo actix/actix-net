@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 3.0.0-rc.2 - 2021-12-10
 * Re-export `openssl::SslConnectorBuilder` in `connect::openssl::reexports`. [#???]
 
 [#???]: https://github.com/actix/actix-net/pull/???
