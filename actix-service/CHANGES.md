@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.2 - 2021-12-18
 - Service types can now be `Send` and `'static` regardless of request, response, and config types, etc.. [#397]
 
 [#397]: https://github.com/actix/actix-net/pull/397
