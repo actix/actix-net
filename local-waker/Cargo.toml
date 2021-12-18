@@ -1,6 +1,6 @@
 [package]
 name = "local-waker"
-version = "0.1.1"
+version = "0.1.2"
 description = "A synchronization primitive for thread-local task wakeup"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",

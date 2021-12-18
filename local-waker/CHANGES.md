@@ -3,7 +3,7 @@
 ## Unreleased - 2021-xx-xx
 
 
-## 0.1.2 - 2021-04-01
+## 0.1.2 - 2021-12-18
 - Fix crate metadata.
 
 
