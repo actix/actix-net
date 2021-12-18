@@ -40,11 +40,13 @@ pin_project! {
 
 impl<L, R> Either<L, R> {
     /// Creates new `Either` using left variant.
+    #[inline]
     pub fn left(value: L) -> Either<L, R> {
         Either::Left { value }
     }
 
     /// Creates new `Either` using right variant.
+    #[inline]
     pub fn right(value: R) -> Either<L, R> {
         Either::Right { value }
     }
@@ -52,6 +54,7 @@ impl<L, R> Either<L, R> {
 
 impl<T> Either<T, T> {
     /// Unwraps into inner value when left and right have a common type.
+    #[inline]
     pub fn into_inner(self) -> T {
         match self {
             Either::Left { value } => value,
@@ -67,6 +70,7 @@ where
 {
     type Output = L::Output;
 
+    #[inline]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.project() {
             EitherProj::Left { value } => value.poll(cx),

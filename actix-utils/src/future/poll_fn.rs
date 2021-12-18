@@ -8,6 +8,7 @@ use core::{
 };
 
 /// Creates a future driven by the provided function that receives a task context.
+#[inline]
 pub fn poll_fn<F, T>(f: F) -> PollFn<F>
 where
     F: FnMut(&mut Context<'_>) -> Poll<T>,
@@ -34,6 +35,7 @@ where
 {
     type Output = T;
 
+    #[inline]
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         (self.f)(cx)
     }

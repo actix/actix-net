@@ -22,16 +22,19 @@ impl Counter {
     }
 
     /// Create new counter guard, incrementing the counter.
+    #[inline]
     pub fn get(&self) -> CounterGuard {
         CounterGuard::new(self.0.clone())
     }
 
     /// Returns true if counter is below capacity. Otherwise, register to wake task when it is.
+    #[inline]
     pub fn available(&self, cx: &mut task::Context<'_>) -> bool {
         self.0.available(cx)
     }
 
     /// Get total number of acquired guards.
+    #[inline]
     pub fn total(&self) -> usize {
         self.0.count.get()
     }
