@@ -106,12 +106,13 @@ mod tests {
     use std::rc::Rc;
 
     use futures_util::task::noop_waker;
-    use static_assertions::{assert_impl_all, assert_not_impl_all};
+    use static_assertions::{assert_impl_all, assert_not_impl_any};
 
     use super::*;
 
-    assert_impl_all!(Ready<()>: Send, Sync, Clone);
-    assert_not_impl_all!(Ready<Rc<()>>: Send, Sync);
+    assert_impl_all!(Ready<()>: Send, Sync, Unpin, Clone);
+    assert_impl_all!(Ready<Rc<()>>: Unpin, Clone);
+    assert_not_impl_any!(Ready<Rc<()>>: Send, Sync);
 
     #[test]
     #[should_panic]
