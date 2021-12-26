@@ -3,6 +3,10 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.0 - 2021-12-26
+* No significant changes since `3.0.0-rc.2`.
+
+
 ## 3.0.0-rc.2 - 2021-12-10
 - Re-export `openssl::SslConnectorBuilder` in `connect::openssl::reexports`. [#429]
 

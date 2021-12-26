@@ -1,6 +1,6 @@
 [package]
 name = "actix-tls"
-version = "3.0.0-rc.2"
+version = "3.0.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
@@ -8,7 +8,7 @@ authors = [
 description = "TLS acceptor and connector services for Actix ecosystem"
 keywords = ["network", "tls", "ssl", "async", "transport"]
 repository = "https://github.com/actix/actix-net.git"
-categories = ["network-programming", "asynchronous"]
+categories = ["network-programming", "asynchronous", "cryptography"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 
