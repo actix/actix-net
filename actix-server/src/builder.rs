@@ -6,7 +6,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::{
     server::ServerCommand,
-    service::{InternalServiceFactory, ServiceFactory, StreamNewService},
+    service::{InternalServiceFactory, ServerServiceFactory, StreamNewService},
     socket::{
         create_mio_tcp_listener, MioListener, MioTcpListener, StdTcpListener, ToSocketAddrs,
     },
@@ -142,7 +142,7 @@ impl ServerBuilder {
     /// Add new service to the server.
     pub fn bind<F, U, N: AsRef<str>>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
-        F: ServiceFactory<TcpStream>,
+        F: ServerServiceFactory<TcpStream>,
         U: ToSocketAddrs,
     {
         let sockets = bind_addr(addr, self.backlog)?;
@@ -172,7 +172,7 @@ impl ServerBuilder {
         factory: F,
     ) -> io::Result<Self>
     where
-        F: ServiceFactory<TcpStream>,
+        F: ServerServiceFactory<TcpStream>,
     {
         lst.set_nonblocking(true)?;
         let addr = lst.local_addr()?;
@@ -213,7 +213,7 @@ impl ServerBuilder {
     /// Add new unix domain service to the server.
     pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
+        F: ServerServiceFactory<actix_rt::net::UnixStream>,
         N: AsRef<str>,
         U: AsRef<std::path::Path>,
     {
@@ -240,7 +240,7 @@ impl ServerBuilder {
         factory: F,
     ) -> io::Result<Self>
     where
-        F: ServiceFactory<actix_rt::net::UnixStream>,
+        F: ServerServiceFactory<actix_rt::net::UnixStream>,
     {
         use std::net::{IpAddr, Ipv4Addr};
         lst.set_nonblocking(true)?;

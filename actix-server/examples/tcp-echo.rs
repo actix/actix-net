@@ -26,7 +26,7 @@ use log::{error, info};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 async fn run() -> io::Result<()> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
     let count = Arc::new(AtomicUsize::new(0));
 

@@ -26,24 +26,87 @@ fn test_bind() {
             let srv = Server::build()
                 .workers(1)
                 .disable_signals()
+                .shutdown_timeout(3600)
                 .bind("test", addr, move || {
                     fn_service(|_| async { Ok::<_, ()>(()) })
                 })?
                 .run();
 
-            let _ = tx.send(srv.handle());
-
+            tx.send(srv.handle()).unwrap();
             srv.await
         })
     });
+
     let srv = rx.recv().unwrap();
 
     thread::sleep(Duration::from_millis(500));
-    assert!(net::TcpStream::connect(addr).is_ok());
+
+    net::TcpStream::connect(addr).unwrap();
 
     let _ = srv.stop(true);
     h.join().unwrap().unwrap();
 }
+
+#[test]
+fn test_listen() {
+    let addr = unused_addr();
+    let (tx, rx) = mpsc::channel();
+    let lst = net::TcpListener::bind(addr).unwrap();
+
+    let h = thread::spawn(move || {
+        actix_rt::System::new().block_on(async {
+            let srv = Server::build()
+                .workers(1)
+                .disable_signals()
+                .shutdown_timeout(3600)
+                .listen("test", lst, move || {
+                    fn_service(|_| async { Ok::<_, ()>(()) })
+                })?
+                .run();
+
+            tx.send(srv.handle()).unwrap();
+            srv.await
+        })
+    });
+
+    let srv = rx.recv().unwrap();
+
+    thread::sleep(Duration::from_millis(500));
+
+    net::TcpStream::connect(addr).unwrap();
+
+    let _ = srv.stop(true);
+    h.join().unwrap().unwrap();
+}
+
+// #[test]
+// fn test_bind() {
+//     let addr = unused_addr();
+//     let (tx, rx) = mpsc::channel();
+
+//     let h = thread::spawn(move || {
+//         actix_rt::System::new().block_on(async {
+//             let srv = Server::build()
+//                 .workers(1)
+//                 .disable_signals()
+//                 .bind("test", addr, move || {
+//                     fn_service(|_| async { Ok::<_, ()>(()) })
+//                 })?
+//                 .run();
+
+//             let _ = tx.send(srv.handle());
+
+//             srv.await
+//         })
+//     });
+//     let srv = rx.recv().unwrap();
+
+//     thread::sleep(Duration::from_millis(500));
+//     assert!(net::TcpStream::connect(addr).is_ok());
+
+//     let _ = srv.stop(true);
+//     h.join().unwrap().unwrap();
+// }
 
 #[test]
 fn plain_tokio_runtime() {
@@ -80,37 +143,37 @@ fn plain_tokio_runtime() {
     h.join().unwrap().unwrap();
 }
 
-#[test]
-fn test_listen() {
-    let addr = unused_addr();
-    let lst = net::TcpListener::bind(addr).unwrap();
+// #[test]
+// fn test_listen() {
+//     let addr = unused_addr();
+//     let lst = net::TcpListener::bind(addr).unwrap();
 
-    let (tx, rx) = mpsc::channel();
+//     let (tx, rx) = mpsc::channel();
 
-    let h = thread::spawn(move || {
-        actix_rt::System::new().block_on(async {
-            let srv = Server::build()
-                .disable_signals()
-                .workers(1)
-                .listen("test", lst, move || {
-                    fn_service(|_| async { Ok::<_, ()>(()) })
-                })?
-                .run();
+//     let h = thread::spawn(move || {
+//         actix_rt::System::new().block_on(async {
+//             let srv = Server::build()
+//                 .disable_signals()
+//                 .workers(1)
+//                 .listen("test", lst, move || {
+//                     fn_service(|_| async { Ok::<_, ()>(()) })
+//                 })?
+//                 .run();
 
-            let _ = tx.send(srv.handle());
+//             let _ = tx.send(srv.handle());
 
-            srv.await
-        })
-    });
+//             srv.await
+//         })
+//     });
 
-    let srv = rx.recv().unwrap();
+//     let srv = rx.recv().unwrap();
 
-    thread::sleep(Duration::from_millis(500));
-    assert!(net::TcpStream::connect(addr).is_ok());
+//     thread::sleep(Duration::from_millis(500));
+//     assert!(net::TcpStream::connect(addr).is_ok());
 
-    let _ = srv.stop(true);
-    h.join().unwrap().unwrap();
-}
+//     let _ = srv.stop(true);
+//     h.join().unwrap().unwrap();
+// }
 
 #[test]
 #[cfg(unix)]

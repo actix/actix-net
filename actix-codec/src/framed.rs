@@ -156,7 +156,7 @@ impl<T, U> Framed<T, U> {
 }
 
 impl<T, U> Framed<T, U> {
-    /// Serialize item and Write to the inner buffer
+    /// Serialize item and write to the inner buffer
     pub fn write<I>(mut self: Pin<&mut Self>, item: I) -> Result<(), <U as Encoder<I>>::Error>
     where
         T: AsyncWrite,

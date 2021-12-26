@@ -21,7 +21,7 @@ mod worker;
 pub use self::builder::ServerBuilder;
 pub use self::handle::ServerHandle;
 pub use self::server::Server;
-pub use self::service::ServiceFactory;
+pub use self::service::ServerServiceFactory;
 pub use self::test_server::TestServer;
 
 #[doc(hidden)]

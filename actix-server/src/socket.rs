@@ -1,18 +1,17 @@
 pub(crate) use std::net::{
     SocketAddr as StdSocketAddr, TcpListener as StdTcpListener, ToSocketAddrs,
 };
+use std::{fmt, io};
 
+use actix_rt::net::TcpStream;
 pub(crate) use mio::net::TcpListener as MioTcpListener;
+use mio::{event::Source, Interest, Registry, Token};
+
 #[cfg(unix)]
 pub(crate) use {
     mio::net::UnixListener as MioUnixListener,
     std::os::unix::net::UnixListener as StdUnixListener,
 };
-
-use std::{fmt, io};
-
-use actix_rt::net::TcpStream;
-use mio::{event::Source, Interest, Registry, Token};
 
 pub(crate) enum MioListener {
     Tcp(MioTcpListener),

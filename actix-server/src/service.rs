@@ -1,16 +1,21 @@
-use std::marker::PhantomData;
-use std::net::SocketAddr;
-use std::task::{Context, Poll};
+use std::{
+    marker::PhantomData,
+    net::SocketAddr,
+    task::{Context, Poll},
+};
 
 use actix_service::{Service, ServiceFactory as BaseServiceFactory};
 use actix_utils::future::{ready, Ready};
 use futures_core::future::LocalBoxFuture;
 use log::error;
 
-use crate::socket::{FromStream, MioStream};
-use crate::worker::WorkerCounterGuard;
+use crate::{
+    socket::{FromStream, MioStream},
+    worker::WorkerCounterGuard,
+};
 
-pub trait ServiceFactory<Stream: FromStream>: Send + Clone + 'static {
+#[doc(hidden)]
+pub trait ServerServiceFactory<Stream: FromStream>: Send + Clone + 'static {
     type Factory: BaseServiceFactory<Stream, Config = ()>;
 
     fn create(&self) -> Self::Factory;
@@ -80,7 +85,7 @@ where
     }
 }
 
-pub(crate) struct StreamNewService<F: ServiceFactory<Io>, Io: FromStream> {
+pub(crate) struct StreamNewService<F: ServerServiceFactory<Io>, Io: FromStream> {
     name: String,
     inner: F,
     token: usize,
@@ -90,7 +95,7 @@ pub(crate) struct StreamNewService<F: ServiceFactory<Io>, Io: FromStream> {
 
 impl<F, Io> StreamNewService<F, Io>
 where
-    F: ServiceFactory<Io>,
+    F: ServerServiceFactory<Io>,
     Io: FromStream + Send + 'static,
 {
     pub(crate) fn create(
@@ -111,7 +116,7 @@ where
 
 impl<F, Io> InternalServiceFactory for StreamNewService<F, Io>
 where
-    F: ServiceFactory<Io>,
+    F: ServerServiceFactory<Io>,
     Io: FromStream + Send + 'static,
 {
     fn name(&self, _: usize) -> &str {
@@ -143,7 +148,7 @@ where
     }
 }
 
-impl<F, T, I> ServiceFactory<I> for F
+impl<F, T, I> ServerServiceFactory<I> for F
 where
     F: Fn() -> T + Send + Clone + 'static,
     T: BaseServiceFactory<I, Config = ()>,

@@ -2,7 +2,7 @@ use std::{io, net, sync::mpsc, thread};
 
 use actix_rt::{net::TcpStream, System};
 
-use crate::{Server, ServerBuilder, ServerHandle, ServiceFactory};
+use crate::{Server, ServerBuilder, ServerHandle, ServerServiceFactory};
 
 /// A testing server.
 ///
@@ -66,7 +66,7 @@ impl TestServer {
     }
 
     /// Start new test server with application factory.
-    pub fn with<F: ServiceFactory<TcpStream>>(factory: F) -> TestServerRuntime {
+    pub fn with<F: ServerServiceFactory<TcpStream>>(factory: F) -> TestServerRuntime {
         let (tx, rx) = mpsc::channel();
 
         // run server in separate thread
