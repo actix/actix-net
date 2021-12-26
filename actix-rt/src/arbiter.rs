@@ -108,7 +108,6 @@ impl Arbiter {
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
     #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
-    #[doc(hidden)]
     pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
     where
         F: Fn() -> tokio::runtime::Runtime + Send + 'static,
