@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.0.0-rc.2 - 2021-12-27
 - Simplify `TestServer`. [#431]
 
 [#431]: https://github.com/actix/actix-net/pull/431

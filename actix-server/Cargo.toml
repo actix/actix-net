@@ -1,14 +1,17 @@
 [package]
 name = "actix-server"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "fakeshadow <24548779@qq.com>",
+    "Rob Ede <robjtede@icloud.com>",
+    "Ali MJ Al-Nasrawy <alimjalnasrawy@gmail.com>",
 ]
 description = "General purpose TCP server built for the Actix ecosystem"
-keywords = ["network", "framework", "async", "futures"]
-repository = "https://github.com/actix/actix-net.git"
+keywords = ["network", "tcp", "server", "framework", "async"]
 categories = ["network-programming", "asynchronous"]
+homepage = "https://actix.rs"
+repository = "https://github.com/actix/actix-net.git"
 license = "MIT OR Apache-2.0"
 edition = "2018"
 
