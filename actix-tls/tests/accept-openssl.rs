@@ -94,7 +94,7 @@ fn rustls_connector(_cert: String, _key: String) -> ClientConfig {
 async fn accepts_connections() {
     let (cert, key) = new_cert_and_key();
 
-    let srv = TestServer::with({
+    let srv = TestServer::start({
         let cert = cert.clone();
         let key = key.clone();
 
