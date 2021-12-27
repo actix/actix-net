@@ -46,7 +46,6 @@ impl System {
     /// Create a new System using the [Tokio Runtime](tokio-runtime) returned from a closure.
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
-    #[doc(hidden)]
     pub fn with_tokio_rt<F>(runtime_factory: F) -> SystemRunner
     where
         F: Fn() -> tokio::runtime::Runtime,
