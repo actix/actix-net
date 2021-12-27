@@ -79,35 +79,6 @@ fn test_listen() {
     h.join().unwrap().unwrap();
 }
 
-// #[test]
-// fn test_bind() {
-//     let addr = unused_addr();
-//     let (tx, rx) = mpsc::channel();
-
-//     let h = thread::spawn(move || {
-//         actix_rt::System::new().block_on(async {
-//             let srv = Server::build()
-//                 .workers(1)
-//                 .disable_signals()
-//                 .bind("test", addr, move || {
-//                     fn_service(|_| async { Ok::<_, ()>(()) })
-//                 })?
-//                 .run();
-
-//             let _ = tx.send(srv.handle());
-
-//             srv.await
-//         })
-//     });
-//     let srv = rx.recv().unwrap();
-
-//     thread::sleep(Duration::from_millis(500));
-//     assert!(net::TcpStream::connect(addr).is_ok());
-
-//     let _ = srv.stop(true);
-//     h.join().unwrap().unwrap();
-// }
-
 #[test]
 fn plain_tokio_runtime() {
     let addr = unused_addr();
@@ -142,38 +113,6 @@ fn plain_tokio_runtime() {
     let _ = srv.stop(true);
     h.join().unwrap().unwrap();
 }
-
-// #[test]
-// fn test_listen() {
-//     let addr = unused_addr();
-//     let lst = net::TcpListener::bind(addr).unwrap();
-
-//     let (tx, rx) = mpsc::channel();
-
-//     let h = thread::spawn(move || {
-//         actix_rt::System::new().block_on(async {
-//             let srv = Server::build()
-//                 .disable_signals()
-//                 .workers(1)
-//                 .listen("test", lst, move || {
-//                     fn_service(|_| async { Ok::<_, ()>(()) })
-//                 })?
-//                 .run();
-
-//             let _ = tx.send(srv.handle());
-
-//             srv.await
-//         })
-//     });
-
-//     let srv = rx.recv().unwrap();
-
-//     thread::sleep(Duration::from_millis(500));
-//     assert!(net::TcpStream::connect(addr).is_ok());
-
-//     let _ = srv.stop(true);
-//     h.join().unwrap().unwrap();
-// }
 
 #[test]
 #[cfg(unix)]

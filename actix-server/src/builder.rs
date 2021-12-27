@@ -140,10 +140,11 @@ impl ServerBuilder {
     }
 
     /// Add new service to the server.
-    pub fn bind<F, U, N: AsRef<str>>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
+    pub fn bind<F, U, N>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
         F: ServerServiceFactory<TcpStream>,
         U: ToSocketAddrs,
+        N: AsRef<str>,
     {
         let sockets = bind_addr(addr, self.backlog)?;
 
