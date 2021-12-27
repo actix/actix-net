@@ -28,8 +28,8 @@ use crate::{Server, ServerBuilder, ServerHandle, ServerServiceFactory};
 /// ```
 pub struct TestServer;
 
-/// Test server runtime
-pub struct TestServerRuntime {
+/// Test server handle.
+pub struct TestServerHandle {
     addr: net::SocketAddr,
     host: String,
     port: u16,
@@ -38,46 +38,26 @@ pub struct TestServerRuntime {
 }
 
 impl TestServer {
-    /// Start new server with server builder.
-    pub fn start<F>(mut factory: F) -> TestServerRuntime
-    where
-        F: FnMut(ServerBuilder) -> ServerBuilder + Send + 'static,
-    {
-        let (tx, rx) = mpsc::channel();
-
-        // run server in separate thread
-        let thread_handle = thread::spawn(move || {
-            System::new().block_on(async {
-                let server = factory(Server::build()).workers(1).disable_signals().run();
-                tx.send(server.handle()).unwrap();
-                server.await
-            })
-        });
-
-        let server_handle = rx.recv().unwrap();
-
-        TestServerRuntime {
-            addr: "127.0.0.1:0".parse().unwrap(),
-            host: "127.0.0.1".to_string(),
-            port: 0,
-            server_handle,
-            thread_handle: Some(thread_handle),
-        }
+    /// Start new `TestServer` using application factory and default server config.
+    pub fn start(factory: impl ServerServiceFactory<TcpStream>) -> TestServerHandle {
+        Self::start_with_builder(Server::build(), factory)
     }
 
-    /// Start new test server with application factory.
-    pub fn with<F: ServerServiceFactory<TcpStream>>(factory: F) -> TestServerRuntime {
+    /// Start new `TestServer` using application factory and server builder.
+    pub fn start_with_builder(
+        server_builder: ServerBuilder,
+        factory: impl ServerServiceFactory<TcpStream>,
+    ) -> TestServerHandle {
         let (tx, rx) = mpsc::channel();
 
         // run server in separate thread
         let thread_handle = thread::spawn(move || {
-            let sys = System::new();
-            let tcp = net::TcpListener::bind("127.0.0.1:0").unwrap();
-            let local_addr = tcp.local_addr().unwrap();
+            let lst = net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let local_addr = lst.local_addr().unwrap();
 
-            sys.block_on(async {
-                let server = Server::build()
-                    .listen("test", tcp, factory)
+            System::new().block_on(async {
+                let server = server_builder
+                    .listen("test", lst, factory)
                     .unwrap()
                     .workers(1)
                     .disable_signals()
@@ -93,7 +73,7 @@ impl TestServer {
         let host = format!("{}", addr.ip());
         let port = addr.port();
 
-        TestServerRuntime {
+        TestServerHandle {
             addr,
             host,
             port,
@@ -107,17 +87,19 @@ impl TestServer {
         use socket2::{Domain, Protocol, Socket, Type};
 
         let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
-        let socket =
-            Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP)).unwrap();
+        let domain = Domain::for_address(addr);
+        let socket = Socket::new(domain, Type::STREAM, Some(Protocol::TCP)).unwrap();
+
         socket.set_reuse_address(true).unwrap();
         socket.set_nonblocking(true).unwrap();
         socket.bind(&addr.into()).unwrap();
         socket.listen(1024).unwrap();
+
         net::TcpListener::from(socket).local_addr().unwrap()
     }
 }
 
-impl TestServerRuntime {
+impl TestServerHandle {
     /// Test server host.
     pub fn host(&self) -> &str {
         &self.host
@@ -140,12 +122,12 @@ impl TestServerRuntime {
     }
 
     /// Connect to server, returning a Tokio `TcpStream`.
-    pub fn connect(&self) -> std::io::Result<TcpStream> {
+    pub fn connect(&self) -> io::Result<TcpStream> {
         TcpStream::from_std(net::TcpStream::connect(self.addr)?)
     }
 }
 
-impl Drop for TestServerRuntime {
+impl Drop for TestServerHandle {
     fn drop(&mut self) {
         self.stop()
     }
@@ -158,8 +140,14 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn plain_tokio_runtime() {
-        let srv = TestServer::with(|| fn_service(|_sock| async move { Ok::<_, ()>(()) }));
+    async fn connect_in_tokio_runtime() {
+        let srv = TestServer::start(|| fn_service(|_sock| async move { Ok::<_, ()>(()) }));
+        assert!(srv.connect().is_ok());
+    }
+
+    #[actix_rt::test]
+    async fn connect_in_actix_runtime() {
+        let srv = TestServer::start(|| fn_service(|_sock| async move { Ok::<_, ()>(()) }));
         assert!(srv.connect().is_ok());
     }
 }
