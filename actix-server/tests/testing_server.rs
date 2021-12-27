@@ -51,7 +51,7 @@ async fn testing_server_echo() {
 async fn new_with_builder() {
     let alt_addr = TestServer::unused_addr();
 
-    let srv = TestServer::with_builder(
+    let srv = TestServer::start_with_builder(
         Server::build()
             .bind("alt", alt_addr, || {
                 fn_service(|_| async { Ok::<_, ()>(()) })

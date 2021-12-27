@@ -50,7 +50,7 @@ async fn test_rustls_string() {
 
 #[actix_rt::test]
 async fn test_static_str() {
-    let srv = TestServer::with(|| {
+    let srv = TestServer::start(|| {
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);
             framed.send(Bytes::from_static(b"test")).await?;
@@ -81,7 +81,7 @@ async fn service_factory() {
         Connector::default()
     }
 
-    let srv = TestServer::with(|| {
+    let srv = TestServer::start(|| {
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);
             framed.send(Bytes::from_static(b"test")).await?;
@@ -136,7 +136,7 @@ async fn test_rustls_uri() {
 
 #[actix_rt::test]
 async fn test_local_addr() {
-    let srv = TestServer::with(|| {
+    let srv = TestServer::start(|| {
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);
             framed.send(Bytes::from_static(b"test")).await?;
