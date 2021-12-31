@@ -1,8 +1,6 @@
-name: CI
+name: CI (master only)
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   push:
     branches: [master]
 
@@ -18,8 +16,7 @@ jobs:
           - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
           - { name: Windows (32-bit), os: windows-latest, triple: i686-pc-windows-msvc }
         version:
-          - 1.52.0 # MSRV for -server and -tls
-          - stable
+          - nightly
 
     name: ${{ matrix.target.name }} / ${{ matrix.version }}
     runs-on: ${{ matrix.target.os }}
@@ -87,7 +84,7 @@ jobs:
         if: matrix.target.triple == 'x86_64-pc-windows-gnu'
         uses: actions-rs/cargo@v1
         with: { command: ci-check-min }
-
+      
       - name: check full
         # TODO: compile OpenSSL and run tests on MinGW
         if: >
@@ -118,45 +115,16 @@ jobs:
           cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
           cargo-cache
 
-  build_and_test_lower_msrv:
-    name: Linux / 1.46 (lower MSRV)
+  coverage:
+    name: coverage
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Install 1.46.0 # MSRV for all but -server and -tls
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.46.0-x86_64-unknown-linux-gnu
-          profile: minimal
-          override: true
-
-      - name: Install cargo-hack
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-hack
-
-      - name: tests
-        run: |
-          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=1.46 cargo ci-test-lower-msrv"
-
-      - name: Clear the cargo caches
-        run: |
-          cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
-          cargo-cache
-
-  rustdoc:
-    name: rustdoc
-    runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v2
 
       - name: Install Rust (nightly)
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-x86_64-unknown-linux-gnu
+          toolchain: stable-x86_64-unknown-linux-gnu
           profile: minimal
           override: true
 
@@ -165,7 +133,13 @@ jobs:
         with: { command: generate-lockfile }
       - name: Cache Dependencies
         uses: Swatinem/rust-cache@v1.3.0
-
-      - name: doc tests io-uring
+    
+      - name: Generate coverage file
+        if: github.ref == 'refs/heads/master'
         run: |
-          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=nightly cargo ci-doctest"
+          cargo install cargo-tarpaulin
+          cargo tarpaulin --out Xml --verbose
+      - name: Upload to Codecov
+        if: github.ref == 'refs/heads/master'
+        uses: codecov/codecov-action@v1
+        with: { file: cobertura.xml }
