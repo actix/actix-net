@@ -1,6 +1,6 @@
 [package]
 name = "actix-server"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "fakeshadow <24548779@qq.com>",
@@ -34,7 +34,7 @@ log = "0.4"
 mio = { version = "0.8", features = ["os-poll", "net"] }
 num_cpus = "1.13"
 socket2 = "0.4.2"
-tokio = { version = "1.5.1", features = ["sync"] }
+tokio = { version = "1.13.1", features = ["sync"] }
 
 # runtime for io-uring feature
 tokio-uring = { version = "0.1", optional = true }
@@ -46,4 +46,4 @@ actix-rt = "2.4.0"
 bytes = "1"
 env_logger = "0.9"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink", "async-await-macro"] }
-tokio = { version = "1.5.1", features = ["io-util", "rt-multi-thread", "macros", "fs"] }
+tokio = { version = "1.13.1", features = ["io-util", "rt-multi-thread", "macros", "fs"] }

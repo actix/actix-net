@@ -3,6 +3,10 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 2.0.0-rc.3 - 2021-12-31
+- No significant changes since `2.0.0-rc.2`.
+
+
 ## 2.0.0-rc.2 - 2021-12-27
 - Simplify `TestServer`. [#431]
 
