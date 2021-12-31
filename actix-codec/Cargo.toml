@@ -1,6 +1,6 @@
 [package]
 name = "actix-codec"
-version = "0.4.1"
+version = "0.4.2"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
@@ -24,7 +24,7 @@ futures-sink = { version = "0.3.7", default-features = false }
 log = "0.4"
 memchr = "2.3"
 pin-project-lite = "0.2"
-tokio = "1.5.1"
+tokio = "1.13.1"
 tokio-util = { version = "0.6", features = ["codec", "io"] }
 
 [dev-dependencies]
