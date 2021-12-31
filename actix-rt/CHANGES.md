@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+
+
+## 2.5.1 - 2021-12-31
 - Expose `System::with_tokio_rt` and `Arbiter::with_tokio_rt`. [#430]
 
 [#430]: https://github.com/actix/actix-net/pull/430
