@@ -1,4 +1,4 @@
-#[rustversion::stable(1.46)] // MSRV
+#[rustversion::stable(1.50)Ï] // MSRV
 #[test]
 fn compile_macros() {
     let t = trybuild::TestCases::new();
