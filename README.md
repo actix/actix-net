@@ -13,7 +13,7 @@ See `actix-server/examples` and `actix-tls/examples` for some basic examples.
 
 ### MSRV
 
-This repo's Minimum Supported Rust Version (MSRV) is 1.46.0.
+This repo's Minimum Supported Rust Version (MSRV) is 1.50.0.
 
 ## License
 
