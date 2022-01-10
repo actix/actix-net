@@ -23,4 +23,4 @@ ci-test-rt-linux = "    hack --feature-powerset test --package=actix-rt     --li
 ci-test-server-linux = "hack --feature-powerset test --package=actix-server --lib --tests --no-fail-fast -- --nocapture"
 
 # test lower msrv
-ci-test-lower-msrv = "hack --workspace --exclude=actix-server --feature-powerset test --lib --tests --no-fail-fast -- --nocapture"
+ci-test-lower-msrv = "hack --workspace --exclude=actix-server --exclude=actix-tls --feature-powerset test --lib --tests --no-fail-fast -- --nocapture"
