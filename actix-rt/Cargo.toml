@@ -29,8 +29,9 @@ actix-macros = { version = "0.2.3", optional = true }
 futures-core = { version = "0.3", default-features = false }
 tokio = { version = "1.13.1", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }
 
+# runtime for io-uring feature
 [target.'cfg(target_os = "linux")'.dependencies]
-tokio-uring = { version = "0.1", optional = true }
+tokio-uring = { version = "0.2", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.13.1", features = ["full"] }

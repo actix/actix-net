@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+- Update `tokio-uring` dependency to `0.2.0`. [#436]
+
+[#436]: https://github.com/actix/actix-net/pull/436
 
 
 ## 2.5.1 - 2021-12-31
