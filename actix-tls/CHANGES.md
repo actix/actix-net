@@ -1,10 +1,14 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-- Remove use of `str::split_once` to lower MSRV of `actix-tls` to a de-facto 1.50.0 from 1.52.0
+
+
+## 3.0.1 - 2022-01-11
+- No significant changes since `3.0.0`.
+
 
 ## 3.0.0 - 2021-12-26
-* No significant changes since `3.0.0-rc.2`.
+- No significant changes since `3.0.0-rc.2`.
 
 
 ## 3.0.0-rc.2 - 2021-12-10
