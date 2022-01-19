@@ -3,6 +3,10 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 2.0.0 - 2022-01-19
+- No significant changes since `2.0.0-rc.4`.
+
+
 ## 2.0.0-rc.4 - 2022-01-12
 - Update `tokio-uring` dependency to `0.2.0`. [#436]
 
