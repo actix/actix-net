@@ -5,8 +5,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use actix_utils::counter::Counter;
-use derive_more::{Display, Error};
+use actix_utils::{counter::Counter, derive};
 
 #[cfg(feature = "openssl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "openssl")))]
@@ -45,19 +44,22 @@ pub fn max_concurrent_tls_connect(num: usize) {
 /// All TLS acceptors from this crate will return the `SvcErr` type parameter as [`Infallible`],
 /// which can be cast to your own service type, inferred or otherwise,
 /// using [`into_service_error`](Self::into_service_error).
-#[derive(Debug, Display, Error)]
+#[derive(Debug)]
 pub enum TlsError<TlsErr, SvcErr> {
     /// TLS handshake has timed-out.
-    #[display(fmt = "TLS handshake has timed-out")]
     Timeout,
-
     /// Wraps TLS service errors.
-    #[display(fmt = "TLS handshake error")]
     Tls(TlsErr),
-
     /// Wraps service errors.
-    #[display(fmt = "Service error")]
     Service(SvcErr),
+}
+
+derive::enum_error! {
+    match TlsError<TlsErr, SvcErr> |f| {
+        Timeout => "TLS handshake has timed-out",
+        Tls(e) => "TLS handshake error",
+        Service(e) => "Service error",
+    }
 }
 
 impl<TlsErr> TlsError<TlsErr, Infallible> {

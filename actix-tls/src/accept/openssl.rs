@@ -19,9 +19,9 @@ use actix_rt::{
 use actix_service::{Service, ServiceFactory};
 use actix_utils::{
     counter::{Counter, CounterGuard},
+    derive,
     future::{ready, Ready as FutReady},
 };
-use derive_more::{Deref, DerefMut, From};
 use openssl::ssl::{Error, Ssl, SslAcceptor};
 use pin_project_lite::pin_project;
 
@@ -36,8 +36,11 @@ pub mod reexports {
 }
 
 /// Wraps an `openssl` based async TLS stream in order to implement [`ActixStream`].
-#[derive(Deref, DerefMut, From)]
 pub struct TlsStream<IO>(tokio_openssl::SslStream<IO>);
+
+derive::from! { tokio_openssl::SslStream<IO> => TlsStream<IO> }
+derive::deref! { TlsStream<IO> => 0: tokio_openssl::SslStream<IO> }
+derive::deref_mut! { TlsStream<IO> => 0 }
 
 impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(

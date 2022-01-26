@@ -20,9 +20,9 @@ use actix_rt::{
 use actix_service::{Service, ServiceFactory};
 use actix_utils::{
     counter::{Counter, CounterGuard},
+    derive,
     future::{ready, Ready as FutReady},
 };
-use derive_more::{Deref, DerefMut, From};
 use pin_project_lite::pin_project;
 use tokio_rustls::rustls::ServerConfig;
 use tokio_rustls::{Accept, TlsAcceptor};
@@ -36,8 +36,11 @@ pub mod reexports {
 }
 
 /// Wraps a `rustls` based async TLS stream in order to implement [`ActixStream`].
-#[derive(Deref, DerefMut, From)]
 pub struct TlsStream<IO>(tokio_rustls::server::TlsStream<IO>);
+
+derive::from! { tokio_rustls::server::TlsStream<IO> => TlsStream<IO> }
+derive::deref! { TlsStream<IO> => 0: tokio_rustls::server::TlsStream<IO> }
+derive::deref_mut! { TlsStream<IO> => 0 }
 
 impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
