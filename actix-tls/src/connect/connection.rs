@@ -13,7 +13,7 @@ impl_more::deref_mut! { Connection<R, IO> => io }
 
 impl<R, IO> Connection<R, IO> {
     /// Construct new `Connection` from request and IO parts.
-    pub(crate) fn new(req: R, io: IO) -> Self {
+    pub fn new(req: R, io: IO) -> Self {
         Self { req, io }
     }
 }
