@@ -264,22 +264,23 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
     addr: S,
     backlog: u32,
 ) -> io::Result<Vec<MioTcpListener>> {
-    let mut err = None;
+    let mut opt_err = None;
     let mut success = false;
     let mut sockets = Vec::new();
+
     for addr in addr.to_socket_addrs()? {
         match create_mio_tcp_listener(addr, backlog) {
             Ok(lst) => {
                 success = true;
                 sockets.push(lst);
             }
-            Err(err) => err = Some(err),
+            Err(err) => opt_err = Some(err),
         }
     }
 
     if success {
         Ok(sockets)
-    } else if let Some(err) = err.take() {
+    } else if let Some(err) = opt_err.take() {
         Err(err)
     } else {
         Err(io::Error::new(
