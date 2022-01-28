@@ -5,7 +5,7 @@
 [![CI](https://github.com/actix/actix-net/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/actix/actix-net/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/actix/actix-net/branch/master/graph/badge.svg)](https://codecov.io/gh/actix/actix-net)
 [![Chat on Discord](https://img.shields.io/discord/771444961383153695?label=chat&logo=discord)](https://discord.gg/NWpN5mmg3x)
-[![Dependency Status](https://deps.rs/repo/github/actix/actix-extras/status.svg)](https://deps.rs/repo/github/actix/actix-extras)
+[![Dependency Status](https://deps.rs/repo/github/actix/actix-net/status.svg)](https://deps.rs/repo/github/actix/actix-net)
 
 ## Example
 
