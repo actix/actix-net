@@ -36,8 +36,8 @@ impl fmt::Display for ConnectError {
 impl Error for ConnectError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            ConnectError::Resolver(err) => Some(&**err),
-            ConnectError::Io(err) => Some(err),
+            Self::Resolver(err) => Some(&**err),
+            Self::Io(err) => Some(err),
             _ => None,
         }
     }
