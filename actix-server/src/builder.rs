@@ -220,10 +220,10 @@ impl ServerBuilder {
     {
         // The path must not exist when we try to bind.
         // Try to remove it to avoid bind error.
-        if let Err(e) = std::fs::remove_file(addr.as_ref()) {
+        if let Err(err) = std::fs::remove_file(addr.as_ref()) {
             // NotFound is expected and not an issue. Anything else is.
-            if e.kind() != std::io::ErrorKind::NotFound {
-                return Err(e);
+            if err.kind() != std::io::ErrorKind::NotFound {
+                return Err(err);
             }
         }
 
@@ -273,7 +273,7 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
                 success = true;
                 sockets.push(lst);
             }
-            Err(e) => err = Some(e),
+            Err(err) => err = Some(err),
         }
     }
 

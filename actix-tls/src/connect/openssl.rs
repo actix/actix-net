@@ -141,9 +141,12 @@ where
                 trace!("SSL Handshake success: {:?}", stream.hostname());
                 Poll::Ready(Ok(stream.replace_io(this.io.take().unwrap()).1))
             }
-            Err(e) => {
-                trace!("SSL Handshake error: {:?}", e);
-                Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, format!("{}", e))))
+            Err(err) => {
+                trace!("SSL Handshake error: {:?}", err);
+                Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("{}", err),
+                )))
             }
         }
     }

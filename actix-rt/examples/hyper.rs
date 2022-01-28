@@ -21,8 +21,8 @@ fn main() {
         let server =
             Server::bind(&SocketAddr::from(([127, 0, 0, 1], 3000))).serve(make_service);
 
-        if let Err(e) = server.await {
-            eprintln!("server error: {}", e);
+        if let Err(err) = server.await {
+            eprintln!("server error: {}", err);
         }
     })
 }
