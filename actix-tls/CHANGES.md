@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+- Expose `connect::Connection::new`. [#439]
+
+[#439]: https://github.com/actix/actix-net/pull/439
 
 
 ## 3.0.1 - 2022-01-11
