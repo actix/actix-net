@@ -71,8 +71,8 @@ impl<TlsErr, SvcErr> fmt::Display for TlsError<TlsErr, SvcErr> {
 
 impl<TlsErr, SvcErr> Error for TlsError<TlsErr, SvcErr>
 where
-    TlsErr: 'static + Error,
-    SvcErr: 'static + Error,
+    TlsErr: Error + 'static,
+    SvcErr: Error + 'static,
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
