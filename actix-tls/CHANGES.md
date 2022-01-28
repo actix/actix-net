@@ -1,9 +1,6 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
-- Implement `Error` for `TlsError` when all variants' inner errors also impl `Error`. [#438]
-
-[#438]: https://github.com/actix/actix-net/pull/438
 
 
 ## 3.0.1 - 2022-01-11
