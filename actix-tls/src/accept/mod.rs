@@ -76,9 +76,9 @@ where
 {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            TlsError::Timeout => todo!(),
             TlsError::Tls(err) => Some(err),
             TlsError::Service(err) => Some(err),
+            TlsError::Timeout => None,
         }
     }
 }

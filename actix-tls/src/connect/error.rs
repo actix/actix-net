@@ -38,7 +38,7 @@ impl Error for ConnectError {
         match self {
             Self::Resolver(err) => Some(&**err),
             Self::Io(err) => Some(err),
-            _ => None,
+            Self::NoRecords | Self::InvalidInput | Self::Unresolved => None,
         }
     }
 }
