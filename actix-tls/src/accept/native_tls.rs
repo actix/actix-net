@@ -10,6 +10,7 @@ use std::{
     time::Duration,
 };
 
+use crate::impl_more;
 use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
 use actix_rt::{
     net::{ActixStream, Ready},
@@ -18,7 +19,6 @@ use actix_rt::{
 use actix_service::{Service, ServiceFactory};
 use actix_utils::{
     counter::Counter,
-    derive,
     future::{ready, Ready as FutReady},
 };
 use futures_core::future::LocalBoxFuture;
@@ -35,9 +35,9 @@ pub mod reexports {
 /// Wraps a `native-tls` based async TLS stream in order to implement [`ActixStream`].
 pub struct TlsStream<IO>(tokio_native_tls::TlsStream<IO>);
 
-derive::from! { tokio_native_tls::TlsStream<IO> => TlsStream<IO> }
-derive::deref! { TlsStream<IO> => 0: tokio_native_tls::TlsStream<IO> }
-derive::deref_mut! { TlsStream<IO> => 0 }
+impl_more::from! { tokio_native_tls::TlsStream<IO> => TlsStream<IO> }
+impl_more::deref! { TlsStream<IO> => 0: tokio_native_tls::TlsStream<IO> }
+impl_more::deref_mut! { TlsStream<IO> => 0 }
 
 impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(

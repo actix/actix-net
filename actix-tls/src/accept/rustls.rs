@@ -20,7 +20,6 @@ use actix_rt::{
 use actix_service::{Service, ServiceFactory};
 use actix_utils::{
     counter::{Counter, CounterGuard},
-    derive,
     future::{ready, Ready as FutReady},
 };
 use pin_project_lite::pin_project;
@@ -28,6 +27,7 @@ use tokio_rustls::rustls::ServerConfig;
 use tokio_rustls::{Accept, TlsAcceptor};
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
+use crate::impl_more;
 
 pub mod reexports {
     //! Re-exports from `rustls` that are useful for acceptors.
@@ -38,9 +38,9 @@ pub mod reexports {
 /// Wraps a `rustls` based async TLS stream in order to implement [`ActixStream`].
 pub struct TlsStream<IO>(tokio_rustls::server::TlsStream<IO>);
 
-derive::from! { tokio_rustls::server::TlsStream<IO> => TlsStream<IO> }
-derive::deref! { TlsStream<IO> => 0: tokio_rustls::server::TlsStream<IO> }
-derive::deref_mut! { TlsStream<IO> => 0 }
+impl_more::from! { tokio_rustls::server::TlsStream<IO> => TlsStream<IO> }
+impl_more::deref! { TlsStream<IO> => 0: tokio_rustls::server::TlsStream<IO> }
+impl_more::deref_mut! { TlsStream<IO> => 0 }
 
 impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(

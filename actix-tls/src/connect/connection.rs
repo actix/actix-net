@@ -1,5 +1,5 @@
 use super::Host;
-use actix_utils::derive;
+use crate::impl_more;
 
 /// Wraps underlying I/O and the connection request that initiated it.
 #[derive(Debug)]
@@ -8,8 +8,8 @@ pub struct Connection<R, IO> {
     pub(crate) io: IO,
 }
 
-derive::deref! { Connection<R, IO> => io: IO }
-derive::deref_mut! { Connection<R, IO> => io }
+impl_more::deref! { Connection<R, IO> => io: IO }
+impl_more::deref_mut! { Connection<R, IO> => io }
 
 impl<R, IO> Connection<R, IO> {
     /// Construct new `Connection` from request and IO parts.

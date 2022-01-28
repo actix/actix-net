@@ -2,10 +2,12 @@
 
 use std::{
     convert::Infallible,
+    error::Error,
+    fmt,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use actix_utils::{counter::Counter, derive};
+use actix_utils::counter::Counter;
 
 #[cfg(feature = "openssl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "openssl")))]
@@ -42,23 +44,42 @@ pub fn max_concurrent_tls_connect(num: usize) {
 /// TLS handshake error, TLS timeout, or inner service error.
 ///
 /// All TLS acceptors from this crate will return the `SvcErr` type parameter as [`Infallible`],
-/// which can be cast to your own service type, inferred or otherwise,
-/// using [`into_service_error`](Self::into_service_error).
+/// which can be cast to your own service type, inferred or otherwise, using [`into_service_error`].
+///
+/// [`into_service_error`]: Self::into_service_error
 #[derive(Debug)]
 pub enum TlsError<TlsErr, SvcErr> {
     /// TLS handshake has timed-out.
     Timeout,
+
     /// Wraps TLS service errors.
     Tls(TlsErr),
+
     /// Wraps service errors.
     Service(SvcErr),
 }
 
-derive::enum_error! {
-    match TlsError<TlsErr, SvcErr> |f| {
-        Timeout => "TLS handshake has timed-out",
-        Tls(e) => "TLS handshake error",
-        Service(e) => "Service error",
+impl<TlsErr, SvcErr> fmt::Display for TlsError<TlsErr, SvcErr> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Timeout => f.write_str("TLS handshake has timed-out"),
+            Self::Tls(_) => f.write_str("TLS handshake error"),
+            Self::Service(_) => f.write_str("Service error"),
+        }
+    }
+}
+
+impl<TlsErr, SvcErr> Error for TlsError<TlsErr, SvcErr>
+where
+    TlsErr: 'static + Error,
+    SvcErr: 'static + Error,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            TlsError::Timeout => todo!(),
+            TlsError::Tls(err) => Some(err),
+            TlsError::Service(err) => Some(err),
+        }
     }
 }
 
