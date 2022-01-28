@@ -47,7 +47,6 @@ actix-rt = { version = "2.2.0", default-features = false }
 actix-service = "2.0.0"
 actix-utils = "3.0.0"
 
-derive_more = "0.99.5"
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 log = "0.4"
 pin-project-lite = "0.2.7"

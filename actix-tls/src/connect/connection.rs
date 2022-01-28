@@ -1,16 +1,15 @@
-use derive_more::{Deref, DerefMut};
-
 use super::Host;
+use crate::impl_more;
 
 /// Wraps underlying I/O and the connection request that initiated it.
-#[derive(Debug, Deref, DerefMut)]
+#[derive(Debug)]
 pub struct Connection<R, IO> {
     pub(crate) req: R,
-
-    #[deref]
-    #[deref_mut]
     pub(crate) io: IO,
 }
+
+impl_more::deref! { Connection<R, IO> => io: IO }
+impl_more::deref_mut! { Connection<R, IO> => io }
 
 impl<R, IO> Connection<R, IO> {
     /// Construct new `Connection` from request and IO parts.
