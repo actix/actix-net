@@ -206,3 +206,20 @@ where
 {
     tokio::task::spawn_local(f)
 }
+
+/// Runs the provided future, blocking the current thread until the future completes.
+///
+/// This is a shortcut for creating a [`System`] and calling [`System::block_on`].
+///
+/// # Examples
+///
+/// ```
+/// fn main() {
+///     actix_rt::block_on(async move {
+///         println!("Hello world!");
+///     });
+/// }
+/// ```
+pub fn block_on<F: Future>(fut: F) -> F::Output {
+    System::new().block_on(fut)
+}
