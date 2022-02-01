@@ -97,7 +97,7 @@ where
 
         match this.fut.poll(cx) {
             Poll::Ready(Ok(resp)) => Poll::Ready(Ok((this.f)(resp))),
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+            Poll::Ready(Err(err)) => Poll::Ready(Err(err)),
             Poll::Pending => Poll::Pending,
         }
     }

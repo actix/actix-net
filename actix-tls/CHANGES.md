@@ -3,6 +3,12 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.2 - 2022-01-28
+- Expose `connect::Connection::new`. [#439]
+
+[#439]: https://github.com/actix/actix-net/pull/439
+
+
 ## 3.0.1 - 2022-01-11
 - No significant changes since `3.0.0`.
 
@@ -15,6 +21,7 @@
 - Re-export `openssl::SslConnectorBuilder` in `connect::openssl::reexports`. [#429]
 
 [#429]: https://github.com/actix/actix-net/pull/429
+
 
 ## 3.0.0-rc.1 - 2021-11-29
 ### Added

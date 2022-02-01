@@ -193,7 +193,7 @@ impl<T, U> Framed<T, U> {
                     match this.codec.decode_eof(this.read_buf) {
                         Ok(Some(frame)) => return Poll::Ready(Some(Ok(frame))),
                         Ok(None) => return Poll::Ready(None),
-                        Err(e) => return Poll::Ready(Some(Err(e))),
+                        Err(err) => return Poll::Ready(Some(Err(err))),
                     }
                 }
 
@@ -204,7 +204,7 @@ impl<T, U> Framed<T, U> {
                         log::trace!("frame decoded from buffer");
                         return Poll::Ready(Some(Ok(frame)));
                     }
-                    Err(e) => return Poll::Ready(Some(Err(e))),
+                    Err(err) => return Poll::Ready(Some(Err(err))),
                     _ => (), // Need more data
                 }
 
@@ -221,7 +221,7 @@ impl<T, U> Framed<T, U> {
 
             let cnt = match tokio_util::io::poll_read_buf(this.io, cx, this.read_buf) {
                 Poll::Pending => return Poll::Pending,
-                Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e.into()))),
+                Poll::Ready(Err(err)) => return Poll::Ready(Some(Err(err.into()))),
                 Poll::Ready(Ok(cnt)) => cnt,
             };
 

@@ -50,7 +50,7 @@ impl Write for Bilateral {
                 assert_eq!(&data[..], &src[..data.len()]);
                 Ok(data.len())
             }
-            Some(Err(e)) => Err(e),
+            Some(Err(err)) => Err(err),
             None => panic!("unexpected write; {:?}", src),
         }
     }
@@ -67,13 +67,13 @@ impl AsyncWrite for Bilateral {
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
         match Pin::get_mut(self).write(buf) {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Pending,
+            Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => Pending,
             other => Ready(other),
         }
     }
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         match Pin::get_mut(self).flush() {
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => Pending,
+            Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => Pending,
             other => Ready(other),
         }
     }
@@ -99,8 +99,8 @@ impl AsyncRead for Bilateral {
                 buf.put_slice(&data);
                 Ready(Ok(()))
             }
-            Some(Err(ref e)) if e.kind() == WouldBlock => Pending,
-            Some(Err(e)) => Ready(Err(e)),
+            Some(Err(ref err)) if err.kind() == WouldBlock => Pending,
+            Some(Err(err)) => Ready(Err(err)),
             None => Ready(Ok(())),
         }
     }

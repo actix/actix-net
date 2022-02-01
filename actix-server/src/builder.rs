@@ -220,10 +220,10 @@ impl ServerBuilder {
     {
         // The path must not exist when we try to bind.
         // Try to remove it to avoid bind error.
-        if let Err(e) = std::fs::remove_file(addr.as_ref()) {
+        if let Err(err) = std::fs::remove_file(addr.as_ref()) {
             // NotFound is expected and not an issue. Anything else is.
-            if e.kind() != std::io::ErrorKind::NotFound {
-                return Err(e);
+            if err.kind() != std::io::ErrorKind::NotFound {
+                return Err(err);
             }
         }
 
@@ -264,22 +264,23 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
     addr: S,
     backlog: u32,
 ) -> io::Result<Vec<MioTcpListener>> {
-    let mut err = None;
+    let mut opt_err = None;
     let mut success = false;
     let mut sockets = Vec::new();
+
     for addr in addr.to_socket_addrs()? {
         match create_mio_tcp_listener(addr, backlog) {
             Ok(lst) => {
                 success = true;
                 sockets.push(lst);
             }
-            Err(e) => err = Some(e),
+            Err(err) => opt_err = Some(err),
         }
     }
 
     if success {
         Ok(sockets)
-    } else if let Some(err) = err.take() {
+    } else if let Some(err) = opt_err.take() {
         Err(err)
     } else {
         Err(io::Error::new(

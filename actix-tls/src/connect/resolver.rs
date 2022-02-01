@@ -164,8 +164,8 @@ impl<R: Host> Future for ResolverFut<R> {
             Self::LookUp(fut, req) => {
                 let res = match ready!(Pin::new(fut).poll(cx)) {
                     Ok(Ok(res)) => Ok(res),
-                    Ok(Err(e)) => Err(ConnectError::Resolver(Box::new(e))),
-                    Err(e) => Err(ConnectError::Io(e.into())),
+                    Ok(Err(err)) => Err(ConnectError::Resolver(Box::new(err))),
+                    Err(err) => Err(ConnectError::Io(err.into())),
                 };
 
                 let req = req.take().unwrap();
