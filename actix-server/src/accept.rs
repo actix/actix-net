@@ -332,7 +332,7 @@ impl Accept {
             .for_each(|(_, info)| self.deregister_logged(info));
     }
 
-    fn terminate_all(&self, sockets: &mut[ServerSocketInfo]) {
+    fn terminate_all(&self, sockets: &mut [ServerSocketInfo]) {
         sockets.iter().for_each(|s| s.lst.terminate());
     }
 

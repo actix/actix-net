@@ -38,9 +38,7 @@ impl MioListener {
         match *self {
             MioListener::Tcp(ref lst) => lst.accept().map(|(stream, _)| MioStream::Tcp(stream)),
             #[cfg(unix)]
-            MioListener::Uds(ref lst) => {
-                lst.accept().map(|(stream, _)| MioStream::Uds(stream))
-            }
+            MioListener::Uds(ref lst) => lst.accept().map(|(stream, _)| MioStream::Uds(stream)),
         }
     }
 
@@ -49,16 +47,15 @@ impl MioListener {
             MioListener::Tcp(_) => (),
             #[cfg(unix)]
             MioListener::Uds(ref lst) => {
-                    if let Ok(addr) = lst.local_addr() {
-                        if let Some(path) = addr.as_pathname() {
-                            let _ = std::fs::remove_file(path);
-                        }
+                if let Ok(addr) = lst.local_addr() {
+                    if let Some(path) = addr.as_pathname() {
+                        let _ = std::fs::remove_file(path);
                     }
                 }
+            }
         }
     }
 }
-
 
 impl Source for MioListener {
     fn register(
@@ -91,7 +88,7 @@ impl Source for MioListener {
         match *self {
             MioListener::Tcp(ref mut lst) => lst.deregister(registry),
             #[cfg(unix)]
-            MioListener::Uds(ref mut lst) => lst.deregister(registry)
+            MioListener::Uds(ref mut lst) => lst.deregister(registry),
         }
     }
 }
