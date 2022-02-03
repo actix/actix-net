@@ -217,6 +217,8 @@ impl Accept {
                         self.deregister_all(sockets);
                     }
 
+                    self.terminate_all(sockets);
+
                     return true;
                 }
 
@@ -328,6 +330,10 @@ impl Accept {
             // Socket info with a timeout is already deregistered so skip them.
             .filter(|(timeout, _)| timeout.is_none())
             .for_each(|(_, info)| self.deregister_logged(info));
+    }
+
+    fn terminate_all(&self, sockets: &mut[ServerSocketInfo]) {
+        sockets.iter().for_each(|s| s.lst.terminate());
     }
 
     // Send connection to worker and handle error.
