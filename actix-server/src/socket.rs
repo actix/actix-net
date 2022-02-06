@@ -41,20 +41,6 @@ impl MioListener {
             MioListener::Uds(ref lst) => lst.accept().map(|(stream, _)| MioStream::Uds(stream)),
         }
     }
-
-    pub(crate) fn terminate(&self) {
-        match *self {
-            MioListener::Tcp(_) => (),
-            #[cfg(unix)]
-            MioListener::Uds(ref lst) => {
-                if let Ok(addr) = lst.local_addr() {
-                    if let Some(path) = addr.as_pathname() {
-                        let _ = std::fs::remove_file(path);
-                    }
-                }
-            }
-        }
-    }
 }
 
 impl Source for MioListener {
@@ -272,19 +258,6 @@ mod tests {
             let lst = MioListener::Uds(socket);
             assert!(format!("{:?}", lst).contains("/tmp/sock.xxxxx"));
             assert!(format!("{}", lst).contains("/tmp/sock.xxxxx"));
-        }
-    }
-
-    #[test]
-    #[cfg(unix)]
-    fn uds_terminate() {
-        let socket_path = std::path::Path::new("/tmp/sock.xxxx1");
-        let _ = std::fs::remove_file(socket_path);
-        if let Ok(socket) = MioUnixListener::bind(socket_path) {
-            let listener = MioListener::Uds(socket);
-            assert!(socket_path.exists());
-            listener.terminate();
-            assert!(!socket_path.exists());
         }
     }
 }
