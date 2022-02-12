@@ -169,6 +169,12 @@ jobs:
           command: install
           args: cargo-minimal-versions
 
+      - name: Install cargo-hack
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-hack
+
       - name: Check With Minimal Versions
         uses: actions-rs/cargo@v1
         with:
