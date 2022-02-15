@@ -50,7 +50,7 @@ actix-utils = "3.0.0"
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 log = "0.4"
 pin-project-lite = "0.2.7"
-tokio-util = { version = "0.6.3", default-features = false }
+tokio-util = "0.7"
 
 # uri
 http = { version = "0.2.3", optional = true }
