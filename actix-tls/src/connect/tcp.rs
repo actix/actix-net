@@ -79,7 +79,7 @@ pub enum TcpConnectorFut<R> {
         port: u16,
         local_addr: Option<IpAddr>,
         addrs: Option<VecDeque<SocketAddr>>,
-        stream: ReusableBoxFuture<Result<TcpStream, io::Error>>,
+        stream: ReusableBoxFuture<'static, Result<TcpStream, io::Error>>,
     },
 
     Error(Option<ConnectError>),
