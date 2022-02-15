@@ -3,6 +3,10 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 3.0.3 - 2022-02-15
+- No significant changes since `3.0.2`.
+
+
 ## 3.0.2 - 2022-01-28
 - Expose `connect::Connection::new`. [#439]
 
