@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased - 2021-xx-xx
+## Unreleased - 2022-xx-xx
 
 
 ## 3.0.3 - 2022-02-15
@@ -132,7 +132,7 @@
 [#273]: https://github.com/actix/actix-net/pull/273
 
 
-## 3.0.0-beta.2 - 2021-xx-xx
+## 3.0.0-beta.2 - 2022-xx-xx
 - Depend on stable trust-dns packages. [#204]
 
 [#204]: https://github.com/actix/actix-net/pull/204
