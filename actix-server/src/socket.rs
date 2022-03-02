@@ -74,17 +74,7 @@ impl Source for MioListener {
         match *self {
             MioListener::Tcp(ref mut lst) => lst.deregister(registry),
             #[cfg(unix)]
-            MioListener::Uds(ref mut lst) => {
-                let res = lst.deregister(registry);
-
-                // cleanup file path
-                if let Ok(addr) = lst.local_addr() {
-                    if let Some(path) = addr.as_pathname() {
-                        let _ = std::fs::remove_file(path);
-                    }
-                }
-                res
-            }
+            MioListener::Uds(ref mut lst) => lst.deregister(registry),
         }
     }
 }
