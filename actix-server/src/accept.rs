@@ -41,7 +41,7 @@ impl Accept {
     pub(crate) fn start(
         sockets: Vec<(usize, MioListener)>,
         builder: &ServerBuilder,
-    ) -> io::Result<(WakerQueue, Vec<WorkerHandleServer>)> {
+    ) -> io::Result<(WakerQueue, Vec<WorkerHandleServer>, thread::JoinHandle<()>)> {
         let handle_server = ServerHandle::new(builder.cmd_tx.clone());
 
         // construct poll instance and its waker
@@ -73,12 +73,12 @@ impl Accept {
             handle_server,
         )?;
 
-        thread::Builder::new()
+        let accept_handle = thread::Builder::new()
             .name("actix-server acceptor".to_owned())
             .spawn(move || accept.poll_with(&mut sockets))
             .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
 
-        Ok((waker_queue, handles_server))
+        Ok((waker_queue, handles_server, accept_handle))
     }
 
     fn new_with_sockets(

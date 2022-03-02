@@ -3,6 +3,7 @@ use std::{
     io, mem,
     pin::Pin,
     task::{Context, Poll},
+    thread,
     time::Duration,
 };
 
@@ -158,6 +159,7 @@ impl Future for Server {
 
 pub struct ServerInner {
     worker_handles: Vec<WorkerHandleServer>,
+    accept_handle: Option<thread::JoinHandle<()>>,
     worker_config: ServerWorkerConfig,
     services: Vec<Box<dyn InternalServiceFactory>>,
     waker_queue: WakerQueue,
@@ -205,7 +207,7 @@ impl ServerInner {
             );
         }
 
-        let (waker_queue, worker_handles) = Accept::start(sockets, &builder)?;
+        let (waker_queue, worker_handles, accept_handle) = Accept::start(sockets, &builder)?;
 
         let mux = ServerEventMultiplexer {
             signal_fut: (builder.listen_os_signals).then(Signals::new),
@@ -214,6 +216,7 @@ impl ServerInner {
 
         let server = ServerInner {
             waker_queue,
+            accept_handle: Some(accept_handle),
             worker_handles,
             worker_config: builder.worker_config,
             services: builder.factories,
@@ -243,7 +246,8 @@ impl ServerInner {
             } => {
                 self.stopping = true;
 
-                // stop accept thread
+                // Signal accept thread to stop.
+                // Signal is non-blocking; we wait for thread to stop later.
                 self.waker_queue.wake(WakerInterest::Stop);
 
                 // send stop signal to workers
@@ -257,6 +261,13 @@ impl ServerInner {
                     // wait for all workers to shut down
                     let _ = join_all(workers_stop).await;
                 }
+
+                // wait for accept thread stop
+                self.accept_handle
+                    .take()
+                    .unwrap()
+                    .join()
+                    .expect("Accept thread must not panic in any case");
 
                 if let Some(tx) = completion {
                     let _ = tx.send(());
