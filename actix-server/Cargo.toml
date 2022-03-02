@@ -41,7 +41,7 @@ tokio = { version = "1.13.1", features = ["sync"] }
 tokio-uring = { version = "0.2", optional = true }
 
 [dev-dependencies]
-actix-codec = "0.4.2"
+actix-codec = "0.5.0"
 actix-rt = "2.6.0"
 
 bytes = "1"

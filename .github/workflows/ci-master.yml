@@ -124,7 +124,7 @@ jobs:
       - name: Install Rust (nightly)
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable-x86_64-unknown-linux-gnu
+          toolchain: nightly
           profile: minimal
           override: true
 
@@ -143,3 +143,71 @@ jobs:
         if: github.ref == 'refs/heads/master'
         uses: codecov/codecov-action@v1
         with: { file: cobertura.xml }
+
+  minimal-versions:
+    name: minimal versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust (nightly)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+
+      - name: Generate Cargo.lock
+        uses: actions-rs/cargo@v1
+        with: { command: generate-lockfile }
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v1.3.0
+
+      - name: Install cargo-minimal-versions
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-minimal-versions
+
+      - name: Install cargo-hack
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-hack
+
+      - name: Check With Minimal Versions
+        uses: actions-rs/cargo@v1
+        with:
+          command: minimal-versions
+          args: check
+
+  nextest:
+    name: nextest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Generate Cargo.lock
+        uses: actions-rs/cargo@v1
+        with: { command: generate-lockfile }
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v1.3.0
+
+      - name: Install cargo-nextest
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-nextest
+
+      - name: Test with cargo-nextest
+        uses: actions-rs/cargo@v1
+        with:
+          command: nextest
+          args: run

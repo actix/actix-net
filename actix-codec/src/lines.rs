@@ -7,8 +7,8 @@ use super::{Decoder, Encoder};
 
 /// Lines codec. Reads/writes line delimited strings.
 ///
-/// Will split input up by LF or CRLF delimiters. I.e. carriage return characters at the end of
-/// lines are not preserved.
+/// Will split input up by LF or CRLF delimiters. Carriage return characters at the end of lines are
+/// not preserved.
 #[derive(Debug, Copy, Clone, Default)]
 #[non_exhaustive]
 pub struct LinesCodec;

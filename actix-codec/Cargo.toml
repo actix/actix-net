@@ -1,6 +1,6 @@
 [package]
 name = "actix-codec"
-version = "0.4.2"
+version = "0.5.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
@@ -17,7 +17,7 @@ name = "actix_codec"
 path = "src/lib.rs"
 
 [dependencies]
-bitflags = "1.2.1"
+bitflags = "1.2"
 bytes = "1"
 futures-core = { version = "0.3.7", default-features = false }
 futures-sink = { version = "0.3.7", default-features = false }
@@ -25,7 +25,7 @@ log = "0.4"
 memchr = "2.3"
 pin-project-lite = "0.2"
 tokio = "1.13.1"
-tokio-util = { version = "0.6", features = ["codec", "io"] }
+tokio-util = { version = "0.7", features = ["codec", "io"] }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }

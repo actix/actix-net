@@ -3,6 +3,12 @@
 ## Unreleased - 2021-xx-xx
 
 
+## 0.5.0 - 2022-02-15
+- Updated `tokio-util` dependency to `0.7.0`. [#446]
+
+[#446]: https://github.com/actix/actix-net/pull/446
+
+
 ## 0.4.2 - 2021-12-31
 - No significant changes since `0.4.1`.
 
