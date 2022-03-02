@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2021-xx-xx
+- Wait for accept thread to stop before sending completion signal. [#443]
+
+[#443]: https://github.com/actix/actix-net/pull/443
 
 
 ## 2.0.0 - 2022-01-19

@@ -246,7 +246,8 @@ impl ServerInner {
             } => {
                 self.stopping = true;
 
-                // signal accept thread to stop. This signal is non-blocking with no guarantee for immediate stop.
+                // Signal accept thread to stop.
+                // Signal is non-blocking; we wait for thread to stop later.
                 self.waker_queue.wake(WakerInterest::Stop);
 
                 // send stop signal to workers
@@ -261,7 +262,7 @@ impl ServerInner {
                     let _ = join_all(workers_stop).await;
                 }
 
-                // wait for accept thread stop.
+                // wait for accept thread stop
                 self.accept_handle
                     .take()
                     .unwrap()
