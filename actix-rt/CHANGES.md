@@ -1,10 +1,10 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
-- Update `tokio-uring` dependency to `0.3.0`. [#???]
+- Update `tokio-uring` dependency to `0.3.0`. [#448]
 - Minimum supported Rust version (MSRV) is now 1.49.
 
-[#???]: https://github.com/actix/actix-net/pull/???
+[#448]: https://github.com/actix/actix-net/pull/448
 
 
 ## 2.6.0 - 2022-01-12
