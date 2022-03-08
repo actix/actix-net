@@ -5,7 +5,7 @@ use std::{
 
 use actix_rt::{task::JoinError, Arbiter, System};
 
-#[cfg(not(feature = "io-uring"))]
+#[cfg(not(feature = "experimental-io-uring"))]
 use {
     std::{sync::mpsc::channel, thread},
     tokio::sync::oneshot,
@@ -24,7 +24,7 @@ fn await_for_timer() {
     );
 }
 
-#[cfg(not(feature = "io-uring"))]
+#[cfg(not(feature = "experimental-io-uring"))]
 #[test]
 fn run_with_code() {
     let sys = System::new();
@@ -118,7 +118,7 @@ fn wait_for_spawns() {
 // Temporary disabled tests for io-uring feature.
 // They should be enabled when possible.
 
-#[cfg(not(feature = "io-uring"))]
+#[cfg(not(feature = "experimental-io-uring"))]
 #[test]
 fn arbiter_spawn_fn_runs() {
     let _ = System::new();
@@ -135,7 +135,7 @@ fn arbiter_spawn_fn_runs() {
     arbiter.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+#[cfg(not(feature = "experimental-io-uring"))]
 #[test]
 fn arbiter_handle_spawn_fn_runs() {
     let sys = System::new();
@@ -158,7 +158,7 @@ fn arbiter_handle_spawn_fn_runs() {
     sys.run().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+#[cfg(not(feature = "experimental-io-uring"))]
 #[test]
 fn arbiter_drop_no_panic_fn() {
     let _ = System::new();
@@ -170,7 +170,7 @@ fn arbiter_drop_no_panic_fn() {
     arbiter.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+#[cfg(not(feature = "experimental-io-uring"))]
 #[test]
 fn arbiter_drop_no_panic_fut() {
     let _ = System::new();
@@ -182,7 +182,7 @@ fn arbiter_drop_no_panic_fut() {
     arbiter.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+#[cfg(not(feature = "experimental-io-uring"))]
 #[test]
 fn system_arbiter_spawn() {
     let runner = System::new();
@@ -213,7 +213,7 @@ fn system_arbiter_spawn() {
     thread.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+#[cfg(not(feature = "experimental-io-uring"))]
 #[test]
 fn system_stop_stops_arbiters() {
     let sys = System::new();
@@ -236,7 +236,7 @@ fn system_stop_stops_arbiters() {
     arb.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+#[cfg(not(feature = "experimental-io-uring"))]
 #[test]
 fn new_system_with_tokio() {
     let (tx, rx) = channel();
@@ -269,7 +269,7 @@ fn new_system_with_tokio() {
     assert_eq!(rx.recv().unwrap(), 42);
 }
 
-#[cfg(not(feature = "io-uring"))]
+#[cfg(not(feature = "experimental-io-uring"))]
 #[test]
 fn new_arbiter_with_tokio() {
     use std::sync::{
@@ -348,7 +348,7 @@ fn spawn_local() {
     })
 }
 
-#[cfg(all(target_os = "linux", feature = "io-uring"))]
+#[cfg(all(target_os = "linux", feature = "experimental-io-uring"))]
 #[test]
 fn tokio_uring_arbiter() {
     System::new().block_on(async {

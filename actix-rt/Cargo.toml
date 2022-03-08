@@ -21,7 +21,10 @@ path = "src/lib.rs"
 [features]
 default = ["macros"]
 macros = ["actix-macros"]
-io-uring = ["tokio-uring"]
+experimental-io-uring = ["tokio-uring"]
+
+# deprecated `experimental-io-uring` alias
+io-uring = ["experimental-io-uring"]
 
 [dependencies]
 actix-macros = { version = "0.2.3", optional = true }
@@ -29,9 +32,9 @@ actix-macros = { version = "0.2.3", optional = true }
 futures-core = { version = "0.3", default-features = false }
 tokio = { version = "1.13.1", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }
 
-# runtime for io-uring feature
+# runtime for `experimental-io-uring` feature
 [target.'cfg(target_os = "linux")'.dependencies]
-tokio-uring = { version = "0.2", optional = true }
+tokio-uring = { version = "0.3", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.13.1", features = ["full"] }

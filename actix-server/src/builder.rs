@@ -1,8 +1,8 @@
 use std::{io, time::Duration};
 
 use actix_rt::net::TcpStream;
-use log::{info, trace};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tracing::{info, trace};
 
 use crate::{
     server::ServerCommand,

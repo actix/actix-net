@@ -22,16 +22,15 @@ use actix_server::Server;
 use actix_service::{fn_service, ServiceFactoryExt as _};
 use bytes::BytesMut;
 use futures_util::future::ok;
-use log::{error, info};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 async fn run() -> io::Result<()> {
-    env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
+    tracing_subscriber::fmt::init();
 
     let count = Arc::new(AtomicUsize::new(0));
 
     let addr = ("127.0.0.1", 8080);
-    info!("starting server on port: {}", &addr.0);
+    tracing::info!("starting server on port: {}", &addr.0);
 
     // Bind socket address and start worker(s). By default, the server uses the number of physical
     // CPU cores as the worker count. For this reason, the closure passed to bind needs to return
@@ -58,14 +57,14 @@ async fn run() -> io::Result<()> {
 
                             // more bytes to process
                             Ok(bytes_read) => {
-                                info!("[{}] read {} bytes", num, bytes_read);
+                                tracing::info!("[{}] read {} bytes", num, bytes_read);
                                 stream.write_all(&buf[size..]).await.unwrap();
                                 size += bytes_read;
                             }
 
                             // stream error; bail from loop with error
                             Err(err) => {
-                                error!("Stream Error: {:?}", err);
+                                tracing::error!("Stream Error: {:?}", err);
                                 return Err(());
                             }
                         }
@@ -75,10 +74,10 @@ async fn run() -> io::Result<()> {
                     Ok((buf.freeze(), size))
                 }
             })
-            .map_err(|err| error!("Service Error: {:?}", err))
+            .map_err(|err| tracing::error!("Service Error: {:?}", err))
             .and_then(move |(_, size)| {
                 let num = num2.load(Ordering::SeqCst);
-                info!("[{}] total bytes read: {}", num, size);
+                tracing::info!("[{}] total bytes read: {}", num, size);
                 ok(size)
             })
         })?

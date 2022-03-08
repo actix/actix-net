@@ -21,7 +21,10 @@ path = "src/lib.rs"
 
 [features]
 default = []
-io-uring = ["tokio-uring", "actix-rt/io-uring"]
+experimental-io-uring = ["tokio-uring", "actix-rt/io-uring"]
+
+# deprecated `experimental-io-uring` alias
+io-uring = ["experimental-io-uring"]
 
 [dependencies]
 actix-rt = { version = "2.6.0", default-features = false }
@@ -30,7 +33,7 @@ actix-utils = "3.0.0"
 
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.7", default-features = false, features = ["alloc"] }
-log = "0.4"
+tracing = { version = "0.1.30", features = ["log"] }
 mio = { version = "0.8", features = ["os-poll", "net"] }
 num_cpus = "1.13"
 socket2 = "0.4.2"
@@ -38,13 +41,13 @@ tokio = { version = "1.13.1", features = ["sync"] }
 
 # runtime for io-uring feature
 [target.'cfg(target_os = "linux")'.dependencies]
-tokio-uring = { version = "0.2", optional = true }
+tokio-uring = { version = "0.3", optional = true }
 
 [dev-dependencies]
 actix-codec = "0.5.0"
 actix-rt = "2.6.0"
 
 bytes = "1"
-env_logger = "0.9"
+tracing-subscriber = "0.3.8"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink", "async-await-macro"] }
 tokio = { version = "1.13.1", features = ["io-util", "rt-multi-thread", "macros", "fs"] }

@@ -10,8 +10,8 @@ use std::{
 use actix_rt::{time::sleep, System};
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::stream::StreamExt as _;
-use log::{error, info};
 use tokio::sync::{mpsc::UnboundedReceiver, oneshot};
+use tracing::{error, info};
 
 use crate::{
     accept::Accept,

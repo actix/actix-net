@@ -1,9 +1,11 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
+- Update `tokio-uring` dependency to `0.3.0`. [#???]
 - Wait for accept thread to stop before sending completion signal. [#443]
 
 [#443]: https://github.com/actix/actix-net/pull/443
+[#???]: https://github.com/actix/actix-net/pull/???
 
 
 ## 2.0.0 - 2022-01-19
