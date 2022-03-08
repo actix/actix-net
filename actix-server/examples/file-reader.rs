@@ -41,7 +41,7 @@ async fn run() -> io::Result<()> {
                         Some(Ok(line)) => {
                             match File::open(&line).await {
                                 Ok(mut file) => {
-                                    tracing::info!("reading file: {line}");
+                                    tracing::info!("reading file: {}", &line);
 
                                     // read file into String buffer
                                     let mut buf = String::new();
