@@ -254,6 +254,7 @@ async fn test_max_concurrent_connections() {
     h.join().unwrap().unwrap();
 }
 
+// TODO: race-y failures detected due to integer underflow when calling Counter::total
 #[actix_rt::test]
 async fn test_service_restart() {
     use std::task::{Context, Poll};

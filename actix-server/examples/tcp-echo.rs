@@ -23,6 +23,7 @@ use actix_service::{fn_service, ServiceFactoryExt as _};
 use bytes::BytesMut;
 use futures_util::future::ok;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tracing::{error, info};
 
 async fn run() -> io::Result<()> {
     tracing_subscriber::fmt::init();
