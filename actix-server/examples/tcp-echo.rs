@@ -22,8 +22,8 @@ use actix_server::Server;
 use actix_service::{fn_service, ServiceFactoryExt as _};
 use bytes::BytesMut;
 use futures_util::future::ok;
-use log::{error, info};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tracing::{error, info};
 
 async fn run() -> io::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));

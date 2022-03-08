@@ -21,7 +21,7 @@ async fn run() -> io::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
     let addr = ("127.0.0.1", 8080);
-    log::info!("starting server on port: {}", &addr.0);
+    tracing::info!("starting server on port: {}", &addr.0);
 
     // Bind socket address and start worker(s). By default, the server uses the number of physical
     // CPU cores as the worker count. For this reason, the closure passed to bind needs to return
@@ -52,7 +52,7 @@ async fn run() -> io::Result<()> {
                                     break;
                                 }
                                 Err(err) => {
-                                    log::error!("{}", err);
+                                    tracing::error!("{}", err);
                                     framed
                                         .send("File not found or not readable. Try again.")
                                         .await?;
@@ -72,7 +72,7 @@ async fn run() -> io::Result<()> {
                 // close connection after file has been copied to TCP stream
                 Ok(())
             })
-            .map_err(|err| log::error!("Service Error: {:?}", err))
+            .map_err(|err| tracing::error!("Service Error: {:?}", err))
         })?
         .workers(2)
         .run()

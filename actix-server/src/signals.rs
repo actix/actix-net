@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use log::trace;
+use tracing::trace;
 
 /// Types of process signals.
 // #[allow(dead_code)]
@@ -69,7 +69,7 @@ impl Signals {
                     unix::signal(*kind)
                         .map(|tokio_sig| (*sig, tokio_sig))
                         .map_err(|e| {
-                            log::error!(
+                            tracing::error!(
                                 "Can not initialize stream handler for {:?} err: {}",
                                 sig,
                                 e

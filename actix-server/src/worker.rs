@@ -17,11 +17,11 @@ use actix_rt::{
     Arbiter, ArbiterHandle, System,
 };
 use futures_core::{future::LocalBoxFuture, ready};
-use log::{error, info, trace};
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
+use tracing::{error, info, trace};
 
 use crate::{
     service::{BoxedServerService, InternalServiceFactory},

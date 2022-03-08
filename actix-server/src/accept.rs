@@ -1,8 +1,8 @@
 use std::{io, thread, time::Duration};
 
 use actix_rt::time::Instant;
-use log::{debug, error, info};
 use mio::{Interest, Poll, Token as MioToken};
+use tracing::{debug, error, info};
 
 use crate::{
     availability::Availability,
