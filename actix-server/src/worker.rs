@@ -383,7 +383,7 @@ impl ServerWorker {
                             worker_stopped_rx.await.unwrap();
                         };
 
-                        #[cfg(all(target_os = "linux", feature = "experimental-io-uring"))]
+                        #[cfg(all(target_os = "linux", feature = "io-uring"))]
                         {
                             // TODO: pass max blocking thread config when tokio-uring enable configuration
                             // on building runtime.
@@ -391,10 +391,7 @@ impl ServerWorker {
                             tokio_uring::start(worker_fut);
                         }
 
-                        #[cfg(not(all(
-                            target_os = "linux",
-                            feature = "experimental-io-uring"
-                        )))]
+                        #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
                         {
                             let rt = tokio::runtime::Builder::new_current_thread()
                                 .enable_all()
@@ -410,7 +407,7 @@ impl ServerWorker {
 
             // with actix system
             (Some(_sys), _) => {
-                #[cfg(all(target_os = "linux", feature = "experimental-io-uring"))]
+                #[cfg(all(target_os = "linux", feature = "io-uring"))]
                 let arbiter = {
                     // TODO: pass max blocking thread config when tokio-uring enable configuration
                     // on building runtime.
@@ -418,7 +415,7 @@ impl ServerWorker {
                     Arbiter::new()
                 };
 
-                #[cfg(not(all(target_os = "linux", feature = "experimental-io-uring")))]
+                #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
                 let arbiter = {
                     Arbiter::with_tokio_rt(move || {
                         tokio::runtime::Builder::new_current_thread()

@@ -21,10 +21,7 @@ path = "src/lib.rs"
 
 [features]
 default = []
-experimental-io-uring = ["tokio-uring", "actix-rt/io-uring"]
-
-# deprecated `experimental-io-uring` alias
-io-uring = ["experimental-io-uring"]
+io-uring = ["tokio-uring", "actix-rt/io-uring"]
 
 [dependencies]
 actix-rt = { version = "2.7", default-features = false }
@@ -39,7 +36,7 @@ socket2 = "0.4.2"
 tokio = { version = "1.13.1", features = ["sync"] }
 tracing = { version = "0.1.30", features = ["log"] }
 
-# runtime for `experimental-io-uring` feature
+# runtime for `io-uring` feature
 [target.'cfg(target_os = "linux")'.dependencies]
 tokio-uring = { version = "0.3", optional = true }
 

@@ -95,7 +95,7 @@ impl Arbiter {
     ///
     /// # Panics
     /// Panics if a [System] is not registered on the current thread.
-    #[cfg(not(all(target_os = "linux", feature = "experimental-io-uring")))]
+    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Arbiter {
         Self::with_tokio_rt(|| {
@@ -107,7 +107,7 @@ impl Arbiter {
     /// Spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
-    #[cfg(not(all(target_os = "linux", feature = "experimental-io-uring")))]
+    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
     pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
     where
         F: Fn() -> tokio::runtime::Runtime + Send + 'static,
@@ -162,7 +162,7 @@ impl Arbiter {
     ///
     /// # Panics
     /// Panics if a [System] is not registered on the current thread.
-    #[cfg(all(target_os = "linux", feature = "experimental-io-uring"))]
+    #[cfg(all(target_os = "linux", feature = "io-uring"))]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Arbiter {
         let sys = System::current();

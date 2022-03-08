@@ -29,7 +29,7 @@ pub struct System {
     arbiter_handle: ArbiterHandle,
 }
 
-#[cfg(not(feature = "experimental-io-uring"))]
+#[cfg(not(feature = "io-uring"))]
 impl System {
     /// Create a new system.
     ///
@@ -70,7 +70,7 @@ impl System {
     }
 }
 
-#[cfg(feature = "experimental-io-uring")]
+#[cfg(feature = "io-uring")]
 impl System {
     /// Create a new system.
     ///
@@ -171,7 +171,7 @@ impl System {
 }
 
 /// Runner that keeps a [System]'s event loop alive until stop message is received.
-#[cfg(not(feature = "experimental-io-uring"))]
+#[cfg(not(feature = "io-uring"))]
 #[must_use = "A SystemRunner does nothing unless `run` is called."]
 #[derive(Debug)]
 pub struct SystemRunner {
@@ -179,7 +179,7 @@ pub struct SystemRunner {
     stop_rx: oneshot::Receiver<i32>,
 }
 
-#[cfg(not(feature = "experimental-io-uring"))]
+#[cfg(not(feature = "io-uring"))]
 impl SystemRunner {
     /// Starts event loop and will return once [System] is [stopped](System::stop).
     pub fn run(self) -> io::Result<()> {
@@ -211,12 +211,12 @@ impl SystemRunner {
 }
 
 /// Runner that keeps a [System]'s event loop alive until stop message is received.
-#[cfg(feature = "experimental-io-uring")]
+#[cfg(feature = "io-uring")]
 #[must_use = "A SystemRunner does nothing unless `run` is called."]
 #[derive(Debug)]
 pub struct SystemRunner;
 
-#[cfg(feature = "experimental-io-uring")]
+#[cfg(feature = "io-uring")]
 impl SystemRunner {
     /// Starts event loop and will return once [System] is [stopped](System::stop).
     pub fn run(self) -> io::Result<()> {
