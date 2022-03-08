@@ -38,7 +38,7 @@ tokio = { version = "1.13.1", features = ["sync"] }
 
 # runtime for io-uring feature
 [target.'cfg(target_os = "linux")'.dependencies]
-tokio-uring = { version = "0.2", optional = true }
+tokio-uring = { version = "0.3", optional = true }
 
 [dev-dependencies]
 actix-codec = "0.5.0"
