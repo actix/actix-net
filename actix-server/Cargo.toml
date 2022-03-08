@@ -1,6 +1,6 @@
 [package]
 name = "actix-server"
-version = "2.0.0"
+version = "2.1.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "fakeshadow <24548779@qq.com>",
@@ -24,9 +24,9 @@ default = []
 io-uring = ["tokio-uring", "actix-rt/io-uring"]
 
 [dependencies]
-actix-rt = { version = "2.6.0", default-features = false }
-actix-service = "2.0.0"
-actix-utils = "3.0.0"
+actix-rt = { version = "2.7", default-features = false }
+actix-service = "2"
+actix-utils = "3"
 
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.7", default-features = false, features = ["alloc"] }
@@ -36,7 +36,7 @@ socket2 = "0.4.2"
 tokio = { version = "1.13.1", features = ["sync"] }
 tracing = { version = "0.1.30", features = ["log"] }
 
-# runtime for io-uring feature
+# runtime for `io-uring` feature
 [target.'cfg(target_os = "linux")'.dependencies]
 tokio-uring = { version = "0.3", optional = true }
 

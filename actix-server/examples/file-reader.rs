@@ -39,8 +39,10 @@ async fn run() -> io::Result<()> {
                     // wait for next line
                     match framed.next().await {
                         Some(Ok(line)) => {
-                            match File::open(line).await {
+                            match File::open(&line).await {
                                 Ok(mut file) => {
+                                    tracing::info!("reading file: {}", &line);
+
                                     // read file into String buffer
                                     let mut buf = String::new();
                                     file.read_to_string(&mut buf).await?;

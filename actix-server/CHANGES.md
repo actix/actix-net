@@ -1,9 +1,15 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
+
+
+## 2.1.0 - 2022-03-08
+- Update `tokio-uring` dependency to `0.3.0`. [#448]
+- Logs emitted now use the `tracing` crate with `log` compatibility. [#448]
 - Wait for accept thread to stop before sending completion signal. [#443]
 
 [#443]: https://github.com/actix/actix-net/pull/443
+[#448]: https://github.com/actix/actix-net/pull/448
 
 
 ## 2.0.0 - 2022-01-19
