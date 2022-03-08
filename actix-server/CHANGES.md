@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
+
+
+## 2.1.0 - 2022-03-08
 - Update `tokio-uring` dependency to `0.3.0`. [#448]
 - Wait for accept thread to stop before sending completion signal. [#443]
 
