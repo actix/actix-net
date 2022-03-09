@@ -3,6 +3,10 @@
 ## Unreleased - 2022-xx-xx
 
 
+## 2.1.1 - 2022-03-09
+- No significant changes since `2.1.0`.
+
+
 ## 2.1.0 - 2022-03-08
 - Update `tokio-uring` dependency to `0.3.0`. [#448]
 - Logs emitted now use the `tracing` crate with `log` compatibility. [#448]

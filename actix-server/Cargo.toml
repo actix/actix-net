@@ -1,6 +1,6 @@
 [package]
 name = "actix-server"
-version = "2.1.0"
+version = "2.1.1"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "fakeshadow <24548779@qq.com>",
@@ -34,7 +34,7 @@ mio = { version = "0.8", features = ["os-poll", "net"] }
 num_cpus = "1.13"
 socket2 = "0.4.2"
 tokio = { version = "1.13.1", features = ["sync"] }
-tracing = { version = "0.1.30", features = ["log"] }
+tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
 # runtime for `io-uring` feature
 [target.'cfg(target_os = "linux")'.dependencies]
