@@ -1,10 +1,10 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
-- Logs emitted now use the `tracing` crate with `log` compatibility. [#???]
+- Logs emitted now use the `tracing` crate with `log` compatibility. [#451]
 - Minimum supported Rust version (MSRV) is now 1.49.
 
-[#???]: https://github.com/actix/actix-net/pull/???
+[#451]: https://github.com/actix/actix-net/pull/451
 
 
 ## 0.5.0 - 2022-02-15

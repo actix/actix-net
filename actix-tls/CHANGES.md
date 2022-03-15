@@ -1,9 +1,9 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
-- Logs emitted now use the `tracing` crate with `log` compatibility. [#???]
+- Logs emitted now use the `tracing` crate with `log` compatibility. [#451]
 
-[#???]: https://github.com/actix/actix-net/pull/???
+[#451]: https://github.com/actix/actix-net/pull/451
 
 
 ## 3.0.3 - 2022-02-15
