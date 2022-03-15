@@ -15,10 +15,10 @@ use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
 use actix_utils::future::{ok, Ready};
 use futures_core::ready;
-use log::trace;
 use tokio_rustls::rustls::{client::ServerName, OwnedTrustAnchor, RootCertStore};
 use tokio_rustls::{client::TlsStream as AsyncTlsStream, rustls::ClientConfig};
 use tokio_rustls::{Connect as RustlsConnect, TlsConnector as RustlsTlsConnector};
+use tracing::trace;
 use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::connect::{Connection, Host};

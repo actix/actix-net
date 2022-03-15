@@ -13,9 +13,9 @@ use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
 use actix_utils::future::{ok, Ready};
 use futures_core::ready;
-use log::trace;
 use openssl::ssl::SslConnector;
 use tokio_openssl::SslStream as AsyncSslStream;
+use tracing::trace;
 
 use crate::connect::{Connection, Host};
 

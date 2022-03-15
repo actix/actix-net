@@ -15,8 +15,8 @@ use actix_rt::net::{TcpSocket, TcpStream};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::future::{ok, Ready};
 use futures_core::ready;
-use log::{error, trace};
 use tokio_util::sync::ReusableBoxFuture;
+use tracing::{error, trace};
 
 use super::{connect_addrs::ConnectAddrs, error::ConnectError, ConnectInfo, Connection, Host};
 

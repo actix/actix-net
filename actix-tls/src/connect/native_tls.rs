@@ -8,11 +8,11 @@ use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
 use actix_utils::future::{ok, Ready};
 use futures_core::future::LocalBoxFuture;
-use log::trace;
 use tokio_native_tls::{
     native_tls::TlsConnector as NativeTlsConnector, TlsConnector as AsyncNativeTlsConnector,
     TlsStream as AsyncTlsStream,
 };
+use tracing::trace;
 
 use crate::connect::{Connection, Host};
 
