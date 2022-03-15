@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
+
+
+## 0.5.1 - 2022-03-15
 - Logs emitted now use the `tracing` crate with `log` compatibility. [#451]
 - Minimum supported Rust version (MSRV) is now 1.49.
 
