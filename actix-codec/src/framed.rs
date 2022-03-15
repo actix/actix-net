@@ -197,11 +197,11 @@ impl<T, U> Framed<T, U> {
                     }
                 }
 
-                log::trace!("attempting to decode a frame");
+                tracing::trace!("attempting to decode a frame");
 
                 match this.codec.decode(this.read_buf) {
                     Ok(Some(frame)) => {
-                        log::trace!("frame decoded from buffer");
+                        tracing::trace!("frame decoded from buffer");
                         return Poll::Ready(Some(Ok(frame)));
                     }
                     Err(err) => return Poll::Ready(Some(Err(err))),
@@ -242,10 +242,10 @@ impl<T, U> Framed<T, U> {
         U: Encoder<I>,
     {
         let mut this = self.as_mut().project();
-        log::trace!("flushing framed transport");
+        tracing::trace!("flushing framed transport");
 
         while !this.write_buf.is_empty() {
-            log::trace!("writing; remaining={}", this.write_buf.len());
+            tracing::trace!("writing; remaining={}", this.write_buf.len());
 
             let n = ready!(this.io.as_mut().poll_write(cx, this.write_buf))?;
 
@@ -264,7 +264,7 @@ impl<T, U> Framed<T, U> {
         // Try flushing the underlying IO
         ready!(this.io.poll_flush(cx))?;
 
-        log::trace!("framed transport flushed");
+        tracing::trace!("framed transport flushed");
         Poll::Ready(Ok(()))
     }
 

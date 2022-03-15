@@ -34,9 +34,9 @@ use actix_server::Server;
 use actix_service::ServiceFactoryExt as _;
 use actix_tls::accept::rustls::{Acceptor as RustlsAcceptor, TlsStream};
 use futures_util::future::ok;
-use log::info;
 use rustls::{server::ServerConfig, Certificate, PrivateKey};
 use rustls_pemfile::{certs, rsa_private_keys};
+use tracing::info;
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {

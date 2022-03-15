@@ -12,7 +12,7 @@ use actix_rt::task::{spawn_blocking, JoinHandle};
 use actix_service::{Service, ServiceFactory};
 use actix_utils::future::{ok, Ready};
 use futures_core::{future::LocalBoxFuture, ready};
-use log::trace;
+use tracing::trace;
 
 use super::{ConnectError, ConnectInfo, Host, Resolve};
 
