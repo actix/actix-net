@@ -25,7 +25,6 @@ pub mod reexports {
     pub use openssl::ssl::{
         Error, HandshakeError, SslConnector, SslConnectorBuilder, SslMethod,
     };
-
     pub use tokio_openssl::SslStream as AsyncSslStream;
 }
 

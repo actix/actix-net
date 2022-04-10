@@ -8,11 +8,10 @@ use std::{
 use actix_rt::net::TcpStream;
 use actix_server::TestServer;
 use actix_service::{fn_service, Service, ServiceFactory};
-use futures_core::future::LocalBoxFuture;
-
 use actix_tls::connect::{
     ConnectError, ConnectInfo, Connection, Connector, Host, Resolve, Resolver,
 };
+use futures_core::future::LocalBoxFuture;
 
 #[actix_rt::test]
 async fn custom_resolver() {

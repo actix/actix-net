@@ -9,10 +9,9 @@ use actix_codec::{BytesCodec, Framed};
 use actix_rt::net::TcpStream;
 use actix_server::TestServer;
 use actix_service::{fn_service, Service, ServiceFactory};
+use actix_tls::connect::{ConnectError, ConnectInfo, Connection, Connector, Host};
 use bytes::Bytes;
 use futures_util::sink::SinkExt;
-
-use actix_tls::connect::{ConnectError, ConnectInfo, Connection, Connector, Host};
 
 #[cfg(feature = "openssl")]
 #[actix_rt::test]

@@ -394,8 +394,9 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_auto_impl_send() {
-        use crate::{map_config, ServiceExt, ServiceFactoryExt};
         use alloc::rc::Rc;
+
+        use crate::{map_config, ServiceExt, ServiceFactoryExt};
 
         let srv_1 = fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8)));
 

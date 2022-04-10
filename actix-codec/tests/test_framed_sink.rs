@@ -1,12 +1,16 @@
+use std::{
+    collections::VecDeque,
+    io::{self, Write},
+    pin::Pin,
+    task::{
+        Context,
+        Poll::{self, Pending, Ready},
+    },
+};
+
 use actix_codec::*;
-use bytes::Buf;
-use bytes::{BufMut, BytesMut};
+use bytes::{Buf as _, BufMut as _, BytesMut};
 use futures_sink::Sink;
-use std::collections::VecDeque;
-use std::io::{self, Write};
-use std::pin::Pin;
-use std::task::Poll::{Pending, Ready};
-use std::task::{Context, Poll};
 use tokio_test::{assert_ready, task};
 
 macro_rules! bilateral {

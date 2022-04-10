@@ -51,12 +51,12 @@ fn openssl_acceptor(cert: String, key: String) -> tls_openssl::ssl::SslAcceptor 
 mod danger {
     use std::time::SystemTime;
 
-    use super::*;
-
     use tokio_rustls::rustls::{
         self,
         client::{ServerCertVerified, ServerCertVerifier},
     };
+
+    use super::*;
 
     pub struct NoCertificateVerification;
 

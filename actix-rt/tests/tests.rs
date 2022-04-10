@@ -4,7 +4,6 @@ use std::{
 };
 
 use actix_rt::{task::JoinError, Arbiter, System};
-
 #[cfg(not(feature = "io-uring"))]
 use {
     std::{sync::mpsc::channel, thread},

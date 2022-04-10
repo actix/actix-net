@@ -63,9 +63,9 @@ impl<T> Future for JoinAll<T> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-
     use actix_utils::future::ready;
+
+    use super::*;
 
     #[actix_rt::test]
     async fn test_join_all() {

@@ -219,10 +219,10 @@ mod serde {
 
     #[cfg(test)]
     mod serde_impl_tests {
-        use super::*;
-
         use serde::de::DeserializeOwned;
         use static_assertions::assert_impl_all;
+
+        use super::*;
 
         assert_impl_all!(ByteString: Serialize, DeserializeOwned);
     }

@@ -118,8 +118,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
-
     use std::cell::RefCell;
     use std::collections::{BTreeMap, BTreeSet};
     use std::sync::{Arc, RwLock};
@@ -127,6 +125,8 @@ mod test {
     use actix_service::{fn_factory, fn_service};
     use slab::Slab;
     use tracing::{span, Event, Level, Metadata, Subscriber};
+
+    use super::*;
 
     thread_local! {
         static SPAN: RefCell<Vec<span::Id>> = RefCell::new(Vec::new());

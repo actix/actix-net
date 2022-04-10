@@ -15,8 +15,9 @@
 //! http --verify=false https://127.0.0.1:8443
 //! ```
 
-// this use only exists because of how we have organised the crate
-// it is not necessary for your actual code
+#[rustfmt::skip]
+// this `use` is only exists because of how we have organised the crate
+// it is not necessary for your actual code; you should import from `rustls` directly
 use tokio_rustls::rustls;
 
 use std::{

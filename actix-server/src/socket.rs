@@ -6,7 +6,6 @@ use std::{fmt, io};
 use actix_rt::net::TcpStream;
 pub(crate) use mio::net::TcpListener as MioTcpListener;
 use mio::{event::Source, Interest, Registry, Token};
-
 #[cfg(unix)]
 pub(crate) use {
     mio::net::UnixListener as MioUnixListener,

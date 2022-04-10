@@ -51,13 +51,10 @@ compile_error!("io_uring is a linux only feature.");
 
 use std::future::Future;
 
-use tokio::task::JoinHandle;
-
 // Cannot define a main macro when compiled into test harness.
 // Workaround for https://github.com/rust-lang/rust/issues/62127.
 #[cfg(all(feature = "macros", not(test)))]
 pub use actix_macros::main;
-
 #[cfg(feature = "macros")]
 pub use actix_macros::test;
 
@@ -65,11 +62,12 @@ mod arbiter;
 mod runtime;
 mod system;
 
+pub use tokio::pin;
+use tokio::task::JoinHandle;
+
 pub use self::arbiter::{Arbiter, ArbiterHandle};
 pub use self::runtime::Runtime;
 pub use self::system::{System, SystemRunner};
-
-pub use tokio::pin;
 
 pub mod signal {
     //! Asynchronous signal handling (Tokio re-exports).
@@ -95,7 +93,6 @@ pub mod net {
     use tokio::io::{AsyncRead, AsyncWrite, Interest};
     pub use tokio::net::UdpSocket;
     pub use tokio::net::{TcpListener, TcpSocket, TcpStream};
-
     #[cfg(unix)]
     pub use tokio::net::{UnixDatagram, UnixListener, UnixStream};
 
