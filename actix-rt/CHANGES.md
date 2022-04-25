@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
+- Add `#[track_caller]` attribute to `spawn` functions and methods. [#454]
+
+[#454]: https://github.com/actix/actix-net/pull/454
 
 
 ## 2.7.0 - 2022-03-08

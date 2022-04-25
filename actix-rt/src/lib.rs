@@ -195,6 +195,7 @@ pub mod task {
 /// assert!(handle.await.unwrap_err().is_cancelled());
 /// # });
 /// ```
+#[track_caller]
 #[inline]
 pub fn spawn<Fut>(f: Fut) -> JoinHandle<Fut::Output>
 where

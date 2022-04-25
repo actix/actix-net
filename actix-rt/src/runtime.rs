@@ -53,6 +53,7 @@ impl Runtime {
     /// # Panics
     /// This function panics if the spawn fails. Failure occurs if the executor is currently at
     /// capacity and is unable to spawn a new future.
+    #[track_caller]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -73,6 +74,7 @@ impl Runtime {
     ///
     /// The caller is responsible for ensuring that other spawned futures complete execution by
     /// calling `block_on` or `run`.
+    #[track_caller]
     pub fn block_on<F>(&self, f: F) -> F::Output
     where
         F: Future,
