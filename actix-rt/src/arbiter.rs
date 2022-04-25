@@ -260,6 +260,7 @@ impl Arbiter {
     /// If you require a result, include a response channel in the future.
     ///
     /// Returns true if future was sent successfully and false if the Arbiter has died.
+    #[track_caller]
     pub fn spawn<Fut>(&self, future: Fut) -> bool
     where
         Fut: Future<Output = ()> + Send + 'static,
@@ -275,6 +276,7 @@ impl Arbiter {
     /// channel in the function.
     ///
     /// Returns true if function was sent successfully and false if the Arbiter has died.
+    #[track_caller]
     pub fn spawn_fn<F>(&self, f: F) -> bool
     where
         F: FnOnce() + Send + 'static,

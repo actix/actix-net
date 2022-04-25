@@ -73,6 +73,14 @@ jobs:
           command: install
           args: cargo-hack
 
+      - name: Generate Cargo.lock
+        uses: actions-rs/cargo@v1
+        with: { command: generate-lockfile }
+
+      - name: Tweak lockfile
+        run: |
+          cargo update -p=native-tls --precise=0.2.8
+
       - name: check lib
         if: >
           matrix.target.os != 'ubuntu-latest'
@@ -142,10 +150,9 @@ jobs:
         with: { command: generate-lockfile }
 
       - name: Tweak lockfile
-        uses: actions-rs/cargo@v1
-        with:
-          command: update
-          args: -p=rustls --precise=0.20.2
+        run: |
+          cargo update -p=rustls --precise=0.20.2
+          cargo update -p=native-tls --precise=0.2.8
 
       - name: tests
         run: |

@@ -204,6 +204,7 @@ impl SystemRunner {
     }
 
     /// Runs the provided future, blocking the current thread until the future completes.
+    #[track_caller]
     #[inline]
     pub fn block_on<F: Future>(&self, fut: F) -> F::Output {
         self.rt.block_on(fut)
