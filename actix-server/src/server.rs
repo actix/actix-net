@@ -66,7 +66,7 @@ pub(crate) enum ServerCommand {
 /// server has fully shut down.
 ///
 /// # Shutdown Signals
-/// On UNIX systems, `SIGQUIT` will start a graceful shutdown and `SIGTERM` or `SIGINT` will start a
+/// On UNIX systems, `SIGTERM` will start a graceful shutdown and `SIGQUIT` or `SIGINT` will start a
 /// forced shutdown. On Windows, a Ctrl-C signal will start a forced shutdown.
 ///
 /// A graceful shutdown will wait for all workers to stop first.
