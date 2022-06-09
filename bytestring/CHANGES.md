@@ -2,6 +2,7 @@
 
 ## Unreleased - 2022-xx-xx
 - Minimum supported Rust version (MSRV) is now 1.49.
+- Implement `From<Box<str>>` and `Into<String>`
 
 
 ## 1.0.0 - 2020-12-31
