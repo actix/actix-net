@@ -30,19 +30,19 @@ accept = []
 connect = []
 
 # use openssl impls
-openssl = ["tls-openssl", "tokio-openssl"]
+openssl = ["tls-openssl", "tokio-openssl", "actix-codec"]
 
 # use rustls impls
-rustls = ["tokio-rustls", "webpki-roots"]
+rustls = ["tokio-rustls", "webpki-roots", "actix-codec"]
 
 # use native-tls impls
-native-tls = ["tokio-native-tls"]
+native-tls = ["tokio-native-tls", "actix-codec"]
 
 # support http::Uri as connect address
 uri = ["http"]
 
 [dependencies]
-actix-codec = "0.5.0"
+actix-codec = { version = "0.5.0", optional = true }
 actix-rt = { version = "2.2.0", default-features = false }
 actix-service = "2.0.0"
 actix-utils = "3.0.0"
@@ -67,6 +67,7 @@ webpki-roots = { version = "0.22", optional = true }
 tokio-native-tls = { version = "0.3", optional = true }
 
 [dev-dependencies]
+actix-codec = "0.5.0"
 actix-rt = "2.2.0"
 actix-server = "2.0.0"
 bytes = "1"
