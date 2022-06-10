@@ -109,13 +109,19 @@ jobs:
         with: { command: ci-check-linux }
 
       - name: tests
-        if: >
-          matrix.target.os != 'ubuntu-latest'
-          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        if: matrix.target.os == 'macos-latest'
         run: |
           cargo ci-test
           cargo ci-test-rt
           cargo ci-test-server
+      - name: tests
+        if: >
+          matrix.target.os == 'windows-latest'
+          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        run: |
+          cargo ci-test-win
+          cargo ci-test-rt-win
+          cargo ci-test-server-win
       - name: tests
         if: matrix.target.os == 'ubuntu-latest'
         run: |
