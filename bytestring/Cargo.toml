@@ -1,6 +1,6 @@
 [package]
 name = "bytestring"
-version = "1.0.0"
+version = "1.1.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",

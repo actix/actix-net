@@ -1,8 +1,12 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
+
+
+## 1.1.0 - 2022-06-11
+- Implement `From<Box<str>>` for `ByteString`. [#458]
+- Implement `Into<String>` for `ByteString`. [#458]
 - Minimum supported Rust version (MSRV) is now 1.49.
-- Implement `From<Box<str>>` and `Into<String>`. [#458]
 
 [#458]: https://github.com/actix/actix-net/pull/458
 
