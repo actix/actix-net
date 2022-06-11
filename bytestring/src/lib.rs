@@ -6,7 +6,11 @@
 
 extern crate alloc;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{borrow, convert::TryFrom, fmt, hash, ops, str};
 
 use bytes::Bytes;
@@ -107,6 +111,20 @@ impl From<&str> for ByteString {
     #[inline]
     fn from(value: &str) -> Self {
         Self(Bytes::copy_from_slice(value.as_ref()))
+    }
+}
+
+impl From<Box<str>> for ByteString {
+    #[inline]
+    fn from(value: Box<str>) -> Self {
+        Self(Bytes::from(value.into_boxed_bytes()))
+    }
+}
+
+impl From<ByteString> for String {
+    #[inline]
+    fn from(value: ByteString) -> Self {
+        value.to_string()
     }
 }
 

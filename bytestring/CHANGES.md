@@ -2,6 +2,9 @@
 
 ## Unreleased - 2022-xx-xx
 - Minimum supported Rust version (MSRV) is now 1.49.
+- Implement `From<Box<str>>` and `Into<String>`. [#458]
+
+[#458]: https://github.com/actix/actix-net/pull/458
 
 
 ## 1.0.0 - 2020-12-31
