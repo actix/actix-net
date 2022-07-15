@@ -193,14 +193,14 @@ impl ServerInner {
         let is_tokio = tokio::runtime::Handle::try_current().is_ok();
 
         match (is_actix, is_tokio) {
-            (true, _) => info!("Actix runtime found; starting in Actix runtime"),
-            (_, true) => info!("Tokio runtime found; starting in existing Tokio runtime"),
-            (_, false) => panic!("Actix or Tokio runtime not found; halting"),
+            (true, _) => info!("actix runtime found; starting in actix runtime"),
+            (_, true) => info!("tokio runtime found; starting in existing tokio runtime"),
+            (_, false) => panic!("actix or tokio runtime not found; halting"),
         }
 
         for (_, name, lst) in &builder.sockets {
             info!(
-                r#"Starting service: "{}", workers: {}, listening on: {}"#,
+                r#"starting service: "{}", workers: {}, listening on: {}"#,
                 name,
                 builder.threads,
                 lst.local_addr()
@@ -283,7 +283,7 @@ impl ServerInner {
                 // TODO: maybe just return with warning log if not found ?
                 assert!(self.worker_handles.iter().any(|wrk| wrk.idx == idx));
 
-                error!("Worker {} has died; restarting", idx);
+                error!("worker {} has died; restarting", idx);
 
                 let factories = self
                     .services

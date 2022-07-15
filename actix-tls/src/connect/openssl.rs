@@ -97,7 +97,7 @@ where
     actix_service::always_ready!();
 
     fn call(&self, stream: Connection<R, IO>) -> Self::Future {
-        trace!("SSL Handshake start for: {:?}", stream.hostname());
+        trace!("SSL handshake start for: {:?}", stream.hostname());
         let (io, stream) = stream.replace_io(());
         let host = stream.hostname();
 
@@ -137,11 +137,11 @@ where
         match ready!(Pin::new(this.io.as_mut().unwrap()).poll_connect(cx)) {
             Ok(_) => {
                 let stream = this.stream.take().unwrap();
-                trace!("SSL Handshake success: {:?}", stream.hostname());
+                trace!("SSL handshake success: {:?}", stream.hostname());
                 Poll::Ready(Ok(stream.replace_io(this.io.take().unwrap()).1))
             }
             Err(err) => {
-                trace!("SSL Handshake error: {:?}", err);
+                trace!("SSL handshake error: {:?}", err);
                 Poll::Ready(Err(io::Error::new(
                     io::ErrorKind::Other,
                     format!("{}", err),

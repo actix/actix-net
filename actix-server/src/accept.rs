@@ -140,7 +140,7 @@ impl Accept {
                     WAKER_TOKEN => {
                         let exit = self.handle_waker(sockets);
                         if exit {
-                            info!("Accept thread stopped");
+                            info!("accept thread stopped");
                             return;
                         }
                     }
@@ -297,16 +297,16 @@ impl Accept {
 
     fn register_logged(&self, info: &mut ServerSocketInfo) {
         match self.register(info) {
-            Ok(_) => debug!("Resume accepting connections on {}", info.lst.local_addr()),
-            Err(err) => error!("Can not register server socket {}", err),
+            Ok(_) => debug!("resume accepting connections on {}", info.lst.local_addr()),
+            Err(err) => error!("can not register server socket {}", err),
         }
     }
 
     fn deregister_logged(&self, info: &mut ServerSocketInfo) {
         match self.poll.registry().deregister(&mut info.lst) {
-            Ok(_) => debug!("Paused accepting connections on {}", info.lst.local_addr()),
+            Ok(_) => debug!("paused accepting connections on {}", info.lst.local_addr()),
             Err(err) => {
-                error!("Can not deregister server socket {}", err)
+                error!("can not deregister server socket {}", err)
             }
         }
     }
@@ -350,7 +350,7 @@ impl Accept {
                 self.remove_next();
 
                 if self.handles.is_empty() {
-                    error!("No workers");
+                    error!("no workers");
                     // All workers are gone and Conn is nowhere to be sent.
                     // Treat this situation as Ok and drop Conn.
                     return Ok(());
@@ -399,7 +399,7 @@ impl Accept {
                 Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => return,
                 Err(ref err) if connection_error(err) => continue,
                 Err(err) => {
-                    error!("Error accepting connection: {}", err);
+                    error!("error accepting connection: {}", err);
 
                     // deregister listener temporary
                     self.deregister_logged(info);

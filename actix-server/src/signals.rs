@@ -70,7 +70,7 @@ impl Signals {
                         .map(|tokio_sig| (*sig, tokio_sig))
                         .map_err(|e| {
                             tracing::error!(
-                                "Can not initialize stream handler for {:?} err: {}",
+                                "can not initialize stream handler for {:?} err: {}",
                                 sig,
                                 e
                             )

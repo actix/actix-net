@@ -78,7 +78,7 @@ where
                 Ok(())
             }
             Err(err) => {
-                error!("Can not convert to an async tcp stream: {}", err);
+                error!("can not convert to an async tcp stream: {}", err);
                 Err(())
             }
         })
