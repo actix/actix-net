@@ -197,7 +197,7 @@ impl ServerBuilder {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
-            info!("Starting {} workers", self.threads);
+            info!("starting {} workers", self.threads);
             Server::new(self)
         }
     }

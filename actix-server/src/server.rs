@@ -200,7 +200,7 @@ impl ServerInner {
 
         for (_, name, lst) in &builder.sockets {
             info!(
-                r#"Starting service: "{}", workers: {}, listening on: {}"#,
+                r#"starting service: "{}", workers: {}, listening on: {}"#,
                 name,
                 builder.threads,
                 lst.local_addr()
@@ -283,7 +283,7 @@ impl ServerInner {
                 // TODO: maybe just return with warning log if not found ?
                 assert!(self.worker_handles.iter().any(|wrk| wrk.idx == idx));
 
-                error!("Worker {} has died; restarting", idx);
+                error!("worker {} has died; restarting", idx);
 
                 let factories = self
                     .services

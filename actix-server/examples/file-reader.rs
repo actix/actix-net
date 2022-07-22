@@ -74,7 +74,7 @@ async fn run() -> io::Result<()> {
                 // close connection after file has been copied to TCP stream
                 Ok(())
             })
-            .map_err(|err| tracing::error!("Service Error: {:?}", err))
+            .map_err(|err| tracing::error!("service error: {:?}", err))
         })?
         .workers(2)
         .run()

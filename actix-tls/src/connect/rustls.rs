@@ -101,7 +101,7 @@ where
     actix_service::always_ready!();
 
     fn call(&self, connection: Connection<R, IO>) -> Self::Future {
-        trace!("SSL Handshake start for: {:?}", connection.hostname());
+        trace!("TLS handshake start for: {:?}", connection.hostname());
         let (stream, connection) = connection.replace_io(());
 
         match ServerName::try_from(connection.hostname()) {
@@ -140,7 +140,7 @@ where
             Self::Future { connect, connection } => {
                 let stream = ready!(Pin::new(connect).poll(cx))?;
                 let connection = connection.take().unwrap();
-                trace!("SSL Handshake success: {:?}", connection.hostname());
+                trace!("TLS handshake success: {:?}", connection.hostname());
                 Poll::Ready(Ok(connection.replace_io(stream).1))
             }
         }

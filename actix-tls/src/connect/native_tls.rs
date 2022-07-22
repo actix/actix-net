@@ -74,16 +74,16 @@ where
         let connector = self.connector.clone();
 
         Box::pin(async move {
-            trace!("SSL Handshake start for: {:?}", stream.hostname());
+            trace!("TLS handshake start for: {:?}", stream.hostname());
             connector
                 .connect(stream.hostname(), io)
                 .await
                 .map(|res| {
-                    trace!("SSL Handshake success: {:?}", stream.hostname());
+                    trace!("TLS handshake success: {:?}", stream.hostname());
                     stream.replace_io(res).1
                 })
                 .map_err(|e| {
-                    trace!("SSL Handshake error: {:?}", e);
+                    trace!("TLS handshake error: {:?}", e);
                     io::Error::new(io::ErrorKind::Other, format!("{}", e))
                 })
         })
