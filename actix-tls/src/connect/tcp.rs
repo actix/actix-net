@@ -114,8 +114,8 @@ impl<R: Host> TcpConnectorFut<R> {
                 stream: ReusableBoxFuture::new(connect(addr, local_addr)),
             },
 
-            // when resolver returns multiple socket addr for request they would be popped from
-            // front end of queue and returns with the first successful tcp connection.
+            // When resolver returns multiple socket addr for request they would be popped from
+            // front end of queue and returns with the first successful TCP connection.
             ConnectAddrs::Multi(mut addrs) => {
                 let addr = addrs.pop_front().unwrap();
 

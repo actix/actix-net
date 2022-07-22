@@ -186,9 +186,9 @@ fn test_start() {
 #[actix_rt::test]
 async fn test_max_concurrent_connections() {
     // Note:
-    // A tcp listener would accept connects based on it's backlog setting.
+    // A TCP listener would accept connects based on it's backlog setting.
     //
-    // The limit test on the other hand is only for concurrent tcp stream limiting a work
+    // The limit test on the other hand is only for concurrent TCP stream limiting a work
     // thread accept.
 
     use tokio::io::AsyncWriteExt;
