@@ -72,7 +72,7 @@ impl AsRef<[u8]> for ByteString {
 
 impl AsRef<str> for ByteString {
     fn as_ref(&self) -> &str {
-        &*self
+        self
     }
 }
 
@@ -96,7 +96,7 @@ impl ops::Deref for ByteString {
 
 impl borrow::Borrow<str> for ByteString {
     fn borrow(&self) -> &str {
-        &*self
+        self
     }
 }
 

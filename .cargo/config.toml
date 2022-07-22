@@ -14,18 +14,10 @@ ci-check = "hack --workspace --feature-powerset --exclude-features=io-uring chec
 ci-check-linux = "hack --workspace --feature-powerset check --tests --examples"
 
 # tests avoiding io-uring feature
-ci-test = "       hack --feature-powerset --exclude=actix-rt --exclude=actix-server --exclude-features=io-uring test --workspace --lib --tests --no-fail-fast -- --nocapture"
-ci-test-rt = "    hack --feature-powerset --exclude-features=io-uring test --package=actix-rt     --lib --tests --no-fail-fast -- --nocapture"
-ci-test-server = "hack --feature-powerset --exclude-features=io-uring test --package=actix-server --lib --tests --no-fail-fast -- --nocapture"
+ci-test = "hack --feature-powerset --exclude-features=io-uring test --lib --tests --no-fail-fast -- --nocapture"
 
 # tests avoiding io-uring feature on Windows
-ci-test-win = "       hack --feature-powerset --depth 2 --exclude=actix-rt --exclude=actix-server --exclude-features=io-uring test --workspace --lib --tests --no-fail-fast -- --nocapture"
-ci-test-rt-win = "    hack --feature-powerset --depth 2 --exclude-features=io-uring test --package=actix-rt     --lib --tests --no-fail-fast -- --nocapture"
-ci-test-server-win = "hack --feature-powerset --depth 2 --exclude-features=io-uring test --package=actix-server --lib --tests --no-fail-fast -- --nocapture"
+ci-test-win = "hack --feature-powerset --depth 2 --exclude-features=io-uring test --lib --tests --no-fail-fast -- --nocapture"
 
 # test with io-uring feature
-ci-test-rt-linux = "    hack --feature-powerset test --package=actix-rt     --lib --tests --no-fail-fast -- --nocapture"
-ci-test-server-linux = "hack --feature-powerset test --package=actix-server --lib --tests --no-fail-fast -- --nocapture"
-
-# test lower msrv
-ci-test-lower-msrv = "hack --workspace --exclude=actix-server --exclude=actix-tls --feature-powerset test --lib --tests --no-fail-fast -- --nocapture"
+ci-test-linux = "    hack --feature-powerset test --lib --tests --no-fail-fast -- --nocapture"

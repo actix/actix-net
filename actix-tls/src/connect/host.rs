@@ -27,25 +27,25 @@ pub trait Host: Unpin + 'static {
 
 impl Host for String {
     fn hostname(&self) -> &str {
-        str_split_once(self, ':')
+        self.split_once(':')
             .map(|(hostname, _)| hostname)
             .unwrap_or(self)
     }
 
     fn port(&self) -> Option<u16> {
-        str_split_once(self, ':').and_then(|(_, port)| port.parse().ok())
+        self.split_once(':').and_then(|(_, port)| port.parse().ok())
     }
 }
 
 impl Host for &'static str {
     fn hostname(&self) -> &str {
-        str_split_once(self, ':')
+        self.split_once(':')
             .map(|(hostname, _)| hostname)
             .unwrap_or(self)
     }
 
     fn port(&self) -> Option<u16> {
-        str_split_once(self, ':').and_then(|(_, port)| port.parse().ok())
+        self.split_once(':').and_then(|(_, port)| port.parse().ok())
     }
 }
 
@@ -68,12 +68,4 @@ mod tests {
         assert_connection_info_eq!("example.com:false", "example.com", None);
         assert_connection_info_eq!("example.com:false:false", "example.com", None);
     }
-}
-
-// `str::split_once` is stabilized in 1.52.0
-fn str_split_once(str: &str, delimiter: char) -> Option<(&str, &str)> {
-    let mut splitn = str.splitn(2, delimiter);
-    let prefix = splitn.next()?;
-    let suffix = splitn.next()?;
-    Some((prefix, suffix))
 }

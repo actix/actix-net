@@ -24,7 +24,7 @@ struct ServerSocketInfo {
     timeout: Option<actix_rt::time::Instant>,
 }
 
-/// poll instance of the server.
+/// Poll instance of the server.
 pub(crate) struct Accept {
     poll: Poll,
     waker_queue: WakerQueue,
@@ -161,11 +161,13 @@ impl Accept {
         // a loop that would try to drain the command channel. It's yet unknown
         // if it's necessary/good practice to actively drain the waker queue.
         loop {
-            // take guard with every iteration so no new interest can be added
-            // until the current task is done.
+            // Take guard with every iteration so no new interests can be added until the current
+            // task is done. Take care not to take the guard again inside this loop.
             let mut guard = self.waker_queue.guard();
+
+            #[allow(clippy::significant_drop_in_scrutinee)]
             match guard.pop_front() {
-                // worker notify it becomes available.
+                // Worker notified it became available.
                 Some(WakerInterest::WorkerAvailable(idx)) => {
                     drop(guard);
 
@@ -176,7 +178,7 @@ impl Accept {
                     }
                 }
 
-                // a new worker thread is made and it's handle would be added to Accept
+                // A new worker thread has been created so store its handle.
                 Some(WakerInterest::Worker(handle)) => {
                     drop(guard);
 
