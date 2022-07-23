@@ -19,7 +19,7 @@ path = "src/lib.rs"
 actix-service = "2.0.0"
 actix-utils = "3.0.0"
 
-tracing = "0.1"
+tracing = "0.1.35"
 tracing-futures = "0.2"
 
 [dev_dependencies]
