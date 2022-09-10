@@ -19,6 +19,7 @@ mod waker_queue;
 mod worker;
 
 pub use self::builder::ServerBuilder;
+pub use self::builder::MPTCP;
 pub use self::handle::ServerHandle;
 pub use self::server::Server;
 pub use self::service::ServerServiceFactory;

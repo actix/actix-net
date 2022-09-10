@@ -14,6 +14,13 @@ use crate::{
     Server,
 };
 
+#[derive(PartialEq, Eq, Copy, Clone)]
+pub enum MPTCP {
+    Disabled,
+    TcpFallback,
+    NoFallback,
+}
+
 /// [Server] builder.
 pub struct ServerBuilder {
     pub(crate) threads: usize,
@@ -21,6 +28,7 @@ pub struct ServerBuilder {
     pub(crate) backlog: u32,
     pub(crate) factories: Vec<Box<dyn InternalServiceFactory>>,
     pub(crate) sockets: Vec<(usize, String, MioListener)>,
+    pub(crate) mptcp: MPTCP,
     pub(crate) exit: bool,
     pub(crate) listen_os_signals: bool,
     pub(crate) cmd_tx: UnboundedSender<ServerCommand>,
@@ -45,6 +53,7 @@ impl ServerBuilder {
             factories: Vec::new(),
             sockets: Vec::new(),
             backlog: 2048,
+            mptcp: MPTCP::Disabled,
             exit: false,
             listen_os_signals: true,
             cmd_tx,
@@ -98,6 +107,25 @@ impl ServerBuilder {
         self
     }
 
+    /// Enable the MPTCP protocol at the socket level.
+    ///
+    /// This enable the Multiple Path TCP protocol at the socket level. This means it's managed
+    /// by the kernel and the application (userspace) doesn't have to deal with path management.
+    ///
+    /// Only available in Linux Kernel >= 5.6. If you try to set it on a Windows machine or on
+    /// an older Linux machine, this will fail with a panic.
+    ///
+    /// In Addition to a recent Linux Kernel, you also need to enable the sysctl (if it's not on
+    /// by default):
+    /// `sysctl sysctl net.mptcp.enabled=1`
+    ///
+    /// This method will have no effect if called after a `bind()`.
+    #[cfg(target_os = "linux")]
+    pub fn mptcp(mut self, mptcp_enabled: MPTCP) -> Self {
+        self.mptcp = mptcp_enabled;
+        self
+    }
+
     /// Sets the maximum per-worker number of concurrent connections.
     ///
     /// All socket listeners will stop accepting connections when this limit is reached for
@@ -146,7 +174,7 @@ impl ServerBuilder {
         U: ToSocketAddrs,
         N: AsRef<str>,
     {
-        let sockets = bind_addr(addr, self.backlog)?;
+        let sockets = bind_addr(addr, self.backlog, &self.mptcp)?;
 
         trace!("binding server to: {:?}", &sockets);
 
@@ -263,13 +291,14 @@ impl ServerBuilder {
 pub(super) fn bind_addr<S: ToSocketAddrs>(
     addr: S,
     backlog: u32,
+    mptcp: &MPTCP,
 ) -> io::Result<Vec<MioTcpListener>> {
     let mut opt_err = None;
     let mut success = false;
     let mut sockets = Vec::new();
 
     for addr in addr.to_socket_addrs()? {
-        match create_mio_tcp_listener(addr, backlog) {
+        match create_mio_tcp_listener(addr, backlog, mptcp) {
             Ok(lst) => {
                 success = true;
                 sockets.push(lst);
