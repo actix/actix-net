@@ -19,15 +19,16 @@ name = "actix_rt"
 path = "src/lib.rs"
 
 [features]
-default = ["macros"]
+default = ["macros", "net"]
 macros = ["actix-macros"]
 io-uring = ["tokio-uring"]
+net = ["tokio/net", "tokio/signal"]
 
 [dependencies]
 actix-macros = { version = "0.2.3", optional = true }
 
 futures-core = { version = "0.3", default-features = false }
-tokio = { version = "1.13.1", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }
+tokio = { version = "1.13.1", features = ["rt", "parking_lot", "sync", "time"] }
 
 # runtime for `io-uring` feature
 [target.'cfg(target_os = "linux")'.dependencies]

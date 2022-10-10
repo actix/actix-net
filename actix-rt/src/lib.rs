@@ -69,17 +69,19 @@ pub use self::arbiter::{Arbiter, ArbiterHandle};
 pub use self::runtime::Runtime;
 pub use self::system::{System, SystemRunner};
 
+#[cfg(feature = "net")]
 pub mod signal {
     //! Asynchronous signal handling (Tokio re-exports).
 
     #[cfg(unix)]
     pub mod unix {
         //! Unix specific signals (Tokio re-exports).
-        pub use tokio::signal::unix::*;
+        // pub use tokio::signal::unix::*;
     }
-    pub use tokio::signal::ctrl_c;
+    // pub use tokio::signal::ctrl_c;
 }
 
+#[cfg(feature = "net")]
 pub mod net {
     //! TCP/UDP/Unix bindings (mostly Tokio re-exports).
 
