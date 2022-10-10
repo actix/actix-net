@@ -27,7 +27,6 @@ pub(crate) fn default_tokio_runtime() -> io::Result<tokio::runtime::Runtime> {
         .build()
 }
 
-
 impl Runtime {
     /// Returns a new runtime initialized with default configuration values.
     #[allow(clippy::new_ret_no_self)]
