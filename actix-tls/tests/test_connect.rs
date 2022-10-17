@@ -143,6 +143,9 @@ async fn test_local_addr() {
         })
     });
 
+    // if you've arrived here because of a failing test on macOS run this in your terminal:
+    // sudo ifconfig lo0 alias 127.0.0.3
+
     let conn = Connector::default().service();
     let local = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 3));
 
