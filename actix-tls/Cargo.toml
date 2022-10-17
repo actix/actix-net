@@ -48,6 +48,7 @@ actix-service = "2.0.0"
 actix-utils = "3.0.0"
 
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
+impl-more = "0.1.0"
 pin-project-lite = "0.2.7"
 tokio-util = "0.7"
 tracing = { version = "0.1.30", default-features = false, features = ["log"] }

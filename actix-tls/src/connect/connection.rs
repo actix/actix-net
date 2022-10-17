@@ -1,5 +1,4 @@
 use super::Host;
-use crate::impl_more;
 
 /// Wraps underlying I/O and the connection request that initiated it.
 #[derive(Debug)]
@@ -8,8 +7,7 @@ pub struct Connection<R, IO> {
     pub(crate) io: IO,
 }
 
-impl_more::deref! { Connection<R, IO> => io: IO }
-impl_more::deref_mut! { Connection<R, IO> => io }
+impl_more::impl_deref_and_mut!(<R, IO> in Connection<R, IO> => io: IO);
 
 impl<R, IO> Connection<R, IO> {
     /// Construct new `Connection` from request and IO parts.

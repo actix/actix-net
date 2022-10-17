@@ -27,7 +27,6 @@ use tokio_rustls::rustls::ServerConfig;
 use tokio_rustls::{Accept, TlsAcceptor};
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
-use crate::impl_more;
 
 pub mod reexports {
     //! Re-exports from `rustls` that are useful for acceptors.
@@ -38,9 +37,8 @@ pub mod reexports {
 /// Wraps a `rustls` based async TLS stream in order to implement [`ActixStream`].
 pub struct TlsStream<IO>(tokio_rustls::server::TlsStream<IO>);
 
-impl_more::from! { tokio_rustls::server::TlsStream<IO> => TlsStream<IO> }
-impl_more::deref! { TlsStream<IO> => 0: tokio_rustls::server::TlsStream<IO> }
-impl_more::deref_mut! { TlsStream<IO> => 0 }
+impl_more::impl_from!(<IO> in tokio_rustls::server::TlsStream<IO> => TlsStream<IO>);
+impl_more::impl_deref_and_mut!(<IO> in TlsStream<IO> => tokio_rustls::server::TlsStream<IO>);
 
 impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
