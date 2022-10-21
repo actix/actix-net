@@ -1,4 +1,4 @@
-//! Asynchronous values.
+//! Helpers for constructing futures.
 
 mod either;
 mod poll_fn;
