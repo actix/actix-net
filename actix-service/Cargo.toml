@@ -23,6 +23,6 @@ paste = "1"
 pin-project-lite = "0.2"
 
 [dev-dependencies]
-actix-rt = "2.0.0"
-actix-utils = "3.0.0"
+actix-rt = "2"
+actix-utils = "3"
 futures-util = { version = "0.3.7", default-features = false }

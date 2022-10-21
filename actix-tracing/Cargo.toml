@@ -16,12 +16,12 @@ name = "actix_tracing"
 path = "src/lib.rs"
 
 [dependencies]
-actix-service = "2.0.0"
-actix-utils = "3.0.0"
+actix-service = "2"
+actix-utils = "3"
 
 tracing = "0.1.35"
 tracing-futures = "0.2"
 
 [dev_dependencies]
-actix-rt = "2.0.0"
+actix-rt = "2"
 slab = "0.4"

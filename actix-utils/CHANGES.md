@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
+
+
+## 3.0.1 - 2022-10-21
 - Minimum supported Rust version (MSRV) is now 1.57.
 
 

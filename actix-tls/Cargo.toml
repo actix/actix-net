@@ -44,11 +44,11 @@ uri = ["http"]
 [dependencies]
 actix-codec = { version = "0.5.0", optional = true }
 actix-rt = { version = "2.2.0", default-features = false }
-actix-service = "2.0.0"
-actix-utils = "3.0.0"
+actix-service = "2"
+actix-utils = "3"
 
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
-impl-more = "0.1.0"
+impl-more = "0.1"
 pin-project-lite = "0.2.7"
 tokio-util = "0.7"
 tracing = { version = "0.1.30", default-features = false, features = ["log"] }
@@ -70,7 +70,7 @@ tokio-native-tls = { version = "0.3", optional = true }
 [dev-dependencies]
 actix-codec = "0.5.0"
 actix-rt = "2.2.0"
-actix-server = "2.0.0"
+actix-server = "2"
 bytes = "1"
 env_logger = "0.9"
 futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
@@ -78,7 +78,7 @@ log = "0.4"
 rcgen = "0.8"
 rustls-pemfile = "0.2.1"
 tokio-rustls = { version = "0.23", features = ["dangerous_configuration"] }
-trust-dns-resolver = "0.20.0"
+trust-dns-resolver = "0.20"
 
 [[example]]
 name = "accept-rustls"
