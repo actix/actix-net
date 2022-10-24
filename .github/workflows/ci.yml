@@ -80,7 +80,7 @@ jobs:
       - name: workaround MSRV issues
         if: matrix.version != 'stable'
         run: |
-          cargo update -p=time --precise=0.3.13
+          cargo update -p=time --precise=0.3.13  # time is only a dev dep so shouldn't affect msrv
 
       - name: check lib
         if: >
@@ -123,6 +123,7 @@ jobs:
           sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux"
 
       - name: Clear the cargo caches
+        if: matrix.version == 'stable' # MSRV(1.58) cargo-cache now fails to install on 1.57
         run: |
           cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
           cargo-cache
