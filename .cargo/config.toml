@@ -20,4 +20,4 @@ ci-test = "hack --feature-powerset --exclude-features=io-uring test --lib --test
 ci-test-win = "hack --feature-powerset --depth 2 --exclude-features=io-uring test --lib --tests --no-fail-fast -- --nocapture"
 
 # test with io-uring feature
-ci-test-linux = "    hack --feature-powerset test --lib --tests --no-fail-fast -- --nocapture"
+ci-test-linux = "hack --feature-powerset test --lib --tests --no-fail-fast -- --nocapture"

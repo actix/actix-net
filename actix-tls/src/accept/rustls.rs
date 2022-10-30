@@ -12,7 +12,6 @@ use std::{
     time::Duration,
 };
 
-use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
 use actix_rt::{
     net::{ActixStream, Ready},
     time::{sleep, Sleep},
@@ -23,6 +22,7 @@ use actix_utils::{
     future::{ready, Ready as FutReady},
 };
 use pin_project_lite::pin_project;
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_rustls::rustls::ServerConfig;
 use tokio_rustls::{Accept, TlsAcceptor};
 

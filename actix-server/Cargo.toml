@@ -40,8 +40,8 @@ tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 tokio-uring = { version = "0.3", optional = true }
 
 [dev-dependencies]
-actix-codec = "0.5.0"
-actix-rt = "2.6.0"
+actix-codec = "0.5"
+actix-rt = "2.6"
 
 bytes = "1"
 env_logger = "0.9"

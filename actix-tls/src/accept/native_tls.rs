@@ -10,7 +10,6 @@ use std::{
     time::Duration,
 };
 
-use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
 use actix_rt::{
     net::{ActixStream, Ready},
     time::timeout,
@@ -21,6 +20,7 @@ use actix_utils::{
     future::{ready, Ready as FutReady},
 };
 use futures_core::future::LocalBoxFuture;
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_native_tls::{native_tls::Error, TlsAcceptor};
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};

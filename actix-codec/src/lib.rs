@@ -1,8 +1,7 @@
 //! Codec utilities for working with framed protocols.
 //!
-//! Contains adapters to go from streams of bytes, [`AsyncRead`] and
-//! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].
-//! Framed streams are also known as `transports`.
+//! Contains adapters to go from streams of bytes, [`AsyncRead`] and [`AsyncWrite`], to framed
+//! streams implementing [`Sink`] and [`Stream`]. Framed streams are also known as `transports`.
 //!
 //! [`Sink`]: futures_sink::Sink
 //! [`Stream`]: futures_core::Stream
