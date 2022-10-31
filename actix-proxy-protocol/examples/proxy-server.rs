@@ -74,8 +74,8 @@ async fn wrap_with_proxy_protocol_v2(mut stream: TcpStream) -> io::Result<()> {
 
     let mut proxy_header = v2::Header::new_tcp_ipv4_proxy(([127, 0, 0, 1], 8082), *UPSTREAM);
 
-    proxy_header.add_tlv(0x05, [0x34, 0x32, 0x36, 0x39]); // UNIQUE_ID
-    proxy_header.add_tlv(0x04, "NOOP m9"); // NOOP
+    proxy_header.add_typed_tlv(tlv::UniqueId::new("4269")); // UNIQUE_ID
+    proxy_header.add_typed_tlv(tlv::Noop::new("NOOP m8")); // NOOP
     proxy_header.add_crc23c_checksum_tlv();
 
     proxy_header.write_to_tokio(&mut upstream).await?;

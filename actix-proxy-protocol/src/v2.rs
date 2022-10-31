@@ -57,6 +57,10 @@ impl Header {
         self.tlvs.push((typ, SmallVec::from_slice(value.as_ref())));
     }
 
+    pub fn add_typed_tlv<T: Tlv>(&mut self, tlv: T) {
+        self.add_tlv(T::TYPE, tlv.value_bytes());
+    }
+
     fn v2_len(&self) -> u16 {
         let addr_len = if self.src.is_ipv4() {
             4 + 2 // 4b IPv4 + 2b port number
@@ -144,8 +148,7 @@ impl Header {
         //   the bits unchanged.
 
         // add zeroed checksum field to TLVs
-        let crc = (Crc32c::TYPE, Crc32c::default().value_bytes().to_smallvec());
-        self.tlvs.push(crc);
+        self.add_typed_tlv(Crc32c::default());
 
         // write PROXY header to buffer
         let mut buf = Vec::new();
