@@ -76,7 +76,9 @@ async fn wrap_with_proxy_protocol_v2(mut stream: TcpStream) -> io::Result<()> {
 
     proxy_header.add_typed_tlv(tlv::UniqueId::new("4269")); // UNIQUE_ID
     proxy_header.add_typed_tlv(tlv::Noop::new("NOOP m8")); // NOOP
-    proxy_header.add_crc23c_checksum_tlv();
+    proxy_header.add_typed_tlv(tlv::Authority::new("localhost")); // NOOP
+    proxy_header.add_typed_tlv(tlv::Alpn::new("http/1.1")); // NOOP
+    proxy_header.add_crc23c_checksum();
 
     proxy_header.write_to_tokio(&mut upstream).await?;
 

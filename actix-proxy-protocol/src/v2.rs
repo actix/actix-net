@@ -132,8 +132,12 @@ impl Header {
         self.tlvs.iter().any(|&(typ, _)| typ == T::TYPE)
     }
 
+    /// Calculates and adds a crc32c TLV to the PROXY header.
+    ///
+    /// Uses method defined in spec.
+    ///
     /// If this is not called last thing it will be wrong.
-    pub fn add_crc23c_checksum_tlv(&mut self) {
+    pub fn add_crc23c_checksum(&mut self) {
         // don't add a checksum if it is already set
         if self.has_tlv::<Crc32c>() {
             return;
@@ -285,7 +289,7 @@ mod tests {
         );
 
         // add crc32c TLV to header
-        header.add_crc23c_checksum_tlv();
+        header.add_crc23c_checksum();
 
         assert_eq!(header.v2_len(), 12 + 7);
         assert_eq!(header.to_vec(), exp);
