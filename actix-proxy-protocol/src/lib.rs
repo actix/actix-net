@@ -16,6 +16,7 @@ use std::{
 use arrayvec::{ArrayString, ArrayVec};
 use tokio::io::{AsyncWrite, AsyncWriteExt as _};
 
+pub mod tlv;
 pub mod v1;
 pub mod v2;
 
@@ -164,81 +165,4 @@ impl TransportProtocol {
 enum ProxyProtocolHeader {
     V1(v1::Header),
     V2(v2::Header),
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Pp2Crc32c {
-    checksum: u32,
-}
-
-impl Pp2Crc32c {
-    fn to_tlv(&self) -> Tlv {
-        Tlv {
-            r#type: 0x03,
-            value: self.checksum.to_be_bytes().to_vec(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Tlv {
-    r#type: u8,
-    value: Vec<u8>,
-}
-
-impl Tlv {
-    pub fn new(r#type: u8, value: impl Into<Vec<u8>>) -> Self {
-        let value = value.into();
-
-        assert!(
-            !value.is_empty(),
-            "TLV values must have length greater than 1",
-        );
-
-        Self { r#type, value }
-    }
-
-    fn len(&self) -> u16 {
-        // 1b type + 2b len
-        // + [len]b value
-        1 + 2 + (self.value.len() as u16)
-    }
-
-    pub fn write_to(&self, wrt: &mut impl io::Write) -> io::Result<()> {
-        wrt.write_all(&[self.r#type])?;
-        wrt.write_all(&(self.value.len() as u16).to_be_bytes())?;
-        wrt.write_all(&self.value)?;
-        Ok(())
-    }
-
-    pub fn as_crc32c(&self) -> Option<Pp2Crc32c> {
-        if self.r#type != 0x03 {
-            return None;
-        }
-
-        let checksum_bytes = <[u8; 4]>::try_from(self.value.as_slice()).ok()?;
-
-        Some(Pp2Crc32c {
-            checksum: u32::from_be_bytes(checksum_bytes),
-        })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn tlv_as_crc32c() {
-        let noop = Tlv::new(0x04, vec![0x00]);
-        assert_eq!(noop.as_crc32c(), None);
-
-        let noop = Tlv::new(0x03, vec![0x08, 0x70, 0x17, 0x7b]);
-        assert_eq!(
-            noop.as_crc32c(),
-            Some(Pp2Crc32c {
-                checksum: 141563771
-            })
-        );
-    }
 }

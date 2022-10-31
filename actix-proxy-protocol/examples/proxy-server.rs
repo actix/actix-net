@@ -11,7 +11,7 @@ use std::{
     },
 };
 
-use actix_proxy_protocol::{v1, v2, AddressFamily, Command, Tlv, TransportProtocol};
+use actix_proxy_protocol::{tlv, v1, v2, AddressFamily, Command, TransportProtocol};
 use actix_rt::net::TcpStream;
 use actix_server::Server;
 use actix_service::{fn_service, ServiceFactoryExt as _};
@@ -31,6 +31,7 @@ TLV = type-length-value
 TO DO:
 handle UNKNOWN transport
 v2 UNSPEC mode
+AF_UNIX socket
 */
 
 fn extend_with_ip_bytes(buf: &mut Vec<u8>, ip: IpAddr) {
@@ -71,18 +72,10 @@ async fn wrap_with_proxy_protocol_v2(mut stream: TcpStream) -> io::Result<()> {
         UPSTREAM.to_string()
     );
 
-    let mut proxy_header = v2::Header::new(
-        Command::Proxy,
-        TransportProtocol::Stream,
-        AddressFamily::Inet,
-        SocketAddr::from(([127, 0, 0, 1], 8082)),
-        *UPSTREAM,
-        vec![
-            Tlv::new(0x05, [0x34, 0x32, 0x36, 0x39]), // UNIQUE_ID
-            Tlv::new(0x04, "NOOP m9"),                // NOOP
-        ],
-    );
+    let mut proxy_header = v2::Header::new_tcp_ipv4_proxy(([127, 0, 0, 1], 8082), *UPSTREAM);
 
+    proxy_header.add_tlv(0x05, [0x34, 0x32, 0x36, 0x39]); // UNIQUE_ID
+    proxy_header.add_tlv(0x04, "NOOP m9"); // NOOP
     proxy_header.add_crc23c_checksum_tlv();
 
     proxy_header.write_to_tokio(&mut upstream).await?;

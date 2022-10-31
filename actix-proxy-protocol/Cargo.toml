@@ -21,6 +21,7 @@ crc32fast = "1"
 futures-core = { version = "0.3.17", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.17", default-features = false, features = ["std"] }
 itoa = "1"
+smallvec = "1"
 tokio = { version = "1.13.1", features = ["sync", "io-util"] }
 tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
