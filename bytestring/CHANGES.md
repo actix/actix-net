@@ -1,10 +1,14 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
-- Minimum supported Rust version (MSRV) is now 1.57.
+
+
+## 1.2.0 - 2022-11-07
 - Add `ByteString::slice_ref` which can safely slice a `ByteString` into a new one with zero copy. [#470]
+- Minimum supported Rust version (MSRV) is now 1.57.
 
 [#470]: https://github.com/actix/actix-net/pull/470
+
 
 ## 1.1.0 - 2022-06-11
 - Implement `From<Box<str>>` for `ByteString`. [#458]
