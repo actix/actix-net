@@ -51,30 +51,29 @@ impl ByteString {
         Self(src)
     }
 
-    /// Returns a slice of self that is equivalent to the given `subset`. Corresponds to [`Bytes::slice_ref`].
+    /// Returns a byte string that is equivalent to the given `subset`.
     ///
-    /// When processing a `ByteString` buffer with other tools, one often gets a
-    /// `&str` which is in fact a slice of the `ByteString`, i.e. a subset of it.
-    /// This function turns that `&str` into another `ByteString`, as if one had
-    /// sliced the `ByteString` with the offsets that correspond to `subset`.
+    /// When processing a `ByteString` buffer with other tools, one often gets a `&str` which is in
+    /// fact a slice of the `ByteString`; i.e., a subset of it. This function turns that `&str` into
+    /// another `ByteString`, as if one had sliced the `ByteString` with the offsets that correspond
+    /// to `subset`.
+    ///
+    /// Corresponds to [`Bytes::slice_ref`].
     ///
     /// This operation is `O(1)`.
     ///
+    /// # Panics
+    /// Requires that the given `subset` str is in fact contained within the `ByteString` buffer;
+    /// otherwise this function will panic.
+    ///
     /// # Examples
-    ///
     /// ```
-    /// use bytestring::ByteString;
-    ///
+    /// # use bytestring::ByteString;
     /// let string = ByteString::from_static(" foo ");
     /// let subset = string.trim();
     /// let substring = string.slice_ref(subset);
     /// assert_eq!(substring, "foo");
     /// ```
-    ///
-    /// # Panics
-    ///
-    /// Requires that the given `subset` str is in fact contained within the
-    /// `ByteString` buffer; otherwise this function will panic.
     pub fn slice_ref(&self, subset: &str) -> Self {
         Self(self.0.slice_ref(subset.as_bytes()))
     }
