@@ -50,6 +50,34 @@ impl ByteString {
     pub const unsafe fn from_bytes_unchecked(src: Bytes) -> ByteString {
         Self(src)
     }
+
+    /// Returns a slice of self that is equivalent to the given `subset`. Corresponds to [`Bytes::slice_ref`].
+    ///
+    /// When processing a `ByteString` buffer with other tools, one often gets a
+    /// `&str` which is in fact a slice of the `ByteString`, i.e. a subset of it.
+    /// This function turns that `&str` into another `ByteString`, as if one had
+    /// sliced the `ByteString` with the offsets that correspond to `subset`.
+    ///
+    /// This operation is `O(1)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bytestring::ByteString;
+    ///
+    /// let string = ByteString::from_static(" foo ");
+    /// let subset = string.trim();
+    /// let substring = string.slice_ref(subset);
+    /// assert_eq!(substring, "foo");
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Requires that the given `subset` str is in fact contained within the
+    /// `ByteString` buffer; otherwise this function will panic.
+    pub fn slice_ref(&self, subset: &str) -> Self {
+        Self(self.0.slice_ref(subset.as_bytes()))
+    }
 }
 
 impl PartialEq<str> for ByteString {
@@ -348,5 +376,11 @@ mod test {
     fn test_deserialize() {
         let s = serde_json::to_string(&ByteString::from_static("nice bytes")).unwrap();
         assert_eq!(s, r#""nice bytes""#);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_slice_ref_catches_not_a_subset() {
+        ByteString::from_static("foo bar").slice_ref("foo");
     }
 }
