@@ -2,7 +2,7 @@
 
 ## Unreleased - 2022-xx-xx
 - Add `#[track_caller]` attribute to `spawn` functions and methods. [#454]
-- Minimum supported Rust version (MSRV) is now 1.57.
+- Minimum supported Rust version (MSRV) is now 1.59.
 
 [#454]: https://github.com/actix/actix-net/pull/454
 

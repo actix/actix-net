@@ -18,7 +18,7 @@ jobs:
           - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
           - { name: Windows (32-bit), os: windows-latest, triple: i686-pc-windows-msvc }
         version:
-          - 1.57.0
+          - 1.59.0
           - stable
 
     name: ${{ matrix.target.name }} / ${{ matrix.version }}
@@ -68,12 +68,12 @@ jobs:
       #   uses: Swatinem/rust-cache@v1.2.0
 
       - name: Install cargo-hack
-        if: matrix.version != '1.57.0'
+        if: matrix.version != '1.59.0'
         run: cargo install cargo-hack
 
       # newer cargo-hack versions require 1.60 or above
-      - name: Install cargo-hack (1.57.0)
-        if: matrix.version == '1.57.0'
+      - name: Install cargo-hack (1.59.0)
+        if: matrix.version == '1.59.0'
         run: cargo install cargo-hack --version=0.5.21
 
       - name: Generate Cargo.lock
@@ -126,7 +126,7 @@ jobs:
           sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux"
 
       - name: Clear the cargo caches
-        if: matrix.version == 'stable' # MSRV(1.58) cargo-cache now fails to install on 1.57
+        if: matrix.version == 'stable' # MSRV(1.58) cargo-cache now fails to install on 1.59
         run: |
           cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
           cargo-cache
