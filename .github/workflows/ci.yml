@@ -68,10 +68,13 @@ jobs:
       #   uses: Swatinem/rust-cache@v1.2.0
 
       - name: Install cargo-hack
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-hack
+        if: matrix.version != '1.57.0'
+        run: cargo install cargo-hack
+
+      # newer cargo-hack versions require 1.60 or above
+      - name: Install cargo-hack (1.57.0)
+        if: matrix.version == '1.57.0'
+        run: cargo install cargo-hack --version=0.5.21
 
       - name: Generate Cargo.lock
         uses: actions-rs/cargo@v1
