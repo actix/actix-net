@@ -2,6 +2,9 @@
 
 ## Unreleased - 2022-xx-xx
 - Minimum supported Rust version (MSRV) is now 1.59.
+- Fix no_std compatibility. [#471]
+
+[#471]: https://github.com/actix/actix-net/pull/471
 
 
 ## 1.2.0 - 2022-11-07
