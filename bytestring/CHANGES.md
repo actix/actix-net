@@ -1,6 +1,9 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
+- Fix no_std compatibility. [#471]
+
+[#471]: https://github.com/actix/actix-net/pull/471
 
 
 ## 1.2.0 - 2022-11-07
