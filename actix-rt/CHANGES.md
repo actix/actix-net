@@ -6,7 +6,7 @@
 - Update tokio-uring to 0.4
 
 [#454]: https://github.com/actix/actix-net/pull/454
-[#???]: todo
+[#473]: https://github.com/actix/actix-net/pull/473
 
 
 ## 2.7.0 - 2022-03-08
