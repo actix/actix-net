@@ -37,7 +37,7 @@ tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
 # runtime for `io-uring` feature
 [target.'cfg(target_os = "linux")'.dependencies]
-tokio-uring = { version = "0.3", optional = true }
+tokio-uring = { version = "0.4", optional = true }
 
 [dev-dependencies]
 actix-codec = "0.5"
