@@ -1,23 +1,26 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
+
+
+## 2.8.0 - 2022-12-21
 - Add `#[track_caller]` attribute to `spawn` functions and methods. [#454]
+- Update `tokio-uring` dependency to `0.4`. [#473]
 - Minimum supported Rust version (MSRV) is now 1.59.
-- Update tokio-uring to 0.4
 
 [#454]: https://github.com/actix/actix-net/pull/454
 [#473]: https://github.com/actix/actix-net/pull/473
 
 
 ## 2.7.0 - 2022-03-08
-- Update `tokio-uring` dependency to `0.3.0`. [#448]
+- Update `tokio-uring` dependency to `0.3`. [#448]
 - Minimum supported Rust version (MSRV) is now 1.49.
 
 [#448]: https://github.com/actix/actix-net/pull/448
 
 
 ## 2.6.0 - 2022-01-12
-- Update `tokio-uring` dependency to `0.2.0`. [#436]
+- Update `tokio-uring` dependency to `0.2`. [#436]
 
 [#436]: https://github.com/actix/actix-net/pull/436
 

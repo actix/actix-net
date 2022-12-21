@@ -23,12 +23,12 @@ default = []
 io-uring = ["tokio-uring", "actix-rt/io-uring"]
 
 [dependencies]
-actix-rt = { version = "2.7", default-features = false }
+actix-rt = { version = "2.8", default-features = false }
 actix-service = "2"
 actix-utils = "3"
 
-futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
-futures-util = { version = "0.3.7", default-features = false, features = ["alloc"] }
+futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
+futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
 mio = { version = "0.8", features = ["os-poll", "net"] }
 num_cpus = "1.13"
 socket2 = "0.4.2"
@@ -41,9 +41,9 @@ tokio-uring = { version = "0.4", optional = true }
 
 [dev-dependencies]
 actix-codec = "0.5"
-actix-rt = "2.6"
+actix-rt = "2.8"
 
 bytes = "1"
 env_logger = "0.9"
-futures-util = { version = "0.3.7", default-features = false, features = ["sink", "async-await-macro"] }
+futures-util = { version = "0.3.17", default-features = false, features = ["sink", "async-await-macro"] }
 tokio = { version = "1.13.1", features = ["io-util", "rt-multi-thread", "macros", "fs"] }

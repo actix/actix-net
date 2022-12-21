@@ -1,6 +1,6 @@
 [package]
 name = "actix-rt"
-version = "2.7.0"
+version = "2.8.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
