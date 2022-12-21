@@ -72,8 +72,8 @@ actix-codec = "0.5"
 actix-rt = "2.2"
 actix-server = "2"
 bytes = "1"
-env_logger = "0.9"
-futures-util = { version = "0.3.7", default-features = false, features = ["sink"] }
+env_logger = "0.10"
+futures-util = { version = "0.3.17", default-features = false, features = ["sink"] }
 log = "0.4"
 rcgen = "0.10"
 rustls-pemfile = "1"

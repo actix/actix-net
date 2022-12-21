@@ -17,11 +17,11 @@ name = "actix_service"
 path = "src/lib.rs"
 
 [dependencies]
-futures-core = { version = "0.3.7", default-features = false }
+futures-core = { version = "0.3.17", default-features = false }
 paste = "1"
 pin-project-lite = "0.2"
 
 [dev-dependencies]
 actix-rt = "2"
 actix-utils = "3"
-futures-util = { version = "0.3.7", default-features = false }
+futures-util = { version = "0.3.17", default-features = false }
