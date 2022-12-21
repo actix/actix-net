@@ -41,8 +41,7 @@ use tracing::info;
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
-    env::set_var("RUST_LOG", "info");
-    env_logger::init();
+    env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
     // Load TLS key and cert files
     let cert_file = &mut BufReader::new(File::open("./examples/cert.pem").unwrap());

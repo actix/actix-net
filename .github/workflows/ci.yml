@@ -76,6 +76,13 @@ jobs:
         if: matrix.version == '1.59.0'
         run: cargo install cargo-hack --version=0.5.21
 
+      - name: workaround MSRV issues
+        if: matrix.version == 'stable'
+        run: |
+          cargo install cargo-edit --version=0.8.0
+          cargo add env_logger@0.9 --dev -p=actix-tls
+          cargo add env_logger@0.9 --dev -p=actix-server
+
       - name: Generate Cargo.lock
         uses: actions-rs/cargo@v1
         with: { command: generate-lockfile }
