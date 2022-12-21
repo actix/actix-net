@@ -1,8 +1,11 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
+
+
+## 2.2.0 - 2022-12-21
 - Minimum supported Rust version (MSRV) is now 1.59.
-- Update tokio-uring to 0.4
+- Update `tokio-uring` dependency to `0.4`. [#473]
 
 [#473]: https://github.com/actix/actix-net/pull/473
 
@@ -12,7 +15,7 @@
 
 
 ## 2.1.0 - 2022-03-08
-- Update `tokio-uring` dependency to `0.3.0`. [#448]
+- Update `tokio-uring` dependency to `0.3`. [#448]
 - Logs emitted now use the `tracing` crate with `log` compatibility. [#448]
 - Wait for accept thread to stop before sending completion signal. [#443]
 
@@ -25,7 +28,7 @@
 
 
 ## 2.0.0-rc.4 - 2022-01-12
-- Update `tokio-uring` dependency to `0.2.0`. [#436]
+- Update `tokio-uring` dependency to `0.2`. [#436]
 
 [#436]: https://github.com/actix/actix-net/pull/436
 
