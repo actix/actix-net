@@ -2,6 +2,9 @@
 
 ## Unreleased - 2022-xx-xx
 - Minimum supported Rust version (MSRV) is now 1.59.
+- Update tokio-uring to 0.4
+
+[#473]: https://github.com/actix/actix-net/pull/473
 
 
 ## 2.1.1 - 2022-03-09
