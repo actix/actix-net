@@ -363,6 +363,6 @@ impl Stream for ServerEventMultiplexer {
             }
         }
 
-        Pin::new(&mut this.cmd_rx).poll_recv(cx)
+        this.cmd_rx.poll_recv(cx)
     }
 }
