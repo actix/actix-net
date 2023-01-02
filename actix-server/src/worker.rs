@@ -585,9 +585,7 @@ impl Future for ServerWorker {
         let this = self.as_mut().get_mut();
 
         // `StopWorker` message handler
-        if let Poll::Ready(Some(Stop { graceful, tx })) =
-            Pin::new(&mut this.stop_rx).poll_recv(cx)
-        {
+        if let Poll::Ready(Some(Stop { graceful, tx })) = this.stop_rx.poll_recv(cx) {
             let num = this.counter.total();
             if num == 0 {
                 info!("shutting down idle worker");
@@ -649,7 +647,7 @@ impl Future for ServerWorker {
             }
             WorkerState::Shutdown(ref mut shutdown) => {
                 // drop all pending connections in rx channel.
-                while let Poll::Ready(Some(conn)) = Pin::new(&mut this.conn_rx).poll_recv(cx) {
+                while let Poll::Ready(Some(conn)) = this.conn_rx.poll_recv(cx) {
                     // WorkerCounterGuard is needed as Accept thread has incremented counter.
                     // It's guard's job to decrement the counter together with drop of Conn.
                     let guard = this.counter.guard();
@@ -696,7 +694,7 @@ impl Future for ServerWorker {
                 }
 
                 // handle incoming io stream
-                match ready!(Pin::new(&mut this.conn_rx).poll_recv(cx)) {
+                match ready!(this.conn_rx.poll_recv(cx)) {
                     Some(msg) => {
                         let guard = this.counter.guard();
                         let _ = this.services[msg.token].service.call((guard, msg.io));

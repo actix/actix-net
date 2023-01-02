@@ -292,7 +292,7 @@ impl Future for SystemController {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // process all items currently buffered in channel
         loop {
-            match ready!(Pin::new(&mut self.cmd_rx).poll_recv(cx)) {
+            match ready!(self.cmd_rx.poll_recv(cx)) {
                 // channel closed; no more messages can be received
                 None => return Poll::Ready(()),
 

@@ -96,7 +96,7 @@ impl Future for Signals {
         #[cfg(unix)]
         {
             for (sig, fut) in self.signals.iter_mut() {
-                if Pin::new(fut).poll_recv(cx).is_ready() {
+                if fut.poll_recv(cx).is_ready() {
                     trace!("{} received", sig);
                     return Poll::Ready(*sig);
                 }
