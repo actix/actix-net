@@ -49,7 +49,7 @@ actix-utils = "3"
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 impl-more = "0.1"
 pin-project-lite = "0.2.7"
-tokio = "1.13.1"
+tokio = "1.18.4"
 tokio-util = "0.7"
 tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 

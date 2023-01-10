@@ -23,7 +23,7 @@ futures-core = { version = "0.3.7", default-features = false }
 futures-sink = { version = "0.3.7", default-features = false }
 memchr = "2.3"
 pin-project-lite = "0.2"
-tokio = "1.13.1"
+tokio = "1.18.4"
 tokio-util = { version = "0.7", features = ["codec", "io"] }
 tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
