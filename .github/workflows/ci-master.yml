@@ -29,7 +29,7 @@ jobs:
         if: matrix.target.os == 'macos-latest'
         run: sudo ifconfig lo0 alias 127.0.0.3
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       # install OpenSSL on Windows
       - name: Set vcpkg root
@@ -43,11 +43,10 @@ jobs:
         run: vcpkg install openssl:x86-windows
 
       - name: Install ${{ matrix.version }}
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.version }}-${{ matrix.target.triple }}
-          profile: minimal
-          override: true
+        run: |
+          rustup set profile minimal
+          rustup install ${{ matrix.version }}-${{ matrix.target.triple }}
+          rustup override set ${{ matrix.version }}-${{ matrix.target.triple }}
 
       # - name: Install MSYS2
       #   if: matrix.target.triple == 'x86_64-pc-windows-gnu'
@@ -59,43 +58,34 @@ jobs:
       #     msys2 -c 'pacman --noconfirm -S base-devel pkg-config'
 
       # - name: Generate Cargo.lock
-      #   uses: actions-rs/cargo@v1
-      #   with: { command: generate-lockfile }
+      #   run: cargo generate-lockfile
       # - name: Cache Dependencies
-      #   uses: Swatinem/rust-cache@v1.2.0
+      #   uses: Swatinem/rust-cache@v2.2.0
 
       - name: Install cargo-hack
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-hack
+        run: cargo install cargo-hack
 
       - name: check lib
         if: >
           matrix.target.os != 'ubuntu-latest'
           && matrix.target.triple != 'x86_64-pc-windows-gnu'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-lib }
+        run: cargo ci-check-lib
       - name: check lib
         if: matrix.target.os == 'ubuntu-latest'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-lib-linux }
+        run: cargo ci-check-lib-linux
       - name: check lib
         if: matrix.target.triple == 'x86_64-pc-windows-gnu'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-min }
-      
+        run: cargo ci-check-min
+
       - name: check full
         # TODO: compile OpenSSL and run tests on MinGW
         if: >
           matrix.target.os != 'ubuntu-latest'
           && matrix.target.triple != 'x86_64-pc-windows-gnu'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check }
+        run: cargo ci-check
       - name: check all
         if: matrix.target.os == 'ubuntu-latest'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-linux }
+        run: cargo ci-check-linux
 
       - name: tests
         if: >
@@ -116,21 +106,19 @@ jobs:
     name: coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust (nightly)
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          override: true
+        run: |
+          rustup set profile minimal
+          rustup install nightly
+          rustup override set nightly
 
       - name: Generate Cargo.lock
-        uses: actions-rs/cargo@v1
-        with: { command: generate-lockfile }
+        run: cargo generate-lockfile
       - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v1.3.0
-    
+        uses: Swatinem/rust-cache@v2.2.0
+
       - name: Generate coverage file
         if: github.ref == 'refs/heads/master'
         run: |
@@ -138,73 +126,54 @@ jobs:
           cargo tarpaulin --out Xml --verbose
       - name: Upload to Codecov
         if: github.ref == 'refs/heads/master'
-        uses: codecov/codecov-action@v1
-        with: { file: cobertura.xml }
+        uses: codecov/codecov-action@v3
+        with: { files: cobertura.xml }
 
   minimal-versions:
     name: minimal versions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust (nightly)
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          profile: minimal
-          override: true
+        run: |
+          rustup set profile minimal
+          rustup install nightly
+          rustup override set nightly
 
       - name: Generate Cargo.lock
-        uses: actions-rs/cargo@v1
-        with: { command: generate-lockfile }
+        run: cargo generate-lockfile
       - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v1.3.0
+        uses: Swatinem/rust-cache@v2.2.0
 
       - name: Install cargo-minimal-versions
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-minimal-versions
+        run: cargo install cargo-minimal-versions
 
       - name: Install cargo-hack
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-hack
+        run: cargo install cargo-hack
 
       - name: Check With Minimal Versions
-        uses: actions-rs/cargo@v1
-        with:
-          command: minimal-versions
-          args: check
+        run: cargo minimal-versions check
 
   nextest:
     name: nextest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+        run: |
+          rustup set profile minimal
+          rustup install stable
+          rustup override set stable
 
       - name: Generate Cargo.lock
-        uses: actions-rs/cargo@v1
-        with: { command: generate-lockfile }
+        run: cargo generate-lockfile
       - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v1.3.0
+        uses: Swatinem/rust-cache@v2.2.0
 
       - name: Install cargo-nextest
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-nextest
+        run: cargo install cargo-nextest
 
       - name: Test with cargo-nextest
-        uses: actions-rs/cargo@v1
-        with:
-          command: nextest
-          args: run
+        run: cargo nextest run
