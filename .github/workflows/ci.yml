@@ -32,7 +32,7 @@ jobs:
         if: matrix.target.os == 'macos-latest'
         run: sudo ifconfig lo0 alias 127.0.0.3
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       # install OpenSSL on Windows
       - name: Set vcpkg root
@@ -46,11 +46,10 @@ jobs:
         run: vcpkg install openssl:x86-windows
 
       - name: Install ${{ matrix.version }}
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.version }}-${{ matrix.target.triple }}
-          profile: minimal
-          override: true
+        run: |
+          rustup set profile minimal
+          rustup install ${{ matrix.version }}-${{ matrix.target.triple }}
+          rustup override set ${{ matrix.version }}-${{ matrix.target.triple }}
 
       # - name: Install MSYS2
       #   if: matrix.target.triple == 'x86_64-pc-windows-gnu'
@@ -62,10 +61,9 @@ jobs:
       #     msys2 -c 'pacman --noconfirm -S base-devel pkg-config'
 
       # - name: Generate Cargo.lock
-      #   uses: actions-rs/cargo@v1
-      #   with: { command: generate-lockfile }
+      #   run: cargo generate-lockfile
       # - name: Cache Dependencies
-      #   uses: Swatinem/rust-cache@v1.2.0
+      #   uses: Swatinem/rust-cache@v2.2.0
 
       - name: Install cargo-hack
         if: matrix.version != '1.59.0'
@@ -84,8 +82,7 @@ jobs:
           cargo add env_logger@0.9 --dev -p=actix-server
 
       - name: Generate Cargo.lock
-        uses: actions-rs/cargo@v1
-        with: { command: generate-lockfile }
+        run: cargo generate-lockfile
 
       - name: workaround MSRV issues
         if: matrix.version != 'stable'
@@ -96,28 +93,23 @@ jobs:
         if: >
           matrix.target.os != 'ubuntu-latest'
           && matrix.target.triple != 'x86_64-pc-windows-gnu'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-lib }
+        run: cargo ci-check-lib
       - name: check lib
         if: matrix.target.os == 'ubuntu-latest'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-lib-linux }
+        run: cargo ci-check-lib-linux
       - name: check lib
         if: matrix.target.triple == 'x86_64-pc-windows-gnu'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-min }
+        run: cargo ci-check-min
 
       - name: check full
         # TODO: compile OpenSSL and run tests on MinGW
         if: >
           matrix.target.os != 'ubuntu-latest'
           && matrix.target.triple != 'x86_64-pc-windows-gnu'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check }
+        run: cargo ci-check
       - name: check all
         if: matrix.target.os == 'ubuntu-latest'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-linux }
+        run: cargo ci-check-linux
 
       - name: tests
         if: matrix.target.os == 'macos-latest'
@@ -143,20 +135,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust (nightly)
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-x86_64-unknown-linux-gnu
-          profile: minimal
-          override: true
+        run: |
+          rustup set profile minimal
+          rustup install nightly
+          rustup override set nightly
 
       - name: Generate Cargo.lock
-        uses: actions-rs/cargo@v1
-        with: { command: generate-lockfile }
+        run: cargo generate-lockfile
       - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v1.3.0
+        uses: Swatinem/rust-cache@v2.2.0
 
       - name: doc tests io-uring
         run: |

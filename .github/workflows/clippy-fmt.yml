@@ -8,35 +8,30 @@ jobs:
   fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          components: rustfmt
-          override: true
+        run: |
+          rustup set profile minimal
+          rustup install stable
+          rustup override set stable
+          rustup component add rustfmt
       - name: Rustfmt Check
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: cargo fmt --all -- --check
 
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        run: |
+          rustup set profile minimal
+          rustup install stable
+          rustup override set stable
+          rustup component add clippy
+      - uses: giraffate/clippy-action@v1
         with:
-          toolchain: stable
-          profile: minimal
-          components: clippy
-          override: true
-      - name: Clippy Check
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --workspace --all-features --tests --examples --bins -- -Dclippy::todo
+          reporter: "github-pr-check"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          clippy_flags: --workspace --all-features --tests --examples --bins -- -Dclippy::todo
