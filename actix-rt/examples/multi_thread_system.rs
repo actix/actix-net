@@ -4,15 +4,22 @@
 use actix_rt::System;
 
 fn main() {
-    System::with_tokio_rt(|| {
+    #[cfg(not(feature = "io-uring"))]
+    let system = System::with_tokio_rt(|| {
         // build system with a multi-thread tokio runtime.
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
             .build()
             .unwrap()
-    })
-    .block_on(async_main());
+    });
+    #[cfg(feature = "io-uring")]
+    let system = System::with_tokio_rt(|| {
+        // build system with tokio uring runtime.
+        tokio_uring::Runtime::new(&tokio_uring::builder())
+            .unwrap()
+    });
+    system.block_on(async_main());
 }
 
 // async main function that acts like #[actix_web::main] or #[tokio::main]

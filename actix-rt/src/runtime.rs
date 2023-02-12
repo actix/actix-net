@@ -6,17 +6,38 @@ use tokio::task::{JoinHandle, LocalSet};
 ///
 /// All spawned futures will be executed on the current thread. Therefore, there is no `Send` bound
 /// on submitted futures.
-#[derive(Debug)]
+#[cfg_attr(not(all(target_os = "linux", feature = "io-uring")),derive(Debug))]
 pub struct Runtime {
     local: LocalSet,
-    rt: tokio::runtime::Runtime,
+    rt: GlobalRuntime,
 }
 
-pub(crate) fn default_tokio_runtime() -> io::Result<tokio::runtime::Runtime> {
+#[cfg(all(target_os = "linux", feature = "io-uring"))]
+impl std::fmt::Debug for Runtime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Runtime")
+            .field("local", &self.local)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(all(target_os = "linux", feature = "io-uring"))]
+pub(crate) type GlobalRuntime = tokio_uring::Runtime;
+
+#[cfg(not(all(target_os = "linux", feature = "io-uring")))]
+pub(crate) type GlobalRuntime = tokio::runtime::Runtime;
+
+#[cfg(not(all(target_os = "linux", feature = "io-uring")))]
+pub(crate) fn default_tokio_runtime() -> io::Result<GlobalRuntime> {
     tokio::runtime::Builder::new_current_thread()
         .enable_io()
         .enable_time()
         .build()
+}
+
+#[cfg(all(target_os = "linux", feature = "io-uring"))]
+pub(crate) fn default_tokio_runtime() -> io::Result<GlobalRuntime> {
+    tokio_uring::Runtime::new(&tokio_uring::builder())
 }
 
 impl Runtime {
@@ -79,12 +100,12 @@ impl Runtime {
     where
         F: Future,
     {
-        self.local.block_on(&self.rt, f)
+        self.rt.block_on(self.local.run_until(f))
     }
 }
 
-impl From<tokio::runtime::Runtime> for Runtime {
-    fn from(rt: tokio::runtime::Runtime) -> Self {
+impl From<GlobalRuntime> for Runtime {
+    fn from(rt: GlobalRuntime) -> Self {
         Self {
             local: LocalSet::new(),
             rt,

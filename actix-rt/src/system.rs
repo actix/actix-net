@@ -78,18 +78,40 @@ impl System {
     /// Panics if underlying Tokio runtime can not be created.
     #[allow(clippy::new_ret_no_self)]
     pub fn new() -> SystemRunner {
-        SystemRunner
+        Self::with_tokio_rt(|| {
+            crate::runtime::default_tokio_runtime()
+                .expect("Default Actix (Tokio) runtime could not be created.")
+        })
     }
 
     /// Create a new System using the [Tokio Runtime](tokio-runtime) returned from a closure.
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
     #[doc(hidden)]
-    pub fn with_tokio_rt<F>(_: F) -> SystemRunner
+    pub fn with_tokio_rt<F>(runtime_factory: F) -> SystemRunner
     where
-        F: Fn() -> tokio::runtime::Runtime,
+        F: Fn() -> tokio_uring::Runtime,
     {
-        unimplemented!("System::with_tokio_rt is not implemented for io-uring feature yet")
+        let (stop_tx, stop_rx) = oneshot::channel();
+        let (sys_tx, sys_rx) = mpsc::unbounded_channel();
+
+        let rt = runtime_factory();
+        let sys_arbiter = rt.block_on(async { Arbiter::in_new_system() });
+        let system = System::construct(sys_tx, sys_arbiter.clone());
+
+        system
+            .tx()
+            .send(SystemCommand::RegisterArbiter(usize::MAX, sys_arbiter))
+            .unwrap();
+
+        // init background system arbiter
+        let sys_ctrl = SystemController::new(sys_rx, stop_tx);
+        rt.block_on(async move {
+            tokio::spawn(sys_ctrl);
+        });
+
+        let rt = crate::runtime::Runtime::from(rt);
+        SystemRunner { rt, stop_rx }
     }
 }
 
@@ -171,7 +193,7 @@ impl System {
 }
 
 /// Runner that keeps a [System]'s event loop alive until stop message is received.
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 #[must_use = "A SystemRunner does nothing unless `run` is called."]
 #[derive(Debug)]
 pub struct SystemRunner {
@@ -179,7 +201,7 @@ pub struct SystemRunner {
     stop_rx: oneshot::Receiver<i32>,
 }
 
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 impl SystemRunner {
     /// Starts event loop and will return once [System] is [stopped](System::stop).
     pub fn run(self) -> io::Result<()> {
@@ -210,12 +232,15 @@ impl SystemRunner {
         self.rt.block_on(fut)
     }
 }
-
+/*
 /// Runner that keeps a [System]'s event loop alive until stop message is received.
 #[cfg(feature = "io-uring")]
 #[must_use = "A SystemRunner does nothing unless `run` is called."]
 #[derive(Debug)]
-pub struct SystemRunner;
+pub struct SystemRunner {
+    rt: crate::runtime::Runtime,
+    stop_rx: oneshot::Receiver<i32>,
+}
 
 #[cfg(feature = "io-uring")]
 impl SystemRunner {
@@ -255,7 +280,7 @@ impl SystemRunner {
             res
         })
     }
-}
+}*/
 
 #[derive(Debug)]
 pub(crate) enum SystemCommand {
