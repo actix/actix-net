@@ -89,7 +89,7 @@ impl ServerBuilder {
     /// Set max number of submission queue and completion queue AKA. ring size 
     /// for each worker's ring.  
     /// 
-    /// Ring size value should be the power of two between 1 and 4096.
+    /// Max ring size is defined here: [io_uring.c](https://github.com/torvalds/linux/blob/f339c2597ebb00e738f2b6328c14804ed19f5d57/io_uring/io_uring.c#L99)
     /// 
     /// # Examples:
     /// ```
@@ -101,7 +101,7 @@ impl ServerBuilder {
     /// 
     /// See [tokio_uring::Builder::entries] for behavior reference.
     pub fn worker_max_blocking_threads(mut self, num: usize) -> Self {
-        self.worker_config.max_blocking_threads(num.clamp(1, 4096));
+        self.worker_config.max_blocking_threads(num);
         self
     }
     
