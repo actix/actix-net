@@ -66,6 +66,7 @@ impl ServerBuilder {
         self
     }
 
+    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
     /// Set max number of threads for each worker's blocking task thread pool.
     ///
     /// One thread pool is set up **per worker**; not shared across workers.
@@ -83,7 +84,27 @@ impl ServerBuilder {
         self.worker_config.max_blocking_threads(num);
         self
     }
-
+    
+    #[cfg(all(target_os = "linux", feature = "io-uring"))]
+    /// Set max number of submission queue and completion queue AKA. ring size 
+    /// for each worker's ring.  
+    /// 
+    /// Ring size value should be the power of two between 1 and 4096.
+    /// 
+    /// # Examples:
+    /// ```
+    /// # use actix_server::ServerBuilder;
+    /// let builder = ServerBuilder::new()
+    ///     .workers(4) // server has 4 worker thread.
+    ///     .worker_max_blocking_threads(512); // every worker has 512 sq & cq.
+    /// ```
+    /// 
+    /// See [tokio_uring::Builder::entries] for behavior reference.
+    pub fn worker_max_blocking_threads(mut self, num: usize) -> Self {
+        self.worker_config.max_blocking_threads(num.clamp(1, 4096));
+        self
+    }
+    
     /// Set the maximum number of pending connections.
     ///
     /// This refers to the number of clients that can be waiting to be served. Exceeding this number
