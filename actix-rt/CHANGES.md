@@ -1,7 +1,13 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
-
+- tokio_uring improvement
+  - rework `actix_rt::Arbiter::with_tokio_rt` and 
+    `actix_rt::Arbiter::with_tokio_rt` (to compatible with old code)
+  - rework `actix_rt::Runtime` to support `tokio_uring::Runtime`
+    - impl `actix_rt::Runtime::{block_on,from}`  
+  - rework `actix_rt::System` to support `tokio_uring::Runtime`
+    - impl `actix_rt::Runtime::{new,with_tokio_rt}`
 
 ## 2.8.0 - 2022-12-21
 - Add `#[track_caller]` attribute to `spawn` functions and methods. [#454]

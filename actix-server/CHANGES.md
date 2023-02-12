@@ -1,7 +1,7 @@
 # Changes
 
 ## Unreleased - 2022-xx-xx
-
+- use `max_blocking_threads` as submission queue & completion queue (tokio_uring) and docs in `actix_server::worker::ServerWorker`
 
 ## 2.2.0 - 2022-12-21
 - Minimum supported Rust version (MSRV) is now 1.59.
