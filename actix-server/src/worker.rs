@@ -250,7 +250,11 @@ pub(crate) struct ServerWorkerConfig {
 impl Default for ServerWorkerConfig {
     fn default() -> Self {
         // 512 is the default max blocking thread count of tokio runtime.
+        #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
         let max_blocking_threads = std::cmp::max(512 / num_cpus::get_physical(), 1);
+        // 256 is default sq & cq size used by tokio_uring 
+        #[cfg(all(target_os = "linux", feature = "io-uring"))]
+        let max_blocking_threads = 256;
         Self {
             shutdown_timeout: Duration::from_secs(30),
             max_blocking_threads,
@@ -385,10 +389,12 @@ impl ServerWorker {
 
                         #[cfg(all(target_os = "linux", feature = "io-uring"))]
                         {
-                            // TODO: pass max blocking thread config when tokio-uring enable configuration
-                            // on building runtime.
-                            let _ = config.max_blocking_threads;
-                            tokio_uring::start(worker_fut);
+                            // passing `max_blocking_threads` as submission queue & completion queue 
+                            // should be useful than let it sit here
+                            let queue_size = config.max_blocking_threads.clamp(1,u32::MAX as usize) as u32;
+                            let mut builder = tokio_uring::builder();
+                            builder.entries(queue_size);
+                            builder.start(worker_fut);
                         }
 
                         #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
