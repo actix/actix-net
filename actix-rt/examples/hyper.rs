@@ -10,20 +10,14 @@ async fn handle(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
 }
 
 fn main() {
-    #[cfg(not(feature = "io-uring"))]
-    let rt = actix_rt::System::with_tokio_rt(|| {
+    actix_rt::System::with_tokio_rt(|| {
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap()
-    });
-    #[cfg(feature = "io-uring")]
-    let rt = actix_rt::System::with_tokio_rt(|| {
-        tokio_uring::Runtime::new(&tokio_uring::builder())
-            .unwrap()
-    });
-    
-    rt.block_on(async {
+        // for io_uring feature use `tokio_uring::Runtime::new(&tokio_uring::builder()).unwrap()`
+    })
+    .block_on(async {
         let make_service =
             make_service_fn(|_conn| async { Ok::<_, Infallible>(service_fn(handle)) });
 
