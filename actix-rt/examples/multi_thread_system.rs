@@ -5,12 +5,22 @@ use actix_rt::System;
 
 fn main() {
     System::with_tokio_rt(|| {
-        // build system with a multi-thread tokio runtime.
-        tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(2)
-            .enable_all()
-            .build()
-            .unwrap()
+        // this cfg is needed when use it with io-uring, if you don't use io-uring
+        // you can remove this cfg and last line in this closure
+        #[cfg(not(feature = "io-uring"))]
+        {
+            // build system with a multi-thread tokio runtime.
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .enable_all()
+                .build()
+                .unwrap()
+        }
+        // you can remove this two lines if you don't have tokio_uring feature enabled.
+        // Note: tokio_uring is single thread and can't be multithreaded, 
+        // unless you spawn multiple of them
+        #[cfg(feature = "io-uring")]
+        tokio_uring::Runtime::new(&tokio_uring::builder()).unwrap()
     })
     .block_on(async_main());
 }

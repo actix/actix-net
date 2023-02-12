@@ -11,11 +11,18 @@ async fn handle(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
 
 fn main() {
     actix_rt::System::with_tokio_rt(|| {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-        // for io_uring feature use `tokio_uring::Runtime::new(&tokio_uring::builder()).unwrap()`
+        // this cfg is needed when use it with io-uring, if you don't use io-uring
+        // you can remove this cfg and last line in this closure
+        #[cfg(not(feature = "io-uring"))]
+        {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+        }
+        // you can remove this two lines if you don't have tokio_uring feature enabled
+        #[cfg(feature = "io-uring")]
+        tokio_uring::Runtime::new(&tokio_uring::builder()).unwrap()
     })
     .block_on(async {
         let make_service =
