@@ -93,6 +93,10 @@ fn non_static_block_on() {
         assert_eq!("test_str", string);
     });
 
+    // this drop is required for tokio_uring because it initialize io_uring driver twice!
+    #[cfg(feature = "io-uring")]
+    drop(sys);
+
     let rt = actix_rt::Runtime::new().unwrap();
 
     rt.block_on(async {
