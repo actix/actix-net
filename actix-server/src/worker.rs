@@ -391,7 +391,7 @@ impl ServerWorker {
                         {
                             // passing `max_blocking_threads` as submission queue & completion queue 
                             // should be useful than let it sit here
-                            let queue_size = config.max_blocking_threads.clamp(1,u32::MAX as usize) as u32;
+                            let queue_size = config.max_blocking_threads.clamp(1, u32::MAX as usize) as u32;
                             let mut builder = tokio_uring::builder();
                             builder.entries(queue_size);
                             builder.start(worker_fut);
