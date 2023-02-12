@@ -29,7 +29,7 @@ pub struct System {
     arbiter_handle: ArbiterHandle,
 }
 
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 impl System {
     /// Create a new system.
     ///
@@ -48,7 +48,7 @@ impl System {
     /// [tokio-runtime]: tokio::runtime::Runtime
     pub fn with_tokio_rt<F>(runtime_factory: F) -> SystemRunner
     where
-        F: Fn() -> tokio::runtime::Runtime,
+        F: Fn() -> crate::runtime::GlobalRuntime,
     {
         let (stop_tx, stop_rx) = oneshot::channel();
         let (sys_tx, sys_rx) = mpsc::unbounded_channel();
@@ -69,7 +69,7 @@ impl System {
         SystemRunner { rt, stop_rx }
     }
 }
-
+/*
 #[cfg(feature = "io-uring")]
 impl System {
     /// Create a new system.
@@ -113,7 +113,7 @@ impl System {
         let rt = crate::runtime::Runtime::from(rt);
         SystemRunner { rt, stop_rx }
     }
-}
+}*/
 
 impl System {
     /// Constructs new system and registers it on the current thread.
