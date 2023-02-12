@@ -4,7 +4,7 @@ use std::{
 };
 
 use actix_rt::{task::JoinError, Arbiter, System};
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 use {
     std::{sync::mpsc::channel, thread},
     tokio::sync::oneshot,
@@ -23,7 +23,7 @@ fn await_for_timer() {
     );
 }
 
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 #[test]
 fn run_with_code() {
     let sys = System::new();
@@ -117,7 +117,7 @@ fn wait_for_spawns() {
 // Temporary disabled tests for io-uring feature.
 // They should be enabled when possible.
 
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_spawn_fn_runs() {
     let _ = System::new();
@@ -134,7 +134,7 @@ fn arbiter_spawn_fn_runs() {
     arbiter.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_handle_spawn_fn_runs() {
     let sys = System::new();
@@ -157,7 +157,7 @@ fn arbiter_handle_spawn_fn_runs() {
     sys.run().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_drop_no_panic_fn() {
     let _ = System::new();
@@ -169,7 +169,7 @@ fn arbiter_drop_no_panic_fn() {
     arbiter.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_drop_no_panic_fut() {
     let _ = System::new();
@@ -181,11 +181,10 @@ fn arbiter_drop_no_panic_fut() {
     arbiter.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 #[test]
 fn system_arbiter_spawn() {
     let runner = System::new();
-
     let (tx, rx) = oneshot::channel();
     let sys = System::current();
 
@@ -212,7 +211,7 @@ fn system_arbiter_spawn() {
     thread.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
+//#[cfg(not(feature = "io-uring"))]
 #[test]
 fn system_stop_stops_arbiters() {
     let sys = System::new();
@@ -267,6 +266,29 @@ fn new_system_with_tokio() {
     assert_eq!(res, 123);
     assert_eq!(rx.recv().unwrap(), 42);
 }
+#[cfg(feature = "io-uring")]
+#[test]
+fn new_system_with_tokio() {
+    let (tx, rx) = channel();
+
+    let res = System::with_tokio_rt(move || {
+        tokio_uring::Runtime::new(&tokio_uring::builder()).unwrap()
+    })
+    .block_on(async {
+        actix_rt::time::sleep(Duration::from_millis(1)).await;
+
+        tokio::task::spawn(async move {
+            tx.send(42).unwrap();
+        })
+        .await
+        .unwrap();
+
+        123usize
+    });
+
+    assert_eq!(res, 123);
+    assert_eq!(rx.recv().unwrap(), 42);
+}
 
 #[cfg(not(feature = "io-uring"))]
 #[test]
@@ -283,6 +305,36 @@ fn new_arbiter_with_tokio() {
             .enable_all()
             .build()
             .unwrap()
+    });
+
+    let counter = Arc::new(AtomicBool::new(true));
+
+    let counter1 = counter.clone();
+    let did_spawn = arb.spawn(async move {
+        actix_rt::time::sleep(Duration::from_millis(1)).await;
+        counter1.store(false, Ordering::SeqCst);
+        Arbiter::current().stop();
+    });
+
+    assert!(did_spawn);
+
+    arb.join().unwrap();
+
+    assert!(!counter.load(Ordering::SeqCst));
+}
+
+#[cfg(feature = "io-uring")]
+#[test]
+fn new_arbiter_with_tokio() {
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
+    let _ = System::new();
+
+    let arb = Arbiter::with_tokio_rt(|| {
+        tokio_uring::Runtime::new(&tokio_uring::builder()).unwrap()
     });
 
     let counter = Arc::new(AtomicBool::new(true));
@@ -351,7 +403,7 @@ fn spawn_local() {
 #[test]
 fn tokio_uring_arbiter() {
     System::new().block_on(async {
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (tx, rx) = channel();
 
         Arbiter::new().spawn(async move {
             let handle = actix_rt::spawn(async move {
