@@ -6,7 +6,7 @@ use tokio::task::{JoinHandle, LocalSet};
 ///
 /// All spawned futures will be executed on the current thread. Therefore, there is no `Send` bound
 /// on submitted futures.
-#[cfg_attr(not(all(target_os = "linux", feature = "io-uring")),derive(Debug))]
+#[cfg_attr(not(all(target_os = "linux", feature = "io-uring")), derive(Debug))]
 pub struct Runtime {
     local: LocalSet,
     rt: GlobalRuntime,

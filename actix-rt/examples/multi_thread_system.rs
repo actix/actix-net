@@ -17,7 +17,7 @@ fn main() {
                 .unwrap()
         }
         // you can remove this two lines if you don't have tokio_uring feature enabled.
-        // Note: tokio_uring is single thread and can't be multithreaded, 
+        // Note: tokio_uring is single thread and can't be multithreaded,
         // unless you spawn multiple of them
         #[cfg(feature = "io-uring")]
         tokio_uring::Runtime::new(&tokio_uring::builder()).unwrap()

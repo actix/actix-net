@@ -337,9 +337,8 @@ fn new_arbiter_with_tokio() {
 
     let _ = System::new();
 
-    let arb = Arbiter::with_tokio_rt(|| {
-        tokio_uring::Runtime::new(&tokio_uring::builder()).unwrap()
-    });
+    let arb =
+        Arbiter::with_tokio_rt(|| tokio_uring::Runtime::new(&tokio_uring::builder()).unwrap());
 
     let counter = Arc::new(AtomicBool::new(true));
 
