@@ -2,8 +2,9 @@
 
 ## Unreleased - 2022-xx-xx
 
+## 1.3.0 - 2023-03-03
+
 - Implement `AsRef<ByteString>` for `ByteString`.
-- Minimum supported Rust version (MSRV) is now 1.59.
 
 ## 1.2.1 - 2022-11-12
 
