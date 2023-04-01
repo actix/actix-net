@@ -3,6 +3,13 @@ name: Upload documentation
 on:
   push: { branches: [master] }
 
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     permissions:

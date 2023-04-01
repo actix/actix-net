@@ -18,6 +18,7 @@ const LW: usize = 1024;
 const HW: usize = 8 * 1024;
 
 bitflags! {
+    #[derive(Debug, Clone, Copy)]
     struct Flags: u8 {
         const EOF = 0b0001;
         const READABLE = 0b0010;
