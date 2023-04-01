@@ -9,7 +9,8 @@ authors = [
 repository = "https://github.com/actix/actix-net.git"
 keywords = ["channel", "local", "futures"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition = "2021"
+rust-version = "1.60"
 
 [dependencies]
 futures-core = "0.3.17"

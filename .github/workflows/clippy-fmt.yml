@@ -1,37 +1,43 @@
 name: Lint
 
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+on: [pull_request]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   fmt:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install Rust
-        run: |
-          rustup set profile minimal
-          rustup install stable
-          rustup override set stable
-          rustup component add rustfmt
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rustfmt
+
       - name: Rustfmt Check
         run: cargo fmt --all -- --check
 
   clippy:
+    permissions:
+      contents: write
+
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install Rust
-        run: |
-          rustup set profile minimal
-          rustup install stable
-          rustup override set stable
-          rustup component add clippy
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with: { components: clippy }
+
       - uses: giraffate/clippy-action@v1
         with:
-          reporter: "github-pr-check"
+          reporter: 'github-pr-check'
           github_token: ${{ secrets.GITHUB_TOKEN }}
           clippy_flags: --workspace --all-features --tests --examples --bins -- -Dclippy::todo

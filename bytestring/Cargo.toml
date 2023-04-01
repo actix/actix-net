@@ -11,11 +11,8 @@ categories = ["no-std", "web-programming"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 license = "MIT OR Apache-2.0"
-edition = "2018"
-
-[lib]
-name = "bytestring"
-path = "src/lib.rs"
+edition = "2021"
+rust-version = "1.60"
 
 [dependencies]
 bytes = { version = "1.2", default-features = false }

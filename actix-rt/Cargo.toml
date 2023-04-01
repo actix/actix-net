@@ -11,11 +11,8 @@ homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
-
-[lib]
-name = "actix_rt"
-path = "src/lib.rs"
+edition = "2021"
+rust-version = "1.60"
 
 [features]
 default = ["macros"]
