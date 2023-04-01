@@ -73,17 +73,17 @@ impl<IO: ActixStream> AsyncWrite for TlsStream<IO> {
     }
 
     fn is_write_vectored(&self) -> bool {
-        (&**self).is_write_vectored()
+        (**self).is_write_vectored()
     }
 }
 
 impl<IO: ActixStream> ActixStream for TlsStream<IO> {
     fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        IO::poll_read_ready((&**self).get_ref().get_ref().get_ref(), cx)
+        IO::poll_read_ready((**self).get_ref().get_ref().get_ref(), cx)
     }
 
     fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        IO::poll_write_ready((&**self).get_ref().get_ref().get_ref(), cx)
+        IO::poll_write_ready((**self).get_ref().get_ref().get_ref(), cx)
     }
 }
 
