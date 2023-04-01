@@ -21,7 +21,6 @@
 use tokio_rustls::rustls;
 
 use std::{
-    env,
     fs::File,
     io::{self, BufReader},
     sync::{

@@ -22,19 +22,15 @@ mod resolver;
 pub mod tcp;
 
 #[cfg(feature = "uri")]
-#[cfg_attr(docsrs, doc(cfg(feature = "uri")))]
 mod uri;
 
 #[cfg(feature = "openssl")]
-#[cfg_attr(docsrs, doc(cfg(feature = "openssl")))]
 pub mod openssl;
 
 #[cfg(feature = "rustls")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rustls")))]
 pub mod rustls;
 
 #[cfg(feature = "native-tls")]
-#[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
 pub mod native_tls;
 
 pub use self::connection::Connection;

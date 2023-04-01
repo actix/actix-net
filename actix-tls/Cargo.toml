@@ -42,7 +42,7 @@ native-tls = ["tokio-native-tls"]
 uri = ["http"]
 
 [dependencies]
-actix-rt = { version = "2.2.0", default-features = false }
+actix-rt = { version = "2.2", default-features = false }
 actix-service = "2"
 actix-utils = "3"
 

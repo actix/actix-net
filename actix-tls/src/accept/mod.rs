@@ -10,15 +10,12 @@ use std::{
 use actix_utils::counter::Counter;
 
 #[cfg(feature = "openssl")]
-#[cfg_attr(docsrs, doc(cfg(feature = "openssl")))]
 pub mod openssl;
 
 #[cfg(feature = "rustls")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rustls")))]
 pub mod rustls;
 
 #[cfg(feature = "native-tls")]
-#[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
 pub mod native_tls;
 
 pub(crate) static MAX_CONN: AtomicUsize = AtomicUsize::new(256);
