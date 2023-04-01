@@ -19,4 +19,4 @@ futures-util = { version = "0.3.17", default-features = false }
 local-waker = "0.1"
 
 [dev-dependencies]
-tokio = { version = "1.18.4", features = ["rt", "macros"] }
+tokio = { version = "1.23.1", features = ["rt", "macros"] }

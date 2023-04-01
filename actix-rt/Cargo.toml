@@ -23,12 +23,12 @@ io-uring = ["tokio-uring"]
 actix-macros = { version = "0.2.3", optional = true }
 
 futures-core = { version = "0.3", default-features = false }
-tokio = { version = "1.18.4", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }
+tokio = { version = "1.23.1", features = ["rt", "net", "parking_lot", "signal", "sync", "time"] }
 
 # runtime for `io-uring` feature
 [target.'cfg(target_os = "linux")'.dependencies]
 tokio-uring = { version = "0.4", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.18.4", features = ["full"] }
+tokio = { version = "1.23.1", features = ["full"] }
 hyper = { version = "0.14.10", default-features = false, features = ["server", "tcp", "http1"] }
