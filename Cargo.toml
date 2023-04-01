@@ -12,6 +12,7 @@ members = [
   "local-channel",
   "local-waker",
 ]
+resolver = "2"
 
 [patch.crates-io]
 actix-codec = { path = "actix-codec" }

@@ -1,21 +1,20 @@
 name: Upload documentation
 
 on:
-  push:
-    branches: [master]
+  push: { branches: [master] }
 
 jobs:
   build:
+    permissions:
+      contents: write
+
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install Rust
-        run: |
-          rustup set profile minimal
-          rustup install nightly
-          rustup override set nightly
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with: { toolchain: nightly }
 
       - name: Build Docs
         run: cargo doc --workspace --all-features --no-deps

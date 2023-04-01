@@ -10,7 +10,8 @@ description = "Macros for Actix system and runtime"
 repository = "https://github.com/actix/actix-net.git"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition = "2021"
+rust-version = "1.60"
 
 [lib]
 proc-macro = true
