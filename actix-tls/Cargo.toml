@@ -10,15 +10,12 @@ keywords = ["network", "tls", "ssl", "async", "transport"]
 repository = "https://github.com/actix/actix-net.git"
 categories = ["network-programming", "asynchronous", "cryptography"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition = "2021"
+rust-version = "1.60"
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
-
-[lib]
-name = "actix_tls"
-path = "src/lib.rs"
 
 [features]
 default = ["accept", "connect"]

@@ -10,11 +10,8 @@ keywords = ["network", "framework", "async", "futures"]
 categories = ["network-programming", "asynchronous"]
 repository = "https://github.com/actix/actix-net"
 license = "MIT OR Apache-2.0"
-edition = "2018"
-
-[lib]
-name = "actix_utils"
-path = "src/lib.rs"
+edition = "2021"
+rust-version = "1.60"
 
 [dependencies]
 pin-project-lite = "0.2"

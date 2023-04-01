@@ -4,6 +4,13 @@ on:
   push:
     branches: [master]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build_and_test_nightly:
     strategy:
@@ -21,8 +28,7 @@ jobs:
     name: ${{ matrix.target.name }} / ${{ matrix.version }}
     runs-on: ${{ matrix.target.os }}
 
-    env:
-      VCPKGRS_DYNAMIC: 1
+    env: {}
 
     steps:
       - name: Setup Routing
@@ -31,36 +37,17 @@ jobs:
 
       - uses: actions/checkout@v3
 
-      # install OpenSSL on Windows
-      - name: Set vcpkg root
-        if: matrix.target.triple == 'x86_64-pc-windows-msvc' || matrix.target.triple == 'i686-pc-windows-msvc'
-        run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Install OpenSSL
-        if: matrix.target.triple == 'x86_64-pc-windows-msvc'
-        run: vcpkg install openssl:x64-windows
-      - name: Install OpenSSL
-        if: matrix.target.triple == 'i686-pc-windows-msvc'
-        run: vcpkg install openssl:x86-windows
+        if: matrix.target.os == 'windows-latest'
+        run: choco install openssl
+      - name: Set OpenSSL dir in env
+        if: matrix.target.os == 'windows-latest'
+        run: echo 'OPENSSL_DIR=C:\Program Files\OpenSSL-Win64' | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Install ${{ matrix.version }}
-        run: |
-          rustup set profile minimal
-          rustup install ${{ matrix.version }}-${{ matrix.target.triple }}
-          rustup override set ${{ matrix.version }}-${{ matrix.target.triple }}
-
-      # - name: Install MSYS2
-      #   if: matrix.target.triple == 'x86_64-pc-windows-gnu'
-      #   uses: msys2/setup-msys2@v2
-      # - name: Install MinGW Packages
-      #   if: matrix.target.triple == 'x86_64-pc-windows-gnu'
-      #   run: |
-      #     msys2 -c 'pacman -Sy --noconfirm pacman'
-      #     msys2 -c 'pacman --noconfirm -S base-devel pkg-config'
-
-      # - name: Generate Cargo.lock
-      #   run: cargo generate-lockfile
-      # - name: Cache Dependencies
-      #   uses: Swatinem/rust-cache@v2.2.0
+      - name: Install Rust (${{ matrix.version }})
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ matrix.version }}
 
       - name: Install cargo-hack
         run: cargo install cargo-hack
@@ -109,15 +96,8 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust (nightly)
-        run: |
-          rustup set profile minimal
-          rustup install nightly
-          rustup override set nightly
-
-      - name: Generate Cargo.lock
-        run: cargo generate-lockfile
-      - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v2.2.0
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with: { toolchain: nightly }
 
       - name: Generate coverage file
         if: github.ref == 'refs/heads/master'
@@ -136,15 +116,8 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust (nightly)
-        run: |
-          rustup set profile minimal
-          rustup install nightly
-          rustup override set nightly
-
-      - name: Generate Cargo.lock
-        run: cargo generate-lockfile
-      - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v2.2.0
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with: { toolchain: nightly }
 
       - name: Install cargo-minimal-versions
         run: cargo install cargo-minimal-versions
@@ -162,15 +135,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Rust
-        run: |
-          rustup set profile minimal
-          rustup install stable
-          rustup override set stable
-
-      - name: Generate Cargo.lock
-        run: cargo generate-lockfile
-      - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v2.2.0
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install cargo-nextest
         run: cargo install cargo-nextest
