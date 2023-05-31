@@ -61,6 +61,65 @@ impl Runtime {
         self.local.spawn_local(future)
     }
 
+    /// Retrieves a reference to the underlying Tokio runtime associated with this instance.
+    ///
+    /// The Tokio runtime is responsible for executing asynchronous tasks and managing
+    /// the event loop for an asynchronous Rust program. This method allows accessing
+    /// the runtime to interact with its features directly.
+    ///
+    /// In a typical use case, you might need to share the same runtime between different
+    /// modules of your project. For example, a module might require a `tokio::runtime::Handle`
+    /// to spawn tasks on the same runtime, or the runtime itself to configure more complex
+    /// behaviours.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use actix_rt::Runtime;
+    /// use tokio::task;
+    ///
+    /// mod module_a {
+    ///     pub fn do_something(handle: tokio::runtime::Handle) {
+    ///         handle.spawn(async {
+    ///             // Some asynchronous task here
+    ///         });
+    ///     }
+    /// }
+    ///
+    /// mod module_b {
+    ///     pub fn do_something_else(rt: &tokio::runtime::Runtime) {
+    ///         rt.spawn(async {
+    ///             // Another asynchronous task here
+    ///         });
+    ///     }
+    /// }
+    ///
+    /// fn main() {
+    ///     let actix_runtime = actix_rt::Runtime::new().unwrap();
+    ///     let tokio_runtime = actix_runtime.tokio_runtime();
+    ///
+    ///     let handle = tokio_runtime.handle().clone();
+    ///
+    ///     module_a::do_something(handle);
+    ///     module_b::do_something_else(tokio_runtime);
+    /// }
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// An immutable reference to the `tokio::runtime::Runtime` instance associated with this
+    /// `Runtime` instance.
+    ///
+    /// # Note
+    ///
+    /// While this method provides an immutable reference to the Tokio runtime, which is safe to share across threads,
+    /// be aware that spawning blocking tasks on the Tokio runtime could potentially impact the execution
+    /// of the Actix runtime. This is because Tokio is responsible for driving the Actix system,
+    /// and blocking tasks could delay or deadlock other tasks in run loop.
+    pub fn tokio_runtime(&self) -> &tokio::runtime::Runtime {
+        &self.rt
+    }
+
     /// Runs the provided future, blocking the current thread until the future completes.
     ///
     /// This function can be used to synchronously block the current thread until the provided

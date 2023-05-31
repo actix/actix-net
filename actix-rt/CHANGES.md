@@ -3,6 +3,8 @@
 ## Unreleased - 2023-xx-xx
 
 - Minimum supported Rust version (MSRV) is now 1.60.
+- Add `actix_rt::System::runtime()` method to retrieve the underlying `actix_rt::Runtime` runtime
+- Add `actix_rt::Runtime::tokio_runtime()` method to retrieve the underlying Tokio runtime
 
 ## 2.8.0 - 2022-12-21
 
