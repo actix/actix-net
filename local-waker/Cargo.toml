@@ -11,6 +11,6 @@ keywords = ["waker", "local", "futures", "no-std"]
 categories = ["asynchronous", "no-std"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.63"
 
 [dependencies]

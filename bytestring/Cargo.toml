@@ -12,7 +12,7 @@ homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 license = "MIT OR Apache-2.0"
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.63"
 
 [dependencies]
 bytes = { version = "1.2", default-features = false }

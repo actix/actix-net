@@ -11,7 +11,7 @@ repository = "https://github.com/actix/actix-net.git"
 categories = ["network-programming", "asynchronous", "cryptography"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.63"
 
 [package.metadata.docs.rs]
 all-features = true

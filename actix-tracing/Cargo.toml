@@ -10,7 +10,7 @@ documentation = "https://docs.rs/actix-tracing"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.63"
 
 [dependencies]
 actix-service = "2"
