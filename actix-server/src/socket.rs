@@ -240,13 +240,14 @@ pub(crate) fn create_mio_tcp_listener(
 
     let socket = match Socket::new(Domain::for_address(addr), Type::STREAM, Some(protocol)) {
         Ok(sock) => sock,
-        Err(err) => {
-            if matches!(mptcp, MpTcp::TcpFallback) {
-                Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP))?
-            } else {
-                return Err(err);
-            }
+
+        Err(err) if matches!(mptcp, MpTcp::TcpFallback) => {
+            tracing::warn!("binding socket as MPTCP failed: {err}");
+            tracing::warn!("falling back to TCP");
+            Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP))?
         }
+
+        Err(err) => return Err(err),
     };
 
     socket.set_reuse_address(true)?;
