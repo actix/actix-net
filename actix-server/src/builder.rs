@@ -12,6 +12,22 @@ use crate::{
     Server,
 };
 
+/// Multipath TCP (MPTCP) preference.
+///
+/// Also see [`ServerBuilder::mptcp()`].
+#[derive(Debug, Clone)]
+pub enum MpTcp {
+    /// MPTCP will not be used when binding sockets.
+    Disabled,
+
+    /// MPTCP will be attempted when binding sockets. If errors occur, regular TCP will be
+    /// attempted, too.
+    TcpFallback,
+
+    /// MPTCP will be used when binding sockets (with no fallback).
+    NoFallback,
+}
+
 /// [Server] builder.
 pub struct ServerBuilder {
     pub(crate) threads: usize,
@@ -19,6 +35,7 @@ pub struct ServerBuilder {
     pub(crate) backlog: u32,
     pub(crate) factories: Vec<Box<dyn InternalServiceFactory>>,
     pub(crate) sockets: Vec<(usize, String, MioListener)>,
+    pub(crate) mptcp: MpTcp,
     pub(crate) exit: bool,
     pub(crate) listen_os_signals: bool,
     pub(crate) cmd_tx: UnboundedSender<ServerCommand>,
@@ -43,6 +60,7 @@ impl ServerBuilder {
             factories: Vec::new(),
             sockets: Vec::new(),
             backlog: 2048,
+            mptcp: MpTcp::Disabled,
             exit: false,
             listen_os_signals: true,
             cmd_tx,
@@ -96,6 +114,24 @@ impl ServerBuilder {
         self
     }
 
+    /// Sets MultiPath TCP (MPTCP) preference on bound sockets.
+    ///
+    /// Multipath TCP (MPTCP) builds on top of TCP to improve connection redundancy and performance
+    /// by sharing a network data stream across multiple underlying TCP sessions. See [mptcp.dev]
+    /// for more info about MPTCP itself.
+    ///
+    /// MPTCP is available on Linux kernel version 5.6 and higher. In addition, you'll also need to
+    /// ensure the kernel option is enabled using `sysctl net.mptcp.enabled=1`.
+    ///
+    /// This method will have no effect if called after a `bind()`.
+    ///
+    /// [mptcp.dev]: https://www.mptcp.dev
+    #[cfg(target_os = "linux")]
+    pub fn mptcp(mut self, mptcp_enabled: MpTcp) -> Self {
+        self.mptcp = mptcp_enabled;
+        self
+    }
+
     /// Sets the maximum per-worker number of concurrent connections.
     ///
     /// All socket listeners will stop accepting connections when this limit is reached for
@@ -144,7 +180,7 @@ impl ServerBuilder {
         U: ToSocketAddrs,
         N: AsRef<str>,
     {
-        let sockets = bind_addr(addr, self.backlog)?;
+        let sockets = bind_addr(addr, self.backlog, &self.mptcp)?;
 
         trace!("binding server to: {:?}", &sockets);
 
@@ -260,13 +296,14 @@ impl ServerBuilder {
 pub(super) fn bind_addr<S: ToSocketAddrs>(
     addr: S,
     backlog: u32,
+    mptcp: &MpTcp,
 ) -> io::Result<Vec<MioTcpListener>> {
     let mut opt_err = None;
     let mut success = false;
     let mut sockets = Vec::new();
 
     for addr in addr.to_socket_addrs()? {
-        match create_mio_tcp_listener(addr, backlog) {
+        match create_mio_tcp_listener(addr, backlog, mptcp) {
             Ok(lst) => {
                 success = true;
                 sockets.push(lst);
