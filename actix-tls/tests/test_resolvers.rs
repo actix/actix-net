@@ -51,8 +51,7 @@ async fn custom_resolver_connect() {
 
     use trust_dns_resolver::TokioAsyncResolver;
 
-    let srv =
-        TestServer::start(|| fn_service(|_io: TcpStream| async { Ok::<_, io::Error>(()) }));
+    let srv = TestServer::start(|| fn_service(|_io: TcpStream| async { Ok::<_, io::Error>(()) }));
 
     struct MyResolver {
         trust_dns: TokioAsyncResolver,

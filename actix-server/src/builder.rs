@@ -7,9 +7,7 @@ use tracing::{info, trace};
 use crate::{
     server::ServerCommand,
     service::{InternalServiceFactory, ServerServiceFactory, StreamNewService},
-    socket::{
-        create_mio_tcp_listener, MioListener, MioTcpListener, StdTcpListener, ToSocketAddrs,
-    },
+    socket::{create_mio_tcp_listener, MioListener, MioTcpListener, StdTcpListener, ToSocketAddrs},
     worker::ServerWorkerConfig,
     Server,
 };
@@ -246,8 +244,7 @@ impl ServerBuilder {
         use std::net::{IpAddr, Ipv4Addr};
         lst.set_nonblocking(true)?;
         let token = self.next_token();
-        let addr =
-            crate::socket::StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let addr = crate::socket::StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         self.factories.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,

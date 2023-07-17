@@ -15,9 +15,11 @@ use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
 use actix_utils::future::{ok, Ready};
 use futures_core::ready;
-use tokio_rustls::rustls::{client::ServerName, OwnedTrustAnchor, RootCertStore};
-use tokio_rustls::{client::TlsStream as AsyncTlsStream, rustls::ClientConfig};
-use tokio_rustls::{Connect as RustlsConnect, TlsConnector as RustlsTlsConnector};
+use tokio_rustls::{
+    client::TlsStream as AsyncTlsStream,
+    rustls::{client::ServerName, ClientConfig, OwnedTrustAnchor, RootCertStore},
+    Connect as RustlsConnect, TlsConnector as RustlsTlsConnector,
+};
 use tracing::trace;
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -26,8 +28,7 @@ use crate::connect::{Connection, Host};
 pub mod reexports {
     //! Re-exports from `rustls` and `webpki_roots` that are useful for connectors.
 
-    pub use tokio_rustls::client::TlsStream as AsyncTlsStream;
-    pub use tokio_rustls::rustls::ClientConfig;
+    pub use tokio_rustls::{client::TlsStream as AsyncTlsStream, rustls::ClientConfig};
     pub use webpki_roots::TLS_SERVER_ROOTS;
 }
 

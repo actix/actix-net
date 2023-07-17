@@ -33,14 +33,16 @@ mod then;
 mod transform;
 mod transform_err;
 
-pub use self::apply::{apply_fn, apply_fn_factory};
-pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
-pub use self::ext::{ServiceExt, ServiceFactoryExt, TransformExt};
-pub use self::fn_service::{fn_factory, fn_factory_with_config, fn_service};
-pub use self::map_config::{map_config, unit_config};
 #[allow(unused_imports)]
 use self::ready::{err, ok, ready, Ready};
-pub use self::transform::{apply, ApplyTransform, Transform};
+pub use self::{
+    apply::{apply_fn, apply_fn_factory},
+    apply_cfg::{apply_cfg, apply_cfg_factory},
+    ext::{ServiceExt, ServiceFactoryExt, TransformExt},
+    fn_service::{fn_factory, fn_factory_with_config, fn_service},
+    map_config::{map_config, unit_config},
+    transform::{apply, ApplyTransform, Transform},
+};
 
 /// An asynchronous operation from `Request` to a `Response`.
 ///

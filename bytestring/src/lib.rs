@@ -253,8 +253,10 @@ impl fmt::Display for ByteString {
 mod serde {
     use alloc::string::String;
 
-    use serde::de::{Deserialize, Deserializer};
-    use serde::ser::{Serialize, Serializer};
+    use serde::{
+        de::{Deserialize, Deserializer},
+        ser::{Serialize, Serializer},
+    };
 
     use super::ByteString;
 

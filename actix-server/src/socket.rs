@@ -8,8 +8,7 @@ pub(crate) use mio::net::TcpListener as MioTcpListener;
 use mio::{event::Source, Interest, Registry, Token};
 #[cfg(unix)]
 pub(crate) use {
-    mio::net::UnixListener as MioUnixListener,
-    std::os::unix::net::UnixListener as StdUnixListener,
+    mio::net::UnixListener as MioUnixListener, std::os::unix::net::UnixListener as StdUnixListener,
 };
 
 pub(crate) enum MioListener {
@@ -105,7 +104,7 @@ impl fmt::Debug for MioListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             MioListener::Tcp(ref lst) => write!(f, "{:?}", lst),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             MioListener::Uds(ref lst) => write!(f, "{:?}", lst),
         }
     }
