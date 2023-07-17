@@ -2,7 +2,7 @@
 
 ## Unreleased - 2023-xx-xx
 
-- Add support for MultiPath TCP (MPTCP) with `Mptcp` enum and `ServerBuilder::mptcp()` method.
+- Add support for MultiPath TCP (MPTCP) with `MpTcp` enum and `ServerBuilder::mptcp()` method.
 - Minimum supported Rust version (MSRV) is now 1.65.
 
 ## 2.2.0 - 2022-12-21

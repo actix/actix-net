@@ -21,7 +21,7 @@ mod worker;
 #[doc(hidden)]
 pub use self::socket::FromStream;
 pub use self::{
-    builder::{ServerBuilder, MPTCP},
+    builder::{MpTcp, ServerBuilder},
     handle::ServerHandle,
     server::Server,
     service::ServerServiceFactory,

@@ -14,7 +14,7 @@ use crate::{
 
 /// Multipath TCP (MPTCP) preference.
 #[derive(Debug, Clone)]
-pub enum Mptcp {
+pub enum MpTcp {
     /// MPTCP will not be used when binding sockets.
     Disabled,
 
@@ -33,7 +33,7 @@ pub struct ServerBuilder {
     pub(crate) backlog: u32,
     pub(crate) factories: Vec<Box<dyn InternalServiceFactory>>,
     pub(crate) sockets: Vec<(usize, String, MioListener)>,
-    pub(crate) mptcp: Mptcp,
+    pub(crate) mptcp: MpTcp,
     pub(crate) exit: bool,
     pub(crate) listen_os_signals: bool,
     pub(crate) cmd_tx: UnboundedSender<ServerCommand>,
@@ -58,7 +58,7 @@ impl ServerBuilder {
             factories: Vec::new(),
             sockets: Vec::new(),
             backlog: 2048,
-            mptcp: MPTCP::Disabled,
+            mptcp: MpTcp::Disabled,
             exit: false,
             listen_os_signals: true,
             cmd_tx,
@@ -294,7 +294,7 @@ impl ServerBuilder {
 pub(super) fn bind_addr<S: ToSocketAddrs>(
     addr: S,
     backlog: u32,
-    mptcp: &MPTCP,
+    mptcp: &MpTcp,
 ) -> io::Result<Vec<MioTcpListener>> {
     let mut opt_err = None;
     let mut success = false;

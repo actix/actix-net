@@ -11,7 +11,7 @@ pub(crate) use {
     mio::net::UnixListener as MioUnixListener, std::os::unix::net::UnixListener as StdUnixListener,
 };
 
-use crate::builder::MPTCP;
+use crate::builder::MpTcp;
 
 pub(crate) enum MioListener {
     Tcp(MioTcpListener),
@@ -225,7 +225,7 @@ mod unix_impl {
 pub(crate) fn create_mio_tcp_listener(
     addr: StdSocketAddr,
     backlog: u32,
-    mptcp: &Mptcp,
+    mptcp: &MpTcp,
 ) -> io::Result<MioTcpListener> {
     use socket2::{Domain, Protocol, Socket, Type};
 
@@ -241,7 +241,7 @@ pub(crate) fn create_mio_tcp_listener(
     let socket = match Socket::new(Domain::for_address(addr), Type::STREAM, Some(protocol)) {
         Ok(sock) => sock,
         Err(err) => {
-            if mptcp == &Mptcp::TcpFallback {
+            if matches!(mptcp, MpTcp::TcpFallback) {
                 Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP))?
             } else {
                 return Err(err);
@@ -268,7 +268,7 @@ mod tests {
         assert_eq!(format!("{}", addr), "127.0.0.1:8080");
 
         let addr: StdSocketAddr = "127.0.0.1:0".parse().unwrap();
-        let lst = create_mio_tcp_listener(addr, 128, &MPTCP::Disabled).unwrap();
+        let lst = create_mio_tcp_listener(addr, 128, &MpTcp::Disabled).unwrap();
         let lst = MioListener::Tcp(lst);
         assert!(format!("{:?}", lst).contains("TcpListener"));
         assert!(format!("{}", lst).contains("127.0.0.1"));
