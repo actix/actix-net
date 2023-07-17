@@ -10,8 +10,8 @@ keywords = ["network", "framework", "async", "futures", "service"]
 categories = ["network-programming", "asynchronous", "no-std"]
 repository = "https://github.com/actix/actix-net"
 license = "MIT OR Apache-2.0"
-edition = "2021"
-rust-version = "1.63"
+edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 futures-core = { version = "0.3.17", default-features = false }

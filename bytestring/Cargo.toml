@@ -11,8 +11,8 @@ categories = ["no-std", "web-programming"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 license = "MIT OR Apache-2.0"
-edition = "2021"
-rust-version = "1.63"
+edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 bytes = { version = "1.2", default-features = false }

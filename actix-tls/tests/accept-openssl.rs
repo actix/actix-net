@@ -17,11 +17,9 @@ use actix_utils::future::ok;
 use tokio_rustls::rustls::{Certificate, ClientConfig, RootCertStore, ServerName};
 
 fn new_cert_and_key() -> (String, String) {
-    let cert = rcgen::generate_simple_self_signed(vec![
-        "127.0.0.1".to_owned(),
-        "localhost".to_owned(),
-    ])
-    .unwrap();
+    let cert =
+        rcgen::generate_simple_self_signed(vec!["127.0.0.1".to_owned(), "localhost".to_owned()])
+            .unwrap();
 
     let key = cert.serialize_private_key_pem();
     let cert = cert.serialize_pem().unwrap();

@@ -234,10 +234,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Flush write buffer to underlying I/O stream.
-    pub fn flush<I>(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), U::Error>>
+    pub fn flush<I>(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
     where
         T: AsyncWrite,
         U: Encoder<I>,
@@ -270,10 +267,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Flush write buffer and shutdown underlying I/O stream.
-    pub fn close<I>(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), U::Error>>
+    pub fn close<I>(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
     where
         T: AsyncWrite,
         U: Encoder<I>,

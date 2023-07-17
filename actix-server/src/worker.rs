@@ -625,8 +625,8 @@ impl Future for ServerWorker {
                 let factory_id = restart.factory_id;
                 let token = restart.token;
 
-                let (token_new, service) = ready!(restart.fut.as_mut().poll(cx))
-                    .unwrap_or_else(|_| {
+                let (token_new, service) =
+                    ready!(restart.fut.as_mut().poll(cx)).unwrap_or_else(|_| {
                         panic!(
                             "Can not restart {:?} service",
                             this.factories[factory_id].name(token)
@@ -697,7 +697,10 @@ impl Future for ServerWorker {
                 match ready!(this.conn_rx.poll_recv(cx)) {
                     Some(msg) => {
                         let guard = this.counter.guard();
-                        let _ = this.services[msg.token].service.call((guard, msg.io));
+                        let _ = this.services[msg.token]
+                            .service
+                            .call((guard, msg.io))
+                            .into_inner();
                     }
                     None => return Poll::Ready(()),
                 };
@@ -706,9 +709,7 @@ impl Future for ServerWorker {
     }
 }
 
-fn wrap_worker_services(
-    services: Vec<(usize, usize, BoxedServerService)>,
-) -> Vec<WorkerService> {
+fn wrap_worker_services(services: Vec<(usize, usize, BoxedServerService)>) -> Vec<WorkerService> {
     services
         .into_iter()
         .fold(Vec::new(), |mut services, (idx, token, service)| {

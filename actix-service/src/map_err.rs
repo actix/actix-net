@@ -206,8 +206,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        err, ok, IntoServiceFactory, Ready, Service, ServiceExt, ServiceFactory,
-        ServiceFactoryExt,
+        err, ok, IntoServiceFactory, Ready, Service, ServiceExt, ServiceFactory, ServiceFactoryExt,
     };
 
     struct Srv;

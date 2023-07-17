@@ -91,8 +91,7 @@ type Inner<C, Req, Res, Err, InitErr> = Box<
     >,
 >;
 
-impl<C, Req, Res, Err, InitErr> ServiceFactory<Req>
-    for BoxServiceFactory<C, Req, Res, Err, InitErr>
+impl<C, Req, Res, Err, InitErr> ServiceFactory<Req> for BoxServiceFactory<C, Req, Res, Err, InitErr>
 where
     Req: 'static,
     Res: 'static,

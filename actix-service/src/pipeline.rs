@@ -6,12 +6,14 @@ use core::{
     task::{Context, Poll},
 };
 
-use crate::and_then::{AndThenService, AndThenServiceFactory};
-use crate::map::{Map, MapServiceFactory};
-use crate::map_err::{MapErr, MapErrServiceFactory};
-use crate::map_init_err::MapInitErr;
-use crate::then::{ThenService, ThenServiceFactory};
-use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
+use crate::{
+    and_then::{AndThenService, AndThenServiceFactory},
+    map::{Map, MapServiceFactory},
+    map_err::{MapErr, MapErrServiceFactory},
+    map_init_err::MapInitErr,
+    then::{ThenService, ThenServiceFactory},
+    IntoService, IntoServiceFactory, Service, ServiceFactory,
+};
 
 /// Construct new pipeline with one service in pipeline chain.
 pub(crate) fn pipeline<I, S, Req>(service: I) -> Pipeline<S, Req>
@@ -252,10 +254,7 @@ where
     }
 
     /// Map this service's error to a different error, returning a new service.
-    pub fn map_err<F, E>(
-        self,
-        f: F,
-    ) -> PipelineFactory<MapErrServiceFactory<SF, Req, F, E>, Req>
+    pub fn map_err<F, E>(self, f: F) -> PipelineFactory<MapErrServiceFactory<SF, Req, F, E>, Req>
     where
         Self: Sized,
         F: Fn(SF::Error) -> E + Clone,
