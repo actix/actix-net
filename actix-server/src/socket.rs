@@ -232,7 +232,7 @@ pub(crate) fn create_mio_tcp_listener(
     #[cfg(not(target_os = "linux"))]
     let protocol = Protocol::TCP;
     #[cfg(target_os = "linux")]
-    let protocol = if matches!(mptcp, Mptcp::Disabled) {
+    let protocol = if matches!(mptcp, MpTcp::Disabled) {
         Protocol::TCP
     } else {
         Protocol::MPTCP

@@ -127,7 +127,7 @@ impl ServerBuilder {
     ///
     /// [mptcp.dev]: https://www.mptcp.dev
     #[cfg(target_os = "linux")]
-    pub fn mptcp(mut self, mptcp_enabled: Mptcp) -> Self {
+    pub fn mptcp(mut self, mptcp_enabled: MpTcp) -> Self {
         self.mptcp = mptcp_enabled;
         self
     }
