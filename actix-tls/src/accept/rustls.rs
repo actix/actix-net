@@ -23,8 +23,7 @@ use actix_utils::{
 };
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-use tokio_rustls::rustls::ServerConfig;
-use tokio_rustls::{Accept, TlsAcceptor};
+use tokio_rustls::{rustls::ServerConfig, Accept, TlsAcceptor};
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 

@@ -99,8 +99,7 @@ impl Arbiter {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Arbiter {
         Self::with_tokio_rt(|| {
-            crate::runtime::default_tokio_runtime()
-                .expect("Cannot create new Arbiter's Runtime.")
+            crate::runtime::default_tokio_runtime().expect("Cannot create new Arbiter's Runtime.")
         })
     }
 
@@ -149,9 +148,7 @@ impl Arbiter {
                         .send(SystemCommand::DeregisterArbiter(arb_id));
                 }
             })
-            .unwrap_or_else(|err| {
-                panic!("Cannot spawn Arbiter's thread: {:?}. {:?}", &name, err)
-            });
+            .unwrap_or_else(|err| panic!("Cannot spawn Arbiter's thread: {name:?}: {err:?}"));
 
         ready_rx.recv().unwrap();
 
@@ -201,9 +198,7 @@ impl Arbiter {
                         .send(SystemCommand::DeregisterArbiter(arb_id));
                 }
             })
-            .unwrap_or_else(|err| {
-                panic!("Cannot spawn Arbiter's thread: {:?}. {:?}", &name, err)
-            });
+            .unwrap_or_else(|err| panic!("Cannot spawn Arbiter's thread: {name:?}: {err:?}"));
 
         ready_rx.recv().unwrap();
 

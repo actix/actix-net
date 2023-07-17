@@ -19,8 +19,7 @@ use crate::connect::{Connection, Host};
 pub mod reexports {
     //! Re-exports from `native-tls` and `tokio-native-tls` that are useful for connectors.
 
-    pub use tokio_native_tls::native_tls::TlsConnector;
-    pub use tokio_native_tls::TlsStream as AsyncTlsStream;
+    pub use tokio_native_tls::{native_tls::TlsConnector, TlsStream as AsyncTlsStream};
 }
 
 /// Connector service and factory using `native-tls`.

@@ -8,8 +8,7 @@ pub(crate) use mio::net::TcpListener as MioTcpListener;
 use mio::{event::Source, Interest, Registry, Token};
 #[cfg(unix)]
 pub(crate) use {
-    mio::net::UnixListener as MioUnixListener,
-    std::os::unix::net::UnixListener as StdUnixListener,
+    mio::net::UnixListener as MioUnixListener, std::os::unix::net::UnixListener as StdUnixListener,
 };
 
 pub(crate) enum MioListener {
