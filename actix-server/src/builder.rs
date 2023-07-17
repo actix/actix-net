@@ -12,10 +12,17 @@ use crate::{
     Server,
 };
 
-#[derive(PartialEq, Eq, Copy, Clone)]
-pub enum MPTCP {
+/// Multipath TCP (MPTCP) preference.
+#[derive(Debug, Clone)]
+pub enum Mptcp {
+    /// MPTCP will not be used when binding sockets.
     Disabled,
+
+    /// MPTCP will be attempted when binding sockets. If errors occur, regular TCP will be
+    /// attempted, too.
     TcpFallback,
+
+    /// MPTCP will be used when binding sockets (with no fallback).
     NoFallback,
 }
 
@@ -26,7 +33,7 @@ pub struct ServerBuilder {
     pub(crate) backlog: u32,
     pub(crate) factories: Vec<Box<dyn InternalServiceFactory>>,
     pub(crate) sockets: Vec<(usize, String, MioListener)>,
-    pub(crate) mptcp: MPTCP,
+    pub(crate) mptcp: Mptcp,
     pub(crate) exit: bool,
     pub(crate) listen_os_signals: bool,
     pub(crate) cmd_tx: UnboundedSender<ServerCommand>,
@@ -105,21 +112,20 @@ impl ServerBuilder {
         self
     }
 
-    /// Enable the MPTCP protocol at the socket level.
+    /// Sets MultiPath TCP (MPTCP) preference on bound sockets.
     ///
-    /// This enable the Multiple Path TCP protocol at the socket level. This means it's managed
-    /// by the kernel and the application (userspace) doesn't have to deal with path management.
+    /// Multipath TCP (MPTCP) builds on top of TCP to improve connection redundancy and performance
+    /// by sharing a network data stream across multiple underlying TCP sessions. See [mptcp.dev]
+    /// for more info about MPTCP itself.
     ///
-    /// Only available in Linux Kernel >= 5.6. If you try to set it on a Windows machine or on
-    /// an older Linux machine, this will fail with a panic.
-    ///
-    /// In Addition to a recent Linux Kernel, you also need to enable the sysctl (if it's not on
-    /// by default):
-    /// `sysctl sysctl net.mptcp.enabled=1`
+    /// MPTCP is available on Linux kernel version 5.6 and higher. In addition, you'll also need to
+    /// ensure the kernel option is enabled using `sysctl net.mptcp.enabled=1`.
     ///
     /// This method will have no effect if called after a `bind()`.
+    ///
+    /// [mptcp.dev]: https://www.mptcp.dev
     #[cfg(target_os = "linux")]
-    pub fn mptcp(mut self, mptcp_enabled: MPTCP) -> Self {
+    pub fn mptcp(mut self, mptcp_enabled: Mptcp) -> Self {
         self.mptcp = mptcp_enabled;
         self
     }

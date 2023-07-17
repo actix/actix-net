@@ -225,14 +225,14 @@ mod unix_impl {
 pub(crate) fn create_mio_tcp_listener(
     addr: StdSocketAddr,
     backlog: u32,
-    mptcp: &MPTCP,
+    mptcp: &Mptcp,
 ) -> io::Result<MioTcpListener> {
     use socket2::{Domain, Protocol, Socket, Type};
 
     #[cfg(not(target_os = "linux"))]
     let protocol = Protocol::TCP;
     #[cfg(target_os = "linux")]
-    let protocol = if mptcp == &MPTCP::Disabled {
+    let protocol = if matches!(mptcp, Mptcp::Disabled) {
         Protocol::TCP
     } else {
         Protocol::MPTCP
@@ -241,7 +241,7 @@ pub(crate) fn create_mio_tcp_listener(
     let socket = match Socket::new(Domain::for_address(addr), Type::STREAM, Some(protocol)) {
         Ok(sock) => sock,
         Err(err) => {
-            if mptcp == &MPTCP::TcpFallback {
+            if mptcp == &Mptcp::TcpFallback {
                 Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP))?
             } else {
                 return Err(err);
