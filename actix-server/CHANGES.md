@@ -2,7 +2,7 @@
 
 ## Unreleased - 2023-xx-xx
 
-- ServerBuilder: add support for Multipath TCP (MPTCP).
+- Add support for Multipath TCP (MPTCP).
 - Minimum supported Rust version (MSRV) is now 1.65.
 
 ## 2.2.0 - 2022-12-21
