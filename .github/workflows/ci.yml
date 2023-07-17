@@ -23,7 +23,7 @@ jobs:
           - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
           - { name: Windows (32-bit), os: windows-latest, triple: i686-pc-windows-msvc }
         version:
-          - 1.60.0
+          - 1.65.0 # MSRV
           - stable
 
     name: ${{ matrix.target.name }} / ${{ matrix.version }}
