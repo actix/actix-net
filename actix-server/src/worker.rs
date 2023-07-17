@@ -697,7 +697,10 @@ impl Future for ServerWorker {
                 match ready!(this.conn_rx.poll_recv(cx)) {
                     Some(msg) => {
                         let guard = this.counter.guard();
-                        let _ = this.services[msg.token].service.call((guard, msg.io));
+                        let _ = this.services[msg.token]
+                            .service
+                            .call((guard, msg.io))
+                            .into_inner();
                     }
                     None => return Poll::Ready(()),
                 };

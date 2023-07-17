@@ -104,7 +104,7 @@ impl fmt::Debug for MioListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             MioListener::Tcp(ref lst) => write!(f, "{:?}", lst),
-            #[cfg(all(unix))]
+            #[cfg(unix)]
             MioListener::Uds(ref lst) => write!(f, "{:?}", lst),
         }
     }
