@@ -51,7 +51,7 @@ jobs:
         with:
           toolchain: ${{ matrix.version }}
 
-      - uses: taiki-e/cache-cargo-install-action@v1
+      - uses: taiki-e/install-action@v2
         with: { tool: cargo-hack }
 
       - name: check lib
@@ -121,11 +121,8 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with: { toolchain: nightly }
 
-      - uses: taiki-e/cache-cargo-install-action@v1
-        with: { tool: cargo-minimal-versions }
-
-      - uses: taiki-e/cache-cargo-install-action@v1
-        with: { tool: cargo-hack }
+      - uses: taiki-e/install-action@v1
+        with: { tool: cargo-hack, cargo-minimal-versions }
 
       - name: Check With Minimal Versions
         run: cargo minimal-versions check
