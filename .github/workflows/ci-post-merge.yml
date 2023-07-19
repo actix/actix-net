@@ -101,11 +101,13 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with: { toolchain: nightly }
 
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@v1
+        with: { tool: cargo-tarpaulin }
+
       - name: Generate coverage file
         if: github.ref == 'refs/heads/master'
-        run: |
-          cargo install cargo-tarpaulin
-          cargo tarpaulin --out Xml --verbose
+        run: cargo tarpaulin --out Xml --verbose
       - name: Upload to Codecov
         if: github.ref == 'refs/heads/master'
         uses: codecov/codecov-action@v3
@@ -121,8 +123,9 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with: { toolchain: nightly }
 
-      - uses: taiki-e/install-action@v1
-        with: { tool: cargo-hack, cargo-minimal-versions }
+      - name: Install cargo-hack & cargo-minimal-versions
+        uses: taiki-e/install-action@v1
+        with: { tool: 'cargo-hack,cargo-minimal-versions' }
 
       - name: Check With Minimal Versions
         run: cargo minimal-versions check
@@ -137,7 +140,8 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install cargo-nextest
-        run: cargo install cargo-nextest
+        uses: taiki-e/install-action@v1
+        with: { tool: cargo-nextest }
 
       - name: Test with cargo-nextest
         run: cargo nextest run

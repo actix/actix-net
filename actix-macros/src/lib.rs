@@ -28,8 +28,8 @@ type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
 ///     println!("Hello world");
 /// }
 /// ```
-// #[allow(clippy::needless_doctest_main)]
-// #[cfg(not(test))] // Work around for rust-lang/rust#62127
+#[allow(clippy::needless_doctest_main)]
+#[cfg(not(test))] // Work around for rust-lang/rust#62127
 #[proc_macro_attribute]
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = match syn::parse::<syn::ItemFn>(item.clone()) {
