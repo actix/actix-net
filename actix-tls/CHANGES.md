@@ -3,6 +3,8 @@
 ## Unreleased - 2023-xx-xx
 
 - Minimum supported Rust version (MSRV) is now 1.65.
+- Update tokio-rustls to 0.24
+- Update webpki-roots to 0.25
 
 ## 3.0.4 - 2022-03-15
 
