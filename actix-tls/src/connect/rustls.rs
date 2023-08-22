@@ -35,14 +35,14 @@ pub mod reexports {
 /// Returns standard root certificates from `webpki-roots` crate as a rustls certificate store.
 pub fn webpki_roots_cert_store() -> RootCertStore {
     let mut root_certs = RootCertStore::empty();
-    for cert in TLS_SERVER_ROOTS.0 {
+    for cert in TLS_SERVER_ROOTS {
         let cert = OwnedTrustAnchor::from_subject_spki_name_constraints(
             cert.subject,
             cert.spki,
             cert.name_constraints,
         );
         let certs = vec![cert].into_iter();
-        root_certs.add_server_trust_anchors(certs);
+        root_certs.add_trust_anchors(certs);
     }
     root_certs
 }
@@ -106,24 +106,25 @@ where
         let (stream, connection) = connection.replace_io(());
 
         match ServerName::try_from(connection.hostname()) {
-            Ok(host) => ConnectFut::Future {
-                connect: RustlsTlsConnector::from(self.connector.clone()).connect(host, stream),
+            Ok(host) => ConnectFut {
+                connect: Some(
+                    RustlsTlsConnector::from(self.connector.clone()).connect(host, stream),
+                ),
                 connection: Some(connection),
             },
-            Err(_) => ConnectFut::InvalidDns,
+            Err(_) => ConnectFut {
+                connect: None,
+                connection: None,
+            },
         }
     }
 }
 
 /// Connect future for Rustls service.
 #[doc(hidden)]
-pub enum ConnectFut<R, IO> {
-    /// See issue <https://github.com/briansmith/webpki/issues/54>
-    InvalidDns,
-    Future {
-        connect: RustlsConnect<IO>,
-        connection: Option<Connection<R, ()>>,
-    },
+pub struct ConnectFut<R, IO> {
+    connect: Option<RustlsConnect<IO>>,
+    connection: Option<Connection<R, ()>>,
 }
 
 impl<R, IO> Future for ConnectFut<R, IO>
@@ -131,19 +132,19 @@ where
     R: Host,
     IO: ActixStream,
 {
-    type Output = Result<Connection<R, AsyncTlsStream<IO>>, io::Error>;
+    type Output = io::Result<Connection<R, AsyncTlsStream<IO>>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.get_mut() {
-            Self::InvalidDns => Poll::Ready(Err(
-                io::Error::new(io::ErrorKind::Other, "rustls currently only handles hostname-based connections. See https://github.com/briansmith/webpki/issues/54")
-            )),
-            Self::Future { connect, connection } => {
-                let stream = ready!(Pin::new(connect).poll(cx))?;
-                let connection = connection.take().unwrap();
-                trace!("TLS handshake success: {:?}", connection.hostname());
-                Poll::Ready(Ok(connection.replace_io(stream).1))
-            }
-        }
+        let Self {
+            connect,
+            connection,
+        } = self.get_mut();
+        let Some(connect) = connect else {
+            return Poll::Ready(Err(io::Error::new(io::ErrorKind::InvalidInput, "actix-tls currently only handles hostname-based connections")));
+        };
+        let stream = ready!(Pin::new(connect).poll(cx))?;
+        let connection = connection.take().unwrap();
+        trace!("TLS handshake success: {:?}", connection.hostname());
+        Poll::Ready(Ok(connection.replace_io(stream).1))
     }
 }
