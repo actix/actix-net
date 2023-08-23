@@ -1,4 +1,4 @@
-use std::{io, time::Duration};
+use std::{io, num::NonZeroUsize, time::Duration};
 
 use actix_rt::net::TcpStream;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -55,7 +55,7 @@ impl ServerBuilder {
         let (cmd_tx, cmd_rx) = unbounded_channel();
 
         ServerBuilder {
-            threads: num_cpus::get_physical(),
+            threads: std::thread::available_parallelism().map_or(2, NonZeroUsize::get),
             token: 0,
             factories: Vec::new(),
             sockets: Vec::new(),
@@ -76,6 +76,12 @@ impl ServerBuilder {
     /// The default worker count is the number of physical CPU cores available. If your benchmark
     /// testing indicates that simultaneous multi-threading is beneficial to your app, you can use
     /// the [`num_cpus`] crate to acquire the _logical_ core count instead.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `num` is 0.
+    ///
+    /// [`num_cpus`]: https://docs.rs/num_cpus
     pub fn workers(mut self, num: usize) -> Self {
         assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;
