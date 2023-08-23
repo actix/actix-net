@@ -1,6 +1,7 @@
 use std::{
     future::Future,
     io, mem,
+    num::NonZeroUsize,
     pin::Pin,
     rc::Rc,
     sync::{
@@ -249,8 +250,11 @@ pub(crate) struct ServerWorkerConfig {
 
 impl Default for ServerWorkerConfig {
     fn default() -> Self {
-        // 512 is the default max blocking thread count of tokio runtime.
-        let max_blocking_threads = std::cmp::max(512 / num_cpus::get_physical(), 1);
+        let parallelism = std::thread::available_parallelism().map_or(2, NonZeroUsize::get);
+
+        // 512 is the default max blocking thread count of a Tokio runtime.
+        let max_blocking_threads = std::cmp::max(512 / parallelism, 1);
+
         Self {
             shutdown_timeout: Duration::from_secs(30),
             max_blocking_threads,

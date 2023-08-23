@@ -37,6 +37,10 @@ jobs:
         run: sudo ifconfig lo0 alias 127.0.0.3
 
       - uses: actions/checkout@v3
+      
+      - name: Free Disk Space
+        if: matrix.target.os == 'ubuntu-latest'
+        run: ./scripts/free-disk-space.sh
 
       - name: Install OpenSSL
         if: matrix.target.os == 'windows-latest'
