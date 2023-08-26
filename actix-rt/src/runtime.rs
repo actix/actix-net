@@ -94,15 +94,13 @@ impl Runtime {
     ///     }
     /// }
     ///
-    /// fn main() {
-    ///     let actix_runtime = actix_rt::Runtime::new().unwrap();
-    ///     let tokio_runtime = actix_runtime.tokio_runtime();
+    /// let actix_runtime = actix_rt::Runtime::new().unwrap();
+    /// let tokio_runtime = actix_runtime.tokio_runtime();
     ///
-    ///     let handle = tokio_runtime.handle().clone();
+    /// let handle = tokio_runtime.handle().clone();
     ///
-    ///     module_a::do_something(handle);
-    ///     module_b::do_something_else(tokio_runtime);
-    /// }
+    /// module_a::do_something(handle);
+    /// module_b::do_something_else(tokio_runtime);
     /// ```
     ///
     /// # Returns
