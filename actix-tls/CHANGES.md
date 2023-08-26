@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 3.1.0
+
 - Support Rustls v0.21.
 - Added `{accept, connect}::rustls_0_21` modules.
 - Added `{accept, connect}::rustls_0_20` alias for `{accept, connect}::rustls` modules.
