@@ -17,12 +17,13 @@
 
 #[rustfmt::skip]
 // this `use` is only exists because of how we have organised the crate
-// it is not necessary for your actual code; you should import from `rustls` directly
-use tokio_rustls::rustls;
+// it is not necessary for your actual code; you should import from `rustls` normally
+use tokio_rustls_024::rustls;
 
 use std::{
     fs::File,
     io::{self, BufReader},
+    path::PathBuf,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -32,7 +33,7 @@ use std::{
 use actix_rt::net::TcpStream;
 use actix_server::Server;
 use actix_service::ServiceFactoryExt as _;
-use actix_tls::accept::rustls::{Acceptor as RustlsAcceptor, TlsStream};
+use actix_tls::accept::rustls_0_21::{Acceptor as RustlsAcceptor, TlsStream};
 use futures_util::future::ok;
 use rustls::{server::ServerConfig, Certificate, PrivateKey};
 use rustls_pemfile::{certs, rsa_private_keys};
@@ -42,9 +43,16 @@ use tracing::info;
 async fn main() -> io::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
+    let root_path = env!("CARGO_MANIFEST_DIR")
+        .parse::<PathBuf>()
+        .unwrap()
+        .join("examples");
+    let cert_path = root_path.clone().join("cert.pem");
+    let key_path = root_path.clone().join("key.pem");
+
     // Load TLS key and cert files
-    let cert_file = &mut BufReader::new(File::open("./examples/cert.pem").unwrap());
-    let key_file = &mut BufReader::new(File::open("./examples/key.pem").unwrap());
+    let cert_file = &mut BufReader::new(File::open(cert_path).unwrap());
+    let key_file = &mut BufReader::new(File::open(key_path).unwrap());
 
     let cert_chain = certs(cert_file)
         .unwrap()
@@ -64,7 +72,7 @@ async fn main() -> io::Result<()> {
     let count = Arc::new(AtomicUsize::new(0));
 
     let addr = ("127.0.0.1", 8443);
-    info!("starting server on port: {}", &addr.0);
+    info!("starting server at: {addr:?}");
 
     Server::build()
         .bind("tls-example", addr, move || {

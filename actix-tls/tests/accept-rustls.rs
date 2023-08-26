@@ -3,7 +3,7 @@
 #![cfg(all(
     feature = "accept",
     feature = "connect",
-    feature = "rustls",
+    feature = "rustls-0_21",
     feature = "openssl"
 ))]
 
@@ -15,13 +15,14 @@ use actix_rt::net::TcpStream;
 use actix_server::TestServer;
 use actix_service::ServiceFactoryExt as _;
 use actix_tls::{
-    accept::rustls::{Acceptor, TlsStream},
+    accept::rustls_0_21::{Acceptor, TlsStream},
     connect::openssl::reexports::SslConnector,
 };
 use actix_utils::future::ok;
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use tls_openssl::ssl::SslVerifyMode;
 use tokio_rustls::rustls::{self, Certificate, PrivateKey, ServerConfig};
+use tokio_rustls_024 as tokio_rustls;
 
 fn new_cert_and_key() -> (String, String) {
     let cert =

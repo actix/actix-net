@@ -9,7 +9,7 @@ description = "TLS acceptor and connector services for Actix ecosystem"
 keywords = ["network", "tls", "ssl", "async", "transport"]
 repository = "https://github.com/actix/actix-net.git"
 categories = ["network-programming", "asynchronous", "cryptography"]
-license = "MIT OR Apache-2.0"
+license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
@@ -29,8 +29,14 @@ connect = []
 # use openssl impls
 openssl = ["tls-openssl", "tokio-openssl"]
 
-# use rustls impls
-rustls = ["tokio-rustls", "webpki-roots"]
+# alias for backwards compat
+rustls = ["rustls-0_20"]
+
+# use rustls v0.20 impls
+rustls-0_20 = ["tokio-rustls-023", "webpki-roots-022"]
+
+# use rustls v0.21 impls
+rustls-0_21 = ["tokio-rustls-024", "webpki-roots-025"]
 
 # use native-tls impls
 native-tls = ["tokio-native-tls"]
@@ -57,9 +63,13 @@ http = { version = "0.2.3", optional = true }
 tls-openssl = { package = "openssl", version = "0.10.48", optional = true }
 tokio-openssl = { version = "0.6", optional = true }
 
-# rustls
-tokio-rustls = { version = "0.23", optional = true }
-webpki-roots = { version = "0.22", optional = true }
+# rustls v0.20
+tokio-rustls-023 = { package = "tokio-rustls", version = "0.23", optional = true }
+webpki-roots-022 = { package = "webpki-roots", version = "0.22", optional = true }
+
+# rustls v0.21
+tokio-rustls-024 = { package = "tokio-rustls", version = "0.24", optional = true }
+webpki-roots-025 = { package = "webpki-roots", version = "0.25", optional = true }
 
 # native-tls
 tokio-native-tls = { version = "0.3", optional = true }
@@ -72,11 +82,11 @@ bytes = "1"
 env_logger = "0.10"
 futures-util = { version = "0.3.17", default-features = false, features = ["sink"] }
 log = "0.4"
-rcgen = "0.10"
+rcgen = "0.11"
 rustls-pemfile = "1"
-tokio-rustls = { version = "0.23", features = ["dangerous_configuration"] }
-trust-dns-resolver = "0.22"
+tokio-rustls-024 = { package = "tokio-rustls", version = "0.24", features = ["dangerous_configuration"] }
+trust-dns-resolver = "0.23"
 
 [[example]]
 name = "accept-rustls"
-required-features = ["accept", "rustls"]
+required-features = ["accept", "rustls-0_21"]
