@@ -29,7 +29,7 @@ impl Counter {
 
     /// Returns true if counter is below capacity. Otherwise, register to wake task when it is.
     #[inline]
-    pub fn available(&self, cx: &mut task::Context<'_>) -> bool {
+    pub fn available(&self, cx: &task::Context<'_>) -> bool {
         self.0.available(cx)
     }
 
@@ -59,7 +59,7 @@ impl CounterInner {
         }
     }
 
-    fn available(&self, cx: &mut task::Context<'_>) -> bool {
+    fn available(&self, cx: &task::Context<'_>) -> bool {
         if self.count.get() < self.capacity {
             true
         } else {

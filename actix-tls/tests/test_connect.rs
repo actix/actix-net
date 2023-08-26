@@ -30,7 +30,7 @@ async fn test_string() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(feature = "rustls")]
+#[cfg(feature = "rustls-0_21")]
 #[actix_rt::test]
 async fn test_rustls_string() {
     let srv = TestServer::start(|| {
@@ -114,7 +114,7 @@ async fn test_openssl_uri() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(all(feature = "rustls", feature = "uri"))]
+#[cfg(all(feature = "rustls-0_21", feature = "uri"))]
 #[actix_rt::test]
 async fn test_rustls_uri() {
     use std::convert::TryFrom;

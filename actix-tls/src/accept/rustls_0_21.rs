@@ -1,4 +1,4 @@
-//! `rustls` based TLS connection acceptor service.
+//! `rustls` v0.21 based TLS connection acceptor service.
 //!
 //! See [`Acceptor`] for main service factory docs.
 
@@ -24,13 +24,14 @@ use actix_utils::{
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_rustls::{rustls::ServerConfig, Accept, TlsAcceptor};
+use tokio_rustls_024 as tokio_rustls;
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
 
 pub mod reexports {
     //! Re-exports from `rustls` that are useful for acceptors.
 
-    pub use tokio_rustls::rustls::ServerConfig;
+    pub use tokio_rustls_024::rustls::ServerConfig;
 }
 
 /// Wraps a `rustls` based async TLS stream in order to implement [`ActixStream`].

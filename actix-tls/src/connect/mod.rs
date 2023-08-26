@@ -27,8 +27,15 @@ mod uri;
 #[cfg(feature = "openssl")]
 pub mod openssl;
 
-#[cfg(feature = "rustls")]
-pub mod rustls;
+#[cfg(feature = "rustls-0_20")]
+pub mod rustls_0_20;
+
+#[doc(hidden)]
+#[cfg(feature = "rustls-0_20")]
+pub use rustls_0_20 as rustls;
+
+#[cfg(feature = "rustls-0_21")]
+pub mod rustls_0_21;
 
 #[cfg(feature = "native-tls")]
 pub mod native_tls;
