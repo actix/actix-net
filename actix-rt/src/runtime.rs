@@ -76,7 +76,6 @@ impl Runtime {
     ///
     /// ```
     /// use actix_rt::Runtime;
-    /// use tokio::task;
     ///
     /// mod module_a {
     ///     pub fn do_something(handle: tokio::runtime::Handle) {
