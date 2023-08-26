@@ -1,4 +1,4 @@
-use std::{io, time::Duration};
+use std::{io, num::NonZeroUsize, time::Duration};
 
 use actix_rt::net::TcpStream;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -7,12 +7,26 @@ use tracing::{info, trace};
 use crate::{
     server::ServerCommand,
     service::{InternalServiceFactory, ServerServiceFactory, StreamNewService},
-    socket::{
-        create_mio_tcp_listener, MioListener, MioTcpListener, StdTcpListener, ToSocketAddrs,
-    },
+    socket::{create_mio_tcp_listener, MioListener, MioTcpListener, StdTcpListener, ToSocketAddrs},
     worker::ServerWorkerConfig,
     Server,
 };
+
+/// Multipath TCP (MPTCP) preference.
+///
+/// Also see [`ServerBuilder::mptcp()`].
+#[derive(Debug, Clone)]
+pub enum MpTcp {
+    /// MPTCP will not be used when binding sockets.
+    Disabled,
+
+    /// MPTCP will be attempted when binding sockets. If errors occur, regular TCP will be
+    /// attempted, too.
+    TcpFallback,
+
+    /// MPTCP will be used when binding sockets (with no fallback).
+    NoFallback,
+}
 
 /// [Server] builder.
 pub struct ServerBuilder {
@@ -21,6 +35,7 @@ pub struct ServerBuilder {
     pub(crate) backlog: u32,
     pub(crate) factories: Vec<Box<dyn InternalServiceFactory>>,
     pub(crate) sockets: Vec<(usize, String, MioListener)>,
+    pub(crate) mptcp: MpTcp,
     pub(crate) exit: bool,
     pub(crate) listen_os_signals: bool,
     pub(crate) cmd_tx: UnboundedSender<ServerCommand>,
@@ -40,11 +55,12 @@ impl ServerBuilder {
         let (cmd_tx, cmd_rx) = unbounded_channel();
 
         ServerBuilder {
-            threads: num_cpus::get_physical(),
+            threads: std::thread::available_parallelism().map_or(2, NonZeroUsize::get),
             token: 0,
             factories: Vec::new(),
             sockets: Vec::new(),
             backlog: 2048,
+            mptcp: MpTcp::Disabled,
             exit: false,
             listen_os_signals: true,
             cmd_tx,
@@ -60,6 +76,12 @@ impl ServerBuilder {
     /// The default worker count is the number of physical CPU cores available. If your benchmark
     /// testing indicates that simultaneous multi-threading is beneficial to your app, you can use
     /// the [`num_cpus`] crate to acquire the _logical_ core count instead.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `num` is 0.
+    ///
+    /// [`num_cpus`]: https://docs.rs/num_cpus
     pub fn workers(mut self, num: usize) -> Self {
         assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;
@@ -95,6 +117,24 @@ impl ServerBuilder {
     /// This method should be called before `bind()` method call.
     pub fn backlog(mut self, num: u32) -> Self {
         self.backlog = num;
+        self
+    }
+
+    /// Sets MultiPath TCP (MPTCP) preference on bound sockets.
+    ///
+    /// Multipath TCP (MPTCP) builds on top of TCP to improve connection redundancy and performance
+    /// by sharing a network data stream across multiple underlying TCP sessions. See [mptcp.dev]
+    /// for more info about MPTCP itself.
+    ///
+    /// MPTCP is available on Linux kernel version 5.6 and higher. In addition, you'll also need to
+    /// ensure the kernel option is enabled using `sysctl net.mptcp.enabled=1`.
+    ///
+    /// This method will have no effect if called after a `bind()`.
+    ///
+    /// [mptcp.dev]: https://www.mptcp.dev
+    #[cfg(target_os = "linux")]
+    pub fn mptcp(mut self, mptcp_enabled: MpTcp) -> Self {
+        self.mptcp = mptcp_enabled;
         self
     }
 
@@ -146,7 +186,7 @@ impl ServerBuilder {
         U: ToSocketAddrs,
         N: AsRef<str>,
     {
-        let sockets = bind_addr(addr, self.backlog)?;
+        let sockets = bind_addr(addr, self.backlog, &self.mptcp)?;
 
         trace!("binding server to: {:?}", &sockets);
 
@@ -246,8 +286,7 @@ impl ServerBuilder {
         use std::net::{IpAddr, Ipv4Addr};
         lst.set_nonblocking(true)?;
         let token = self.next_token();
-        let addr =
-            crate::socket::StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let addr = crate::socket::StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         self.factories.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
@@ -263,13 +302,14 @@ impl ServerBuilder {
 pub(super) fn bind_addr<S: ToSocketAddrs>(
     addr: S,
     backlog: u32,
+    mptcp: &MpTcp,
 ) -> io::Result<Vec<MioTcpListener>> {
     let mut opt_err = None;
     let mut success = false;
     let mut sockets = Vec::new();
 
     for addr in addr.to_socket_addrs()? {
-        match create_mio_tcp_listener(addr, backlog) {
+        match create_mio_tcp_listener(addr, backlog, mptcp) {
             Ok(lst) => {
                 success = true;
                 sockets.push(lst);

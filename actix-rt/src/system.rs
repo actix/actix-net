@@ -266,9 +266,7 @@ impl SystemRunner {
 
     /// Runs the event loop until [stopped](System::stop_with_code), returning the exit code.
     pub fn run_with_code(self) -> io::Result<i32> {
-        unimplemented!(
-            "SystemRunner::run_with_code is not implemented for io-uring feature yet"
-        );
+        unimplemented!("SystemRunner::run_with_code is not implemented for io-uring feature yet");
     }
 
     /// Runs the provided future, blocking the current thread until the future completes.

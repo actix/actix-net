@@ -198,8 +198,7 @@ pin_project! {
     }
 }
 
-impl<SF, Req, F, Cfg, Fut, S> Future
-    for ApplyConfigServiceFactoryResponse<SF, Req, F, Cfg, Fut, S>
+impl<SF, Req, F, Cfg, Fut, S> Future for ApplyConfigServiceFactoryResponse<SF, Req, F, Cfg, Fut, S>
 where
     SF: ServiceFactory<Req, Config = ()>,
     SF::InitError: From<SF::Error>,

@@ -118,9 +118,11 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::cell::RefCell;
-    use std::collections::{BTreeMap, BTreeSet};
-    use std::sync::{Arc, RwLock};
+    use std::{
+        cell::RefCell,
+        collections::{BTreeMap, BTreeSet},
+        sync::{Arc, RwLock},
+    };
 
     use actix_service::{fn_factory, fn_service};
     use slab::Slab;

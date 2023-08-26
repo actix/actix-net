@@ -1,6 +1,7 @@
 use std::{
     future::Future,
     io, mem,
+    num::NonZeroUsize,
     pin::Pin,
     rc::Rc,
     sync::{
@@ -249,8 +250,11 @@ pub(crate) struct ServerWorkerConfig {
 
 impl Default for ServerWorkerConfig {
     fn default() -> Self {
-        // 512 is the default max blocking thread count of tokio runtime.
-        let max_blocking_threads = std::cmp::max(512 / num_cpus::get_physical(), 1);
+        let parallelism = std::thread::available_parallelism().map_or(2, NonZeroUsize::get);
+
+        // 512 is the default max blocking thread count of a Tokio runtime.
+        let max_blocking_threads = std::cmp::max(512 / parallelism, 1);
+
         Self {
             shutdown_timeout: Duration::from_secs(30),
             max_blocking_threads,
@@ -621,12 +625,13 @@ impl Future for ServerWorker {
                     self.poll(cx)
                 }
             },
+
             WorkerState::Restarting(ref mut restart) => {
                 let factory_id = restart.factory_id;
                 let token = restart.token;
 
-                let (token_new, service) = ready!(restart.fut.as_mut().poll(cx))
-                    .unwrap_or_else(|_| {
+                let (token_new, service) =
+                    ready!(restart.fut.as_mut().poll(cx)).unwrap_or_else(|_| {
                         panic!(
                             "Can not restart {:?} service",
                             this.factories[factory_id].name(token)
@@ -645,6 +650,7 @@ impl Future for ServerWorker {
 
                 self.poll(cx)
             }
+
             WorkerState::Shutdown(ref mut shutdown) => {
                 // drop all pending connections in rx channel.
                 while let Poll::Ready(Some(conn)) = this.conn_rx.poll_recv(cx) {
@@ -678,6 +684,7 @@ impl Future for ServerWorker {
                     shutdown.timer.as_mut().poll(cx)
                 }
             }
+
             // actively poll stream and handle worker command
             WorkerState::Available => loop {
                 match this.check_readiness(cx) {
@@ -697,7 +704,10 @@ impl Future for ServerWorker {
                 match ready!(this.conn_rx.poll_recv(cx)) {
                     Some(msg) => {
                         let guard = this.counter.guard();
-                        let _ = this.services[msg.token].service.call((guard, msg.io));
+                        let _ = this.services[msg.token]
+                            .service
+                            .call((guard, msg.io))
+                            .into_inner();
                     }
                     None => return Poll::Ready(()),
                 };
@@ -706,9 +716,7 @@ impl Future for ServerWorker {
     }
 }
 
-fn wrap_worker_services(
-    services: Vec<(usize, usize, BoxedServerService)>,
-) -> Vec<WorkerService> {
+fn wrap_worker_services(services: Vec<(usize, usize, BoxedServerService)>) -> Vec<WorkerService> {
     services
         .into_iter()
         .fold(Vec::new(), |mut services, (idx, token, service)| {

@@ -20,8 +20,7 @@ fn main() {
         let make_service =
             make_service_fn(|_conn| async { Ok::<_, Infallible>(service_fn(handle)) });
 
-        let server =
-            Server::bind(&SocketAddr::from(([127, 0, 0, 1], 3000))).serve(make_service);
+        let server = Server::bind(&SocketAddr::from(([127, 0, 0, 1], 3000))).serve(make_service);
 
         if let Err(err) = server.await {
             eprintln!("server error: {}", err);

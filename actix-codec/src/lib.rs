@@ -11,14 +11,18 @@
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
+pub use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+pub use tokio_util::{
+    codec::{Decoder, Encoder},
+    io::poll_read_buf,
+};
+
 mod bcodec;
 mod framed;
 mod lines;
 
-pub use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-pub use tokio_util::codec::{Decoder, Encoder};
-pub use tokio_util::io::poll_read_buf;
-
-pub use self::bcodec::BytesCodec;
-pub use self::framed::{Framed, FramedParts};
-pub use self::lines::LinesCodec;
+pub use self::{
+    bcodec::BytesCodec,
+    framed::{Framed, FramedParts},
+    lines::LinesCodec,
+};

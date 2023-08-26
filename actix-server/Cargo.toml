@@ -12,8 +12,8 @@ categories = ["network-programming", "asynchronous"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 license = "MIT OR Apache-2.0"
-edition = "2021"
-rust-version = "1.60"
+edition.workspace = true
+rust-version.workspace = true
 
 [features]
 default = []
@@ -27,8 +27,7 @@ actix-utils = "3"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
 mio = { version = "0.8", features = ["os-poll", "net"] }
-num_cpus = "1.13"
-socket2 = "0.4.2" # TODO(MSRV 1.64) update to 0.5
+socket2 = "0.5"
 tokio = { version = "1.23.1", features = ["sync"] }
 tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 

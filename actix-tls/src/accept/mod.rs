@@ -12,15 +12,27 @@ use actix_utils::counter::Counter;
 #[cfg(feature = "openssl")]
 pub mod openssl;
 
-#[cfg(feature = "rustls")]
-pub mod rustls;
+#[cfg(feature = "rustls-0_20")]
+pub mod rustls_0_20;
+
+#[doc(hidden)]
+#[cfg(feature = "rustls-0_20")]
+pub use rustls_0_20 as rustls;
+
+#[cfg(feature = "rustls-0_21")]
+pub mod rustls_0_21;
 
 #[cfg(feature = "native-tls")]
 pub mod native_tls;
 
 pub(crate) static MAX_CONN: AtomicUsize = AtomicUsize::new(256);
 
-#[cfg(any(feature = "openssl", feature = "rustls", feature = "native-tls"))]
+#[cfg(any(
+    feature = "openssl",
+    feature = "rustls-0_20",
+    feature = "rustls-0_21",
+    feature = "native-tls",
+))]
 pub(crate) const DEFAULT_TLS_HANDSHAKE_TIMEOUT: std::time::Duration =
     std::time::Duration::from_secs(3);
 
@@ -56,6 +68,25 @@ pub enum TlsError<TlsErr, SvcErr> {
     Service(SvcErr),
 }
 
+impl<TlsErr> TlsError<TlsErr, Infallible> {
+    /// Casts the infallible service error type returned from acceptors into caller's type.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::convert::Infallible;
+    /// # use actix_tls::accept::TlsError;
+    /// let a: TlsError<u32, Infallible> = TlsError::Tls(42);
+    /// let _b: TlsError<u32, u64> = a.into_service_error();
+    /// ```
+    pub fn into_service_error<SvcErr>(self) -> TlsError<TlsErr, SvcErr> {
+        match self {
+            Self::Timeout => TlsError::Timeout,
+            Self::Tls(err) => TlsError::Tls(err),
+            Self::Service(err) => match err {},
+        }
+    }
+}
+
 impl<TlsErr, SvcErr> fmt::Display for TlsError<TlsErr, SvcErr> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -76,25 +107,6 @@ where
             TlsError::Tls(err) => Some(err),
             TlsError::Service(err) => Some(err),
             TlsError::Timeout => None,
-        }
-    }
-}
-
-impl<TlsErr> TlsError<TlsErr, Infallible> {
-    /// Casts the infallible service error type returned from acceptors into caller's type.
-    ///
-    /// # Examples
-    /// ```
-    /// # use std::convert::Infallible;
-    /// # use actix_tls::accept::TlsError;
-    /// let a: TlsError<u32, Infallible> = TlsError::Tls(42);
-    /// let _b: TlsError<u32, u64> = a.into_service_error();
-    /// ```
-    pub fn into_service_error<SvcErr>(self) -> TlsError<TlsErr, SvcErr> {
-        match self {
-            Self::Timeout => TlsError::Timeout,
-            Self::Tls(err) => TlsError::Tls(err),
-            Self::Service(err) => match err {},
         }
     }
 }

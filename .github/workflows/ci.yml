@@ -1,6 +1,6 @@
 name: CI
 
-on: 
+on:
   pull_request: {}
   push: { branches: [master] }
 
@@ -16,6 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # prettier-ignore
         target:
           - { name: Linux, os: ubuntu-latest, triple: x86_64-unknown-linux-gnu }
           - { name: macOS, os: macos-latest, triple: x86_64-apple-darwin }
@@ -23,7 +24,7 @@ jobs:
           - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
           - { name: Windows (32-bit), os: windows-latest, triple: i686-pc-windows-msvc }
         version:
-          - 1.60.0
+          - 1.65.0 # MSRV
           - stable
 
     name: ${{ matrix.target.name }} / ${{ matrix.version }}
@@ -38,19 +39,25 @@ jobs:
 
       - uses: actions/checkout@v3
 
+      - name: Free Disk Space
+        if: matrix.target.os == 'ubuntu-latest'
+        run: ./scripts/free-disk-space.sh
+
       - name: Install OpenSSL
         if: matrix.target.os == 'windows-latest'
-        run: choco install openssl
+        run: choco install openssl -y --forcex64 --no-progress
       - name: Set OpenSSL dir in env
         if: matrix.target.os == 'windows-latest'
-        run: echo 'OPENSSL_DIR=C:\Program Files\OpenSSL-Win64' | Out-File -FilePath $env:GITHUB_ENV -Append
+        run: |
+          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL-Win64' | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL' | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Install Rust (${{ matrix.version }})
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.version }}
 
-      - uses: taiki-e/cache-cargo-install-action@v1
+      - uses: taiki-e/install-action@v1
         with: { tool: cargo-hack }
 
       - name: Generate Cargo.lock
@@ -93,8 +100,15 @@ jobs:
         run: cargo ci-test-win
       - name: tests
         if: matrix.target.os == 'ubuntu-latest'
-        run: |
-          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux"
+        run: >-
+          sudo bash -c "
+          ulimit -Sl 512
+          && ulimit -Hl 512
+          && PATH=$PATH:/usr/share/rust/.cargo/bin
+          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-020
+          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-021
+          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux
+          "
 
       - name: Clear the cargo caches
         run: |

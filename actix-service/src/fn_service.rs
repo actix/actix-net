@@ -3,9 +3,7 @@ use core::{future::Future, marker::PhantomData};
 use crate::{ok, IntoService, IntoServiceFactory, Ready, Service, ServiceFactory};
 
 /// Create `ServiceFactory` for function that can act as a `Service`
-pub fn fn_service<F, Fut, Req, Res, Err, Cfg>(
-    f: F,
-) -> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
+pub fn fn_service<F, Fut, Req, Res, Err, Cfg>(f: F) -> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
 where
     F: Fn(Req) -> Fut + Clone,
     Fut: Future<Output = Result<Res, Err>>,
@@ -48,9 +46,7 @@ where
 ///     Ok(())
 /// }
 /// ```
-pub fn fn_factory<F, Cfg, Srv, Req, Fut, Err>(
-    f: F,
-) -> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
+pub fn fn_factory<F, Cfg, Srv, Req, Fut, Err>(f: F) -> FnServiceNoConfig<F, Cfg, Srv, Req, Fut, Err>
 where
     F: Fn() -> Fut,
     Fut: Future<Output = Result<Srv, Err>>,
@@ -265,8 +261,7 @@ where
     }
 }
 
-impl<F, Fut, Cfg, Srv, Req, Err> ServiceFactory<Req>
-    for FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
+impl<F, Fut, Cfg, Srv, Req, Err> ServiceFactory<Req> for FnServiceConfig<F, Fut, Cfg, Srv, Req, Err>
 where
     F: Fn(Cfg) -> Fut,
     Fut: Future<Output = Result<Srv, Err>>,
@@ -404,9 +399,8 @@ mod tests {
             ok::<_, Rc<u8>>(fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8))))
         });
 
-        let fac_2 = fn_factory(|| {
-            ok::<_, Rc<u8>>(fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8))))
-        });
+        let fac_2 =
+            fn_factory(|| ok::<_, Rc<u8>>(fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8)))));
 
         fn is_send<T: Send + Sync + Clone>(_: &T) {}
 

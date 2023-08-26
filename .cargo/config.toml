@@ -15,9 +15,11 @@ ci-check-linux = "hack --workspace --feature-powerset check --tests --examples"
 
 # tests avoiding io-uring feature
 ci-test = "hack --feature-powerset --exclude-features=io-uring test --lib --tests --no-fail-fast -- --nocapture"
+ci-test-rustls-020 = "hack --feature-powerset --exclude-features=io-uring,rustls-0_21 test --lib --tests --no-fail-fast -- --nocapture"
+ci-test-rustls-021 = "hack --feature-powerset --exclude-features=io-uring,rustls-0_20 test --lib --tests --no-fail-fast -- --nocapture"
 
 # tests avoiding io-uring feature on Windows
-ci-test-win = "hack --feature-powerset --depth 2 --exclude-features=io-uring test --lib --tests --no-fail-fast -- --nocapture"
+ci-test-win = "hack --feature-powerset --depth=2 --exclude-features=io-uring test --lib --tests --no-fail-fast -- --nocapture"
 
 # test with io-uring feature
-ci-test-linux = "hack --feature-powerset test --lib --tests --no-fail-fast -- --nocapture"
+ci-test-linux = "hack --feature-powerset --exclude-features=rustls-0_20 test --lib --tests --no-fail-fast -- --nocapture"

@@ -27,16 +27,25 @@ mod uri;
 #[cfg(feature = "openssl")]
 pub mod openssl;
 
-#[cfg(feature = "rustls")]
-pub mod rustls;
+#[cfg(feature = "rustls-0_20")]
+pub mod rustls_0_20;
+
+#[doc(hidden)]
+#[cfg(feature = "rustls-0_20")]
+pub use rustls_0_20 as rustls;
+
+#[cfg(feature = "rustls-0_21")]
+pub mod rustls_0_21;
 
 #[cfg(feature = "native-tls")]
 pub mod native_tls;
 
-pub use self::connection::Connection;
-pub use self::connector::{Connector, ConnectorService};
-pub use self::error::ConnectError;
-pub use self::host::Host;
-pub use self::info::ConnectInfo;
-pub use self::resolve::Resolve;
-pub use self::resolver::{Resolver, ResolverService};
+pub use self::{
+    connection::Connection,
+    connector::{Connector, ConnectorService},
+    error::ConnectError,
+    host::Host,
+    info::ConnectInfo,
+    resolve::Resolve,
+    resolver::{Resolver, ResolverService},
+};

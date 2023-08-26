@@ -16,6 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # prettier-ignore
         target:
           - { name: Linux, os: ubuntu-latest, triple: x86_64-unknown-linux-gnu }
           - { name: macOS, os: macos-latest, triple: x86_64-apple-darwin }
@@ -37,19 +38,25 @@ jobs:
 
       - uses: actions/checkout@v3
 
+      - name: Free Disk Space
+        if: matrix.target.os == 'ubuntu-latest'
+        run: ./scripts/free-disk-space.sh
+
       - name: Install OpenSSL
         if: matrix.target.os == 'windows-latest'
-        run: choco install openssl
+        run: choco install openssl -y --forcex64 --no-progress
       - name: Set OpenSSL dir in env
         if: matrix.target.os == 'windows-latest'
-        run: echo 'OPENSSL_DIR=C:\Program Files\OpenSSL-Win64' | Out-File -FilePath $env:GITHUB_ENV -Append
+        run: |
+          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL-Win64' | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL' | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Install Rust (${{ matrix.version }})
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.version }}
 
-      - uses: taiki-e/cache-cargo-install-action@v1
+      - uses: taiki-e/install-action@v2
         with: { tool: cargo-hack }
 
       - name: check lib
@@ -81,8 +88,15 @@ jobs:
         run: cargo ci-test
       - name: tests
         if: matrix.target.os == 'ubuntu-latest'
-        run: |
-          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux"
+        run: >-
+          sudo bash -c "
+          ulimit -Sl 512
+          && ulimit -Hl 512
+          && PATH=$PATH:/usr/share/rust/.cargo/bin
+          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-020
+          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-021
+          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux
+          "
 
       - name: Clear the cargo caches
         run: |
@@ -99,11 +113,13 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with: { toolchain: nightly }
 
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@v1
+        with: { tool: cargo-tarpaulin }
+
       - name: Generate coverage file
         if: github.ref == 'refs/heads/master'
-        run: |
-          cargo install cargo-tarpaulin
-          cargo tarpaulin --out Xml --verbose
+        run: cargo tarpaulin --out Xml --verbose
       - name: Upload to Codecov
         if: github.ref == 'refs/heads/master'
         uses: codecov/codecov-action@v3
@@ -119,11 +135,9 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with: { toolchain: nightly }
 
-      - uses: taiki-e/cache-cargo-install-action@v1
-        with: { tool: cargo-minimal-versions }
-
-      - uses: taiki-e/cache-cargo-install-action@v1
-        with: { tool: cargo-hack }
+      - name: Install cargo-hack & cargo-minimal-versions
+        uses: taiki-e/install-action@v1
+        with: { tool: 'cargo-hack,cargo-minimal-versions' }
 
       - name: Check With Minimal Versions
         run: cargo minimal-versions check
@@ -138,7 +152,8 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Install cargo-nextest
-        run: cargo install cargo-nextest
+        uses: taiki-e/install-action@v1
+        with: { tool: cargo-nextest }
 
       - name: Test with cargo-nextest
         run: cargo nextest run
