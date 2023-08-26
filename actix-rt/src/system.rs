@@ -215,15 +215,10 @@ impl SystemRunner {
     /// # Example
     ///
     /// ```
-    /// use actix_rt::SystemRunner;
-    /// use tokio::task;
+    /// let system_runner = actix_rt::System::new();
+    /// let actix_runtime = system_runner.runtime();
     ///
-    /// fn main() {
-    ///     let system_runner = actix_rt::System::new();
-    ///     let actix_runtime = system_runner.runtime();
-    ///
-    ///     // Use the runtime to spawn an async task or perform other operations
-    /// }
+    /// // Use the runtime to spawn an async task or perform other operations
     /// ```
     ///
     /// Read more in the documentation for [`actix_rt::Runtime`]
