@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 3.1.1
+
+- Fix minimum `rustls` v0.21 version requirement.
+
 ## 3.1.0
 
 - Support Rustls v0.21.
