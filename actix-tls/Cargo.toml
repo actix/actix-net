@@ -17,6 +17,11 @@ rust-version.workspace = true
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
+[package.metadata.cargo-machete]
+ignored = [
+    "rustls_021", # specified to force version with add_trust_anchors method
+]
+
 [features]
 default = ["accept", "connect"]
 
@@ -68,6 +73,7 @@ tokio-rustls-023 = { package = "tokio-rustls", version = "0.23", optional = true
 webpki-roots-022 = { package = "webpki-roots", version = "0.22", optional = true }
 
 # rustls v0.21
+rustls-021 = { package = "rustls", version = "0.21.6" }
 tokio-rustls-024 = { package = "tokio-rustls", version = "0.24", optional = true }
 webpki-roots-025 = { package = "webpki-roots", version = "0.25", optional = true }
 
@@ -81,7 +87,6 @@ actix-server = "2"
 bytes = "1"
 env_logger = "0.10"
 futures-util = { version = "0.3.17", default-features = false, features = ["sink"] }
-log = "0.4"
 rcgen = "0.11"
 rustls-pemfile = "1"
 tokio-rustls-024 = { package = "tokio-rustls", version = "0.24", features = ["dangerous_configuration"] }
