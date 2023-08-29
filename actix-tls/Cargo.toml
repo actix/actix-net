@@ -20,6 +20,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [package.metadata.cargo-machete]
 ignored = [
     "rustls_021", # specified to force version with add_trust_anchors method
+    "rustls_webpki_0101", # specified to force secure version
 ]
 
 [features]
@@ -65,7 +66,7 @@ tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 http = { version = "0.2.3", optional = true }
 
 # openssl
-tls-openssl = { package = "openssl", version = "0.10.48", optional = true }
+tls-openssl = { package = "openssl", version = "0.10.55", optional = true }
 tokio-openssl = { version = "0.6", optional = true }
 
 # rustls v0.20
@@ -74,6 +75,7 @@ webpki-roots-022 = { package = "webpki-roots", version = "0.22", optional = true
 
 # rustls v0.21
 rustls-021 = { package = "rustls", version = "0.21.6" }
+rustls-webpki-0101 = { package = "rustls-webpki", version = "0.101.4" }
 tokio-rustls-024 = { package = "tokio-rustls", version = "0.24", optional = true }
 webpki-roots-025 = { package = "webpki-roots", version = "0.25", optional = true }
 

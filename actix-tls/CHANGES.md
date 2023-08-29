@@ -4,7 +4,7 @@
 
 ## 3.1.1
 
-- Fix minimum `rustls` v0.21 version requirement.
+- Fix `rustls` v0.21 version requirement.
 
 ## 3.1.0
 
