@@ -8,15 +8,17 @@ description = "PROXY protocol utilities"
 keywords = ["proxy", "protocol", "network", "haproxy", "tcp"]
 categories = ["network-programming", "asynchronous"]
 homepage = "https://actix.rs"
-repository = "https://github.com/actix/actix-net.git"
-license = "MIT OR Apache-2.0"
-edition = "2018"
+repository = "https://github.com/actix/actix-net"
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 actix-service = "2"
 actix-utils = "3"
 
 arrayvec = "0.7"
+bitflags = "2"
 crc32fast = "1"
 futures-core = { version = "0.3.17", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.17", default-features = false, features = ["std"] }

@@ -110,7 +110,7 @@ impl Header {
         for (typ, value) in &self.tlvs {
             wrt.write_all(&[*typ])?;
             wrt.write_all(&(value.len() as u16).to_be_bytes())?;
-            wrt.write_all(&value)?;
+            wrt.write_all(value)?;
         }
 
         Ok(())
@@ -170,7 +170,7 @@ impl Header {
         let crc_sent = self
             .tlvs
             .iter()
-            .filter_map(|(typ, value)| Crc32c::try_from_parts(*typ, &value))
+            .filter_map(|(typ, value)| Crc32c::try_from_parts(*typ, value))
             .next()?;
 
         // If the checksum is provided as part of the PROXY header and the checksum
@@ -185,7 +185,7 @@ impl Header {
 
         let mut this = self.clone();
         for (typ, value) in this.tlvs.iter_mut() {
-            if Crc32c::try_from_parts(*typ, &value).is_some() {
+            if Crc32c::try_from_parts(*typ, value).is_some() {
                 value.fill(0);
             }
         }
