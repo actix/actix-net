@@ -1,27 +1,27 @@
 # Changes
 
-## Unreleased - 2023-xx-xx
+## Unreleased
 
 - Minimum supported Rust version (MSRV) is now 1.65.
 
-## 0.5.1 - 2022-03-15
+## 0.5.1
 
 - Logs emitted now use the `tracing` crate with `log` compatibility. [#451]
 - Minimum supported Rust version (MSRV) is now 1.49.
 
 [#451]: https://github.com/actix/actix-net/pull/451
 
-## 0.5.0 - 2022-02-15
+## 0.5.0
 
 - Updated `tokio-util` dependency to `0.7.0`. [#446]
 
 [#446]: https://github.com/actix/actix-net/pull/446
 
-## 0.4.2 - 2021-12-31
+## 0.4.2
 
 - No significant changes since `0.4.1`.
 
-## 0.4.1 - 2021-11-05
+## 0.4.1
 
 - Added `LinesCodec.` [#338]
 - `Framed::poll_ready` flushes when the buffer is full. [#409]
@@ -29,11 +29,11 @@
 [#338]: https://github.com/actix/actix-net/pull/338
 [#409]: https://github.com/actix/actix-net/pull/409
 
-## 0.4.0 - 2021-04-20
+## 0.4.0
 
 - No significant changes since v0.4.0-beta.1.
 
-## 0.4.0-beta.1 - 2020-12-28
+## 0.4.0-beta.1
 
 - Replace `pin-project` with `pin-project-lite`. [#237]
 - Upgrade `tokio` dependency to `1`. [#237]
@@ -42,15 +42,15 @@
 
 [#237]: https://github.com/actix/actix-net/pull/237
 
-## 0.3.0 - 2020-08-23
+## 0.3.0
 
 - No changes from beta 2.
 
-## 0.3.0-beta.2 - 2020-08-19
+## 0.3.0-beta.2
 
 - Remove unused type parameter from `Framed::replace_codec`.
 
-## 0.3.0-beta.1 - 2020-08-19
+## 0.3.0-beta.1
 
 - Use `.advance()` instead of `.split_to()`.
 - Upgrade `tokio-util` to `0.3`.
@@ -60,7 +60,7 @@
 - Add method on `Framed` to get a pinned reference to the underlying I/O.
 - Add method on `Framed` check emptiness of read buffer.
 
-## 0.2.0 - 2019-12-10
+## 0.2.0
 
 - Use specific futures dependencies.
 
@@ -77,14 +77,14 @@
 
 - Migrated to `std::future`.
 
-## 0.1.2 - 2019-03-27
+## 0.1.2
 
 - Added `Framed::map_io()` method.
 
-## 0.1.1 - 2019-03-06
+## 0.1.1
 
 - Added `FramedParts::with_read_buffer()` method.
 
-## 0.1.0 - 2018-12-09
+## 0.1.0
 
 - Move codec to separate crate.

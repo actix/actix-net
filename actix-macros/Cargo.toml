@@ -7,11 +7,16 @@ authors = [
     "Rob Ede <robjtede@icloud.com>",
 ]
 description = "Macros for Actix system and runtime"
-repository = "https://github.com/actix/actix-net.git"
+repository = "https://github.com/actix/actix-net"
 categories = ["network-programming", "asynchronous"]
-license = "MIT OR Apache-2.0"
+license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = [
+    "proc_macro2", # specified for minimal versions compat
+]
 
 [lib]
 proc-macro = true
@@ -19,6 +24,9 @@ proc-macro = true
 [dependencies]
 quote = "1"
 syn = { version = "2", features = ["full"] }
+
+# minimal versions compat
+proc-macro2 = "1.0.60"
 
 [dev-dependencies]
 actix-rt = "2"

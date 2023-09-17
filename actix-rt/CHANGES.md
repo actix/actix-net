@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased - 2023-xx-xx
+## Unreleased
 
 ## 2.9.0
 
@@ -8,7 +8,7 @@
 - Add `actix_rt::Runtime::tokio_runtime()` method to retrieve the underlying Tokio runtime.
 - Minimum supported Rust version (MSRV) is now 1.65.
 
-## 2.8.0 - 2022-12-21
+## 2.8.0
 
 - Add `#[track_caller]` attribute to `spawn` functions and methods. [#454]
 - Update `tokio-uring` dependency to `0.4`. [#473]
@@ -17,32 +17,32 @@
 [#454]: https://github.com/actix/actix-net/pull/454
 [#473]: https://github.com/actix/actix-net/pull/473
 
-## 2.7.0 - 2022-03-08
+## 2.7.0
 
 - Update `tokio-uring` dependency to `0.3`. [#448]
 - Minimum supported Rust version (MSRV) is now 1.49.
 
 [#448]: https://github.com/actix/actix-net/pull/448
 
-## 2.6.0 - 2022-01-12
+## 2.6.0
 
 - Update `tokio-uring` dependency to `0.2`. [#436]
 
 [#436]: https://github.com/actix/actix-net/pull/436
 
-## 2.5.1 - 2021-12-31
+## 2.5.1
 
 - Expose `System::with_tokio_rt` and `Arbiter::with_tokio_rt`. [#430]
 
 [#430]: https://github.com/actix/actix-net/pull/430
 
-## 2.5.0 - 2021-11-22
+## 2.5.0
 
 - Add `System::run_with_code` to allow retrieving the exit code on stop. [#411]
 
 [#411]: https://github.com/actix/actix-net/pull/411
 
-## 2.4.0 - 2021-11-05
+## 2.4.0
 
 - Add `Arbiter::try_current` for situations where thread may or may not have Arbiter context. [#408]
 - Start io-uring with `System::new` when feature is enabled. [#395]
@@ -50,7 +50,7 @@
 [#395]: https://github.com/actix/actix-net/pull/395
 [#408]: https://github.com/actix/actix-net/pull/408
 
-## 2.3.0 - 2021-10-11
+## 2.3.0
 
 - The `spawn` method can now resolve with non-unit outputs. [#369]
 - Add experimental (semver-exempt) `io-uring` feature for enabling async file I/O on linux. [#374]
@@ -58,14 +58,14 @@
 [#369]: https://github.com/actix/actix-net/pull/369
 [#374]: https://github.com/actix/actix-net/pull/374
 
-## 2.2.0 - 2021-03-29
+## 2.2.0
 
 - **BREAKING** `ActixStream::{poll_read_ready, poll_write_ready}` methods now return `Ready` object in ok variant. [#293]
   - Breakage is acceptable since `ActixStream` was not intended to be public.
 
 [#293]: https://github.com/actix/actix-net/pull/293
 
-## 2.1.0 - 2021-02-24
+## 2.1.0
 
 - Add `ActixStream` extension trait to include readiness methods. [#276]
 - Re-export `tokio::net::TcpSocket` in `net` module [#282]
@@ -73,7 +73,7 @@
 [#276]: https://github.com/actix/actix-net/pull/276
 [#282]: https://github.com/actix/actix-net/pull/282
 
-## 2.0.2 - 2021-02-06
+## 2.0.2
 
 - Add `Arbiter::handle` to get a handle of an owned Arbiter. [#274]
 - Add `System::try_current` for situations where actix may or may not be running a System. [#275]
@@ -81,20 +81,20 @@
 [#274]: https://github.com/actix/actix-net/pull/274
 [#275]: https://github.com/actix/actix-net/pull/275
 
-## 2.0.1 - 2021-02-06
+## 2.0.1
 
 - Expose `JoinError` from Tokio. [#271]
 
 [#271]: https://github.com/actix/actix-net/pull/271
 
-## 2.0.0 - 2021-02-02
+## 2.0.0
 
 - Remove all Arbiter-local storage methods. [#262]
 - Re-export `tokio::pin`. [#262]
 
 [#262]: https://github.com/actix/actix-net/pull/262
 
-## 2.0.0-beta.3 - 2021-01-31
+## 2.0.0-beta.3
 
 - Remove `run_in_tokio`, `attach_to_tokio` and `AsyncSystemRunner`. [#253]
 - Return `JoinHandle` from `actix_rt::spawn`. [#253]
@@ -118,14 +118,14 @@
 [#256]: https://github.com/actix/actix-net/pull/256
 [#257]: https://github.com/actix/actix-net/pull/257
 
-## 2.0.0-beta.2 - 2021-01-09
+## 2.0.0-beta.2
 
 - Add `task` mod with re-export of `tokio::task::{spawn_blocking, yield_now, JoinHandle}` [#245]
 - Add default "macros" feature to allow faster compile times when using `default-features=false`.
 
 [#245]: https://github.com/actix/actix-net/pull/245
 
-## 2.0.0-beta.1 - 2020-12-28
+## 2.0.0-beta.1
 
 - Add `System::attach_to_tokio` method. [#173]
 - Update `tokio` dependency to `1.0`. [#236]
@@ -139,13 +139,13 @@
 [#207]: https://github.com/actix/actix-net/pull/207
 [#236]: https://github.com/actix/actix-net/pull/236
 
-## 1.1.1 - 2020-04-30
+## 1.1.1
 
 - Fix memory leak due to [#94] (see [#129] for more detail)
 
 [#129]: https://github.com/actix/actix-net/issues/129
 
-## 1.1.0 - 2020-04-08 _(YANKED)_
+## 1.1.0 _(YANKED)_
 
 - Expose `System::is_set` to check if current system has ben started [#99]
 - Add `Arbiter::is_running` to check if event loop is running [#124]
@@ -155,57 +155,57 @@
 [#99]: https://github.com/actix/actix-net/pull/99
 [#124]: https://github.com/actix/actix-net/pull/124
 
-## 1.0.0 - 2019-12-11
+## 1.0.0
 
 - Update dependencies
 
-## 1.0.0-alpha.3 - 2019-12-07
+## 1.0.0-alpha.3
 
 - Migrate to tokio 0.2
 - Fix compilation on non-unix platforms
 
-## 1.0.0-alpha.2 - 2019-12-02
+## 1.0.0-alpha.2
 
 - Export `main` and `test` attribute macros
 - Export `time` module (re-export of tokio-timer)
 - Export `net` module (re-export of tokio-net)
 
-## 1.0.0-alpha.1 - 2019-11-22
+## 1.0.0-alpha.1
 
 - Migrate to std::future and tokio 0.2
 
-## 0.2.6 - 2019-11-14
+## 0.2.6
 
 - Allow to join arbiter's thread. #60
 - Fix arbiter's thread panic message.
 
-## 0.2.5 - 2019-09-02
+## 0.2.5
 
 - Add arbiter specific storage
 
-## 0.2.4 - 2019-07-17
+## 0.2.4
 
 - Avoid a copy of the Future when initializing the Box. #29
 
-## 0.2.3 - 2019-06-22
+## 0.2.3
 
 - Allow to start System using existing CurrentThread Handle #22
 
-## 0.2.2 - 2019-03-28
+## 0.2.2
 
 - Moved `blocking` module to `actix-threadpool` crate
 
-## 0.2.1 - 2019-03-11
+## 0.2.1
 
 - Added `blocking` module
 - Added `Arbiter::exec_fn` - execute fn on the arbiter's thread
 - Added `Arbiter::exec` - execute fn on the arbiter's thread and wait result
 
-## 0.2.0 - 2019-03-06
+## 0.2.0
 
 - `run` method returns `io::Result<()>`
 - Removed `Handle`
 
-## 0.1.0 - 2018-12-09
+## 0.1.0
 
 - Initial release
