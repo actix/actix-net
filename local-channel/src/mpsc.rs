@@ -4,6 +4,7 @@ use alloc::{collections::VecDeque, rc::Rc};
 use core::{
     cell::RefCell,
     fmt,
+    future::poll_fn,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -11,7 +12,6 @@ use std::error::Error;
 
 use futures_core::stream::Stream;
 use futures_sink::Sink;
-use futures_util::future::poll_fn;
 use local_waker::LocalWaker;
 
 /// Creates a unbounded in-memory channel with buffered storage.

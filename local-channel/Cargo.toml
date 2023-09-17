@@ -15,8 +15,8 @@ rust-version.workspace = true
 [dependencies]
 futures-core = "0.3.17"
 futures-sink = "0.3.17"
-futures-util = { version = "0.3.17", default-features = false }
 local-waker = "0.1"
 
 [dev-dependencies]
+futures-util = { version = "0.3.17", default-features = false }
 tokio = { version = "1.23.1", features = ["rt", "macros"] }
