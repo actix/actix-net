@@ -72,12 +72,13 @@ impl ServerBuilder {
 
     /// Sets number of workers to start.
     ///
-    /// `num` must be greater than 0.
-    ///
-    /// Note that the factory
+    /// See [`bind()`](Self::bind()) for more details on how worker count affects the number of
+    /// server factory instantiations.
     ///
     /// The default worker count is the determined by [`std::thread::available_parallelism()`]. See
     /// its documentation to determine what behavior you should expect when server is run.
+    ///
+    /// `num` must be greater than 0.
     ///
     /// # Panics
     ///
