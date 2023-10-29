@@ -13,6 +13,15 @@ license = "MIT OR Apache-2.0"
 edition.workspace = true
 rust-version.workspace = true
 
+[package.metadata.cargo_check_external_types]
+allowed_external_types = [
+    "bytes::*",
+    "futures_core::*",
+    "futures_sink::*",
+    "tokio::*",
+    "tokio_util::*",
+]
+
 [dependencies]
 bitflags = "2"
 bytes = "1"
