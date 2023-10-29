@@ -1,6 +1,6 @@
 [package]
 name = "local-channel"
-version = "0.1.4"
+version = "0.1.5"
 description = "A non-threadsafe multi-producer, single-consumer, futures-aware, FIFO queue"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
