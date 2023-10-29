@@ -26,6 +26,7 @@ quote = "1"
 syn = { version = "2", features = ["full"] }
 
 # minimal versions compat
+[target.'cfg(any())'.dependencies]
 proc-macro2 = "1.0.60"
 
 [dev-dependencies]
