@@ -2,7 +2,6 @@ use std::{io, num::NonZeroUsize, time::Duration};
 
 use actix_rt::net::TcpStream;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tracing::{info, trace};
 
 use crate::{
     server::ServerCommand,
@@ -69,19 +68,18 @@ impl ServerBuilder {
         }
     }
 
-    /// Set number of workers to start.
+    /// Sets number of workers to start.
     ///
     /// `num` must be greater than 0.
     ///
-    /// The default worker count is the number of physical CPU cores available. If your benchmark
-    /// testing indicates that simultaneous multi-threading is beneficial to your app, you can use
-    /// the [`num_cpus`] crate to acquire the _logical_ core count instead.
+    /// Note that the factory
+    ///
+    /// The default worker count is the determined by [`std::thread::available_parallelism()`]. See
+    /// its documentation to determine what behavior you should expect when server is run.
     ///
     /// # Panics
     ///
     /// Panics if `num` is 0.
-    ///
-    /// [`num_cpus`]: https://docs.rs/num_cpus
     pub fn workers(mut self, num: usize) -> Self {
         assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;
@@ -155,13 +153,15 @@ impl ServerBuilder {
         self.max_concurrent_connections(num)
     }
 
-    /// Stop Actix `System` after server shutdown.
+    /// Sets flag to stop Actix `System` after server shutdown.
+    ///
+    /// This has no effect when server is running in a Tokio-only runtime.
     pub fn system_exit(mut self) -> Self {
         self.exit = true;
         self
     }
 
-    /// Disable OS signal handling.
+    /// Disables OS signal handling.
     pub fn disable_signals(mut self) -> Self {
         self.listen_os_signals = false;
         self
@@ -179,25 +179,49 @@ impl ServerBuilder {
         self
     }
 
-    /// Add new service to the server.
-    pub fn bind<F, U, N>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
+    /// Adds new service to the server.
+    ///
+    /// Note that, if a DNS lookup is required, resolving hostnames is a blocking operation.
+    ///
+    /// # Worker Count
+    ///
+    /// The `factory` will be instantiated multiple times in most scenarios. The number of
+    /// instantiations is number of [`workers`](Self::workers()) × number of sockets resolved by
+    /// `addrs`.
+    ///
+    /// For example, if you've manually set [`workers`](Self::workers()) to 2, and use `127.0.0.1`
+    /// as the bind `addrs`, then `factory` will be instantiated twice. However, using `localhost`
+    /// as the bind `addrs` can often resolve to both `127.0.0.1` (IPv4) _and_ `::1` (IPv6), causing
+    /// the `factory` to be instantiated 4 times (2 workers × 2 bind addresses).
+    ///
+    /// Using a bind address of `0.0.0.0`, which signals to use all interfaces, may also multiple
+    /// the number of instantiations in a similar way.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `io::Error` if:
+    /// - `addrs` cannot be resolved into one or more socket addresses;
+    /// - all the resolved socket addresses are already bound.
+    pub fn bind<F, U, N>(mut self, name: N, addrs: U, factory: F) -> io::Result<Self>
     where
         F: ServerServiceFactory<TcpStream>,
         U: ToSocketAddrs,
         N: AsRef<str>,
     {
-        let sockets = bind_addr(addr, self.backlog, &self.mptcp)?;
+        let sockets = bind_addr(addrs, self.backlog, &self.mptcp)?;
 
-        trace!("binding server to: {:?}", &sockets);
+        tracing::trace!("binding server to: {sockets:?}");
 
         for lst in sockets {
             let token = self.next_token();
+
             self.factories.push(StreamNewService::create(
                 name.as_ref().to_string(),
                 token,
                 factory.clone(),
                 lst.local_addr()?,
             ));
+
             self.sockets
                 .push((token, name.as_ref().to_string(), MioListener::Tcp(lst)));
         }
@@ -205,7 +229,12 @@ impl ServerBuilder {
         Ok(self)
     }
 
-    /// Add new service to the server.
+    /// Adds service to the server using a socket listener already bound.
+    ///
+    /// # Worker Count
+    ///
+    /// The `factory` will be instantiated multiple times in most scenarios. The number of
+    /// instantiations is: number of [`workers`](Self::workers()).
     pub fn listen<F, N: AsRef<str>>(
         mut self,
         name: N,
@@ -237,7 +266,7 @@ impl ServerBuilder {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
-            info!("starting {} workers", self.threads);
+            tracing::info!("starting {} workers", self.threads);
             Server::new(self)
         }
     }
@@ -251,7 +280,12 @@ impl ServerBuilder {
 
 #[cfg(unix)]
 impl ServerBuilder {
-    /// Add new unix domain service to the server.
+    /// Adds new service to the server using a UDS (unix domain socket) address.
+    ///
+    /// # Worker Count
+    ///
+    /// The `factory` will be instantiated multiple times in most scenarios. The number of
+    /// instantiations is: number of [`workers`](Self::workers()).
     pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
         F: ServerServiceFactory<actix_rt::net::UnixStream>,
@@ -271,9 +305,14 @@ impl ServerBuilder {
         self.listen_uds(name, lst, factory)
     }
 
-    /// Add new unix domain service to the server.
+    /// Adds new service to the server using a UDS (unix domain socket) listener already bound.
     ///
     /// Useful when running as a systemd service and a socket FD is acquired externally.
+    ///
+    /// # Worker Count
+    ///
+    /// The `factory` will be instantiated multiple times in most scenarios. The number of
+    /// instantiations is: number of [`workers`](Self::workers()).
     pub fn listen_uds<F, N: AsRef<str>>(
         mut self,
         name: N,
@@ -284,17 +323,22 @@ impl ServerBuilder {
         F: ServerServiceFactory<actix_rt::net::UnixStream>,
     {
         use std::net::{IpAddr, Ipv4Addr};
+
         lst.set_nonblocking(true)?;
+
         let token = self.next_token();
         let addr = crate::socket::StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+
         self.factories.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
             factory,
             addr,
         ));
+
         self.sockets
             .push((token, name.as_ref().to_string(), MioListener::from(lst)));
+
         Ok(self)
     }
 }
