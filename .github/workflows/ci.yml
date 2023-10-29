@@ -57,7 +57,7 @@ jobs:
         with:
           toolchain: ${{ matrix.version }}
 
-      - uses: taiki-e/install-action@v1
+      - uses: taiki-e/install-action@v2
         with: { tool: cargo-hack }
 
       - name: Generate Cargo.lock
