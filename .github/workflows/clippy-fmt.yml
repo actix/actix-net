@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
         with:
           toolchain: nightly
           components: rustfmt
@@ -33,11 +33,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
         with: { components: clippy }
 
-      - uses: giraffate/clippy-action@v1
+      - uses: giraffate/clippy-action@v1.0.1
         with:
           reporter: 'github-pr-check'
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          clippy_flags: --workspace --all-features --tests --examples --bins -- -Dclippy::todo
+          clippy_flags: --workspace --all-features --tests --examples --bins -- -Dclippy::todo -Aunknown_lints
