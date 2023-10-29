@@ -1,0 +1,2 @@
+_list:
+    @just --list
