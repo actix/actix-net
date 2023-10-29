@@ -24,10 +24,10 @@ jobs:
           - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
           - { name: Windows (32-bit), os: windows-latest, triple: i686-pc-windows-msvc }
         version:
-          - 1.65.0 # MSRV
-          - stable
+          - { name: msrv, version: 1.65.0 }
+          - { name: stable, version: stable }
 
-    name: ${{ matrix.target.name }} / ${{ matrix.version }}
+    name: ${{ matrix.target.name }} / ${{ matrix.version.name }}
     runs-on: ${{ matrix.target.os }}
 
     env: {}
@@ -52,10 +52,10 @@ jobs:
           echo 'OPENSSL_DIR=C:\Program Files\OpenSSL-Win64' | Out-File -FilePath $env:GITHUB_ENV -Append
           echo 'OPENSSL_DIR=C:\Program Files\OpenSSL' | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Install Rust (${{ matrix.version }})
+      - name: Install Rust (${{ matrix.version.name }})
         uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
         with:
-          toolchain: ${{ matrix.version }}
+          toolchain: ${{ matrix.version.version }}
 
       - uses: taiki-e/install-action@v2.21.2
         with:
@@ -65,9 +65,12 @@ jobs:
         run: cargo generate-lockfile
 
       - name: workaround MSRV issues
-        if: matrix.version != 'stable'
+        if: matrix.version.name == 'msrv'
         run: |
-          cargo update -p=time --precise=0.3.16  # time is only a dev dep so shouldn't affect msrv
+          cargo update -p=time --precise=0.3.16
+          cargo update -p=clap --precise=4.3.24
+          cargo update -p=clap_lex --precise=0.5.0
+          cargo update -p=anstyle --precise=1.0.2
 
       - name: check lib
         if: >
@@ -106,9 +109,9 @@ jobs:
           ulimit -Sl 512
           && ulimit -Hl 512
           && PATH=$PATH:/usr/share/rust/.cargo/bin
-          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-020
-          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-021
-          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux
+          && RUSTUP_TOOLCHAIN=${{ matrix.version.version }} cargo ci-test-rustls-020
+          && RUSTUP_TOOLCHAIN=${{ matrix.version.version }} cargo ci-test-rustls-021
+          && RUSTUP_TOOLCHAIN=${{ matrix.version.version }} cargo ci-test-linux
           "
 
       - name: Clear the cargo caches
