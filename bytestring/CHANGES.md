@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.3.1
+
+- No significant changes since `1.3.0`.
+
 ## 1.3.0
 
 - Implement `AsRef<ByteString>` for `ByteString`.
