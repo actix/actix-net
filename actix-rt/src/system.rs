@@ -203,16 +203,20 @@ impl SystemRunner {
             .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
     }
 
-    /// Retrieves a reference to the underlying Actix runtime associated with this SystemRunner instance.
+    /// Retrieves a reference to the underlying [Actix runtime](crate::Runtime) associated with this
+    /// `SystemRunner` instance.
     ///
-    /// The Actix runtime is responsible for managing the event loop for an Actix system and executing asynchronous tasks.
-    /// This method provides access to the runtime, allowing direct interaction with its features.
+    /// The Actix runtime is responsible for managing the event loop for an Actix system and
+    /// executing asynchronous tasks. This method provides access to the runtime, allowing direct
+    /// interaction with its features.
     ///
     /// In a typical use case, you might need to share the same runtime between different
-    /// parts of your project. For example, some components might require a [`actix_rt::Runtime`] to spawn tasks on
-    /// the same runtime.
+    /// parts of your project. For example, some components might require a [`Runtime`] to spawn
+    /// tasks on the same runtime.
     ///
-    /// # Example
+    /// Read more in the documentation for [`Runtime`].
+    ///
+    /// # Examples
     ///
     /// ```
     /// let system_runner = actix_rt::System::new();
@@ -221,19 +225,14 @@ impl SystemRunner {
     /// // Use the runtime to spawn an async task or perform other operations
     /// ```
     ///
-    /// Read more in the documentation for [`actix_rt::Runtime`]
-    ///
-    /// # Returns
-    ///
-    /// An immutable reference to the [`actix_rt::Runtime`] instance associated with this
-    /// [`actix_rt::SystemRunner`] instance.
-    ///
     /// # Note
     ///
-    /// While this method provides an immutable reference to the Actix runtime, which is safe to share across threads,
-    /// be aware that spawning blocking tasks on the Actix runtime could potentially impact system performance.
-    /// This is because the Actix runtime is responsible for driving the system,
-    /// and blocking tasks could delay other tasks in the run loop.
+    /// While this method provides an immutable reference to the Actix runtime, which is safe to
+    /// share across threads, be aware that spawning blocking tasks on the Actix runtime could
+    /// potentially impact system performance. This is because the Actix runtime is responsible for
+    /// driving the system, and blocking tasks could delay other tasks in the run loop.
+    ///
+    /// [`Runtime`]: crate::Runtime
     pub fn runtime(&self) -> &crate::runtime::Runtime {
         &self.rt
     }

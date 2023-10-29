@@ -13,7 +13,9 @@ use crate::{
 
 /// Multipath TCP (MPTCP) preference.
 ///
-/// Also see [`ServerBuilder::mptcp()`].
+/// Currently only useful on Linux.
+///
+#[cfg_attr(target_os = "linux", doc = "Also see [`ServerBuilder::mptcp()`].")]
 #[derive(Debug, Clone)]
 pub enum MpTcp {
     /// MPTCP will not be used when binding sockets.
