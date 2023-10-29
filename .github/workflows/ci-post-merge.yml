@@ -36,7 +36,7 @@ jobs:
         if: matrix.target.os == 'macos-latest'
         run: sudo ifconfig lo0 alias 127.0.0.3
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Free Disk Space
         if: matrix.target.os == 'ubuntu-latest'
@@ -52,12 +52,13 @@ jobs:
           echo 'OPENSSL_DIR=C:\Program Files\OpenSSL' | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Install Rust (${{ matrix.version }})
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
         with:
           toolchain: ${{ matrix.version }}
 
-      - uses: taiki-e/install-action@v2
-        with: { tool: cargo-hack }
+      - uses: taiki-e/install-action@v2.21.2
+        with:
+          tool: cargo-hack
 
       - name: check lib
         if: >
@@ -107,15 +108,15 @@ jobs:
     name: minimal versions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust (nightly)
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
         with:
           toolchain: nightly
 
       - name: Install cargo-hack & cargo-minimal-versions
-        uses: taiki-e/install-action@v1
+        uses: taiki-e/install-action@v2.21.2
         with:
           tool: cargo-hack,cargo-minimal-versions
 
@@ -126,14 +127,15 @@ jobs:
     name: nextest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v1
-        with: { tool: cargo-nextest }
+        uses: taiki-e/install-action@v2.21.2
+        with:
+          tool: cargo-nextest
 
       - name: Test with cargo-nextest
         run: cargo nextest run

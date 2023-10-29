@@ -18,9 +18,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
         with: { toolchain: nightly }
 
       - name: Build Docs
@@ -30,6 +30,7 @@ jobs:
         run: echo '<meta http-equiv="refresh" content="0;url=actix_server/index.html">' > target/doc/index.html
 
       - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@v4
+        uses: JamesIves/github-pages-deploy-action@v4.4.3
         with:
           folder: target/doc
+          single-commit: true
