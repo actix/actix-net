@@ -1,6 +1,6 @@
 # `bytestring`
 
-> A UTF-8 encoded read-only string using Bytes as storage.
+> A UTF-8 encoded read-only string using `Bytes` as storage.
 
 <!-- prettier-ignore-start -->
 

@@ -1,4 +1,6 @@
-//! A UTF-8 encoded read-only string using Bytes as storage.
+//! A UTF-8 encoded read-only string using `Bytes` as storage.
+//!
+//! See docs for [`ByteString`].
 
 #![no_std]
 #![deny(rust_2018_idioms, nonstandard_style)]
