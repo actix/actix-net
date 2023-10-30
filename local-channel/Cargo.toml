@@ -12,6 +12,12 @@ license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[package.metadata.cargo_check_external_types]
+allowed_external_types = [
+    "futures_core::*",
+    "futures_sink::*",
+]
+
 [dependencies]
 futures-core = "0.3.17"
 futures-sink = "0.3.17"

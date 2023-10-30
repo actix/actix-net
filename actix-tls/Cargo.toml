@@ -17,6 +17,14 @@ rust-version.workspace = true
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
+[package.metadata.cargo_check_external_types]
+allowed_external_types = [
+    "actix_service::*",
+    "actix_utils::*",
+    "futures_core::*",
+    "tokio::*",
+]
+
 [package.metadata.cargo-machete]
 ignored = [
     "rustls_021", # specified to force version with add_trust_anchors method
