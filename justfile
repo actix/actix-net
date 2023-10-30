@@ -14,18 +14,19 @@ doc-watch:
 check-external-types-all:
     #!/usr/bin/env bash
     set -euo pipefail
-    for f in $(find . -mindepth 2 -maxdepth 2 -name Cargo.toml); do
-        echo "Checking for $f"
-        just check-external-types-manifest "$f" || true
+    exit=0
+    for f in $(find . -mindepth 2 -maxdepth 2 -name Cargo.toml | grep -vE "\-codegen/|\-derive/|\-macros/"); do
+        if ! just check-external-types-manifest "$f"; then exit=1; fi
         echo
         echo
     done
+    exit $exit
 
 # Check for unintentional external type exposure on all crates in workspace.
 check-external-types-all-table:
     #!/usr/bin/env bash
     set -euo pipefail
-    for f in $(find . -mindepth 2 -maxdepth 2 -name Cargo.toml); do
+    for f in $(find . -mindepth 2 -maxdepth 2 -name Cargo.toml | grep -vE "\-codegen/|\-derive/|\-macros/"); do
         echo
         echo "Checking for $f"
         just check-external-types-manifest "$f" --output-format=markdown-table
