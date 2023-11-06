@@ -117,7 +117,7 @@ impl TestServerHandle {
 
     /// Stop server.
     fn stop(&mut self) {
-        let _ = self.server_handle.stop(false);
+        drop(self.server_handle.stop(false));
         self.thread_handle.take().unwrap().join().unwrap().unwrap();
     }
 

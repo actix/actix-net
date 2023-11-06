@@ -3,7 +3,7 @@
 #![cfg(all(
     feature = "accept",
     feature = "connect",
-    feature = "rustls",
+    feature = "rustls-0_21",
     feature = "openssl"
 ))]
 
@@ -15,13 +15,12 @@ use actix_service::ServiceFactoryExt as _;
 use actix_tls::accept::openssl::{Acceptor, TlsStream};
 use actix_utils::future::ok;
 use tokio_rustls::rustls::{Certificate, ClientConfig, RootCertStore, ServerName};
+use tokio_rustls_024 as tokio_rustls;
 
 fn new_cert_and_key() -> (String, String) {
-    let cert = rcgen::generate_simple_self_signed(vec![
-        "127.0.0.1".to_owned(),
-        "localhost".to_owned(),
-    ])
-    .unwrap();
+    let cert =
+        rcgen::generate_simple_self_signed(vec!["127.0.0.1".to_owned(), "localhost".to_owned()])
+            .unwrap();
 
     let key = cert.serialize_private_key_pem();
     let cert = cert.serialize_pem().unwrap();
@@ -51,7 +50,7 @@ fn openssl_acceptor(cert: String, key: String) -> tls_openssl::ssl::SslAcceptor 
 mod danger {
     use std::time::SystemTime;
 
-    use tokio_rustls::rustls::{
+    use tokio_rustls_024::rustls::{
         self,
         client::{ServerCertVerified, ServerCertVerifier},
     };

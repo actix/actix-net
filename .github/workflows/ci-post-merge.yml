@@ -1,0 +1,141 @@
+name: CI (master only)
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_and_test_nightly:
+    strategy:
+      fail-fast: false
+      matrix:
+        # prettier-ignore
+        target:
+          - { name: Linux, os: ubuntu-latest, triple: x86_64-unknown-linux-gnu }
+          - { name: macOS, os: macos-latest, triple: x86_64-apple-darwin }
+          - { name: Windows, os: windows-latest, triple: x86_64-pc-windows-msvc }
+          - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
+          - { name: Windows (32-bit), os: windows-latest, triple: i686-pc-windows-msvc }
+        version:
+          - nightly
+
+    name: ${{ matrix.target.name }} / ${{ matrix.version }}
+    runs-on: ${{ matrix.target.os }}
+
+    env: {}
+
+    steps:
+      - name: Setup Routing
+        if: matrix.target.os == 'macos-latest'
+        run: sudo ifconfig lo0 alias 127.0.0.3
+
+      - uses: actions/checkout@v4
+
+      - name: Free Disk Space
+        if: matrix.target.os == 'ubuntu-latest'
+        run: ./scripts/free-disk-space.sh
+
+      - name: Install OpenSSL
+        if: matrix.target.os == 'windows-latest'
+        run: choco install openssl -y --forcex64 --no-progress
+      - name: Set OpenSSL dir in env
+        if: matrix.target.os == 'windows-latest'
+        run: |
+          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL-Win64' | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL' | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Install Rust (${{ matrix.version }})
+        uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
+        with:
+          toolchain: ${{ matrix.version }}
+
+      - uses: taiki-e/install-action@v2.21.7
+        with:
+          tool: cargo-hack
+
+      - name: check lib
+        if: >
+          matrix.target.os != 'ubuntu-latest'
+          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        run: cargo ci-check-lib
+      - name: check lib
+        if: matrix.target.os == 'ubuntu-latest'
+        run: cargo ci-check-lib-linux
+      - name: check lib
+        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
+        run: cargo ci-check-min
+
+      - name: check full
+        # TODO: compile OpenSSL and run tests on MinGW
+        if: >
+          matrix.target.os != 'ubuntu-latest'
+          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        run: cargo ci-check
+      - name: check all
+        if: matrix.target.os == 'ubuntu-latest'
+        run: cargo ci-check-linux
+
+      - name: tests
+        if: >
+          matrix.target.os != 'ubuntu-latest'
+          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        run: cargo ci-test
+      - name: tests
+        if: matrix.target.os == 'ubuntu-latest'
+        run: >-
+          sudo bash -c "
+          ulimit -Sl 512
+          && ulimit -Hl 512
+          && PATH=$PATH:/usr/share/rust/.cargo/bin
+          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-020
+          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-021
+          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux
+          "
+
+      - name: Clear the cargo caches
+        run: |
+          cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
+          cargo-cache
+
+  minimal-versions:
+    name: minimal versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (nightly)
+        uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
+        with:
+          toolchain: nightly
+
+      - name: Install cargo-hack & cargo-minimal-versions
+        uses: taiki-e/install-action@v2.21.7
+        with:
+          tool: cargo-hack,cargo-minimal-versions
+
+      - name: Check With Minimal Versions
+        run: cargo minimal-versions check
+
+  nextest:
+    name: nextest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2.21.7
+        with:
+          tool: cargo-nextest
+
+      - name: Test with cargo-nextest
+        run: cargo nextest run

@@ -12,6 +12,12 @@ members = [
   "local-channel",
   "local-waker",
 ]
+resolver = "2"
+
+[workspace.package]
+license = "MIT OR Apache-2.0"
+edition = "2021"
+rust-version = "1.65"
 
 [patch.crates-io]
 actix-codec = { path = "actix-codec" }

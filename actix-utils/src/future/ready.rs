@@ -1,4 +1,4 @@
-//! When MSRV is 1.48, replace with `core::future::Ready` and `core::future::ready()`.
+//! When `core::future::Ready` has a `into_inner()` method, this can be deprecated.
 
 use core::{
     future::Future,
@@ -6,7 +6,7 @@ use core::{
     task::{Context, Poll},
 };
 
-/// Future for the [`ready`](ready()) function.
+/// Future for the [`ready`] function.
 ///
 /// Panic will occur if polled more than once.
 ///

@@ -81,10 +81,7 @@ impl AsyncWrite for Bilateral {
             other => Ready(other),
         }
     }
-    fn poll_shutdown(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<Result<(), io::Error>> {
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         unimplemented!()
     }
 }

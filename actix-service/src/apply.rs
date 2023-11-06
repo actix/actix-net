@@ -140,8 +140,7 @@ where
     }
 }
 
-impl<SF, F, Fut, Req, In, Res, Err> ServiceFactory<Req>
-    for ApplyFactory<SF, F, Req, In, Res, Err>
+impl<SF, F, Fut, Req, In, Res, Err> ServiceFactory<Req> for ApplyFactory<SF, F, Req, In, Res, Err>
 where
     SF: ServiceFactory<In, Error = Err>,
     F: Fn(Req, &SF::Service) -> Fut + Clone,

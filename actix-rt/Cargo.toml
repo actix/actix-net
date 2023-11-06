@@ -1,10 +1,9 @@
 [package]
 name = "actix-rt"
-version = "2.7.0"
+version = "2.9.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
-    "fakeshadow <24548779@qq.com>",
 ]
 description = "Tokio-based single-threaded async runtime for the Actix ecosystem"
 keywords = ["async", "futures", "io", "runtime"]
@@ -12,11 +11,13 @@ homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition.workspace = true
+rust-version.workspace = true
 
-[lib]
-name = "actix_rt"
-path = "src/lib.rs"
+[package.metadata.cargo_check_external_types]
+allowed_external_types = [
+    "tokio::*",
+]
 
 [features]
 default = ["macros", "net"]
@@ -28,12 +29,12 @@ net = ["tokio/net", "tokio/signal"]
 actix-macros = { version = "0.2.3", optional = true }
 
 futures-core = { version = "0.3", default-features = false }
-tokio = { version = "1.13.1", features = ["rt", "parking_lot", "sync", "time"] }
+tokio = { version = "1.23.1", features = ["rt", "parking_lot", "sync", "time"] }
 
 # runtime for `io-uring` feature
 [target.'cfg(target_os = "linux")'.dependencies]
-tokio-uring = { version = "0.3", optional = true }
+tokio-uring = { version = "0.4", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.13.1", features = ["full"] }
+tokio = { version = "1.23.1", features = ["full"] }
 hyper = { version = "0.14.10", default-features = false, features = ["server", "tcp", "http1"] }

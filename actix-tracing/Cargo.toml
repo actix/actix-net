@@ -9,19 +9,24 @@ repository = "https://github.com/actix/actix-net.git"
 documentation = "https://docs.rs/actix-tracing"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition.workspace = true
+rust-version.workspace = true
 
-[lib]
-name = "actix_tracing"
-path = "src/lib.rs"
+[package.metadata.cargo_check_external_types]
+allowed_external_types = [
+    "actix_service::*",
+    "actix_utils::*",
+    "tracing::*",
+    "tracing_futures::*",
+]
 
 [dependencies]
-actix-service = "2.0.0"
-actix-utils = "3.0.0"
+actix-service = "2"
+actix-utils = "3"
 
 tracing = "0.1.35"
 tracing-futures = "0.2"
 
 [dev_dependencies]
-actix-rt = "2.0.0"
+actix-rt = "2"
 slab = "0.4"

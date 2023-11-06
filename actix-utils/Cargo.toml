@@ -1,6 +1,6 @@
 [package]
 name = "actix-utils"
-version = "3.0.0"
+version = "3.0.1"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
@@ -10,17 +10,14 @@ keywords = ["network", "framework", "async", "futures"]
 categories = ["network-programming", "asynchronous"]
 repository = "https://github.com/actix/actix-net"
 license = "MIT OR Apache-2.0"
-edition = "2018"
-
-[lib]
-name = "actix_utils"
-path = "src/lib.rs"
+edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 pin-project-lite = "0.2"
 local-waker = "0.1"
 
 [dev-dependencies]
-actix-rt = "2.0.0"
-futures-util = { version = "0.3.7", default-features = false }
+actix-rt = "2"
+futures-util = { version = "0.3.17", default-features = false }
 static_assertions = "1.1"

@@ -4,25 +4,21 @@ version = "2.0.2"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
-    "fakeshadow <24548779@qq.com>",
 ]
 description = "Service trait and combinators for representing asynchronous request/response operations."
 keywords = ["network", "framework", "async", "futures", "service"]
 categories = ["network-programming", "asynchronous", "no-std"]
 repository = "https://github.com/actix/actix-net"
 license = "MIT OR Apache-2.0"
-edition = "2018"
-
-[lib]
-name = "actix_service"
-path = "src/lib.rs"
+edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
-futures-core = { version = "0.3.7", default-features = false }
+futures-core = { version = "0.3.17", default-features = false }
 paste = "1"
 pin-project-lite = "0.2"
 
 [dev-dependencies]
-actix-rt = "2.0.0"
-actix-utils = "3.0.0"
-futures-util = { version = "0.3.7", default-features = false }
+actix-rt = "2"
+actix-utils = "3"
+futures-util = { version = "0.3.17", default-features = false }

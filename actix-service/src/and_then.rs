@@ -121,12 +121,7 @@ pub struct AndThenServiceFactory<A, B, Req>
 where
     A: ServiceFactory<Req>,
     A::Config: Clone,
-    B: ServiceFactory<
-        A::Response,
-        Config = A::Config,
-        Error = A::Error,
-        InitError = A::InitError,
-    >,
+    B: ServiceFactory<A::Response, Config = A::Config, Error = A::Error, InitError = A::InitError>,
 {
     inner: Rc<(A, B)>,
     _phantom: PhantomData<Req>,
@@ -136,12 +131,7 @@ impl<A, B, Req> AndThenServiceFactory<A, B, Req>
 where
     A: ServiceFactory<Req>,
     A::Config: Clone,
-    B: ServiceFactory<
-        A::Response,
-        Config = A::Config,
-        Error = A::Error,
-        InitError = A::InitError,
-    >,
+    B: ServiceFactory<A::Response, Config = A::Config, Error = A::Error, InitError = A::InitError>,
 {
     /// Create new `AndThenFactory` combinator
     pub(crate) fn new(a: A, b: B) -> Self {
@@ -156,12 +146,7 @@ impl<A, B, Req> ServiceFactory<Req> for AndThenServiceFactory<A, B, Req>
 where
     A: ServiceFactory<Req>,
     A::Config: Clone,
-    B: ServiceFactory<
-        A::Response,
-        Config = A::Config,
-        Error = A::Error,
-        InitError = A::InitError,
-    >,
+    B: ServiceFactory<A::Response, Config = A::Config, Error = A::Error, InitError = A::InitError>,
 {
     type Response = B::Response;
     type Error = A::Error;
@@ -184,12 +169,7 @@ impl<A, B, Req> Clone for AndThenServiceFactory<A, B, Req>
 where
     A: ServiceFactory<Req>,
     A::Config: Clone,
-    B: ServiceFactory<
-        A::Response,
-        Config = A::Config,
-        Error = A::Error,
-        InitError = A::InitError,
-    >,
+    B: ServiceFactory<A::Response, Config = A::Config, Error = A::Error, InitError = A::InitError>,
 {
     fn clone(&self) -> Self {
         Self {
@@ -334,9 +314,8 @@ mod tests {
     async fn test_new_service() {
         let cnt = Rc::new(Cell::new(0));
         let cnt2 = cnt.clone();
-        let new_srv =
-            pipeline_factory(fn_factory(move || ready(Ok::<_, ()>(Srv1(cnt2.clone())))))
-                .and_then(move || ready(Ok(Srv2(cnt.clone()))));
+        let new_srv = pipeline_factory(fn_factory(move || ready(Ok::<_, ()>(Srv1(cnt2.clone())))))
+            .and_then(move || ready(Ok(Srv2(cnt.clone()))));
 
         let srv = new_srv.new_service(()).await.unwrap();
         let res = srv.call("srv1").await;

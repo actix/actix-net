@@ -1,9 +1,8 @@
 [package]
 name = "actix-server"
-version = "2.1.1"
+version = "2.3.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
-    "fakeshadow <24548779@qq.com>",
     "Rob Ede <robjtede@icloud.com>",
     "Ali MJ Al-Nasrawy <alimjalnasrawy@gmail.com>",
 ]
@@ -13,38 +12,39 @@ categories = ["network-programming", "asynchronous"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net.git"
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition.workspace = true
+rust-version.workspace = true
 
-[lib]
-name = "actix_server"
-path = "src/lib.rs"
+[package.metadata.cargo_check_external_types]
+allowed_external_types = [
+    "tokio::*",
+]
 
 [features]
 default = []
 io-uring = ["tokio-uring", "actix-rt/io-uring"]
 
 [dependencies]
-actix-rt = { version = "2.7", default-features = false }
+actix-rt = { version = "2.8", default-features = false }
 actix-service = "2"
 actix-utils = "3"
 
-futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
-futures-util = { version = "0.3.7", default-features = false, features = ["alloc"] }
+futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
+futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
 mio = { version = "0.8", features = ["os-poll", "net"] }
-num_cpus = "1.13"
-socket2 = "0.4.2"
-tokio = { version = "1.13.1", features = ["sync"] }
+socket2 = "0.5"
+tokio = { version = "1.23.1", features = ["sync"] }
 tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
 # runtime for `io-uring` feature
 [target.'cfg(target_os = "linux")'.dependencies]
-tokio-uring = { version = "0.3", optional = true }
+tokio-uring = { version = "0.4", optional = true }
 
 [dev-dependencies]
-actix-codec = "0.5.0"
-actix-rt = "2.6.0"
+actix-codec = "0.5"
+actix-rt = "2.8"
 
 bytes = "1"
-env_logger = "0.9"
-futures-util = { version = "0.3.7", default-features = false, features = ["sink", "async-await-macro"] }
-tokio = { version = "1.13.1", features = ["io-util", "rt-multi-thread", "macros", "fs"] }
+env_logger = "0.10"
+futures-util = { version = "0.3.17", default-features = false, features = ["sink", "async-await-macro"] }
+tokio = { version = "1.23.1", features = ["io-util", "rt-multi-thread", "macros", "fs"] }

@@ -1,16 +1,23 @@
 # Changes
 
-## Unreleased - 2022-xx-xx
-- Minimum supported Rust version (MSRV) is now 1.57.
+## Unreleased
 
+## 0.1.5
 
-## 0.1.3 - 2022-05-03
+- No significant changes since `0.1.4`.
+
+## 0.1.4
+
+- Minimum supported Rust version (MSRV) is now 1.65.
+
+## 0.1.3
+
 - Minimum supported Rust version (MSRV) is now 1.49.
 
+## 0.1.2
 
-## 0.1.2 - 2021-04-01
 - No significant changes from `0.1.1`.
 
+## 0.1.1
 
-## 0.1.1 - 2021-03-29
-- Move local mpsc channel to it's own crate.
+- Move local MPSC channel to it's own crate.

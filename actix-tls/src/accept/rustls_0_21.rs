@@ -1,4 +1,4 @@
-//! `rustls` based TLS connection acceptor service.
+//! `rustls` v0.21 based TLS connection acceptor service.
 //!
 //! See [`Acceptor`] for main service factory docs.
 
@@ -12,7 +12,6 @@ use std::{
     time::Duration,
 };
 
-use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
 use actix_rt::{
     net::{ActixStream, Ready},
     time::{sleep, Sleep},
@@ -23,24 +22,23 @@ use actix_utils::{
     future::{ready, Ready as FutReady},
 };
 use pin_project_lite::pin_project;
-use tokio_rustls::rustls::ServerConfig;
-use tokio_rustls::{Accept, TlsAcceptor};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio_rustls::{rustls::ServerConfig, Accept, TlsAcceptor};
+use tokio_rustls_024 as tokio_rustls;
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
-use crate::impl_more;
 
 pub mod reexports {
     //! Re-exports from `rustls` that are useful for acceptors.
 
-    pub use tokio_rustls::rustls::ServerConfig;
+    pub use tokio_rustls_024::rustls::ServerConfig;
 }
 
 /// Wraps a `rustls` based async TLS stream in order to implement [`ActixStream`].
 pub struct TlsStream<IO>(tokio_rustls::server::TlsStream<IO>);
 
-impl_more::from! { tokio_rustls::server::TlsStream<IO> => TlsStream<IO> }
-impl_more::deref! { TlsStream<IO> => 0: tokio_rustls::server::TlsStream<IO> }
-impl_more::deref_mut! { TlsStream<IO> => 0 }
+impl_more::impl_from!(<IO> in tokio_rustls::server::TlsStream<IO> => TlsStream<IO>);
+impl_more::impl_deref_and_mut!(<IO> in TlsStream<IO> => tokio_rustls::server::TlsStream<IO>);
 
 impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
@@ -78,17 +76,17 @@ impl<IO: ActixStream> AsyncWrite for TlsStream<IO> {
     }
 
     fn is_write_vectored(&self) -> bool {
-        (&**self).is_write_vectored()
+        (**self).is_write_vectored()
     }
 }
 
 impl<IO: ActixStream> ActixStream for TlsStream<IO> {
     fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        IO::poll_read_ready((&**self).get_ref().0, cx)
+        IO::poll_read_ready((**self).get_ref().0, cx)
     }
 
     fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        IO::poll_write_ready((&**self).get_ref().0, cx)
+        IO::poll_write_ready((**self).get_ref().0, cx)
     }
 }
 

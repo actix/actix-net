@@ -1,4 +1,6 @@
-//! A UTF-8 encoded read-only string using Bytes as storage.
+//! A UTF-8 encoded read-only string using `Bytes` as storage.
+//!
+//! See docs for [`ByteString`].
 
 #![no_std]
 #![deny(rust_2018_idioms, nonstandard_style)]
@@ -11,7 +13,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{borrow, convert::TryFrom, fmt, hash, ops, str};
+use core::{borrow::Borrow, convert::TryFrom, fmt, hash, ops, str};
 
 use bytes::Bytes;
 
@@ -50,6 +52,44 @@ impl ByteString {
     pub const unsafe fn from_bytes_unchecked(src: Bytes) -> ByteString {
         Self(src)
     }
+
+    /// Returns a new byte string that is equivalent to the given `subset`.
+    ///
+    /// When processing a `ByteString` buffer with other tools, one often gets a `&str` which is in
+    /// fact a slice of the original `ByteString`; i.e., a subset of it. This function turns that
+    /// `&str` into another `ByteString`, as if one had sliced the `ByteString` with the offsets
+    /// that correspond to `subset`.
+    ///
+    /// Corresponds to [`Bytes::slice_ref`].
+    ///
+    /// This operation is `O(1)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `subset` is not a sub-slice of this byte string.
+    ///
+    /// Note that strings which are only subsets from an equality perspective do not uphold this
+    /// requirement; see examples.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let string = ByteString::from_static(" foo ");
+    /// let subset = string.trim();
+    /// let substring = string.slice_ref(subset);
+    /// assert_eq!(substring, "foo");
+    /// ```
+    ///
+    /// ```should_panic
+    /// # use bytestring::ByteString;
+    /// // panics because the given slice is not derived from the original byte string, despite
+    /// // being a logical subset of the string
+    /// ByteString::from_static("foo bar").slice_ref("foo");
+    /// ```
+    pub fn slice_ref(&self, subset: &str) -> Self {
+        Self(self.0.slice_ref(subset.as_bytes()))
+    }
 }
 
 impl PartialEq<str> for ByteString {
@@ -61,6 +101,12 @@ impl PartialEq<str> for ByteString {
 impl<T: AsRef<str>> PartialEq<T> for ByteString {
     fn eq(&self, other: &T) -> bool {
         &self[..] == other.as_ref()
+    }
+}
+
+impl AsRef<ByteString> for ByteString {
+    fn as_ref(&self) -> &ByteString {
+        self
     }
 }
 
@@ -88,13 +134,12 @@ impl ops::Deref for ByteString {
     #[inline]
     fn deref(&self) -> &str {
         let bytes = self.0.as_ref();
-        // SAFETY:
-        // UTF-8 validity is guaranteed at during construction.
+        // SAFETY: UTF-8 validity is guaranteed during construction.
         unsafe { str::from_utf8_unchecked(bytes) }
     }
 }
 
-impl borrow::Borrow<str> for ByteString {
+impl Borrow<str> for ByteString {
     fn borrow(&self) -> &str {
         self
     }
@@ -210,8 +255,10 @@ impl fmt::Display for ByteString {
 mod serde {
     use alloc::string::String;
 
-    use serde::de::{Deserialize, Deserializer};
-    use serde::ser::{Serialize, Serializer};
+    use serde::{
+        de::{Deserialize, Deserializer},
+        ser::{Serialize, Serializer},
+    };
 
     use super::ByteString;
 
@@ -248,8 +295,11 @@ mod serde {
 
 #[cfg(test)]
 mod test {
-    use alloc::borrow::ToOwned;
-    use core::hash::{Hash, Hasher};
+    use alloc::{borrow::ToOwned, format, vec};
+    use core::{
+        hash::{Hash, Hasher},
+        panic::{RefUnwindSafe, UnwindSafe},
+    };
 
     use ahash::AHasher;
     use static_assertions::assert_impl_all;
@@ -259,19 +309,10 @@ mod test {
     assert_impl_all!(ByteString: Send, Sync, Unpin, Sized);
     assert_impl_all!(ByteString: Clone, Default, Eq, PartialOrd, Ord);
     assert_impl_all!(ByteString: fmt::Debug, fmt::Display);
-
-    #[rustversion::since(1.56)]
-    mod above_1_56_impls {
-        // `[Ref]UnwindSafe` traits were only in std until rust 1.56
-
-        use core::panic::{RefUnwindSafe, UnwindSafe};
-
-        use super::*;
-        assert_impl_all!(ByteString: UnwindSafe, RefUnwindSafe);
-    }
+    assert_impl_all!(ByteString: UnwindSafe, RefUnwindSafe);
 
     #[test]
-    fn test_partial_eq() {
+    fn eq() {
         let s: ByteString = ByteString::from_static("test");
         assert_eq!(s, "test");
         assert_eq!(s, *"test");
@@ -279,12 +320,45 @@ mod test {
     }
 
     #[test]
-    fn test_new() {
+    fn new() {
         let _: ByteString = ByteString::new();
     }
 
     #[test]
-    fn test_hash() {
+    fn as_bytes() {
+        let buf = ByteString::new();
+        assert!(buf.as_bytes().is_empty());
+
+        let buf = ByteString::from("hello");
+        assert_eq!(buf.as_bytes(), "hello");
+    }
+
+    #[test]
+    fn from_bytes_unchecked() {
+        let buf = unsafe { ByteString::from_bytes_unchecked(Bytes::new()) };
+        assert!(buf.is_empty());
+
+        let buf = unsafe { ByteString::from_bytes_unchecked(Bytes::from("hello")) };
+        assert_eq!(buf, "hello");
+    }
+
+    #[test]
+    fn as_ref() {
+        let buf = ByteString::new();
+
+        let _: &ByteString = buf.as_ref();
+        let _: &[u8] = buf.as_ref();
+    }
+
+    #[test]
+    fn borrow() {
+        let buf = ByteString::new();
+
+        let _: &str = buf.borrow();
+    }
+
+    #[test]
+    fn hash() {
         let mut hasher1 = AHasher::default();
         "str".hash(&mut hasher1);
 
@@ -295,7 +369,7 @@ mod test {
     }
 
     #[test]
-    fn test_from_string() {
+    fn from_string() {
         let s: ByteString = "hello".to_owned().into();
         assert_eq!(&s, "hello");
         let t: &str = s.as_ref();
@@ -303,23 +377,30 @@ mod test {
     }
 
     #[test]
-    fn test_from_str() {
+    fn from_str() {
         let _: ByteString = "str".into();
+        let _: ByteString = "str".to_owned().into_boxed_str().into();
     }
 
     #[test]
-    fn test_from_static_str() {
+    fn to_string() {
+        let buf = ByteString::from("foo");
+        assert_eq!(String::from(buf), "foo");
+    }
+
+    #[test]
+    fn from_static_str() {
         static _S: ByteString = ByteString::from_static("hello");
         let _ = ByteString::from_static("str");
     }
 
     #[test]
-    fn test_try_from_slice() {
+    fn try_from_slice() {
         let _ = ByteString::try_from(b"nice bytes").unwrap();
     }
 
     #[test]
-    fn test_try_from_array() {
+    fn try_from_array() {
         assert_eq!(
             ByteString::try_from([b'h', b'i']).unwrap(),
             ByteString::from_static("hi")
@@ -327,26 +408,61 @@ mod test {
     }
 
     #[test]
-    fn test_try_from_bytes() {
+    fn try_from_vec() {
+        let _ = ByteString::try_from(vec![b'f', b'o', b'o']).unwrap();
+        ByteString::try_from(vec![0, 159, 146, 150]).unwrap_err();
+    }
+
+    #[test]
+    fn try_from_bytes() {
         let _ = ByteString::try_from(Bytes::from_static(b"nice bytes")).unwrap();
     }
 
     #[test]
-    fn test_try_from_bytes_mut() {
+    fn try_from_bytes_mut() {
         let _ = ByteString::try_from(bytes::BytesMut::from(&b"nice bytes"[..])).unwrap();
+    }
+
+    #[test]
+    fn display() {
+        let buf = ByteString::from("bar");
+        assert_eq!(format!("{buf}"), "bar");
+    }
+
+    #[test]
+    fn debug() {
+        let buf = ByteString::from("baz");
+        assert_eq!(format!("{buf:?}"), r#""baz""#);
     }
 
     #[cfg(feature = "serde")]
     #[test]
-    fn test_serialize() {
+    fn serialize() {
         let s: ByteString = serde_json::from_str(r#""nice bytes""#).unwrap();
         assert_eq!(s, "nice bytes");
     }
 
     #[cfg(feature = "serde")]
     #[test]
-    fn test_deserialize() {
+    fn deserialize() {
         let s = serde_json::to_string(&ByteString::from_static("nice bytes")).unwrap();
         assert_eq!(s, r#""nice bytes""#);
+    }
+
+    #[test]
+    fn slice_ref() {
+        let string = ByteString::from_static(" foo ");
+        let subset = string.trim();
+        // subset is derived from original byte string
+        let substring = string.slice_ref(subset);
+        assert_eq!(substring, "foo");
+    }
+
+    #[test]
+    #[should_panic]
+    fn slice_ref_catches_not_a_subset() {
+        // panics because the given slice is not derived from the original byte string, despite
+        // being a logical subset of the string
+        ByteString::from_static("foo bar").slice_ref("foo");
     }
 }

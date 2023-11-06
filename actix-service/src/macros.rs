@@ -25,6 +25,8 @@
 ///     }
 /// }
 /// ```
+///
+/// [`forward_ready!`]: crate::forward_ready
 #[macro_export]
 macro_rules! always_ready {
     () => {
