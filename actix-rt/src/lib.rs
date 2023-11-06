@@ -45,6 +45,7 @@
 #![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[cfg(all(not(target_os = "linux"), feature = "io-uring"))]
 compile_error!("io_uring is a linux only feature.");
@@ -78,9 +79,9 @@ pub mod signal {
     #[cfg(unix)]
     pub mod unix {
         //! Unix specific signals (Tokio re-exports).
-        // pub use tokio::signal::unix::*;
+        pub use tokio::signal::unix::*;
     }
-    // pub use tokio::signal::ctrl_c;
+    pub use tokio::signal::ctrl_c;
 }
 
 #[cfg(feature = "net")]
