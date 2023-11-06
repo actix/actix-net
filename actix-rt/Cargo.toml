@@ -8,7 +8,7 @@ authors = [
 description = "Tokio-based single-threaded async runtime for the Actix ecosystem"
 keywords = ["async", "futures", "io", "runtime"]
 homepage = "https://actix.rs"
-repository = "https://github.com/actix/actix-net.git"
+repository = "https://github.com/actix/actix-net"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
 edition.workspace = true
@@ -16,6 +16,7 @@ rust-version.workspace = true
 
 [package.metadata.cargo_check_external_types]
 allowed_external_types = [
+    "actix_macros::*",
     "tokio::*",
 ]
 
