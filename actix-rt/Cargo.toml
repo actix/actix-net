@@ -37,4 +37,3 @@ tokio-uring = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.23.1", features = ["full"] }
-hyper = { version = "0.14.10", default-features = false, features = ["server", "tcp", "http1"] }
