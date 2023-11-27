@@ -56,7 +56,7 @@ jobs:
         with:
           toolchain: ${{ matrix.version }}
 
-      - uses: taiki-e/install-action@v2.21.17
+      - uses: taiki-e/install-action@v2.21.20
         with:
           tool: cargo-hack
 
@@ -116,7 +116,7 @@ jobs:
           toolchain: nightly
 
       - name: Install cargo-hack & cargo-minimal-versions
-        uses: taiki-e/install-action@v2.21.17
+        uses: taiki-e/install-action@v2.21.20
         with:
           tool: cargo-hack,cargo-minimal-versions
 
@@ -133,7 +133,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.21.17
+        uses: taiki-e/install-action@v2.21.20
         with:
           tool: cargo-nextest
 
