@@ -1,8 +1,22 @@
 use http::Uri;
+use http_1::Uri as Http1Uri;
 
 use super::Host;
 
 impl Host for Uri {
+    fn hostname(&self) -> &str {
+        self.host().unwrap_or("")
+    }
+
+    fn port(&self) -> Option<u16> {
+        match self.port_u16() {
+            Some(port) => Some(port),
+            None => scheme_to_port(self.scheme_str()),
+        }
+    }
+}
+
+impl Host for Http1Uri {
     fn hostname(&self) -> &str {
         self.host().unwrap_or("")
     }
