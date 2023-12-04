@@ -58,7 +58,7 @@ jobs:
         with:
           toolchain: ${{ matrix.version.version }}
 
-      - uses: taiki-e/install-action@v2.21.20
+      - uses: taiki-e/install-action@v2.21.26
         with:
           tool: cargo-hack
 
