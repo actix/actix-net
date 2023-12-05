@@ -117,8 +117,6 @@ async fn test_openssl_uri() {
 #[cfg(all(feature = "rustls-0_21", feature = "uri"))]
 #[actix_rt::test]
 async fn test_rustls_uri_http1() {
-    use std::convert::TryFrom;
-
     let srv = TestServer::start(|| {
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);

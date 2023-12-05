@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-## 3.2.0
-
 - Added support to `http` crate version `1.0`.
 
 ## 3.1.1
