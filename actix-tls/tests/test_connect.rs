@@ -116,6 +116,23 @@ async fn test_openssl_uri() {
 
 #[cfg(all(feature = "rustls-0_21", feature = "uri"))]
 #[actix_rt::test]
+async fn test_rustls_uri_http1() {
+    let srv = TestServer::start(|| {
+        fn_service(|io: TcpStream| async {
+            let mut framed = Framed::new(io, BytesCodec);
+            framed.send(Bytes::from_static(b"test")).await?;
+            Ok::<_, io::Error>(())
+        })
+    });
+
+    let conn = Connector::default().service();
+    let addr = http_1::Uri::try_from(format!("https://localhost:{}", srv.port())).unwrap();
+    let con = conn.call(addr.into()).await.unwrap();
+    assert_eq!(con.peer_addr().unwrap(), srv.addr());
+}
+
+#[cfg(all(feature = "rustls-0_21", feature = "uri"))]
+#[actix_rt::test]
 async fn test_rustls_uri() {
     use std::convert::TryFrom;
 

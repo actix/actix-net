@@ -56,7 +56,7 @@ rustls-0_21 = ["tokio-rustls-024", "webpki-roots-025"]
 native-tls = ["tokio-native-tls"]
 
 # support http::Uri as connect address
-uri = ["http"]
+uri = ["http", "http-1"]
 
 [dependencies]
 actix-rt = { version = "2.2", default-features = false }
@@ -72,6 +72,7 @@ tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
 # uri
 http = { version = "0.2.3", optional = true }
+http-1 = { package = "http", version = "1", optional = true }
 
 # openssl
 tls-openssl = { package = "openssl", version = "0.10.55", optional = true }
