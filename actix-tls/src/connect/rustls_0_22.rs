@@ -3,7 +3,6 @@
 //! See [`TlsConnector`] for main connector service factory docs.
 
 use std::{
-    convert::TryFrom,
     future::Future,
     io,
     pin::Pin,
@@ -15,56 +14,43 @@ use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
 use actix_utils::future::{ok, Ready};
 use futures_core::ready;
+use rustls_pki_types_1::ServerName;
 use tokio_rustls::{
     client::TlsStream as AsyncTlsStream,
-    rustls::{client::ServerName, ClientConfig, RootCertStore},
+    rustls::{ClientConfig, RootCertStore},
     Connect as RustlsConnect, TlsConnector as RustlsTlsConnector,
 };
-use tokio_rustls_023 as tokio_rustls;
+use tokio_rustls_025 as tokio_rustls;
 
 use crate::connect::{Connection, Host};
 
 pub mod reexports {
-    //! Re-exports from the `rustls` v0.20 ecosystem that are useful for connectors.
+    //! Re-exports from the `rustls` v0.22 ecosystem that are useful for connectors.
 
-    pub use tokio_rustls_023::{client::TlsStream as AsyncTlsStream, rustls::ClientConfig};
-    #[cfg(feature = "rustls-0_20-webpki-roots")]
-    pub use webpki_roots_022::TLS_SERVER_ROOTS;
+    pub use tokio_rustls_025::{client::TlsStream as AsyncTlsStream, rustls::ClientConfig};
+    #[cfg(feature = "rustls-0_22-webpki-roots")]
+    pub use webpki_roots_026::TLS_SERVER_ROOTS;
 }
 
 /// Returns root certificates via `rustls-native-certs` crate as a rustls certificate store.
 ///
 /// See [`rustls_native_certs::load_native_certs()`] for more info on behavior and errors.
-#[cfg(feature = "rustls-0_20-native-roots")]
+#[cfg(feature = "rustls-0_22-native-roots")]
 pub fn native_roots_cert_store() -> io::Result<RootCertStore> {
     let mut root_certs = RootCertStore::empty();
 
-    for cert in rustls_native_certs_06::load_native_certs()? {
-        root_certs
-            .add(&tokio_rustls_023::rustls::Certificate(cert.0))
-            .unwrap();
+    for cert in rustls_native_certs_07::load_native_certs()? {
+        root_certs.add(cert).unwrap();
     }
 
     Ok(root_certs)
 }
 
 /// Returns standard root certificates from `webpki-roots` crate as a rustls certificate store.
-#[cfg(feature = "rustls-0_20-webpki-roots")]
+#[cfg(feature = "rustls-0_22-webpki-roots")]
 pub fn webpki_roots_cert_store() -> RootCertStore {
-    use tokio_rustls_023::rustls;
-
     let mut root_certs = RootCertStore::empty();
-
-    for cert in webpki_roots_022::TLS_SERVER_ROOTS.0 {
-        let cert = rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
-            cert.subject,
-            cert.spki,
-            cert.name_constraints,
-        );
-        let certs = vec![cert].into_iter();
-        root_certs.add_server_trust_anchors(certs);
-    }
-
+    root_certs.extend(webpki_roots_026::TLS_SERVER_ROOTS.to_owned());
     root_certs
 }
 
@@ -124,15 +110,15 @@ where
 
     fn call(&self, connection: Connection<R, IO>) -> Self::Future {
         tracing::trace!("TLS handshake start for: {:?}", connection.hostname());
-        let (stream, connection) = connection.replace_io(());
+        let (stream, conn) = connection.replace_io(());
 
-        match ServerName::try_from(connection.hostname()) {
+        match ServerName::try_from(conn.hostname()) {
             Ok(host) => ConnectFut::Future {
                 connect: RustlsTlsConnector::from(Arc::clone(&self.connector))
-                    .connect(host, stream),
-                connection: Some(connection),
+                    .connect(host.to_owned(), stream),
+                connection: Some(conn),
             },
-            Err(_) => ConnectFut::InvalidDns,
+            Err(_) => ConnectFut::InvalidServerName,
         }
     }
 }
@@ -141,8 +127,7 @@ where
 #[doc(hidden)]
 #[allow(clippy::large_enum_variant)]
 pub enum ConnectFut<R, IO> {
-    /// See issue <https://github.com/briansmith/webpki/issues/54>
-    InvalidDns,
+    InvalidServerName,
     Future {
         connect: RustlsConnect<IO>,
         connection: Option<Connection<R, ()>>,
@@ -158,10 +143,9 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.get_mut() {
-            Self::InvalidDns => Poll::Ready(Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Rustls v0.20 can only handle hostname-based connections. Enable the `rustls-0_21` \
-                feature and use the Rustls v0.21 utilities to gain this feature.",
+            Self::InvalidServerName => Poll::Ready(Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "connection parameters specified invalid server name",
             ))),
 
             Self::Future {

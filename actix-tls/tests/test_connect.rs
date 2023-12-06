@@ -11,7 +11,7 @@ use actix_server::TestServer;
 use actix_service::{fn_service, Service, ServiceFactory};
 use actix_tls::connect::{ConnectError, ConnectInfo, Connection, Connector, Host};
 use bytes::Bytes;
-use futures_util::sink::SinkExt;
+use futures_util::sink::SinkExt as _;
 
 #[cfg(feature = "openssl")]
 #[actix_rt::test]
@@ -30,7 +30,7 @@ async fn test_string() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(feature = "rustls-0_21")]
+#[cfg(feature = "rustls-0_22")]
 #[actix_rt::test]
 async fn test_rustls_string() {
     let srv = TestServer::start(|| {
@@ -114,7 +114,7 @@ async fn test_openssl_uri() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(all(feature = "rustls-0_21", feature = "uri"))]
+#[cfg(all(feature = "rustls-0_22", feature = "uri"))]
 #[actix_rt::test]
 async fn test_rustls_uri_http1() {
     let srv = TestServer::start(|| {
@@ -131,7 +131,7 @@ async fn test_rustls_uri_http1() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(all(feature = "rustls-0_21", feature = "uri"))]
+#[cfg(all(feature = "rustls-0_22", feature = "uri"))]
 #[actix_rt::test]
 async fn test_rustls_uri() {
     use std::convert::TryFrom;

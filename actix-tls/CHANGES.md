@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Support Rustls v0.22.
+- Added `{accept, connect}::rustls_0_22` modules.
 - Add `rustls-0_21-native-roots` and `rustls-0_20-native-roots` crate features which utilize the `rustls-native-certs` crate to enable a `native_roots_cert_store()` functions in each rustls-based `connect` module.
 - Implement `Host` for `http::Uri` (`http` crate version `1`).
 

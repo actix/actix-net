@@ -39,7 +39,7 @@ pub mod reexports {
 pub fn native_roots_cert_store() -> io::Result<RootCertStore> {
     let mut root_certs = RootCertStore::empty();
 
-    for cert in rustls_native_certs::load_native_certs()? {
+    for cert in rustls_native_certs_06::load_native_certs()? {
         root_certs
             .add(&tokio_rustls_024::rustls::Certificate(cert.0))
             .unwrap();
