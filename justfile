@@ -7,8 +7,8 @@ doc:
 
 # Document crates in workspace and watch for changes.
 doc-watch:
-    RUSTDOCFLAGS="--cfg=docsrs" cargo +nightly doc --no-deps --workspace --features=rustls,openssl --open
-    cargo watch -- RUSTDOCFLAGS="--cfg=docsrs" cargo +nightly doc --no-deps --workspace --features=rustls,openssl
+    RUSTDOCFLAGS="--cfg=docsrs"                cargo +nightly doc --no-deps --workspace --features=rustls-0_20,rustls-0_21,rustls-0_20-native-roots,rustls-0_21-native-roots,openssl --open
+    cargo watch -- RUSTDOCFLAGS="--cfg=docsrs" cargo +nightly doc --no-deps --workspace --features=rustls-0_20,rustls-0_21,rustls-0_20-native-roots,rustls-0_21-native-roots,openssl
 
 # Check for unintentional external type exposure on all crates in workspace.
 check-external-types-all toolchain="+nightly":

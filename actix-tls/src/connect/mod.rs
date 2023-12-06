@@ -27,14 +27,23 @@ mod uri;
 #[cfg(feature = "openssl")]
 pub mod openssl;
 
-#[cfg(feature = "rustls-0_20")]
+#[cfg(any(
+    feature = "rustls-0_20-webpki-roots",
+    feature = "rustls-0_20-native-roots",
+))]
 pub mod rustls_0_20;
 
 #[doc(hidden)]
-#[cfg(feature = "rustls-0_20")]
+#[cfg(any(
+    feature = "rustls-0_20-webpki-roots",
+    feature = "rustls-0_20-native-roots",
+))]
 pub use rustls_0_20 as rustls;
 
-#[cfg(feature = "rustls-0_21")]
+#[cfg(any(
+    feature = "rustls-0_21-webpki-roots",
+    feature = "rustls-0_21-native-roots",
+))]
 pub mod rustls_0_21;
 
 #[cfg(feature = "native-tls")]

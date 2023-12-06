@@ -47,10 +47,14 @@ openssl = ["tls-openssl", "tokio-openssl"]
 rustls = ["rustls-0_20"]
 
 # use rustls v0.20 impls
-rustls-0_20 = ["tokio-rustls-023", "webpki-roots-022"]
+rustls-0_20 = ["rustls-0_20-webpki-roots"]
+rustls-0_20-webpki-roots = ["tokio-rustls-023", "webpki-roots-022"]
+rustls-0_20-native-roots = ["tokio-rustls-023", "dep:rustls-native-certs"]
 
 # use rustls v0.21 impls
-rustls-0_21 = ["tokio-rustls-024", "webpki-roots-025"]
+rustls-0_21 = ["rustls-0_21-webpki-roots"]
+rustls-0_21-webpki-roots = ["tokio-rustls-024", "webpki-roots-025"]
+rustls-0_21-native-roots = ["tokio-rustls-024", "dep:rustls-native-certs"]
 
 # use native-tls impls
 native-tls = ["tokio-native-tls"]
@@ -87,6 +91,9 @@ rustls-021 = { package = "rustls", version = "0.21.6" }
 rustls-webpki-0101 = { package = "rustls-webpki", version = "0.101.4" }
 tokio-rustls-024 = { package = "tokio-rustls", version = "0.24", optional = true }
 webpki-roots-025 = { package = "webpki-roots", version = "0.25", optional = true }
+
+# native root certificates for both rustls impls
+rustls-native-certs = { version = "0.6", optional = true }
 
 # native-tls
 tokio-native-tls = { version = "0.3", optional = true }
