@@ -3,7 +3,7 @@
 #![cfg(all(
     feature = "accept",
     feature = "connect",
-    feature = "rustls-0_21",
+    feature = "rustls-0_22",
     feature = "openssl"
 ))]
 
@@ -41,8 +41,10 @@ fn rustls_server_config(cert: String, key: String) -> rustls::ServerConfig {
     let cert = &mut BufReader::new(cert.as_bytes());
     let key = &mut BufReader::new(key.as_bytes());
 
-    let cert_chain = certs(cert).unwrap().into_iter().map(Certificate).collect();
-    let mut keys = pkcs8_private_keys(key).unwrap();
+    let cert_chain = certs(cert).collect::<Result<Vec<_>, _>>().unwrap();
+    let mut keys = pkcs8_private_keys(key)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
     let mut config = ServerConfig::builder()
         .with_safe_defaults()

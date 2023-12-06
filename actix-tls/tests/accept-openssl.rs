@@ -3,19 +3,20 @@
 #![cfg(all(
     feature = "accept",
     feature = "connect",
-    feature = "rustls-0_21",
+    feature = "rustls-0_22",
     feature = "openssl"
 ))]
 
-use std::{convert::TryFrom, io::Write, sync::Arc};
+use std::{io::Write as _, sync::Arc};
 
 use actix_rt::net::TcpStream;
 use actix_server::TestServer;
 use actix_service::ServiceFactoryExt as _;
 use actix_tls::accept::openssl::{Acceptor, TlsStream};
 use actix_utils::future::ok;
-use tokio_rustls::rustls::{Certificate, ClientConfig, RootCertStore, ServerName};
-use tokio_rustls_024 as tokio_rustls;
+use rustls_pki_types_1::ServerName;
+use tokio_rustls::rustls::{ClientConfig, RootCertStore};
+use tokio_rustls_025 as tokio_rustls;
 
 fn new_cert_and_key() -> (String, String) {
     let cert =
@@ -48,28 +49,45 @@ fn openssl_acceptor(cert: String, key: String) -> tls_openssl::ssl::SslAcceptor 
 
 #[allow(dead_code)]
 mod danger {
-    use std::time::SystemTime;
+    use tokio_rustls_025::rustls;
 
-    use tokio_rustls_024::rustls::{
-        self,
-        client::{ServerCertVerified, ServerCertVerifier},
-    };
-
-    use super::*;
-
+    #[derive(Debug)]
     pub struct NoCertificateVerification;
 
-    impl ServerCertVerifier for NoCertificateVerification {
+    impl rustls::client::danger::ServerCertVerifier for NoCertificateVerification {
         fn verify_server_cert(
             &self,
-            _end_entity: &Certificate,
-            _intermediates: &[Certificate],
-            _server_name: &ServerName,
-            _scts: &mut dyn Iterator<Item = &[u8]>,
-            _ocsp_response: &[u8],
-            _now: SystemTime,
-        ) -> Result<ServerCertVerified, rustls::Error> {
-            Ok(ServerCertVerified::assertion())
+            end_entity: &rustls_pki_types_1::CertificateDer::CertificateDer<'_>,
+            intermediates: &[rustls_pki_types_1::CertificateDer::CertificateDer<'_>],
+            server_name: &rustls_pki_types_1::CertificateDer::ServerName<'_>,
+            ocsp_response: &[u8],
+            now: rustls_pki_types_1::CertificateDer::UnixTime,
+        ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+            Ok(rustls::client::danger::ServerCertVerified::assertion())
+        }
+
+        fn verify_tls12_signature(
+            &self,
+            message: &[u8],
+            cert: &rustls_pki_types_1::CertificateDer<'_>,
+            dss: &rustls::DigitallySignedStruct,
+        ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+            Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+        }
+
+        fn verify_tls13_signature(
+            &self,
+            message: &[u8],
+            cert: &rustls_pki_types_1::CertificateDer<'_>,
+            dss: &rustls::DigitallySignedStruct,
+        ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+            Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+        }
+
+        fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+            rustls::crypto::ring::default_provider()
+                .signature_verification_algorithms
+                .supported_schemes()
         }
     }
 }
@@ -77,7 +95,6 @@ mod danger {
 #[allow(dead_code)]
 fn rustls_connector(_cert: String, _key: String) -> ClientConfig {
     let mut config = ClientConfig::builder()
-        .with_safe_defaults()
         .with_root_certificates(RootCertStore::empty())
         .with_no_client_auth();
 
