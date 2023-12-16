@@ -22,6 +22,12 @@ pub use rustls_0_20 as rustls;
 #[cfg(feature = "rustls-0_21")]
 pub mod rustls_0_21;
 
+#[cfg(any(
+    feature = "rustls-0_22-webpki-roots",
+    feature = "rustls-0_22-native-roots",
+))]
+pub mod rustls_0_22;
+
 #[cfg(feature = "native-tls")]
 pub mod native_tls;
 

@@ -15,11 +15,8 @@
 //! http --verify=false https://127.0.0.1:8443
 //! ```
 
-#[rustfmt::skip]
 // this `use` is only exists because of how we have organised the crate
 // it is not necessary for your actual code; you should import from `rustls` normally
-use tokio_rustls_024::rustls;
-
 use std::{
     fs::File,
     io::{self, BufReader},
@@ -33,10 +30,13 @@ use std::{
 use actix_rt::net::TcpStream;
 use actix_server::Server;
 use actix_service::ServiceFactoryExt as _;
-use actix_tls::accept::rustls_0_21::{Acceptor as RustlsAcceptor, TlsStream};
+use actix_tls::accept::rustls_0_22::{Acceptor as RustlsAcceptor, TlsStream};
 use futures_util::future::ok;
-use rustls::{server::ServerConfig, Certificate, PrivateKey};
+use itertools::Itertools as _;
+use rustls::server::ServerConfig;
 use rustls_pemfile::{certs, rsa_private_keys};
+use rustls_pki_types_1::PrivateKeyDer;
+use tokio_rustls_025::rustls;
 use tracing::info;
 
 #[actix_rt::main]
@@ -54,17 +54,15 @@ async fn main() -> io::Result<()> {
     let cert_file = &mut BufReader::new(File::open(cert_path).unwrap());
     let key_file = &mut BufReader::new(File::open(key_path).unwrap());
 
-    let cert_chain = certs(cert_file)
-        .unwrap()
-        .into_iter()
-        .map(Certificate)
-        .collect();
-    let mut keys = rsa_private_keys(key_file).unwrap();
+    let cert_chain = certs(cert_file);
+    let mut keys = rsa_private_keys(key_file);
 
     let tls_config = ServerConfig::builder()
-        .with_safe_defaults()
         .with_no_client_auth()
-        .with_single_cert(cert_chain, PrivateKey(keys.remove(0)))
+        .with_single_cert(
+            cert_chain.try_collect::<_, Vec<_>, _>()?,
+            PrivateKeyDer::Pkcs1(keys.next().unwrap()?),
+        )
         .unwrap();
 
     let tls_acceptor = RustlsAcceptor::new(tls_config);
