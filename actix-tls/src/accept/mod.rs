@@ -37,6 +37,8 @@ pub(crate) static MAX_CONN: AtomicUsize = AtomicUsize::new(256);
     feature = "openssl",
     feature = "rustls-0_20",
     feature = "rustls-0_21",
+    feature = "rustls-0_22-webpki-roots",
+    feature = "rustls-0_22-native-roots",
     feature = "native-tls",
 ))]
 pub(crate) const DEFAULT_TLS_HANDSHAKE_TIMEOUT: std::time::Duration =
