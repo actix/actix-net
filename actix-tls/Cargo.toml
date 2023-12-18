@@ -116,7 +116,7 @@ bytes = "1"
 env_logger = "0.10"
 futures-util = { version = "0.3.17", default-features = false, features = ["sink"] }
 itertools = "0.12"
-rcgen = "0.11"
+rcgen = "0.12"
 rustls-pemfile = "2"
 tokio-rustls-025 = { package = "tokio-rustls", version = "0.25" }
 trust-dns-resolver = "0.23"
