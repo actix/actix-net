@@ -56,9 +56,10 @@ jobs:
         with:
           toolchain: ${{ matrix.version }}
 
-      - uses: taiki-e/install-action@v2.22.0
+      - name: Install cargo-hack and cargo-ci-cache-clean
+        uses: taiki-e/install-action@v2.22.0
         with:
-          tool: cargo-hack
+          tool: cargo-hack,cargo-ci-cache-clean
 
       - name: check lib
         if: >
@@ -98,11 +99,6 @@ jobs:
           && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-021
           && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux
           "
-
-      - name: Install cargo-ci-cache-clean
-        uses: taiki-e/install-action@v2.23.2
-        with:
-          tool: cargo-ci-cache-clean
 
       - name: CI cache clean
         run: cargo-ci-cache-clean
