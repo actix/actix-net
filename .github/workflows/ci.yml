@@ -115,10 +115,13 @@ jobs:
           && RUSTUP_TOOLCHAIN=${{ matrix.version.version }} cargo ci-test-linux
           "
 
-      - name: Clear the cargo caches
-        run: |
-          cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
-          cargo-cache
+      - name: Install cargo-ci-cache-clean
+        uses: taiki-e/install-action@v2.23.2
+        with:
+          tool: cargo-ci-cache-clean
+
+      - name: CI cache clean
+        run: cargo-ci-cache-clean
 
   rustdoc:
     name: rustdoc
