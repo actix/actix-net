@@ -5,7 +5,7 @@
 ## 3.2.0
 
 - Support Rustls v0.22.
-- Added `{accept, connect}::rustls_0_22` modules.
+- Add `{accept, connect}::rustls_0_22` modules.
 - Add `rustls-0_21-native-roots` and `rustls-0_20-native-roots` crate features which utilize the `rustls-native-certs` crate to enable a `native_roots_cert_store()` functions in each rustls-based `connect` module.
 - Implement `Host` for `http::Uri` (`http` crate version `1`).
 
@@ -16,8 +16,8 @@
 ## 3.1.0
 
 - Support Rustls v0.21.
-- Added `{accept, connect}::rustls_0_21` modules.
-- Added `{accept, connect}::rustls_0_20` alias for `{accept, connect}::rustls` modules.
+- Add `{accept, connect}::rustls_0_21` modules.
+- Add `{accept, connect}::rustls_0_20` alias for `{accept, connect}::rustls` modules.
 - Minimum supported Rust version (MSRV) is now 1.65.
 
 ## 3.0.4
