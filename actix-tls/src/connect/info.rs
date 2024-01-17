@@ -118,6 +118,7 @@ impl<R: Host> ConnectInfo<R> {
     /// let mut addrs = conn.addrs();
     /// assert_eq!(addrs.next().unwrap(), addr);
     /// ```
+    #[allow(clippy::implied_bounds_in_impls)]
     pub fn addrs(
         &self,
     ) -> impl Iterator<Item = SocketAddr>
@@ -149,6 +150,7 @@ impl<R: Host> ConnectInfo<R> {
     /// let mut addrs = conn.take_addrs();
     /// assert_eq!(addrs.next().unwrap(), addr);
     /// ```
+    #[allow(clippy::implied_bounds_in_impls)]
     pub fn take_addrs(
         &mut self,
     ) -> impl Iterator<Item = SocketAddr>

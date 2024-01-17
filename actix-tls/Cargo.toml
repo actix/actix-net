@@ -41,7 +41,7 @@ accept = []
 connect = []
 
 # use openssl impls
-openssl = ["tls-openssl", "tokio-openssl"]
+openssl = ["dep:tls-openssl", "dep:tokio-openssl"]
 
 # alias for backwards compat
 rustls = ["rustls-0_20"]
@@ -61,10 +61,10 @@ rustls-0_22-webpki-roots = ["dep:tokio-rustls-025", "dep:rustls-pki-types-1", "d
 rustls-0_22-native-roots = ["dep:tokio-rustls-025", "dep:rustls-pki-types-1", "dep:rustls-native-certs-07"]
 
 # use native-tls impls
-native-tls = ["tokio-native-tls"]
+native-tls = ["dep:tokio-native-tls"]
 
 # support http::Uri as connect address
-uri = ["http", "http-1"]
+uri = ["dep:http-0_2", "dep:http-1"]
 
 [dependencies]
 actix-rt = { version = "2.2", default-features = false }
@@ -79,7 +79,7 @@ tokio-util = "0.7"
 tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
 # uri
-http = { version = "0.2.3", optional = true }
+http-0_2 = { package = "http", version = "0.2.3", optional = true }
 http-1 = { package = "http", version = "1", optional = true }
 
 # openssl

@@ -1,8 +1,6 @@
-use http as http_02;
-
 use super::Host;
 
-impl Host for http_02::Uri {
+impl Host for http_0_2::Uri {
     fn hostname(&self) -> &str {
         self.host().unwrap_or("")
     }
