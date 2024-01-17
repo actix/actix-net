@@ -109,7 +109,7 @@ async fn test_openssl_uri() {
     });
 
     let connector = Connector::default().service();
-    let addr = http::Uri::try_from(format!("https://localhost:{}", srv.port())).unwrap();
+    let addr = http_0_2::Uri::try_from(format!("https://localhost:{}", srv.port())).unwrap();
     let con = connector.call(addr.into()).await.unwrap();
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
@@ -145,7 +145,7 @@ async fn test_rustls_uri() {
     });
 
     let conn = Connector::default().service();
-    let addr = http::Uri::try_from(format!("https://localhost:{}", srv.port())).unwrap();
+    let addr = http_1::Uri::try_from(format!("https://localhost:{}", srv.port())).unwrap();
     let con = conn.call(addr.into()).await.unwrap();
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
