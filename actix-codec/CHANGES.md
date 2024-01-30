@@ -2,20 +2,18 @@
 
 ## Unreleased
 
+## 0.5.2
+
 - Minimum supported Rust version (MSRV) is now 1.65.
 
 ## 0.5.1
 
-- Logs emitted now use the `tracing` crate with `log` compatibility. [#451]
+- Logs emitted now use the `tracing` crate with `log` compatibility.
 - Minimum supported Rust version (MSRV) is now 1.49.
-
-[#451]: https://github.com/actix/actix-net/pull/451
 
 ## 0.5.0
 
-- Updated `tokio-util` dependency to `0.7.0`. [#446]
-
-[#446]: https://github.com/actix/actix-net/pull/446
+- Updated `tokio-util` dependency to `0.7.0`.
 
 ## 0.4.2
 
@@ -23,11 +21,8 @@
 
 ## 0.4.1
 
-- Added `LinesCodec.` [#338]
-- `Framed::poll_ready` flushes when the buffer is full. [#409]
-
-[#338]: https://github.com/actix/actix-net/pull/338
-[#409]: https://github.com/actix/actix-net/pull/409
+- Added `LinesCodec`.
+- `Framed::poll_ready` flushes when the buffer is full.
 
 ## 0.4.0
 
@@ -35,12 +30,10 @@
 
 ## 0.4.0-beta.1
 
-- Replace `pin-project` with `pin-project-lite`. [#237]
-- Upgrade `tokio` dependency to `1`. [#237]
-- Upgrade `tokio-util` dependency to `0.6`. [#237]
-- Upgrade `bytes` dependency to `1`. [#237]
-
-[#237]: https://github.com/actix/actix-net/pull/237
+- Replace `pin-project` with `pin-project-lite`.
+- Upgrade `tokio` dependency to `1`.
+- Upgrade `tokio-util` dependency to `0.6`.
+- Upgrade `bytes` dependency to `1`.
 
 ## 0.3.0
 
