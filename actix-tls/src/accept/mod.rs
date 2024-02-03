@@ -22,10 +22,7 @@ pub use rustls_0_20 as rustls;
 #[cfg(feature = "rustls-0_21")]
 pub mod rustls_0_21;
 
-#[cfg(any(
-    feature = "rustls-0_22-webpki-roots",
-    feature = "rustls-0_22-native-roots",
-))]
+#[cfg(feature = "rustls-0_22")]
 pub mod rustls_0_22;
 
 #[cfg(feature = "native-tls")]
@@ -37,8 +34,7 @@ pub(crate) static MAX_CONN: AtomicUsize = AtomicUsize::new(256);
     feature = "openssl",
     feature = "rustls-0_20",
     feature = "rustls-0_21",
-    feature = "rustls-0_22-webpki-roots",
-    feature = "rustls-0_22-native-roots",
+    feature = "rustls-0_22",
     feature = "native-tls",
 ))]
 pub(crate) const DEFAULT_TLS_HANDSHAKE_TIMEOUT: std::time::Duration =

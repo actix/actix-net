@@ -57,8 +57,9 @@ rustls-0_21-webpki-roots = ["tokio-rustls-024", "webpki-roots-025"]
 rustls-0_21-native-roots = ["tokio-rustls-024", "dep:rustls-native-certs-06"]
 
 # use rustls v0.22 impls
-rustls-0_22-webpki-roots = ["dep:tokio-rustls-025", "dep:rustls-pki-types-1", "dep:webpki-roots-026"]
-rustls-0_22-native-roots = ["dep:tokio-rustls-025", "dep:rustls-pki-types-1", "dep:rustls-native-certs-07"]
+rustls-0_22 = ["dep:tokio-rustls-025", "dep:rustls-pki-types-1"]
+rustls-0_22-webpki-roots = ["rustls-0_22", "dep:webpki-roots-026"]
+rustls-0_22-native-roots = ["rustls-0_22", "dep:rustls-native-certs-07"]
 
 # use native-tls impls
 native-tls = ["dep:tokio-native-tls"]

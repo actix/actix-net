@@ -34,6 +34,7 @@
 //! ```
 //!
 //! # `io-uring` Support
+//!
 //! There is experimental support for using io-uring with this crate by enabling the
 //! `io-uring` feature. For now, it is semver exempt.
 //!

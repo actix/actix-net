@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `rustls-0_22` create feature which excludes any root certificate methods or re-exports.
+
 ## 3.2.0
 
 - Support Rustls v0.22.
