@@ -16,9 +16,8 @@ use actix_utils::future::{ok, Ready};
 use futures_core::ready;
 use rustls_pki_types_1::ServerName;
 use tokio_rustls::{
-    client::TlsStream as AsyncTlsStream,
-    rustls::{ClientConfig, RootCertStore},
-    Connect as RustlsConnect, TlsConnector as RustlsTlsConnector,
+    client::TlsStream as AsyncTlsStream, rustls::ClientConfig, Connect as RustlsConnect,
+    TlsConnector as RustlsTlsConnector,
 };
 use tokio_rustls_025 as tokio_rustls;
 
@@ -36,8 +35,8 @@ pub mod reexports {
 ///
 /// See [`rustls_native_certs::load_native_certs()`] for more info on behavior and errors.
 #[cfg(feature = "rustls-0_22-native-roots")]
-pub fn native_roots_cert_store() -> io::Result<RootCertStore> {
-    let mut root_certs = RootCertStore::empty();
+pub fn native_roots_cert_store() -> io::Result<tokio_rustls::rustls::RootCertStore> {
+    let mut root_certs = tokio_rustls::rustls::RootCertStore::empty();
 
     for cert in rustls_native_certs_07::load_native_certs()? {
         root_certs.add(cert).unwrap();
@@ -48,8 +47,8 @@ pub fn native_roots_cert_store() -> io::Result<RootCertStore> {
 
 /// Returns standard root certificates from `webpki-roots` crate as a rustls certificate store.
 #[cfg(feature = "rustls-0_22-webpki-roots")]
-pub fn webpki_roots_cert_store() -> RootCertStore {
-    let mut root_certs = RootCertStore::empty();
+pub fn webpki_roots_cert_store() -> tokio_rustls::rustls::RootCertStore {
+    let mut root_certs = tokio_rustls::rustls::RootCertStore::empty();
     root_certs.extend(webpki_roots_026::TLS_SERVER_ROOTS.to_owned());
     root_certs
 }
