@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 3.3.0
+
 - Add `rustls-0_22` create feature which excludes any root certificate methods or re-exports.
 
 ## 3.2.0
