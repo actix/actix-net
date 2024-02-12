@@ -55,7 +55,7 @@ jobs:
           toolchain: nightly-2023-10-10
 
       - name: Install just
-        uses: taiki-e/install-action@v2.26.13
+        uses: taiki-e/install-action@v2.26.18
         with:
           tool: just
 
