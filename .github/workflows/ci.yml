@@ -69,6 +69,7 @@ jobs:
       - name: workaround MSRV issues
         if: matrix.version.name == 'msrv'
         run: |
+          cargo update -p=ahash --precise=0.8.7
           cargo update -p=ciborium --precise=0.2.1
           cargo update -p=ciborium-ll --precise=0.2.1
           cargo update -p=time --precise=0.3.16
