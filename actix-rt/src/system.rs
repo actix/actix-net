@@ -16,7 +16,7 @@ use crate::{arbiter::ArbiterHandle, Arbiter};
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 thread_local!(
-    static CURRENT: RefCell<Option<System>> = RefCell::new(None);
+    static CURRENT: RefCell<Option<System>> = const { RefCell::new(None) };
 );
 
 /// A manager for a per-thread distributed async runtime.
