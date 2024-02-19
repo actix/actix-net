@@ -3,7 +3,6 @@
 //! See [`TlsConnector`] for main connector service factory docs.
 
 use std::{
-    convert::TryFrom,
     future::Future,
     io,
     pin::Pin,
