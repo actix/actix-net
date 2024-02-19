@@ -208,15 +208,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::task::Poll;
-
     use futures_util::future::lazy;
 
     use super::*;
     use crate::{
         ok,
         pipeline::{pipeline, pipeline_factory},
-        Ready, Service, ServiceFactory,
+        Ready,
     };
 
     #[derive(Clone)]

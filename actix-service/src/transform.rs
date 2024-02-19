@@ -226,7 +226,6 @@ mod tests {
     use actix_utils::future::{ready, Ready};
 
     use super::*;
-    use crate::Service;
 
     // pseudo-doctest for Transform trait
     pub struct TimeoutTransform {
