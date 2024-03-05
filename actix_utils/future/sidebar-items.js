@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Either"],"fn":["err","ok","poll_fn","ready"],"struct":["PollFn","Ready"]};
