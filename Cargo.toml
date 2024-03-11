@@ -2,6 +2,7 @@
 members = [
   "actix-codec",
   "actix-macros",
+  "actix-proxy-protocol",
   "actix-rt",
   "actix-server",
   "actix-service",
@@ -22,6 +23,7 @@ rust-version = "1.65"
 [patch.crates-io]
 actix-codec = { path = "actix-codec" }
 actix-macros = { path = "actix-macros" }
+actix-proxy-protocol = { path = "actix-proxy-protocol" }
 actix-rt = { path = "actix-rt" }
 actix-server = { path = "actix-server" }
 actix-service = { path = "actix-service" }
