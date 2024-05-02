@@ -46,6 +46,7 @@ jobs:
 
       - name: Install OpenSSL
         if: matrix.target.os == 'windows-latest'
+        uses: ilammy/setup-nasm@v1.5.1
         shell: bash
         run: |
           set -e
