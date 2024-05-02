@@ -3,7 +3,7 @@
 #![cfg(all(
     feature = "accept",
     feature = "connect",
-    feature = "rustls-0_22",
+    feature = "rustls-0_23",
     feature = "openssl"
 ))]
 
@@ -15,7 +15,7 @@ use actix_rt::net::TcpStream;
 use actix_server::TestServer;
 use actix_service::ServiceFactoryExt as _;
 use actix_tls::{
-    accept::rustls_0_22::{reexports::ServerConfig, Acceptor, TlsStream},
+    accept::rustls_0_23::{reexports::ServerConfig, Acceptor, TlsStream},
     connect::openssl::reexports::SslConnector,
 };
 use actix_utils::future::ok;

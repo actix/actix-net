@@ -2,9 +2,11 @@
 
 ## Unreleased
 
+- Add `rustls-0_23` crate feature which excludes any root certificate methods or re-exports.
+
 ## 3.3.0
 
-- Add `rustls-0_22` create feature which excludes any root certificate methods or re-exports.
+- Add `rustls-0_22` crate feature which excludes any root certificate methods or re-exports.
 
 ## 3.2.0
 

@@ -25,6 +25,9 @@ pub mod rustls_0_21;
 #[cfg(feature = "rustls-0_22")]
 pub mod rustls_0_22;
 
+#[cfg(feature = "rustls-0_23")]
+pub mod rustls_0_23;
+
 #[cfg(feature = "native-tls")]
 pub mod native_tls;
 
