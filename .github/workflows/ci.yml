@@ -58,24 +58,17 @@ jobs:
         with:
           toolchain: ${{ matrix.version.version }}
 
-      - name: Install cargo-hack and cargo-ci-cache-clean
+      - name: Install just, cargo-hack, cargo-ci-cache-clean
         uses: taiki-e/install-action@v2.28.1
         with:
-          tool: cargo-hack,cargo-ci-cache-clean
+          tool: just,cargo-hack,cargo-ci-cache-clean
 
       - name: Generate Cargo.lock
         run: cargo generate-lockfile
 
       - name: workaround MSRV issues
         if: matrix.version.name == 'msrv'
-        run: |
-          cargo update -p=ahash --precise=0.8.7
-          cargo update -p=ciborium --precise=0.2.1
-          cargo update -p=ciborium-ll --precise=0.2.1
-          cargo update -p=time --precise=0.3.16
-          cargo update -p=clap --precise=4.3.24
-          cargo update -p=clap_lex --precise=0.5.0
-          cargo update -p=anstyle --precise=1.0.2
+        run: just downgrade-msrv
 
       - name: check lib
         if: >

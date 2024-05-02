@@ -1,6 +1,18 @@
 _list:
     @just --list
 
+# Downgrade dev-dependencies necessary to run MSRV checks/tests.
+[private]
+downgrade-msrv:
+    cargo update -p=ahash --precise=0.8.7
+    cargo update -p=ciborium --precise=0.2.1
+    cargo update -p=ciborium-ll --precise=0.2.1
+    cargo update -p=time --precise=0.3.16
+    cargo update -p=clap --precise=4.3.24
+    cargo update -p=clap_lex --precise=0.5.0
+    cargo update -p=anstyle --precise=1.0.2
+    cargo update -p=trybuild --precise=1.0.89
+
 # Document crates in workspace.
 doc:
     RUSTDOCFLAGS="--cfg=docsrs" cargo +nightly doc --no-deps --workspace --features=rustls,openssl
