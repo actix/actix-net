@@ -127,7 +127,7 @@ futures-util = { version = "0.3.17", default-features = false, features = ["sink
 itertools = "0.12"
 rcgen = "0.12"
 rustls-pemfile = "2"
-tokio-rustls-025 = { package = "tokio-rustls", version = "0.25" }
+tokio-rustls-026 = { package = "tokio-rustls", version = "0.26", features = ["ring"] }
 trust-dns-resolver = "0.23"
 
 [[example]]
