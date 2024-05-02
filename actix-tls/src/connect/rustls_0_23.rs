@@ -26,7 +26,7 @@ use crate::connect::{Connection, Host};
 pub mod reexports {
     //! Re-exports from the `rustls` v0.23 ecosystem that are useful for connectors.
 
-    pub use tokio_rustls_025::{client::TlsStream as AsyncTlsStream, rustls::ClientConfig};
+    pub use tokio_rustls_026::{client::TlsStream as AsyncTlsStream, rustls::ClientConfig};
     #[cfg(feature = "rustls-0_23-webpki-roots")]
     pub use webpki_roots_026::TLS_SERVER_ROOTS;
 }
