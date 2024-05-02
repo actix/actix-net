@@ -44,7 +44,7 @@ jobs:
         if: matrix.target.os == 'ubuntu-latest'
         run: ./scripts/free-disk-space.sh
 
-      - name: Install OpenSSL
+      - name: Setup for Windows
         if: matrix.target.os == 'windows-latest'
         uses: ilammy/setup-nasm@v1.5.1
         shell: bash
