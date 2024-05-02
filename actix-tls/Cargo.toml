@@ -132,4 +132,4 @@ trust-dns-resolver = "0.23"
 
 [[example]]
 name = "accept-rustls"
-required-features = ["accept", "rustls-0_22"]
+required-features = ["accept", "rustls-0_23"]
