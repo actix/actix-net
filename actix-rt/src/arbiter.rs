@@ -80,42 +80,79 @@ impl ArbiterHandle {
     }
 }
 
-/// An Arbiter represents a thread that provides an asynchronous execution environment for futures
-/// and functions.
-///
-/// When an arbiter is created, it spawns a new [OS thread](thread), and hosts an event loop.
-#[derive(Debug)]
-pub struct Arbiter {
-    tx: mpsc::UnboundedSender<ArbiterCommand>,
-    thread_handle: thread::JoinHandle<()>,
+/// A builder for configuring and spawning a new [Arbiter] thread.
+pub struct ArbiterBuilder {
+    name_factory: Option<Box<dyn Fn(usize, usize) -> String + 'static>>,
+    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
+    runtime_factory: Option<Box<dyn FnOnce() -> tokio::runtime::Runtime + Send + 'static>>,
 }
 
-impl Arbiter {
+impl ArbiterBuilder {
+    /// Create a new [ArbiterBuilder].
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Self {
+            name_factory: None,
+            #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
+            runtime_factory: None,
+        }
+    }
+
+    /// Specify a factory function for generating the name of the Arbiter thread.
+    ///
+    /// Defaults to `actix-rt|system:<system_id>|arbiter:<arb_id>`
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// let _ = actix_rt::System::new();
+    /// actix_rt::ArbiterBuilder::new()
+    ///     .name(|system_id, arb_id| {
+    ///         format!("some-prefix|system:{}|arbiter:{}", system_id, arb_id)
+    ///     })
+    ///     .build();
+    /// ```
+    pub fn name<N>(mut self, name_factory: N) -> Self
+    where
+        N: Fn(usize, usize) -> String + 'static,
+    {
+        self.name_factory = Some(Box::new(name_factory));
+        self
+    }
+
+    /// Specify a factory function for generating the [Tokio Runtime](tokio-runtime) used by the Arbiter.
+    ///
+    /// [tokio-runtime]: tokio::runtime::Runtime
+    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
+    pub fn runtime<R>(mut self, runtime_factory: R) -> Self
+    where
+        R: FnOnce() -> tokio::runtime::Runtime + Send + 'static,
+    {
+        self.runtime_factory = Some(Box::new(runtime_factory));
+        self
+    }
+
     /// Spawn a new Arbiter thread and start its event loop.
     ///
     /// # Panics
     /// Panics if a [System] is not registered on the current thread.
     #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Arbiter {
-        Self::with_tokio_rt(|| {
-            crate::runtime::default_tokio_runtime().expect("Cannot create new Arbiter's Runtime.")
-        })
-    }
-
-    /// Spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
-    ///
-    /// [tokio-runtime]: tokio::runtime::Runtime
-    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
-    pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
-    where
-        F: FnOnce() -> tokio::runtime::Runtime + Send + 'static,
-    {
+    pub fn build(self) -> Arbiter {
         let sys = System::current();
         let system_id = sys.id();
         let arb_id = COUNT.fetch_add(1, Ordering::Relaxed);
 
-        let name = format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id);
+        let name = self.name_factory.unwrap_or_else(|| {
+            Box::new(|system_id, arb_id| {
+                format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id)
+            })
+        })(system_id, arb_id);
+        let runtime_factory = self.runtime_factory.unwrap_or_else(|| {
+            Box::new(|| {
+                crate::runtime::default_tokio_runtime()
+                    .expect("Cannot create new Arbiter's Runtime.")
+            })
+        });
         let (tx, rx) = mpsc::unbounded_channel();
 
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
@@ -160,13 +197,16 @@ impl Arbiter {
     /// # Panics
     /// Panics if a [System] is not registered on the current thread.
     #[cfg(all(target_os = "linux", feature = "io-uring"))]
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Arbiter {
+    pub fn build(self) -> Arbiter {
         let sys = System::current();
         let system_id = sys.id();
         let arb_id = COUNT.fetch_add(1, Ordering::Relaxed);
 
-        let name = format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id);
+        let name = self.name_factory.unwrap_or_else(|| {
+            Box::new(|system_id, arb_id| {
+                format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id)
+            })
+        })(system_id, arb_id);
         let (tx, rx) = mpsc::unbounded_channel();
 
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
@@ -203,6 +243,54 @@ impl Arbiter {
         ready_rx.recv().unwrap();
 
         Arbiter { tx, thread_handle }
+    }
+}
+
+/// An Arbiter represents a thread that provides an asynchronous execution environment for futures
+/// and functions.
+///
+/// When an arbiter is created, it spawns a new [OS thread](thread), and hosts an event loop.
+#[derive(Debug)]
+pub struct Arbiter {
+    tx: mpsc::UnboundedSender<ArbiterCommand>,
+    thread_handle: thread::JoinHandle<()>,
+}
+
+impl Arbiter {
+    /// Create an [ArbiterBuilder] to configure and spawn a new Arbiter thread.
+    pub fn builder() -> ArbiterBuilder {
+        ArbiterBuilder::new()
+    }
+
+    /// Spawn a new Arbiter thread and start its event loop.
+    ///
+    /// # Panics
+    /// Panics if a [System] is not registered on the current thread.
+    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Arbiter {
+        ArbiterBuilder::new().build()
+    }
+
+    /// Spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
+    ///
+    /// [tokio-runtime]: tokio::runtime::Runtime
+    #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
+    pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
+    where
+        F: FnOnce() -> tokio::runtime::Runtime + Send + 'static,
+    {
+        ArbiterBuilder::new().runtime(runtime_factory).build()
+    }
+
+    /// Spawn a new Arbiter thread and start its event loop with `tokio-uring` runtime.
+    ///
+    /// # Panics
+    /// Panics if a [System] is not registered on the current thread.
+    #[cfg(all(target_os = "linux", feature = "io-uring"))]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Arbiter {
+        ArbiterBuilder::new().build()
     }
 
     /// Sets up an Arbiter runner in a new System using the environment's local set.

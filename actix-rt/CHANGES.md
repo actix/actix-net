@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `actix_rt::ArbiterBuilder` to allow user to configure the thread spawned for the arbiter.
+
 ## 2.10.0
 
 - Relax `F`'s bound (`Fn => FnOnce`) on `{Arbiter, System}::with_tokio_rt()` functions.
