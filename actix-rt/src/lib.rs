@@ -67,7 +67,7 @@ pub use tokio::pin;
 use tokio::task::JoinHandle;
 
 pub use self::{
-    arbiter::{Arbiter, ArbiterHandle},
+    arbiter::{Arbiter, ArbiterBuilder, ArbiterHandle},
     runtime::Runtime,
     system::{System, SystemRunner},
 };

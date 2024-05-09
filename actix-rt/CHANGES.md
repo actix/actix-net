@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `actix_rt::ArbiterBuilder` to allow user to configure the thread spawned for the arbiter.
+
 ## 2.9.0
 
 - Add `actix_rt::System::runtime()` method to retrieve the underlying `actix_rt::Runtime` runtime.
