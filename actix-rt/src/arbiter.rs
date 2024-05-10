@@ -71,6 +71,13 @@ impl ArbiterHandle {
         self.spawn(async { f() })
     }
 
+    /// Check if the [Arbiter] is still alive.
+    ///
+    /// Returns false if the [Arbiter] has been dropped, returns true otherwise.
+    pub fn alive(&self) -> bool {
+        !self.tx.is_closed()
+    }
+
     /// Instruct [Arbiter] to stop processing it's event loop.
     ///
     /// Returns true if stop message was sent successfully and false if the [Arbiter] has
@@ -365,6 +372,13 @@ impl Arbiter {
         F: FnOnce() + Send + 'static,
     {
         self.spawn(async { f() })
+    }
+
+    /// Check if the [Arbiter] is still alive.
+    ///
+    /// Returns false if the [Arbiter] has been dropped, returns true otherwise.
+    pub fn alive(&self) -> bool {
+        !self.tx.is_closed()
     }
 
     /// Wait for Arbiter's event loop to complete.
