@@ -27,6 +27,6 @@ actix-utils = "3"
 tracing = "0.1.35"
 tracing-futures = "0.2"
 
-[dev_dependencies]
+[dev-dependencies]
 actix-rt = "2"
 slab = "0.4"

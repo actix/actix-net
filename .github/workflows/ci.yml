@@ -25,7 +25,7 @@ jobs:
           - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
           - { name: Windows (32-bit), os: windows-latest, triple: i686-pc-windows-msvc }
         version:
-          - { name: msrv, version: 1.65.0 }
+          - { name: msrv, version: 1.70.0 }
           - { name: stable, version: stable }
 
     name: ${{ matrix.target.name }} / ${{ matrix.version.name }}
@@ -58,17 +58,17 @@ jobs:
         with:
           toolchain: ${{ matrix.version.version }}
 
-      - name: Install just, cargo-hack, cargo-ci-cache-clean
+      - name: Install just, cargo-hack, cargo-nextest, cargo-ci-cache-clean
         uses: taiki-e/install-action@v2.33.17
         with:
-          tool: just,cargo-hack,cargo-ci-cache-clean
+          tool: just,cargo-hack,cargo-nextest,cargo-ci-cache-clean
 
       - name: Generate Cargo.lock
         run: cargo generate-lockfile
 
       - name: workaround MSRV issues
         if: matrix.version.name == 'msrv'
-        run: just downgrade-msrv
+        run: just downgrade-for-msrv
 
       - name: check lib
         if: >
@@ -79,7 +79,7 @@ jobs:
         if: matrix.target.os == 'ubuntu-latest'
         run: cargo ci-check-lib-linux
       - name: check lib
-        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
+        if: matrix.target.triple != 'x86_64-pc-windows-gnu'
         run: cargo ci-check-min
 
       - name: check full
@@ -93,30 +93,15 @@ jobs:
         run: cargo ci-check-linux
 
       - name: tests
-        if: matrix.target.os == 'macos-latest'
-        run: cargo ci-test
-      - name: tests
-        if: >
-          matrix.target.os == 'windows-latest'
-          && matrix.target.triple != 'x86_64-pc-windows-gnu'
-        run: cargo ci-test-win
-      - name: tests
-        if: matrix.target.os == 'ubuntu-latest'
-        run: >-
-          sudo bash -c "
-          ulimit -Sl 512
-          && ulimit -Hl 512
-          && PATH=$PATH:/usr/share/rust/.cargo/bin
-          && RUSTUP_TOOLCHAIN=${{ matrix.version.version }} cargo ci-test-rustls-020
-          && RUSTUP_TOOLCHAIN=${{ matrix.version.version }} cargo ci-test-rustls-021
-          && RUSTUP_TOOLCHAIN=${{ matrix.version.version }} cargo ci-test-linux
-          "
+        run: just test
+
+      # TODO: re-instate some io-uring tests for PRs
 
       - name: CI cache clean
         run: cargo-ci-cache-clean
 
-  rustdoc:
-    name: rustdoc
+  docs:
+    name: Documentation
     runs-on: ubuntu-latest
 
     steps:
@@ -127,6 +112,10 @@ jobs:
         with:
           toolchain: nightly
 
-      - name: doc tests io-uring
-        run: |
-          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=nightly cargo ci-doctest"
+      - name: Install just
+        uses: taiki-e/install-action@v2.33.17
+        with:
+          tool: just
+
+      - name: doc tests
+        run: just test-docs
