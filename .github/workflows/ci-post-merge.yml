@@ -85,7 +85,7 @@ jobs:
 
       - name: tests
         if: matrix.target.os != 'ubuntu-latest'
-        run: just test-code
+        run: just test
       - name: tests
         if: matrix.target.os == 'ubuntu-latest'
         run: >-

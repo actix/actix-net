@@ -14,7 +14,7 @@ downgrade-for-msrv:
 
 msrv := ```
     cargo metadata --format-version=1 \
-    | jq -r 'first(.packages[] | .name = "actix-tls") | .rust_version'
+    | jq -r 'first(.packages[] | select(.source == null and .name == "actix-tls")) | .rust_version'
 ```
 msrv_full := msrv + ".0" # comment out if the MSRV has a patch version specified
 msrv_rustup := "+" + msrv_full

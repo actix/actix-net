@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.70.
+
 ## 3.3.0
 
 - Add `rustls-0_22` create feature which excludes any root certificate methods or re-exports.
