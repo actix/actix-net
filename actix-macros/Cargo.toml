@@ -33,5 +33,6 @@ proc-macro2 = "1.0.60"
 actix-rt = "2"
 
 futures-util = { version = "0.3.17", default-features = false }
-rustversion = "1"
+# rustversion = "1"
+rustversion = { path = "/Users/rob/Development/forks/rustversion" }
 trybuild = "1"

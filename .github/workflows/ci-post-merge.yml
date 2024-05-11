@@ -56,10 +56,10 @@ jobs:
         with:
           toolchain: ${{ matrix.version }}
 
-      - name: Install cargo-hack and cargo-ci-cache-clean
-        uses: taiki-e/install-action@v2.33.12
+      - name: Install just, cargo-hack, cargo-nextest, cargo-ci-cache-clean
+        uses: taiki-e/install-action@v2.33.17
         with:
-          tool: cargo-hack,cargo-ci-cache-clean
+          tool: just,cargo-hack,cargo-nextest,cargo-ci-cache-clean
 
       - name: check lib
         if: >
@@ -84,10 +84,8 @@ jobs:
         run: cargo ci-check-linux
 
       - name: tests
-        if: >
-          matrix.target.os != 'ubuntu-latest'
-          && matrix.target.triple != 'x86_64-pc-windows-gnu'
-        run: cargo ci-test
+        if: matrix.target.os != 'ubuntu-latest'
+        run: just test
       - name: tests
         if: matrix.target.os == 'ubuntu-latest'
         run: >-
@@ -115,7 +113,7 @@ jobs:
           toolchain: nightly
 
       - name: Install cargo-hack & cargo-minimal-versions
-        uses: taiki-e/install-action@v2.33.12
+        uses: taiki-e/install-action@v2.33.17
         with:
           tool: cargo-hack,cargo-minimal-versions
 
@@ -132,7 +130,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1.8.0
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2.33.12
+        uses: taiki-e/install-action@v2.33.17
         with:
           tool: cargo-nextest
 

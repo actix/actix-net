@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.70.
+
 ## 2.9.0
 
 - Add `actix_rt::System::runtime()` method to retrieve the underlying `actix_rt::Runtime` runtime.
