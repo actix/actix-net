@@ -13,7 +13,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  read_msrv:
+    name: Read MSRV
+    uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@main
+
   build_and_test:
+    needs:
+      - read_msrv
+
     strategy:
       fail-fast: false
       matrix:
@@ -24,7 +31,7 @@ jobs:
           - { name: Windows, os: windows-latest, triple: x86_64-pc-windows-msvc }
           - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
         version:
-          - { name: msrv, version: 1.70.0 }
+          - { name: msrv, version: "${{ needs.read_msrv.outputs.msrv }}" }
           - { name: stable, version: stable }
 
     name: ${{ matrix.target.name }} / ${{ matrix.version.name }}
