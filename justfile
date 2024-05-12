@@ -27,6 +27,13 @@ all_crate_features := if os() == "linux" {
     "--features='" + non_linux_all_features_list + "'"
 }
 
+m:
+    cargo metadata --format-version=1 \
+    | jq -r 'first(.packages[] | select(.source == null)) | .rust_version' \
+    | sed -E 's/^1\.([0-9]{2})$/1\.\1\.0/' \
+    | xargs -0 printf "msrv=%s" \
+    | tee /dev/stderr
+
 # Test workspace code.
 test toolchain="":
     cargo {{ toolchain }} test --lib --tests --package=actix-macros
