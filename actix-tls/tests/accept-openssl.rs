@@ -111,6 +111,10 @@ fn rustls_connector(_cert: String, _key: String) -> ClientConfig {
 
 #[actix_rt::test]
 async fn accepts_connections() {
+    tokio_rustls_026::rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
     let (cert, key) = new_cert_and_key();
 
     let srv = TestServer::start({
