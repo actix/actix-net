@@ -88,7 +88,7 @@ mod danger {
         }
 
         fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-            rustls::crypto::ring::default_provider()
+            rustls::crypto::aws_lc_rs::default_provider()
                 .signature_verification_algorithms
                 .supported_schemes()
         }
@@ -111,7 +111,7 @@ fn rustls_connector(_cert: String, _key: String) -> ClientConfig {
 
 #[actix_rt::test]
 async fn accepts_connections() {
-    tokio_rustls_026::rustls::crypto::ring::default_provider()
+    tokio_rustls_026::rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .unwrap();
 

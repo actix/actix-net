@@ -73,7 +73,7 @@ fn openssl_connector(cert: String, key: String) -> SslConnector {
 
 #[actix_rt::test]
 async fn accepts_connections() {
-    tokio_rustls_026::rustls::crypto::ring::default_provider()
+    tokio_rustls_026::rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .unwrap();
 
