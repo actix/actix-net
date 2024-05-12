@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add `rustls-0_23` crate feature which excludes any root certificate methods or re-exports.
+- Add `rustls-0_23`, `rustls-0_23-webpki-roots`, and `rustls-0_23-native-roots` crate features.
 - Minimum supported Rust version (MSRV) is now 1.70.
 
 ## 3.3.0
