@@ -351,7 +351,6 @@ mod tests {
     use futures_util::future::lazy;
 
     use super::*;
-    use crate::{ok, Service, ServiceFactory};
 
     #[actix_rt::test]
     async fn test_fn_service() {

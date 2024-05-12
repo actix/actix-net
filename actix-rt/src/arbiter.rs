@@ -16,7 +16,7 @@ use crate::system::{System, SystemCommand};
 pub(crate) static COUNT: AtomicUsize = AtomicUsize::new(0);
 
 thread_local!(
-    static HANDLE: RefCell<Option<ArbiterHandle>> = RefCell::new(None);
+    static HANDLE: RefCell<Option<ArbiterHandle>> = const { RefCell::new(None) };
 );
 
 pub(crate) enum ArbiterCommand {

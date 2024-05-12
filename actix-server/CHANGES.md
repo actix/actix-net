@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.70.
+
 ## 2.3.0
 
 - Add support for MultiPath TCP (MPTCP) with `MpTcp` enum and `ServerBuilder::mptcp()` method.
@@ -10,9 +12,7 @@
 ## 2.2.0
 
 - Minimum supported Rust version (MSRV) is now 1.59.
-- Update `tokio-uring` dependency to `0.4`. [#473]
-
-[#473]: https://github.com/actix/actix-net/pull/473
+- Update `tokio-uring` dependency to `0.4`.
 
 ## 2.1.1
 
@@ -20,12 +20,9 @@
 
 ## 2.1.0
 
-- Update `tokio-uring` dependency to `0.3`. [#448]
-- Logs emitted now use the `tracing` crate with `log` compatibility. [#448]
-- Wait for accept thread to stop before sending completion signal. [#443]
-
-[#443]: https://github.com/actix/actix-net/pull/443
-[#448]: https://github.com/actix/actix-net/pull/448
+- Update `tokio-uring` dependency to `0.3`.
+- Logs emitted now use the `tracing` crate with `log` compatibility.
+- Wait for accept thread to stop before sending completion signal.
 
 ## 2.0.0
 
@@ -33,9 +30,7 @@
 
 ## 2.0.0-rc.4
 
-- Update `tokio-uring` dependency to `0.2`. [#436]
-
-[#436]: https://github.com/actix/actix-net/pull/436
+- Update `tokio-uring` dependency to `0.2`.
 
 ## 2.0.0-rc.3
 
@@ -43,117 +38,80 @@
 
 ## 2.0.0-rc.2
 
-- Simplify `TestServer`. [#431]
-
-[#431]: https://github.com/actix/actix-net/pull/431
+- Simplify `TestServer`.
 
 ## 2.0.0-rc.1
 
-- Hide implementation details of `Server`. [#424]
-- `Server` now runs only after awaiting it. [#425]
-
-[#424]: https://github.com/actix/actix-net/pull/424
-[#425]: https://github.com/actix/actix-net/pull/425
+- Hide implementation details of `Server`.
+- `Server` now runs only after awaiting it.
 
 ## 2.0.0-beta.9
 
-- Restore `Arbiter` support lost in `beta.8`. [#417]
-
-[#417]: https://github.com/actix/actix-net/pull/417
+- Restore `Arbiter` support lost in `beta.8`.
 
 ## 2.0.0-beta.8
 
-- Fix non-unix signal handler. [#410]
-
-[#410]: https://github.com/actix/actix-net/pull/410
+- Fix non-unix signal handler.
 
 ## 2.0.0-beta.7
 
-- Server can be started in regular Tokio runtime. [#408]
-- Expose new `Server` type whose `Future` impl resolves when server stops. [#408]
-- Rename `Server` to `ServerHandle`. [#407]
-- Add `Server::handle` to obtain handle to server. [#408]
-- Rename `ServerBuilder::{maxconn => max_concurrent_connections}`. [#407]
-- Deprecate crate-level `new` shortcut for server builder. [#408]
+- Server can be started in regular Tokio runtime.
+- Expose new `Server` type whose `Future` impl resolves when server stops.
+- Rename `Server` to `ServerHandle`.
+- Add `Server::handle` to obtain handle to server.
+- Rename `ServerBuilder::{maxconn => max_concurrent_connections}`.
+- Deprecate crate-level `new` shortcut for server builder.
 - Minimum supported Rust version (MSRV) is now 1.52.
-
-[#407]: https://github.com/actix/actix-net/pull/407
-[#408]: https://github.com/actix/actix-net/pull/408
 
 ## 2.0.0-beta.6
 
-- Add experimental (semver-exempt) `io-uring` feature for enabling async file I/O on linux. [#374]
-- Server no long listens to `SIGHUP` signal. Previously, the received was not used but did block subsequent exit signals from working. [#389]
-- Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to this change. [#349]
-- Remove `ServerBuilder::configure` [#349]
-
-[#374]: https://github.com/actix/actix-net/pull/374
-[#349]: https://github.com/actix/actix-net/pull/349
-[#389]: https://github.com/actix/actix-net/pull/389
+- Add experimental (semver-exempt) `io-uring` feature for enabling async file I/O on linux.
+- Server no long listens to `SIGHUP` signal. Previously, the received was not used but did block subsequent exit signals from working.
+- Remove `config` module. `ServiceConfig`, `ServiceRuntime` public types are removed due to this change.
+- Remove `ServerBuilder::configure`.
 
 ## 2.0.0-beta.5
 
-- Server shutdown notifies all workers to exit regardless if shutdown is graceful. This causes all workers to shutdown immediately in force shutdown case. [#333]
-
-[#333]: https://github.com/actix/actix-net/pull/333
+- Server shutdown notifies all workers to exit regardless if shutdown is graceful. This causes all workers to shutdown immediately in force shutdown case.
 
 ## 2.0.0-beta.4
 
 - Prevent panic when `shutdown_timeout` is very large. [f9262db]
 
-[f9262db]: https://github.com/actix/actix-net/commit/f9262db
-
 ## 2.0.0-beta.3
 
-- Hidden `ServerBuilder::start` method has been removed. Use `ServerBuilder::run`. [#246]
-- Add retry for EINTR signal (`io::Interrupted`) in `Accept`'s poll loop. [#264]
-- Add `ServerBuilder::worker_max_blocking_threads` to customize blocking thread pool size. [#265]
-- Update `actix-rt` to `2.0.0`. [#273]
-
-[#246]: https://github.com/actix/actix-net/pull/246
-[#264]: https://github.com/actix/actix-net/pull/264
-[#265]: https://github.com/actix/actix-net/pull/265
-[#273]: https://github.com/actix/actix-net/pull/273
+- Hidden `ServerBuilder::start` method has been removed. Use `ServerBuilder::run`.
+- Add retry for EINTR signal (`io::Interrupted`) in `Accept`'s poll loop.
+- Add `ServerBuilder::worker_max_blocking_threads` to customize blocking thread pool size.
+- Update `actix-rt` to `2.0.0`.
 
 ## 2.0.0-beta.2
 
-- Merge `actix-testing` to `actix-server` as `test_server` mod. [#242]
-
-[#242]: https://github.com/actix/actix-net/pull/242
+- Merge `actix-testing` to `actix-server` as `test_server` mod.
 
 ## 2.0.0-beta.1
 
-- Added explicit info log message on accept queue pause. [#215]
-- Prevent double registration of sockets when back-pressure is resolved. [#223]
-- Update `mio` dependency to `0.7.3`. [#239]
-- Remove `socket2` dependency. [#239]
-- `ServerBuilder::backlog` now accepts `u32` instead of `i32`. [#239]
-- Remove `AcceptNotify` type and pass `WakerQueue` to `Worker` to wake up `Accept`'s `Poll`. [#239]
-- Convert `mio::net::TcpStream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using `FromRawFd` and `IntoRawFd`(`FromRawSocket` and `IntoRawSocket` on windows). [#239]
-- Remove `AsyncRead` and `AsyncWrite` trait bound for `socket::FromStream` trait. [#239]
-
-[#215]: https://github.com/actix/actix-net/pull/215
-[#223]: https://github.com/actix/actix-net/pull/223
-[#239]: https://github.com/actix/actix-net/pull/239
+- Added explicit info log message on accept queue pause.
+- Prevent double registration of sockets when back-pressure is resolved.
+- Update `mio` dependency to `0.7.3`.
+- Remove `socket2` dependency.
+- `ServerBuilder::backlog` now accepts `u32` instead of `i32`.
+- Remove `AcceptNotify` type and pass `WakerQueue` to `Worker` to wake up `Accept`'s `Poll`.
+- Convert `mio::net::TcpStream` to `actix_rt::net::TcpStream`(`UnixStream` for uds) using `FromRawFd` and `IntoRawFd`(`FromRawSocket` and `IntoRawSocket` on windows).
+- Remove `AsyncRead` and `AsyncWrite` trait bound for `socket::FromStream` trait.
 
 ## 1.0.4
 
 - Update actix-codec to 0.3.0.
-- Workers must be greater than 0. [#167]
-
-[#167]: https://github.com/actix/actix-net/pull/167
+- Workers must be greater than 0.
 
 ## 1.0.3
 
-- Replace deprecated `net2` crate with `socket2` [#140]
-
-[#140]: https://github.com/actix/actix-net/pull/140
+- Replace deprecated `net2` crate with `socket2`.
 
 ## 1.0.2
 
-- Avoid error by calling `reregister()` on Windows [#103]
-
-[#103]: https://github.com/actix/actix-net/pull/103
+- Avoid error by calling `reregister()` on Windows.
 
 ## 1.0.1
 

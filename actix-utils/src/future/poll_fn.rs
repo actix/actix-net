@@ -103,6 +103,7 @@ mod tests {
     #[allow(dead_code)]
     fn require_sync<T: Sync>(_t: &T) {}
 
+    #[allow(unused)]
     trait AmbiguousIfUnpin<A> {
         fn some_item(&self) {}
     }

@@ -55,12 +55,12 @@ jobs:
           toolchain: nightly-2023-10-10
 
       - name: Install just
-        uses: taiki-e/install-action@v2.25.2
+        uses: taiki-e/install-action@v2.33.17
         with:
           tool: just
 
       - name: Install cargo-check-external-types
-        uses: taiki-e/cache-cargo-install-action@v1.3.0
+        uses: taiki-e/cache-cargo-install-action@v2.0.0
         with:
           tool: cargo-check-external-types@0.1.10
 

@@ -98,8 +98,6 @@ async fn service_factory() {
 #[cfg(all(feature = "openssl", feature = "uri"))]
 #[actix_rt::test]
 async fn test_openssl_uri() {
-    use std::convert::TryFrom;
-
     let srv = TestServer::start(|| {
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);
@@ -134,8 +132,6 @@ async fn test_rustls_uri_http1() {
 #[cfg(all(feature = "rustls-0_22", feature = "uri"))]
 #[actix_rt::test]
 async fn test_rustls_uri() {
-    use std::convert::TryFrom;
-
     let srv = TestServer::start(|| {
         fn_service(|io: TcpStream| async {
             let mut framed = Framed::new(io, BytesCodec);

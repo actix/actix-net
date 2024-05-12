@@ -15,14 +15,13 @@ use actix_rt::net::TcpStream;
 use actix_server::TestServer;
 use actix_service::ServiceFactoryExt as _;
 use actix_tls::{
-    accept::rustls_0_21::{Acceptor, TlsStream},
+    accept::rustls_0_22::{reexports::ServerConfig, Acceptor, TlsStream},
     connect::openssl::reexports::SslConnector,
 };
 use actix_utils::future::ok;
 use rustls_pemfile::{certs, pkcs8_private_keys};
+use rustls_pki_types_1::PrivateKeyDer;
 use tls_openssl::ssl::SslVerifyMode;
-use tokio_rustls::rustls::{self, Certificate, PrivateKey, ServerConfig};
-use tokio_rustls_024 as tokio_rustls;
 
 fn new_cert_and_key() -> (String, String) {
     let cert =
@@ -35,7 +34,7 @@ fn new_cert_and_key() -> (String, String) {
     (cert, key)
 }
 
-fn rustls_server_config(cert: String, key: String) -> rustls::ServerConfig {
+fn rustls_server_config(cert: String, key: String) -> ServerConfig {
     // Load TLS key and cert files
 
     let cert = &mut BufReader::new(cert.as_bytes());
@@ -47,9 +46,8 @@ fn rustls_server_config(cert: String, key: String) -> rustls::ServerConfig {
         .unwrap();
 
     let mut config = ServerConfig::builder()
-        .with_safe_defaults()
         .with_no_client_auth()
-        .with_single_cert(cert_chain, PrivateKey(keys.remove(0)))
+        .with_single_cert(cert_chain, PrivateKeyDer::Pkcs8(keys.remove(0)))
         .unwrap();
 
     config.alpn_protocols = vec![b"http/1.1".to_vec()];

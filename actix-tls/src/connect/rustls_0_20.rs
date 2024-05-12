@@ -3,7 +3,6 @@
 //! See [`TlsConnector`] for main connector service factory docs.
 
 use std::{
-    convert::TryFrom,
     future::Future,
     io,
     pin::Pin,
@@ -35,6 +34,8 @@ pub mod reexports {
 /// Returns root certificates via `rustls-native-certs` crate as a rustls certificate store.
 ///
 /// See [`rustls_native_certs::load_native_certs()`] for more info on behavior and errors.
+///
+/// [`rustls_native_certs::load_native_certs()`]: rustls_native_certs_06::load_native_certs()
 #[cfg(feature = "rustls-0_20-native-roots")]
 pub fn native_roots_cert_store() -> io::Result<RootCertStore> {
     let mut root_certs = RootCertStore::empty();

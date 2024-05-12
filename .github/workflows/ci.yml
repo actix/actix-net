@@ -23,9 +23,8 @@ jobs:
           - { name: macOS, os: macos-latest, triple: x86_64-apple-darwin }
           - { name: Windows, os: windows-latest, triple: x86_64-pc-windows-msvc }
           - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
-          - { name: Windows (32-bit), os: windows-latest, triple: i686-pc-windows-msvc }
         version:
-          - { name: msrv, version: 1.65.0 }
+          - { name: msrv, version: 1.70.0 }
           - { name: stable, version: stable }
 
     name: ${{ matrix.target.name }} / ${{ matrix.version.name }}
@@ -46,33 +45,29 @@ jobs:
 
       - name: Install OpenSSL
         if: matrix.target.os == 'windows-latest'
-        run: choco install openssl -y --forcex64 --no-progress
-      - name: Set OpenSSL dir in env
-        if: matrix.target.os == 'windows-latest'
+        shell: bash
         run: |
-          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL-Win64' | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL' | Out-File -FilePath $env:GITHUB_ENV -Append
+          set -e
+          choco install openssl --version=1.1.1.2100 -y --no-progress
+          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL' >> $GITHUB_ENV
+          echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
 
       - name: Install Rust (${{ matrix.version.name }})
         uses: actions-rust-lang/setup-rust-toolchain@v1.8.0
         with:
           toolchain: ${{ matrix.version.version }}
 
-      - name: Install cargo-hack and cargo-ci-cache-clean
-        uses: taiki-e/install-action@v2.25.2
+      - name: Install just, cargo-hack, cargo-nextest, cargo-ci-cache-clean
+        uses: taiki-e/install-action@v2.33.17
         with:
-          tool: cargo-hack,cargo-ci-cache-clean
+          tool: just,cargo-hack,cargo-nextest,cargo-ci-cache-clean
 
       - name: Generate Cargo.lock
         run: cargo generate-lockfile
 
       - name: workaround MSRV issues
         if: matrix.version.name == 'msrv'
-        run: |
-          cargo update -p=time --precise=0.3.16
-          cargo update -p=clap --precise=4.3.24
-          cargo update -p=clap_lex --precise=0.5.0
-          cargo update -p=anstyle --precise=1.0.2
+        run: just downgrade-for-msrv
 
       - name: check lib
         if: >
@@ -83,7 +78,7 @@ jobs:
         if: matrix.target.os == 'ubuntu-latest'
         run: cargo ci-check-lib-linux
       - name: check lib
-        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
+        if: matrix.target.triple != 'x86_64-pc-windows-gnu'
         run: cargo ci-check-min
 
       - name: check full
@@ -97,30 +92,15 @@ jobs:
         run: cargo ci-check-linux
 
       - name: tests
-        if: matrix.target.os == 'macos-latest'
-        run: cargo ci-test
-      - name: tests
-        if: >
-          matrix.target.os == 'windows-latest'
-          && matrix.target.triple != 'x86_64-pc-windows-gnu'
-        run: cargo ci-test-win
-      - name: tests
-        if: matrix.target.os == 'ubuntu-latest'
-        run: >-
-          sudo bash -c "
-          ulimit -Sl 512
-          && ulimit -Hl 512
-          && PATH=$PATH:/usr/share/rust/.cargo/bin
-          && RUSTUP_TOOLCHAIN=${{ matrix.version.version }} cargo ci-test-rustls-020
-          && RUSTUP_TOOLCHAIN=${{ matrix.version.version }} cargo ci-test-rustls-021
-          && RUSTUP_TOOLCHAIN=${{ matrix.version.version }} cargo ci-test-linux
-          "
+        run: just test
+
+      # TODO: re-instate some io-uring tests for PRs
 
       - name: CI cache clean
         run: cargo-ci-cache-clean
 
-  rustdoc:
-    name: rustdoc
+  docs:
+    name: Documentation
     runs-on: ubuntu-latest
 
     steps:
@@ -131,6 +111,10 @@ jobs:
         with:
           toolchain: nightly
 
-      - name: doc tests io-uring
-        run: |
-          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=nightly cargo ci-doctest"
+      - name: Install just
+        uses: taiki-e/install-action@v2.33.17
+        with:
+          tool: just
+
+      - name: doc tests
+        run: just test-docs

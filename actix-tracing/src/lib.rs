@@ -131,7 +131,7 @@ mod test {
     use super::*;
 
     thread_local! {
-        static SPAN: RefCell<Vec<span::Id>> = RefCell::new(Vec::new());
+        static SPAN: RefCell<Vec<span::Id>> = const { RefCell::new(Vec::new()) };
     }
 
     #[derive(Default)]

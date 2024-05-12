@@ -13,7 +13,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{borrow::Borrow, convert::TryFrom, fmt, hash, ops, str};
+use core::{borrow::Borrow, fmt, hash, ops, str};
 
 use bytes::Bytes;
 

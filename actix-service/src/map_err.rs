@@ -205,9 +205,7 @@ mod tests {
     use futures_util::future::lazy;
 
     use super::*;
-    use crate::{
-        err, ok, IntoServiceFactory, Ready, Service, ServiceExt, ServiceFactory, ServiceFactoryExt,
-    };
+    use crate::{err, ok, IntoServiceFactory, Ready, ServiceExt, ServiceFactoryExt};
 
     struct Srv;
 
