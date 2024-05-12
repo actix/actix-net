@@ -3,7 +3,7 @@
 #![cfg(all(
     feature = "accept",
     feature = "connect",
-    feature = "rustls-0_22",
+    feature = "rustls-0_23",
     feature = "openssl"
 ))]
 
@@ -14,11 +14,11 @@ use actix_server::TestServer;
 use actix_service::ServiceFactoryExt as _;
 use actix_tls::{
     accept::openssl::{Acceptor, TlsStream},
-    connect::rustls_0_22::reexports::ClientConfig,
+    connect::rustls_0_23::reexports::ClientConfig,
 };
 use actix_utils::future::ok;
 use rustls_pki_types_1::ServerName;
-use tokio_rustls_025::rustls::RootCertStore;
+use tokio_rustls_026::rustls::RootCertStore;
 
 fn new_cert_and_key() -> (String, String) {
     let cert =
@@ -51,7 +51,7 @@ fn openssl_acceptor(cert: String, key: String) -> tls_openssl::ssl::SslAcceptor 
 
 mod danger {
     use rustls_pki_types_1::{CertificateDer, ServerName, UnixTime};
-    use tokio_rustls_025::rustls;
+    use tokio_rustls_026::rustls;
 
     /// Disables certificate verification to allow self-signed certs from rcgen.
     #[derive(Debug)]
@@ -63,7 +63,7 @@ mod danger {
             _end_entity: &CertificateDer<'_>,
             _intermediates: &[CertificateDer<'_>],
             _server_name: &ServerName<'_>,
-            _ocsp_response: &[u8],
+            _ocsp: &[u8],
             _now: UnixTime,
         ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
             Ok(rustls::client::danger::ServerCertVerified::assertion())
@@ -111,6 +111,10 @@ fn rustls_connector(_cert: String, _key: String) -> ClientConfig {
 
 #[actix_rt::test]
 async fn accepts_connections() {
+    tokio_rustls_026::rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
     let (cert, key) = new_cert_and_key();
 
     let srv = TestServer::start({
@@ -137,13 +141,13 @@ async fn accepts_connections() {
     let config = rustls_connector(cert, key);
     let config = Arc::new(config);
 
-    let mut conn = tokio_rustls_025::rustls::ClientConnection::new(
+    let mut conn = tokio_rustls_026::rustls::ClientConnection::new(
         config,
         ServerName::try_from("localhost").unwrap(),
     )
     .unwrap();
 
-    let mut stream = tokio_rustls_025::rustls::Stream::new(&mut conn, &mut sock);
+    let mut stream = tokio_rustls_026::rustls::Stream::new(&mut conn, &mut sock);
 
     stream.flush().expect("TLS handshake failed");
 }

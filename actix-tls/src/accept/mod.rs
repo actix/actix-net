@@ -25,6 +25,9 @@ pub mod rustls_0_21;
 #[cfg(feature = "rustls-0_22")]
 pub mod rustls_0_22;
 
+#[cfg(feature = "rustls-0_23")]
+pub mod rustls_0_23;
+
 #[cfg(feature = "native-tls")]
 pub mod native_tls;
 
@@ -35,6 +38,7 @@ pub(crate) static MAX_CONN: AtomicUsize = AtomicUsize::new(256);
     feature = "rustls-0_20",
     feature = "rustls-0_21",
     feature = "rustls-0_22",
+    feature = "rustls-0_23",
     feature = "native-tls",
 ))]
 pub(crate) const DEFAULT_TLS_HANDSHAKE_TIMEOUT: std::time::Duration =

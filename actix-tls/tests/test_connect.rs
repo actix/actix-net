@@ -30,7 +30,7 @@ async fn test_string() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(feature = "rustls-0_22")]
+#[cfg(feature = "rustls-0_23")]
 #[actix_rt::test]
 async fn test_rustls_string() {
     let srv = TestServer::start(|| {
@@ -112,7 +112,7 @@ async fn test_openssl_uri() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(all(feature = "rustls-0_22", feature = "uri"))]
+#[cfg(all(feature = "rustls-0_23", feature = "uri"))]
 #[actix_rt::test]
 async fn test_rustls_uri_http1() {
     let srv = TestServer::start(|| {
@@ -129,7 +129,7 @@ async fn test_rustls_uri_http1() {
     assert_eq!(con.peer_addr().unwrap(), srv.addr());
 }
 
-#[cfg(all(feature = "rustls-0_22", feature = "uri"))]
+#[cfg(all(feature = "rustls-0_23", feature = "uri"))]
 #[actix_rt::test]
 async fn test_rustls_uri() {
     let srv = TestServer::start(|| {

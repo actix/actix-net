@@ -3,7 +3,7 @@
 #![cfg(all(
     feature = "accept",
     feature = "connect",
-    feature = "rustls-0_22",
+    feature = "rustls-0_23",
     feature = "openssl"
 ))]
 
@@ -15,7 +15,7 @@ use actix_rt::net::TcpStream;
 use actix_server::TestServer;
 use actix_service::ServiceFactoryExt as _;
 use actix_tls::{
-    accept::rustls_0_22::{reexports::ServerConfig, Acceptor, TlsStream},
+    accept::rustls_0_23::{reexports::ServerConfig, Acceptor, TlsStream},
     connect::openssl::reexports::SslConnector,
 };
 use actix_utils::future::ok;
@@ -73,6 +73,10 @@ fn openssl_connector(cert: String, key: String) -> SslConnector {
 
 #[actix_rt::test]
 async fn accepts_connections() {
+    tokio_rustls_026::rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
     let (cert, key) = new_cert_and_key();
 
     let srv = TestServer::start({

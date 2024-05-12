@@ -30,13 +30,13 @@ use std::{
 use actix_rt::net::TcpStream;
 use actix_server::Server;
 use actix_service::ServiceFactoryExt as _;
-use actix_tls::accept::rustls_0_22::{Acceptor as RustlsAcceptor, TlsStream};
+use actix_tls::accept::rustls_0_23::{Acceptor as RustlsAcceptor, TlsStream};
 use futures_util::future::ok;
 use itertools::Itertools as _;
 use rustls::server::ServerConfig;
 use rustls_pemfile::{certs, rsa_private_keys};
 use rustls_pki_types_1::PrivateKeyDer;
-use tokio_rustls_025::rustls;
+use tokio_rustls_026::rustls;
 use tracing::info;
 
 #[actix_rt::main]
