@@ -4,13 +4,7 @@ _list:
 # Downgrade dev-dependencies necessary to run MSRV checks/tests.
 [private]
 downgrade-for-msrv:
-    cargo update -p=ciborium --precise=0.2.1
-    cargo update -p=ciborium-ll --precise=0.2.1
-    cargo update -p=time --precise=0.3.16
-    cargo update -p=clap --precise=4.3.24
-    cargo update -p=clap_lex --precise=0.5.0
-    cargo update -p=anstyle --precise=1.0.2
-    cargo update -p=trybuild --precise=1.0.89
+    cargo update -p=clap --precise=4.4.18
 
 msrv := ```
     cargo metadata --format-version=1 \

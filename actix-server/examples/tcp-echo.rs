@@ -25,7 +25,8 @@ use futures_util::future::ok;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 async fn run() -> io::Result<()> {
-    env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
+    pretty_env_logger::formatted_timed_builder()
+        .parse_env(pretty_env_logger::env_logger::Env::default().default_filter_or("info"));
 
     let count = Arc::new(AtomicUsize::new(0));
 
