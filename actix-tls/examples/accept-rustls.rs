@@ -41,7 +41,8 @@ use tracing::info;
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
-    env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
+    pretty_env_logger::formatted_timed_builder()
+        .parse_env(pretty_env_logger::env_logger::Env::default().default_filter_or("info"));
 
     let root_path = env!("CARGO_MANIFEST_DIR")
         .parse::<PathBuf>()

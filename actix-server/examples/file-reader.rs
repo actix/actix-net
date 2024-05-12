@@ -18,7 +18,8 @@ use futures_util::{SinkExt as _, StreamExt as _};
 use tokio::{fs::File, io::AsyncReadExt as _};
 
 async fn run() -> io::Result<()> {
-    env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
+    pretty_env_logger::formatted_timed_builder()
+        .parse_env(pretty_env_logger::env_logger::Env::default().default_filter_or("info"));
 
     let addr = ("127.0.0.1", 8080);
     tracing::info!("starting server on port: {}", &addr.0);

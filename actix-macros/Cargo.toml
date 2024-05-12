@@ -31,7 +31,6 @@ proc-macro2 = "1.0.60"
 
 [dev-dependencies]
 actix-rt = "2"
-
 futures-util = { version = "0.3.17", default-features = false }
-rustversion = "1"
+rustversion-msrv = "0.99"
 trybuild = "1"

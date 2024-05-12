@@ -122,7 +122,7 @@ actix-codec = "0.5"
 actix-rt = "2.2"
 actix-server = "2"
 bytes = "1"
-env_logger = "0.10"
+pretty_env_logger = "0.5"
 futures-util = { version = "0.3.17", default-features = false, features = ["sink"] }
 itertools = "0.12"
 rcgen = "0.12"
