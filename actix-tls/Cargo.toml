@@ -108,7 +108,7 @@ tokio-rustls-025 = { package = "tokio-rustls", version = "0.25", optional = true
 webpki-roots-026 = { package = "webpki-roots", version = "0.26", optional = true } # Also used for rustls v0.23
 
 # rustls v0.23
-tokio-rustls-026 = { package = "tokio-rustls", version = "0.26", optional = true }
+tokio-rustls-026 = { package = "tokio-rustls", version = "0.26", default-features = false, optional = true }
 
 # native root certificates for rustls impls
 rustls-native-certs-06 = { package = "rustls-native-certs", version = "0.6", optional = true }
@@ -127,7 +127,7 @@ futures-util = { version = "0.3.17", default-features = false, features = ["sink
 itertools = "0.12"
 rcgen = "0.12"
 rustls-pemfile = "2"
-tokio-rustls-026 = { package = "tokio-rustls", version = "0.26", features = ["ring"] }
+tokio-rustls-026 = { package = "tokio-rustls", version = "0.26", default-features = false, features = ["ring"] }
 trust-dns-resolver = "0.23"
 
 [[example]]
