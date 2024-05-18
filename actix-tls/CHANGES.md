@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 3.4.0
+
 - Add `rustls-0_23`, `rustls-0_23-webpki-roots`, and `rustls-0_23-native-roots` crate features.
 - Minimum supported Rust version (MSRV) is now 1.70.
 

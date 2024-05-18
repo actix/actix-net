@@ -1,6 +1,6 @@
 [package]
 name = "actix-tls"
-version = "3.3.0"
+version = "3.4.0"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
@@ -92,23 +92,25 @@ http-1 = { package = "http", version = "1", optional = true }
 tls-openssl = { package = "openssl", version = "0.10.55", optional = true }
 tokio-openssl = { version = "0.6", optional = true }
 
+# rustls PKI types
+rustls-pki-types-1 = { package = "rustls-pki-types", version = "1", optional = true }
+
 # rustls v0.20
 tokio-rustls-023 = { package = "tokio-rustls", version = "0.23", optional = true }
-webpki-roots-022 = { package = "webpki-roots", version = "0.22", optional = true }
 
 # rustls v0.21
-rustls-021 = { package = "rustls", version = "0.21.6", optional = true }
-rustls-webpki-0101 = { package = "rustls-webpki", version = "0.101.4", optional = true }
 tokio-rustls-024 = { package = "tokio-rustls", version = "0.24", optional = true }
-webpki-roots-025 = { package = "webpki-roots", version = "0.25", optional = true }
 
 # rustls v0.22
-rustls-pki-types-1 = { package = "rustls-pki-types", version = "1", optional = true } # Also used for rustls v0.23
 tokio-rustls-025 = { package = "tokio-rustls", version = "0.25", optional = true }
-webpki-roots-026 = { package = "webpki-roots", version = "0.26", optional = true } # Also used for rustls v0.23
 
 # rustls v0.23
 tokio-rustls-026 = { package = "tokio-rustls", version = "0.26", default-features = false, optional = true }
+
+# webpki-roots used with rustls features
+webpki-roots-022 = { package = "webpki-roots", version = "0.22", optional = true }
+webpki-roots-025 = { package = "webpki-roots", version = "0.25", optional = true }
+webpki-roots-026 = { package = "webpki-roots", version = "0.26", optional = true }
 
 # native root certificates for rustls impls
 rustls-native-certs-06 = { package = "rustls-native-certs", version = "0.6", optional = true }
@@ -116,6 +118,10 @@ rustls-native-certs-07 = { package = "rustls-native-certs", version = "0.7", opt
 
 # native-tls
 tokio-native-tls = { version = "0.3", optional = true }
+
+[target.'cfg(any())'.dependencies]
+rustls-021 = { package = "rustls", version = "0.21.6", optional = true } # force version with add_trust_anchors method
+rustls-webpki-0101 = { package = "rustls-webpki", version = "0.101.4", optional = true } # force secure version
 
 [dev-dependencies]
 actix-codec = "0.5"
