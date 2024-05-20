@@ -130,7 +130,7 @@ actix-server = "2"
 bytes = "1"
 pretty_env_logger = "0.5"
 futures-util = { version = "0.3.17", default-features = false, features = ["sink"] }
-itertools = "0.12"
+itertools = "0.13"
 rcgen = "0.12"
 rustls-pemfile = "2"
 tokio-rustls-026 = { package = "tokio-rustls", version = "0.26" }
