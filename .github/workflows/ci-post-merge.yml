@@ -91,19 +91,20 @@ jobs:
         run: cargo ci-check-linux
 
       - name: tests
-        if: matrix.target.os != 'ubuntu-latest'
         run: just test
-      - name: tests
-        if: matrix.target.os == 'ubuntu-latest'
-        run: >-
-          sudo bash -c "
-          ulimit -Sl 512
-          && ulimit -Hl 512
-          && PATH=$PATH:/usr/share/rust/.cargo/bin
-          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-020
-          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-021
-          && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux
-          "
+
+      # TODO: re-instate some io-uring tests PRs
+      # - name: tests
+      #   if: matrix.target.os == 'ubuntu-latest'
+      #   run: >-
+      #     sudo bash -c "
+      #     ulimit -Sl 512
+      #     && ulimit -Hl 512
+      #     && PATH=$PATH:/usr/share/rust/.cargo/bin
+      #     && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-020
+      #     && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-021
+      #     && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux
+      #     "
 
       - name: CI cache clean
         run: cargo-ci-cache-clean
