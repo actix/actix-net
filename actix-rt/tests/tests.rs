@@ -358,7 +358,7 @@ fn tokio_uring_arbiter() {
                 let f = tokio_uring::fs::File::create("test.txt").await.unwrap();
                 let buf = b"Hello World!";
 
-                let (res, _) = f.write_at(&buf[..], 0).await;
+                let (res, _) = f.write_all_at(&buf[..], 0).await;
                 assert!(res.is_ok());
 
                 f.sync_all().await.unwrap();
