@@ -15,7 +15,7 @@ concurrency:
 jobs:
   read_msrv:
     name: Read MSRV
-    uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@main
+    uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@v0.1.0
 
   build_and_test:
     needs:
@@ -108,8 +108,6 @@ jobs:
 
       - name: tests
         run: just test
-
-      # TODO: re-instate some io-uring tests for PRs
 
       - name: CI cache clean
         run: cargo-ci-cache-clean
