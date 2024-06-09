@@ -48,7 +48,7 @@ impl System {
     /// [tokio-runtime]: tokio::runtime::Runtime
     pub fn with_tokio_rt<F>(runtime_factory: F) -> SystemRunner
     where
-        F: Fn() -> tokio::runtime::Runtime,
+        F: FnOnce() -> tokio::runtime::Runtime,
     {
         let (stop_tx, stop_rx) = oneshot::channel();
         let (sys_tx, sys_rx) = mpsc::unbounded_channel();
@@ -87,7 +87,7 @@ impl System {
     #[doc(hidden)]
     pub fn with_tokio_rt<F>(_: F) -> SystemRunner
     where
-        F: Fn() -> tokio::runtime::Runtime,
+        F: FnOnce() -> tokio::runtime::Runtime,
     {
         unimplemented!("System::with_tokio_rt is not implemented for io-uring feature yet")
     }
