@@ -27,6 +27,10 @@ all_crate_features := if os() == "linux" {
     "--features='" + non_linux_all_features_list + "'"
 }
 
+# Run Clippy over workspace.
+clippy toolchain="":
+    cargo {{ toolchain }} clippy --workspace --all-targets {{ all_crate_features }}
+
 # Test workspace code.
 [macos, windows]
 test toolchain="":
