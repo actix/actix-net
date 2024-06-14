@@ -183,11 +183,6 @@ impl ServerInner {
     }
 
     fn run_sync(mut builder: ServerBuilder) -> io::Result<(Self, ServerEventMultiplexer)> {
-        let sockets = mem::take(&mut builder.sockets)
-            .into_iter()
-            .map(|t| (t.0, t.2))
-            .collect();
-
         // Give log information on what runtime will be used.
         let is_actix = actix_rt::System::try_current().is_some();
         let is_tokio = tokio::runtime::Handle::try_current().is_ok();
@@ -206,6 +201,11 @@ impl ServerInner {
                 lst.local_addr()
             );
         }
+
+        let sockets = mem::take(&mut builder.sockets)
+            .into_iter()
+            .map(|t| (t.0, t.2))
+            .collect();
 
         let (waker_queue, worker_handles, accept_handle) = Accept::start(sockets, &builder)?;
 
