@@ -126,7 +126,7 @@ pub(crate) enum SocketAddr {
     Unknown,
     Tcp(StdSocketAddr),
     #[cfg(unix)]
-    Uds(mio::net::SocketAddr),
+    Uds(std::os::unix::net::SocketAddr),
 }
 
 impl fmt::Display for SocketAddr {
