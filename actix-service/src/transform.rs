@@ -228,6 +228,7 @@ mod tests {
     use super::*;
 
     // pseudo-doctest for Transform trait
+    #[allow(unused)]
     pub struct TimeoutTransform {
         timeout: Duration,
     }
@@ -249,6 +250,7 @@ mod tests {
     }
 
     // pseudo-doctest for Transform trait
+    #[allow(unused)]
     pub struct Timeout<S> {
         service: S,
         _timeout: Duration,
