@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.5.0
+
 - Update `mio` dependency to `1`.
 
 ## 2.4.0
