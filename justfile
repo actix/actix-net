@@ -1,6 +1,23 @@
 _list:
     @just --list
 
+# Check project.
+check: && clippy
+    just --unstable --fmt --check
+    # nixpkgs-fmt --check .
+    fd --hidden --type=file -e=md -e=yml --exec-batch prettier --check
+    fd --hidden -e=toml --exec-batch taplo format --check
+    fd --hidden -e=toml --exec-batch taplo lint
+    cargo +nightly fmt -- --check
+
+# Format project.
+fmt:
+    just --unstable --fmt
+    # nixpkgs-fmt .
+    fd --hidden --type=file -e=md -e=yml --exec-batch prettier --write
+    fd --type=file --hidden -e=toml --exec-batch taplo format
+    cargo +nightly fmt
+
 # Downgrade dev-dependencies necessary to run MSRV checks/tests.
 [private]
 downgrade-for-msrv:
@@ -12,7 +29,6 @@ msrv := ```
     | sed -E 's/^1\.([0-9]{2})$/1\.\1\.0/'
 ```
 msrv_rustup := "+" + msrv
-
 non_linux_all_features_list := ```
     cargo metadata --format-version=1 \
     | jq '.packages[] | select(.source == null) | .features | keys' \
@@ -20,19 +36,15 @@ non_linux_all_features_list := ```
         --arg exclusions "tokio-uring,io-uring" \
         'add | unique | . - ($exclusions | split(",")) | join(",")'
 ```
-
-all_crate_features := if os() == "linux" {
-    "--all-features"
-} else {
-    "--features='" + non_linux_all_features_list + "'"
-}
+all_crate_features := if os() == "linux" { "--all-features" } else { "--features='" + non_linux_all_features_list + "'" }
 
 # Run Clippy over workspace.
 clippy toolchain="":
     cargo {{ toolchain }} clippy --workspace --all-targets {{ all_crate_features }}
 
 # Test workspace code.
-[macos, windows]
+[macos]
+[windows]
 test toolchain="":
     cargo {{ toolchain }} test --lib --tests --package=actix-macros
     cargo {{ toolchain }} nextest run --workspace --exclude=actix-macros --no-default-features
