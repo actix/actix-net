@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Update `mio` dependency to `1`.
+
 ## 2.4.0
 
 - Update `tokio-uring` dependency to `0.5`.
