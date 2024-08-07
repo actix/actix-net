@@ -1,0 +1,58 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Custom async DNS resolvers."><title>Resolve in actix_tls::connect - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-d10b2a06af903387.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="actix_tls" data-themes="" data-resource-suffix="" data-rustdoc-version="1.82.0-nightly (e57f3090a 2024-08-05)" data-channel="nightly" data-search-js="search-ef54e092fea9c776.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../static.files/main-9345f17bf569ecba.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="icon" href="https://actix.rs/favicon.ico"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button><a class="logo-container" href="../../actix_tls/index.html"><img src="https://actix.rs/img/logo.png" alt=""></a></nav><nav class="sidebar"><div class="sidebar-crate"><a class="logo-container" href="../../actix_tls/index.html"><img src="https://actix.rs/img/logo.png" alt="logo"></a><h2><a href="../../actix_tls/index.html">actix_<wbr>tls</a><span class="version">3.4.0</span></h2></div><h2 class="location"><a href="#">Resolve</a></h2><div class="sidebar-elems"><section><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.lookup">lookup</a></li></ul><h3><a href="#implementors">Implementors</a></h3></section><h2><a href="index.html">In actix_<wbr>tls::<wbr>connect</a></h2></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Trait <a href="../index.html">actix_tls</a>::<wbr><a href="index.html">connect</a>::<wbr><a class="trait" href="#">Resolve</a><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><span class="out-of-band"><a class="src" href="../../src/actix_tls/connect/resolve.rs.html#55-62">source</a> · <button id="toggle-all-docs" title="collapse all docs">[<span>&#x2212;</span>]</button></span></div><pre class="rust item-decl"><code>pub trait Resolve {
+    // Required method
+    fn <a href="#tymethod.lookup" class="fn">lookup</a>&lt;'a&gt;(
+        &amp;'a self,
+        host: &amp;'a <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>,
+        port: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u16.html">u16</a>,
+    ) -&gt; LocalBoxFuture&lt;'a, <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="enum" href="https://doc.rust-lang.org/nightly/core/net/socket_addr/enum.SocketAddr.html" title="enum core::net::socket_addr::SocketAddr">SocketAddr</a>&gt;, <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/error/trait.Error.html" title="trait core::error::Error">StdError</a>&gt;&gt;&gt;;
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Custom async DNS resolvers.</p>
+<h2 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::net::SocketAddr;
+
+<span class="kw">use </span>actix_tls::connect::{Resolve, Resolver};
+<span class="kw">use </span>futures_util::future::LocalBoxFuture;
+
+<span class="comment">// use trust-dns async tokio resolver
+</span><span class="kw">use </span>trust_dns_resolver::TokioAsyncResolver;
+
+<span class="kw">struct </span>MyResolver {
+    trust_dns: TokioAsyncResolver,
+};
+
+<span class="comment">// impl Resolve trait and convert given host address str and port to SocketAddr.
+</span><span class="kw">impl </span>Resolve <span class="kw">for </span>MyResolver {
+    <span class="kw">fn </span>lookup&lt;<span class="lifetime">'a</span>&gt;(
+        <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="self">self</span>,
+        host: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str,
+        port: u16,
+    ) -&gt; LocalBoxFuture&lt;<span class="lifetime">'a</span>, <span class="prelude-ty">Result</span>&lt;Vec&lt;SocketAddr&gt;, Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt;&gt; {
+        Box::pin(<span class="kw">async move </span>{
+            <span class="kw">let </span>res = <span class="self">self
+                </span>.trust_dns
+                .lookup_ip(host)
+                .<span class="kw">await</span><span class="question-mark">?
+                </span>.iter()
+                .map(|ip| SocketAddr::new(ip, port))
+                .collect();
+            <span class="prelude-val">Ok</span>(res)
+        })
+    }
+}
+
+<span class="kw">let </span>my_resolver = MyResolver {
+    trust_dns: TokioAsyncResolver::tokio_from_system_conf().unwrap(),
+};
+
+<span class="comment">// wrap custom resolver
+</span><span class="kw">let </span>resolver = Resolver::custom(my_resolver);
+
+<span class="comment">// resolver can be passed to connector factory where returned service factory
+// can be used to construct new connector services for use in clients
+</span><span class="kw">let </span>factory = actix_tls::connect::Connector::new(resolver);
+<span class="kw">let </span>connector = factory.service();</code></pre></div>
+</div></details><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.lookup" class="method"><a class="src rightside" href="../../src/actix_tls/connect/resolve.rs.html#57-61">source</a><h4 class="code-header">fn <a href="#tymethod.lookup" class="fn">lookup</a>&lt;'a&gt;(
+    &amp;'a self,
+    host: &amp;'a <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.str.html">str</a>,
+    port: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u16.html">u16</a>,
+) -&gt; LocalBoxFuture&lt;'a, <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="enum" href="https://doc.rust-lang.org/nightly/core/net/socket_addr/enum.SocketAddr.html" title="enum core::net::socket_addr::SocketAddr">SocketAddr</a>&gt;, <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/error/trait.Error.html" title="trait core::error::Error">StdError</a>&gt;&gt;&gt;</h4></section></summary><div class="docblock"><p>Given DNS lookup information, returns a future that completes with socket information.</p>
+</div></details></div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"></div><script src="../../trait.impl/actix_tls/connect/resolve/trait.Resolve.js" async></script></section></div></main></body></html>
