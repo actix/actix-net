@@ -426,6 +426,7 @@ impl ServerWorker {
                             .enable_all()
                             .max_blocking_threads(config.max_blocking_threads)
                             .build()
+                            .map(Arc::new)
                             .unwrap()
                     })
                 };
