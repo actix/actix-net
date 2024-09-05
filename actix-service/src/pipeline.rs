@@ -52,7 +52,7 @@ where
     /// Call another service after call to this one has resolved successfully.
     ///
     /// This function can be used to chain two services together and ensure that
-    /// the second service isn't called until call to the fist service have
+    /// the second service isn't called until call to the first service have
     /// finished. Result of the call to the first service is used as an
     /// input parameter for the second service's call.
     ///
