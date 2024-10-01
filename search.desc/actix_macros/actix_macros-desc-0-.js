@@ -1,0 +1,1 @@
+searchState.loadedDescShard("actix_macros", 0, "Macros for Actix system and runtime.\nMarks async entry-point function to be executed by Actix …\nMarks async test function to be executed in an Actix …")
