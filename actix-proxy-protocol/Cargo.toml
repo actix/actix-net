@@ -1,0 +1,41 @@
+[package]
+name = "actix-proxy-protocol"
+version = "0.0.1"
+authors = [
+    "Rob Ede <robjtede@icloud.com>",
+]
+description = "PROXY protocol utilities"
+keywords = ["proxy", "protocol", "network", "haproxy", "tcp"]
+categories = ["network-programming", "asynchronous"]
+homepage = "https://actix.rs"
+repository = "https://github.com/actix/actix-net"
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+actix-service = "2"
+actix-utils = "3"
+
+arrayvec = "0.7"
+bitflags = "2"
+crc32fast = "1"
+futures-core = { version = "0.3.17", default-features = false, features = ["std"] }
+futures-util = { version = "0.3.17", default-features = false, features = ["std"] }
+itoa = "1"
+smallvec = "1"
+tokio = { version = "1.13.1", features = ["sync", "io-util"] }
+tracing = { version = "0.1.30", default-features = false, features = ["log"] }
+
+[dev-dependencies]
+actix-codec = "0.5"
+actix-rt = "2.6"
+actix-server = "2"
+
+bytes = "1"
+const-str = "0.5"
+env_logger = "0.9"
+futures-util = { version = "0.3.7", default-features = false, features = ["sink", "async-await-macro"] }
+once_cell = "1"
+pretty_assertions = "1"
+tokio = { version = "1.13.1", features = ["io-util", "rt-multi-thread", "macros", "fs"] }
