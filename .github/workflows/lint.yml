@@ -45,14 +45,15 @@ jobs:
           clippy_flags: --workspace --all-features --tests --examples --bins -- -Dclippy::todo -Aunknown_lints
 
   check-external-types:
+    if: false # rustdoc mismatch currently
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust (nightly-2023-10-10)
+      - name: Install Rust (${{ vars.RUST_VERSION_EXTERNAL_TYPES }})
         uses: actions-rust-lang/setup-rust-toolchain@v1.10.1
         with:
-          toolchain: nightly-2023-10-10
+          toolchain: ${{ vars.RUST_VERSION_EXTERNAL_TYPES }}
 
       - name: Install just
         uses: taiki-e/install-action@v2.44.60
@@ -62,7 +63,7 @@ jobs:
       - name: Install cargo-check-external-types
         uses: taiki-e/cache-cargo-install-action@v2.0.1
         with:
-          tool: cargo-check-external-types@0.1.10
+          tool: cargo-check-external-types
 
       - name: check external types
-        run: just check-external-types-all +nightly-2023-10-10
+        run: just check-external-types-all +${{ vars.RUST_VERSION_EXTERNAL_TYPES }}
