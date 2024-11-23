@@ -6,7 +6,7 @@ authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
 ]
-keywords = ["string", "bytes", "utf8", "web", "actix"]
+keywords = ["string", "bytes", "utf8", "web", "bytestring"]
 categories = ["no-std", "web-programming"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net"
