@@ -17,7 +17,7 @@ use core::{borrow::Borrow, fmt, hash, ops, str};
 
 use bytes::Bytes;
 
-/// An immutable UTF-8 encoded string with [`Bytes`] as a storage.
+/// An immutable UTF-8 encoded string using [`Bytes`] as the storage.
 #[derive(Clone, Default, Eq, PartialOrd, Ord)]
 pub struct ByteString(Bytes);
 
@@ -53,7 +53,29 @@ impl ByteString {
         Self(src)
     }
 
-    /// Returns a new byte string that is equivalent to the given `subset`.
+    /// Divides one bytestring into two at an index, returning both parts.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `mid` is not on a UTF-8 code point boundary, or if it is past the end of the last
+    /// code point of the bytestring.
+    pub fn split_at(&self, mid: usize) -> (ByteString, ByteString) {
+        let this: &str = self.as_ref();
+        let _valid_midpoint_check = this.split_at(mid);
+
+        let mut bytes = self.0.clone();
+        let first = bytes.split_to(mid);
+        let last = bytes;
+
+        unsafe {
+            (
+                ByteString::from_bytes_unchecked(first),
+                ByteString::from_bytes_unchecked(last),
+            )
+        }
+    }
+
+    /// Returns a new `ByteString` that is equivalent to the given `subset`.
     ///
     /// When processing a `ByteString` buffer with other tools, one often gets a `&str` which is in
     /// fact a slice of the original `ByteString`; i.e., a subset of it. This function turns that
@@ -464,5 +486,34 @@ mod test {
         // panics because the given slice is not derived from the original byte string, despite
         // being a logical subset of the string
         ByteString::from_static("foo bar").slice_ref("foo");
+    }
+
+    #[test]
+    fn split_at() {
+        let buf = ByteString::from_static("foo bar");
+
+        let (first, last) = buf.split_at(0);
+        assert_eq!(ByteString::from_static(""), first);
+        assert_eq!(ByteString::from_static("foo bar"), last);
+
+        let (first, last) = buf.split_at(4);
+        assert_eq!(ByteString::from_static("foo "), first);
+        assert_eq!(ByteString::from_static("bar"), last);
+
+        let (first, last) = buf.split_at(7);
+        assert_eq!(ByteString::from_static("foo bar"), first);
+        assert_eq!(ByteString::from_static(""), last);
+    }
+
+    #[test]
+    #[should_panic = "byte index 1 is not a char boundary;"]
+    fn split_at_invalid_code_point() {
+        ByteString::from_static("µ").split_at(1);
+    }
+
+    #[test]
+    #[should_panic = "byte index 9 is out of bounds"]
+    fn split_at_outside_string() {
+        ByteString::from_static("foo").split_at(9);
     }
 }

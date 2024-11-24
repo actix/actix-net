@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.71.
+
 ## 2.5.0
 
 - Update `mio` dependency to `1`.

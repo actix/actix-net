@@ -1,12 +1,12 @@
 [package]
 name = "bytestring"
-version = "1.3.1"
+version = "1.4.0"
 description = "A UTF-8 encoded read-only string using `Bytes` as storage"
 authors = [
     "Nikolay Kim <fafhrd91@gmail.com>",
     "Rob Ede <robjtede@icloud.com>",
 ]
-keywords = ["string", "bytes", "utf8", "web", "actix"]
+keywords = ["string", "bytes", "utf8", "web", "bytestring"]
 categories = ["no-std", "web-programming"]
 homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net"
