@@ -506,13 +506,13 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic = "byte index 1 is not a char boundary;"]
     fn split_at_invalid_code_point() {
         ByteString::from_static("µ").split_at(1);
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic = "byte index 9 is out of bounds"]
     fn split_at_outside_string() {
         ByteString::from_static("foo").split_at(9);
     }
