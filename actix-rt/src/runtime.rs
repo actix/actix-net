@@ -1,5 +1,4 @@
-use std::{future::Future, io};
-
+use std::{sync::Arc, future::Future, io};
 use tokio::task::{JoinHandle, LocalSet};
 
 /// A Tokio-based runtime proxy.
@@ -9,14 +8,14 @@ use tokio::task::{JoinHandle, LocalSet};
 #[derive(Debug)]
 pub struct Runtime {
     local: LocalSet,
-    rt: tokio::runtime::Runtime,
+    rt: Arc<tokio::runtime::Runtime>,
 }
 
-pub(crate) fn default_tokio_runtime() -> io::Result<tokio::runtime::Runtime> {
+pub(crate) fn default_tokio_runtime() -> io::Result<Arc<tokio::runtime::Runtime>> {
     tokio::runtime::Builder::new_current_thread()
         .enable_io()
         .enable_time()
-        .build()
+        .build().map(Arc::new)
 }
 
 impl Runtime {
@@ -141,6 +140,15 @@ impl Runtime {
 
 impl From<tokio::runtime::Runtime> for Runtime {
     fn from(rt: tokio::runtime::Runtime) -> Self {
+        Self {
+            local: LocalSet::new(),
+            rt: Arc::new(rt),
+        }
+    }
+}
+
+impl From<Arc<tokio::runtime::Runtime>> for Runtime {
+    fn from(rt: Arc<tokio::runtime::Runtime>) -> Self {
         Self {
             local: LocalSet::new(),
             rt,
