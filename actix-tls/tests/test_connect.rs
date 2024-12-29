@@ -1,5 +1,5 @@
-#![cfg(feature = "connect")]
 #![allow(missing_docs)]
+#![cfg(feature = "connect")]
 
 use std::{
     io,
