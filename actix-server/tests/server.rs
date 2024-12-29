@@ -1,4 +1,4 @@
-#![allow(clippy::let_underscore_future)]
+#![allow(clippy::let_underscore_future, missing_docs)]
 
 use std::{
     net,
