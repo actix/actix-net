@@ -3,8 +3,6 @@
 //! See docs for [`ByteString`].
 
 #![no_std]
-#![deny(rust_2018_idioms, nonstandard_style)]
-#![warn(future_incompatible, missing_docs)]
 
 extern crate alloc;
 

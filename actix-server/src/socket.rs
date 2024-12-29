@@ -160,6 +160,7 @@ pub enum MioStream {
 
 /// Helper trait for converting a Mio stream into a Tokio stream.
 pub trait FromStream: Sized {
+    /// Creates stream from a `mio` stream.
     fn from_mio(sock: MioStream) -> io::Result<Self>;
 }
 

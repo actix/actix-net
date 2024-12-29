@@ -1,7 +1,5 @@
 //! Actix tracing - support for tokio tracing with Actix services.
 
-#![deny(rust_2018_idioms, nonstandard_style)]
-#![warn(future_incompatible)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
@@ -22,6 +20,7 @@ pub struct TracingService<S, F> {
 }
 
 impl<S, F> TracingService<S, F> {
+    /// Constructs new tracing middleware.
     pub fn new(inner: S, make_span: F) -> Self {
         TracingService { inner, make_span }
     }
@@ -63,6 +62,7 @@ pub struct TracingTransform<S, U, F> {
 }
 
 impl<S, U, F> TracingTransform<S, U, F> {
+    /// Constructs new tracing middleware.
     pub fn new(make_span: F) -> Self {
         TracingTransform {
             make_span,

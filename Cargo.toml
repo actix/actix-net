@@ -36,3 +36,9 @@ local-waker = { path = "local-waker" }
 lto = true
 opt-level = 3
 codegen-units = 1
+
+[workspace.lints.rust]
+rust_2018_idioms = "deny"
+nonstandard-style = "deny"
+future_incompatible = "deny"
+missing_docs = { level = "warn", priority = -1 }

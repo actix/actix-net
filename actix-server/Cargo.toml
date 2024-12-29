@@ -2,9 +2,9 @@
 name = "actix-server"
 version = "2.5.0"
 authors = [
-    "Nikolay Kim <fafhrd91@gmail.com>",
-    "Rob Ede <robjtede@icloud.com>",
-    "Ali MJ Al-Nasrawy <alimjalnasrawy@gmail.com>",
+  "Nikolay Kim <fafhrd91@gmail.com>",
+  "Rob Ede <robjtede@icloud.com>",
+  "Ali MJ Al-Nasrawy <alimjalnasrawy@gmail.com>",
 ]
 description = "General purpose TCP server built for the Actix ecosystem"
 keywords = ["network", "tcp", "server", "framework", "async"]
@@ -16,9 +16,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [package.metadata.cargo_check_external_types]
-allowed_external_types = [
-    "tokio::*",
-]
+allowed_external_types = ["tokio::*"]
 
 [features]
 default = []
@@ -28,7 +26,6 @@ io-uring = ["tokio-uring", "actix-rt/io-uring"]
 actix-rt = { version = "2.10", default-features = false }
 actix-service = "2"
 actix-utils = "3"
-
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
 mio = { version = "1", features = ["os-poll", "net"] }
@@ -45,6 +42,9 @@ actix-codec = "0.5"
 actix-rt = "2.8"
 
 bytes = "1"
-pretty_env_logger = "0.5"
 futures-util = { version = "0.3.17", default-features = false, features = ["sink", "async-await-macro"] }
+pretty_env_logger = "0.5"
 tokio = { version = "1.23.1", features = ["io-util", "rt-multi-thread", "macros", "fs"] }
+
+[lints]
+workspace = true

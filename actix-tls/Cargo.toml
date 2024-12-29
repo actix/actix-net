@@ -1,10 +1,7 @@
 [package]
 name = "actix-tls"
 version = "3.4.0"
-authors = [
-    "Nikolay Kim <fafhrd91@gmail.com>",
-    "Rob Ede <robjtede@icloud.com>",
-]
+authors = ["Nikolay Kim <fafhrd91@gmail.com>", "Rob Ede <robjtede@icloud.com>"]
 description = "TLS acceptor and connector services for Actix ecosystem"
 keywords = ["network", "tls", "ssl", "async", "transport"]
 repository = "https://github.com/actix/actix-net.git"
@@ -18,17 +15,12 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.cargo_check_external_types]
-allowed_external_types = [
-    "actix_service::*",
-    "actix_utils::*",
-    "futures_core::*",
-    "tokio::*",
-]
+allowed_external_types = ["actix_service::*", "actix_utils::*", "futures_core::*", "tokio::*"]
 
 [package.metadata.cargo-machete]
 ignored = [
-    "rustls_021", # specified to force version with add_trust_anchors method
-    "rustls_webpki_0101", # specified to force secure version
+  "rustls_021",         # specified to force version with add_trust_anchors method
+  "rustls_webpki_0101", # specified to force secure version
 ]
 
 [features]
@@ -76,7 +68,6 @@ uri = ["dep:http-0_2", "dep:http-1"]
 actix-rt = { version = "2.2", default-features = false }
 actix-service = "2"
 actix-utils = "3"
-
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
 impl-more = "0.1"
 pin-project-lite = "0.2.7"
@@ -120,7 +111,7 @@ rustls-native-certs-07 = { package = "rustls-native-certs", version = "0.7", opt
 tokio-native-tls = { version = "0.3", optional = true }
 
 [target.'cfg(any())'.dependencies]
-rustls-021 = { package = "rustls", version = "0.21.6", optional = true } # force version with add_trust_anchors method
+rustls-021 = { package = "rustls", version = "0.21.6", optional = true }                 # force version with add_trust_anchors method
 rustls-webpki-0101 = { package = "rustls-webpki", version = "0.101.4", optional = true } # force secure version
 
 [dev-dependencies]
@@ -128,9 +119,9 @@ actix-codec = "0.5"
 actix-rt = "2.2"
 actix-server = "2"
 bytes = "1"
-pretty_env_logger = "0.5"
 futures-util = { version = "0.3.17", default-features = false, features = ["sink"] }
 itertools = "0.13"
+pretty_env_logger = "0.5"
 rcgen = "0.13"
 rustls-pemfile = "2"
 tokio-rustls-026 = { package = "tokio-rustls", version = "0.26" }
@@ -139,3 +130,6 @@ trust-dns-resolver = "0.23"
 [[example]]
 name = "accept-rustls"
 required-features = ["accept", "rustls-0_23"]
+
+[lints]
+workspace = true

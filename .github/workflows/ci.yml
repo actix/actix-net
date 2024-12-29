@@ -53,7 +53,7 @@ jobs:
       - name: Setup mold linker
         if: matrix.target.os == 'ubuntu-latest'
         uses: rui314/setup-mold@v1
-        
+
       - name: Install nasm
         if: matrix.target.os == 'windows-latest'
         uses: ilammy/setup-nasm@v1.5.1

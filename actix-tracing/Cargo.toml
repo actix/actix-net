@@ -13,20 +13,17 @@ edition.workspace = true
 rust-version.workspace = true
 
 [package.metadata.cargo_check_external_types]
-allowed_external_types = [
-    "actix_service::*",
-    "actix_utils::*",
-    "tracing::*",
-    "tracing_futures::*",
-]
+allowed_external_types = ["actix_service::*", "actix_utils::*", "tracing::*", "tracing_futures::*"]
 
 [dependencies]
 actix-service = "2"
 actix-utils = "3"
-
 tracing = "0.1.35"
 tracing-futures = "0.2"
 
 [dev-dependencies]
 actix-rt = "2"
 slab = "0.4"
+
+[lints]
+workspace = true

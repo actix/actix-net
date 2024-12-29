@@ -1,10 +1,7 @@
 [package]
 name = "actix-codec"
 version = "0.5.2"
-authors = [
-    "Nikolay Kim <fafhrd91@gmail.com>",
-    "Rob Ede <robjtede@icloud.com>",
-]
+authors = ["Nikolay Kim <fafhrd91@gmail.com>", "Rob Ede <robjtede@icloud.com>"]
 description = "Codec utilities for working with framed protocols"
 keywords = ["network", "framework", "async", "futures"]
 repository = "https://github.com/actix/actix-net"
@@ -14,13 +11,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [package.metadata.cargo_check_external_types]
-allowed_external_types = [
-    "bytes::*",
-    "futures_core::*",
-    "futures_sink::*",
-    "tokio::*",
-    "tokio_util::*",
-]
+allowed_external_types = ["bytes::*", "futures_core::*", "futures_sink::*", "tokio::*", "tokio_util::*"]
 
 [dependencies]
 bitflags = "2"
@@ -40,3 +31,6 @@ tokio-test = "0.4.2"
 [[bench]]
 name = "lines"
 harness = false
+
+[lints]
+workspace = true

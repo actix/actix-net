@@ -8,6 +8,8 @@
 //!
 //! Follow the prompt and enter a file path, relative or absolute.
 
+#![allow(missing_docs)]
+
 use std::io;
 
 use actix_codec::{Framed, LinesCodec};

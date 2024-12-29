@@ -2,9 +2,9 @@
 name = "actix-macros"
 version = "0.2.4"
 authors = [
-    "Nikolay Kim <fafhrd91@gmail.com>",
-    "Ibraheem Ahmed <ibrah1440@gmail.com>",
-    "Rob Ede <robjtede@icloud.com>",
+  "Nikolay Kim <fafhrd91@gmail.com>",
+  "Ibraheem Ahmed <ibrah1440@gmail.com>",
+  "Rob Ede <robjtede@icloud.com>",
 ]
 description = "Macros for Actix system and runtime"
 repository = "https://github.com/actix/actix-net"
@@ -15,7 +15,7 @@ rust-version.workspace = true
 
 [package.metadata.cargo-machete]
 ignored = [
-    "proc_macro2", # specified for minimal versions compat
+  "proc_macro2", # specified for minimal versions compat
 ]
 
 [lib]
@@ -34,3 +34,6 @@ actix-rt = "2"
 futures-util = { version = "0.3.17", default-features = false }
 rustversion-msrv = "0.100"
 trybuild = "1"
+
+[lints]
+workspace = true
