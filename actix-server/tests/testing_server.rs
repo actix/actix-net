@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use std::net;
 
 use actix_rt::net::TcpStream;
