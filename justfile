@@ -47,16 +47,16 @@ clippy toolchain="":
 [windows]
 test toolchain="":
     cargo {{ toolchain }} test --lib --tests --package=actix-macros
-    cargo {{ toolchain }} nextest run --workspace --exclude=actix-macros --no-default-features
-    cargo {{ toolchain }} nextest run --workspace --exclude=actix-macros {{ all_crate_features }}
+    cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros --no-default-features
+    cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros {{ all_crate_features }}
 
 # Test workspace code.
 [linux]
 test toolchain="":
     cargo {{ toolchain }} test --lib --tests --package=actix-macros
-    cargo {{ toolchain }} nextest run --workspace --exclude=actix-macros --no-default-features
-    cargo {{ toolchain }} nextest run --workspace --exclude=actix-macros {{ non_linux_all_features_list }}
-    cargo {{ toolchain }} nextest run --workspace --exclude=actix-macros {{ all_crate_features }}
+    cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros --no-default-features
+    cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros {{ non_linux_all_features_list }}
+    cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros {{ all_crate_features }}
 
 # Test workspace using MSRV.
 test-msrv: downgrade-for-msrv (test msrv_rustup)
