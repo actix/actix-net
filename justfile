@@ -22,6 +22,7 @@ fmt:
 [private]
 downgrade-for-msrv:
     cargo update -p=clap --precise=4.4.18
+    cargo update -p=native-tls --precise=0.2.13
 
 msrv := ```
     cargo metadata --format-version=1 \
