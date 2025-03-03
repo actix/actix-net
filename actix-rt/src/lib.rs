@@ -44,6 +44,7 @@
 #![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[cfg(all(not(target_os = "linux"), feature = "io-uring"))]
 compile_error!("io_uring is a linux only feature.");
@@ -70,6 +71,7 @@ pub use self::{
     system::{System, SystemRunner},
 };
 
+#[cfg(feature = "net")]
 pub mod signal {
     //! Asynchronous signal handling (Tokio re-exports).
 
@@ -81,6 +83,7 @@ pub mod signal {
     pub use tokio::signal::ctrl_c;
 }
 
+#[cfg(feature = "net")]
 pub mod net {
     //! TCP/UDP/Unix bindings (mostly Tokio re-exports).
 
