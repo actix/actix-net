@@ -14,8 +14,7 @@ pub struct Runtime {
 
 pub(crate) fn default_tokio_runtime() -> io::Result<tokio::runtime::Runtime> {
     tokio::runtime::Builder::new_current_thread()
-        .enable_io()
-        .enable_time()
+        .enable_all()
         .build()
 }
 
