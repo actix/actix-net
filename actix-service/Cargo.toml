@@ -12,7 +12,6 @@ rust-version.workspace = true
 
 [dependencies]
 futures-core = { version = "0.3.17", default-features = false }
-paste = "1"
 pin-project-lite = "0.2"
 
 [dev-dependencies]
