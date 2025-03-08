@@ -75,7 +75,7 @@ test-all toolchain="": (test toolchain) (test-docs toolchain)
 doc *args: && doc-set-workspace-crates
     rm -f "$(cargo metadata --format-version=1 | jq -r '.target_directory')/doc/crates.js"
     RUSTDOCFLAGS="--cfg=docsrs -Dwarnings" cargo +nightly doc --no-deps --workspace {{ all_crate_features }} {{ args }}
-    
+
 [private]
 doc-set-workspace-crates:
     #!/usr/bin/env bash

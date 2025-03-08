@@ -71,5 +71,7 @@ async fn new_with_builder() {
     srv.connect().unwrap();
 
     // connect to alt service defined in custom ServerBuilder
-    TcpStream::from_std(net::TcpStream::connect(alt_addr).unwrap()).unwrap();
+    let stream = net::TcpStream::connect(alt_addr).unwrap();
+    stream.set_nonblocking(true).unwrap();
+    TcpStream::from_std(stream).unwrap();
 }
