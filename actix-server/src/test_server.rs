@@ -123,7 +123,9 @@ impl TestServerHandle {
 
     /// Connect to server, returning a Tokio `TcpStream`.
     pub fn connect(&self) -> io::Result<TcpStream> {
-        TcpStream::from_std(net::TcpStream::connect(self.addr)?)
+        let stream = net::TcpStream::connect(self.addr)?;
+        stream.set_nonblocking(true)?;
+        TcpStream::from_std(stream)
     }
 }
 
