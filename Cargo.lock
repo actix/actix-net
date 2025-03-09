@@ -69,7 +69,6 @@ dependencies = [
  "actix-utils",
  "futures-core",
  "futures-util",
- "paste",
  "pin-project-lite",
 ]
 
