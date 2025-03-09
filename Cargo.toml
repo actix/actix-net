@@ -12,6 +12,7 @@ members = [
   "bytestring",
   "local-channel",
   "local-waker",
+  "paste",
 ]
 
 [workspace.package]
