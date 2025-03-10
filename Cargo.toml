@@ -32,7 +32,7 @@ actix-utils = { path = "actix-utils" }
 bytestring = { path = "bytestring" }
 local-channel = { path = "local-channel" }
 local-waker = { path = "local-waker" }
-paste-macro = { path = "paste-macro" }
+paste-macro = { path = "./paste-macro" }
 
 [profile.release]
 lto = true
