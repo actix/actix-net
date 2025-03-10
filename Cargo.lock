@@ -230,7 +230,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e4e8200b9a4a5801a769d50eeabc05670fec7e959a8cb7a63a93e4e519942ae"
 dependencies = [
  "aws-lc-sys",
- "paste 1.0.15",
+ "paste",
  "zeroize",
 ]
 
@@ -245,7 +245,7 @@ dependencies = [
  "cmake",
  "dunce",
  "fs_extra",
- "paste 1.0.15",
+ "paste",
 ]
 
 [[package]]
@@ -1336,13 +1336,18 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "0.1.0"
-
-[[package]]
-name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "paste-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "pem"

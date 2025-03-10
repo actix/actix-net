@@ -3,6 +3,8 @@
 use alloc::{boxed::Box, rc::Rc};
 use core::{future::Future, pin::Pin};
 
+use paste_macro::paste;
+
 use crate::{Service, ServiceFactory};
 
 /// A boxed future with no send bound or lifetime parameters.

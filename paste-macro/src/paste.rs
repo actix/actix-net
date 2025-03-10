@@ -1,4 +1,4 @@
-//! A minimal implementation of the paste crate, allowing identifier concatenation in macros.
+//! A minimal implementation of the paste-macro crate, allowing identifier concatenation in macros.
 
 use proc_macro::{
     Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree
@@ -6,6 +6,21 @@ use proc_macro::{
 use std::{iter, str::FromStr};
 use std::panic;
 
+// Pastes identifiers together to form a single identifier.
+//
+// Within the `paste!` macro, identifiers inside `[<`...`>]` are pasted
+// together to form a single identifier.
+//
+// # Examples
+//
+// ```
+// use paste_macro::paste;
+//
+// paste! {
+//     // Defines a const called `QRST`.
+//     const [<Q R S T>]: &str = "success!";
+// }
+// ```
 #[proc_macro]
 pub fn paste(input: TokenStream) -> TokenStream {
     let mut expanded = TokenStream::new();
@@ -19,7 +34,7 @@ pub fn paste(input: TokenStream) -> TokenStream {
                 let span = group.span();
 
                 if delimiter == Delimiter::Bracket && is_paste_operation(&content) {
-                    // Process [< ... >] paste operation
+                    // Process [< ... >] paste-macro operation
                     if let Ok(pasted) = process_paste_operation(content, span) {
                         expanded.extend(pasted);
                     } else {
@@ -42,7 +57,7 @@ pub fn paste(input: TokenStream) -> TokenStream {
     expanded
 }
 
-// Check if a token stream is a paste operation: [< ... >]
+// Check if a token stream is a paste-macro operation: [< ... >]
 fn is_paste_operation(input: &TokenStream) -> bool {
     let mut tokens = input.clone().into_iter();
 
@@ -77,6 +92,8 @@ fn process_paste_operation(input: TokenStream, span: Span) -> Result<TokenStream
 
     // Collect and process segments
     let mut segments = Vec::new();
+    let mut has_lifetime = false;
+
     while let Some(token) = tokens.next() {
         match &token {
             TokenTree::Punct(punct) if punct.as_char() == '>' => break,
@@ -84,12 +101,15 @@ fn process_paste_operation(input: TokenStream, span: Span) -> Result<TokenStream
             TokenTree::Literal(lit) => {
                 let lit_str = lit.to_string();
                 if lit_str.starts_with('"') && lit_str.ends_with('"') && lit_str.len() >= 2 {
-                    segments.push(lit_str[1..lit_str.len() - 1].to_owned());
+                    segments.push(lit_str[1..lit_str.len() - 1].to_owned().replace('-', "_"));
                 } else {
-                    segments.push(lit_str);
+                    segments.push(lit_str.replace('-', "_"));
                 }
             },
             TokenTree::Punct(punct) if punct.as_char() == '_' => segments.push("_".to_owned()),
+            TokenTree::Punct(punct) if punct.as_char() == '\'' => {
+                has_lifetime = true;
+            },
             TokenTree::Punct(punct) if punct.as_char() == ':' => {
                 if segments.is_empty() {
                     return Err(());
@@ -118,28 +138,31 @@ fn process_paste_operation(input: TokenStream, span: Span) -> Result<TokenStream
     }
 
     // Create identifier from the concatenated segments
-    let pasted = segments.join("");
+    let mut pasted = segments.join("");
 
-    // Convert to a valid Rust identifier
-    let ident = match panic::catch_unwind(|| Ident::new(&pasted, span)) {
-        Ok(ident) => TokenTree::Ident(ident),
-        Err(_) => {
-            // If it starts with a number, try to create a literal
-            if pasted.starts_with(|c: char| c.is_ascii_digit()) {
-                match TokenStream::from_str(&pasted) {
-                    Ok(ts) => {
-                        if let Some(token) = ts.into_iter().next() {
-                            return Ok(iter::once(token).collect());
-                        }
-                    }
-                    Err(_) => {}
+    // Add lifetime symbol if needed
+    if has_lifetime {
+        pasted.insert(0, '\'');
+    }
+
+    // Convert to a valid Rust identifier or literal
+    if pasted.starts_with(|c: char| c.is_ascii_digit()) {
+        // If it starts with a number, try to create a literal
+        match TokenStream::from_str(&pasted) {
+            Ok(ts) => {
+                if let Some(token) = ts.into_iter().next() {
+                    return Ok(iter::once(token).collect());
                 }
             }
-            return Err(());
+            Err(_) => return Err(()),
         }
-    };
+    }
 
-    Ok(iter::once(ident).collect())
+    // Try to create an identifier
+    match panic::catch_unwind(|| Ident::new(&pasted, span)) {
+        Ok(ident) => Ok(iter::once(TokenTree::Ident(ident)).collect()),
+        Err(_) => Err(()),
+    }
 }
 
 // Helper function to convert CamelCase to snake_case
