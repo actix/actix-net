@@ -18,13 +18,14 @@ fmt:
     fd --type=file --hidden -e=toml --exec-batch taplo format
     cargo +nightly fmt
 
-# Downgrade dev-dependencies necessary to run MSRV checks/tests.
+# Downgrade dependencies necessary to run MSRV checks/tests.
 [private]
 downgrade-for-msrv:
-    cargo update -p=clap --precise=4.4.18
-    cargo update -p=native-tls --precise=0.2.13
-    cargo update -p=litemap --precise=0.7.4
-    cargo update -p=zerofrom --precise=0.1.5
+    cargo update -p=clap --precise=4.4.18 # next ver: 1.74.0
+    cargo update -p=native-tls --precise=0.2.13 # next ver: 1.80.0
+    cargo update -p=litemap --precise=0.7.4 # next ver: 1.81.0
+    cargo update -p=zerofrom --precise=0.1.5 # next ver: 1.81.0
+    cargo update -p=half --precise=2.4.1 # next ver: 1.81.0
 
 msrv := ```
     cargo metadata --format-version=1 \
@@ -44,6 +45,9 @@ all_crate_features := if os() == "linux" { "--all-features" } else { "--features
 # Run Clippy over workspace.
 clippy toolchain="":
     cargo {{ toolchain }} clippy --workspace --all-targets {{ all_crate_features }}
+
+# Run Clippy using MSRV.
+clippy-msrv: downgrade-for-msrv (clippy msrv_rustup)
 
 # Test workspace code.
 [macos]
