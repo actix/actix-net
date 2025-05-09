@@ -177,7 +177,7 @@ impl ServerBuilder {
     ///
     /// Using this method will prevent OS signal handlers being set up.
     ///
-    /// Typically, a `CancellationToken` or `oneshot` / `broadcast` channel will be used.
+    /// Typically, a `CancellationToken` will be used, but any future _can_ be.
     ///
     /// # Examples
     ///
@@ -408,9 +408,6 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
     } else if let Some(err) = opt_err.take() {
         Err(err)
     } else {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            "Can not bind to address.",
-        ))
+        Err(io::Error::other("Can not bind to address."))
     }
 }

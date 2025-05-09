@@ -8,26 +8,28 @@ use actix_rt::net::TcpStream;
 use actix_server::Server;
 use actix_service::fn_service;
 use tokio_util::sync::CancellationToken;
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::{prelude::*, EnvFilter};
 
 async fn run(stop_signal: CancellationToken) -> io::Result<()> {
-    pretty_env_logger::formatted_timed_builder()
-        .parse_env(pretty_env_logger::env_logger::Env::default().default_filter_or("info"));
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .init();
 
     let addr = ("127.0.0.1", 8080);
     tracing::info!("starting server on port: {}", &addr.0);
-
-    // let (tx, rx) = tokio::sync::oneshot::channel::<()>();
-    // let (tx, mut rx) = tokio::sync::broadcast::channel::<()>(1);
 
     Server::build()
         .bind("shutdown-signal", addr, || {
             fn_service(|_stream: TcpStream| async { Ok::<_, io::Error>(()) })
         })?
         .shutdown_signal(stop_signal.cancelled_owned())
-        // .shutdown_signal(async move {
-        //     rx.await;
-        //     // rx.recv().await;
-        // })
+        .workers(2)
         .run()
         .await
 }

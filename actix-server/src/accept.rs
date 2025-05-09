@@ -76,7 +76,7 @@ impl Accept {
         let accept_handle = thread::Builder::new()
             .name("actix-server acceptor".to_owned())
             .spawn(move || accept.poll_with(&mut sockets))
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+            .map_err(io::Error::other)?;
 
         Ok((waker_queue, handles_server, accept_handle))
     }

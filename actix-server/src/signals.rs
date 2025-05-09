@@ -57,7 +57,6 @@ impl Future for StopSignal {
 }
 
 /// Process signal listener.
-#[derive(Debug)]
 pub(crate) struct OsSignals {
     #[cfg(not(unix))]
     signals: futures_core::future::BoxFuture<'static, std::io::Result<()>>,

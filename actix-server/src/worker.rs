@@ -341,11 +341,10 @@ impl ServerWorker {
                                     Ok((token, svc)) => services.push((idx, token, svc)),
 
                                     Err(err) => {
-                                        error!("can not start worker: {:?}", err);
-                                        return Err(io::Error::new(
-                                            io::ErrorKind::Other,
-                                            format!("can not start server service {}", idx),
-                                        ));
+                                        error!("can not start worker: {err:?}");
+                                        return Err(io::Error::other(format!(
+                                            "can not start server service {idx}",
+                                        )));
                                     }
                                 }
                             }
@@ -440,13 +439,12 @@ impl ServerWorker {
                                 Ok((token, svc)) => services.push((idx, token, svc)),
 
                                 Err(err) => {
-                                    error!("can not start worker: {:?}", err);
+                                    error!("can not start worker: {err:?}");
                                     Arbiter::current().stop();
                                     factory_tx
-                                        .send(Err(io::Error::new(
-                                            io::ErrorKind::Other,
-                                            format!("can not start server service {}", idx),
-                                        )))
+                                        .send(Err(io::Error::other(format!(
+                                            "can not start server service {idx}",
+                                        ))))
                                         .unwrap();
                                     return;
                                 }

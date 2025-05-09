@@ -41,7 +41,6 @@ non_linux_all_features_list := ```
         'add | unique | . - ($exclusions | split(",")) | join(",")'
 ```
 all_crate_features := if os() == "linux" { "--all-features" } else { "--features='" + non_linux_all_features_list + "'" }
-
 toolchain := ""
 
 # Run Clippy over workspace.
