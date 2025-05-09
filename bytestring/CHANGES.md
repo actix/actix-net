@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.74.
+
 ## 1.4.0
 
 - Add `ByteString::split_at()` method.
