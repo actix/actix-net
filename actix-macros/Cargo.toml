@@ -27,7 +27,7 @@ syn = { version = "2", features = ["full"] }
 
 # minimal versions compat
 [target.'cfg(any())'.dependencies]
-proc-macro2 = "1.0.60"
+proc-macro2 = "1.0.95"
 
 [dev-dependencies]
 actix-rt = "2"
