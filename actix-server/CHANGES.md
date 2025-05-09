@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 2.6.0
+
+- Add `ServerBuilder::shutdown_signal()` method.
 - Minimum supported Rust version (MSRV) is now 1.74.
 
 ## 2.5.1

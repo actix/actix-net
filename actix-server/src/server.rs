@@ -18,7 +18,7 @@ use crate::{
     builder::ServerBuilder,
     join_all::join_all,
     service::InternalServiceFactory,
-    signals::{SignalKind, Signals},
+    signals::{OsSignals, SignalKind, StopSignal},
     waker_queue::{WakerInterest, WakerQueue},
     worker::{ServerWorker, ServerWorkerConfig, WorkerHandleServer},
     ServerHandle,
@@ -210,7 +210,12 @@ impl ServerInner {
         let (waker_queue, worker_handles, accept_handle) = Accept::start(sockets, &builder)?;
 
         let mux = ServerEventMultiplexer {
-            signal_fut: (builder.listen_os_signals).then(Signals::new),
+            signal_fut: builder.shutdown_signal.map(StopSignal::Cancel).or_else(|| {
+                builder
+                    .listen_os_signals
+                    .then(OsSignals::new)
+                    .map(StopSignal::Os)
+            }),
             cmd_rx: builder.cmd_rx,
         };
 
@@ -315,7 +320,16 @@ impl ServerInner {
 
     fn map_signal(signal: SignalKind) -> ServerCommand {
         match signal {
-            SignalKind::Int => {
+            SignalKind::Cancel => {
+                info!("Cancellation token/channel received; starting graceful shutdown");
+                ServerCommand::Stop {
+                    graceful: true,
+                    completion: None,
+                    force_system_stop: true,
+                }
+            }
+
+            SignalKind::OsInt => {
                 info!("SIGINT received; starting forced shutdown");
                 ServerCommand::Stop {
                     graceful: false,
@@ -324,7 +338,7 @@ impl ServerInner {
                 }
             }
 
-            SignalKind::Term => {
+            SignalKind::OsTerm => {
                 info!("SIGTERM received; starting graceful shutdown");
                 ServerCommand::Stop {
                     graceful: true,
@@ -333,7 +347,7 @@ impl ServerInner {
                 }
             }
 
-            SignalKind::Quit => {
+            SignalKind::OsQuit => {
                 info!("SIGQUIT received; starting forced shutdown");
                 ServerCommand::Stop {
                     graceful: false,
@@ -347,7 +361,7 @@ impl ServerInner {
 
 struct ServerEventMultiplexer {
     cmd_rx: UnboundedReceiver<ServerCommand>,
-    signal_fut: Option<Signals>,
+    signal_fut: Option<StopSignal>,
 }
 
 impl Stream for ServerEventMultiplexer {

@@ -187,10 +187,7 @@ impl SystemRunner {
 
         match exit_code {
             0 => Ok(()),
-            nonzero => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("Non-zero exit code: {}", nonzero),
-            )),
+            nonzero => Err(io::Error::other(format!("Non-zero exit code: {}", nonzero))),
         }
     }
 
@@ -199,8 +196,7 @@ impl SystemRunner {
         let SystemRunner { rt, stop_rx, .. } = self;
 
         // run loop
-        rt.block_on(stop_rx)
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
+        rt.block_on(stop_rx).map_err(io::Error::other)
     }
 
     /// Retrieves a reference to the underlying [Actix runtime](crate::Runtime) associated with this

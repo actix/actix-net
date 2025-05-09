@@ -1,6 +1,7 @@
-use std::{io, num::NonZeroUsize, time::Duration};
+use std::{future::Future, io, num::NonZeroUsize, time::Duration};
 
 use actix_rt::net::TcpStream;
+use futures_core::future::BoxFuture;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::{
@@ -39,6 +40,7 @@ pub struct ServerBuilder {
     pub(crate) mptcp: MpTcp,
     pub(crate) exit: bool,
     pub(crate) listen_os_signals: bool,
+    pub(crate) shutdown_signal: Option<BoxFuture<'static, ()>>,
     pub(crate) cmd_tx: UnboundedSender<ServerCommand>,
     pub(crate) cmd_rx: UnboundedReceiver<ServerCommand>,
     pub(crate) worker_config: ServerWorkerConfig,
@@ -64,6 +66,7 @@ impl ServerBuilder {
             mptcp: MpTcp::Disabled,
             exit: false,
             listen_os_signals: true,
+            shutdown_signal: None,
             cmd_tx,
             cmd_rx,
             worker_config: ServerWorkerConfig::default(),
@@ -167,6 +170,41 @@ impl ServerBuilder {
     /// Disables OS signal handling.
     pub fn disable_signals(mut self) -> Self {
         self.listen_os_signals = false;
+        self
+    }
+
+    /// Specify shutdown signal from a future.
+    ///
+    /// Using this method will prevent OS signal handlers being set up.
+    ///
+    /// Typically, a `CancellationToken` will be used, but any future _can_ be.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::io;
+    /// # use tokio::net::TcpStream;
+    /// # use actix_server::Server;
+    /// # async fn run() -> io::Result<()> {
+    /// use actix_service::fn_service;
+    /// use tokio_util::sync::CancellationToken;
+    ///
+    /// let stop_signal = CancellationToken::new();
+    ///
+    /// Server::build()
+    ///     .bind("shutdown-signal", "127.0.0.1:12345", || {
+    ///         fn_service(|_stream: TcpStream| async { Ok::<_, io::Error>(()) })
+    ///     })?
+    ///     .shutdown_signal(stop_signal.cancelled_owned())
+    ///     .run()
+    ///     .await
+    /// # }
+    /// ```
+    pub fn shutdown_signal<Fut>(mut self, shutdown_signal: Fut) -> Self
+    where
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        self.shutdown_signal = Some(Box::pin(shutdown_signal));
         self
     }
 
@@ -370,9 +408,6 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
     } else if let Some(err) = opt_err.take() {
         Err(err)
     } else {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            "Can not bind to address.",
-        ))
+        Err(io::Error::other("Can not bind to address."))
     }
 }
