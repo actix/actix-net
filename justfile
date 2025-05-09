@@ -21,7 +21,6 @@ fmt:
 # Downgrade dependencies necessary to run MSRV checks/tests.
 [private]
 downgrade-for-msrv:
-    cargo update -p=clap --precise=4.4.18 # next ver: 1.74.0
     cargo update -p=native-tls --precise=0.2.13 # next ver: 1.80.0
     cargo update -p=litemap --precise=0.7.4 # next ver: 1.81.0
     cargo update -p=zerofrom --precise=0.1.5 # next ver: 1.81.0
@@ -42,38 +41,42 @@ non_linux_all_features_list := ```
 ```
 all_crate_features := if os() == "linux" { "--all-features" } else { "--features='" + non_linux_all_features_list + "'" }
 
+toolchain := ""
+
 # Run Clippy over workspace.
-clippy toolchain="":
+clippy:
     cargo {{ toolchain }} clippy --workspace --all-targets {{ all_crate_features }}
 
 # Run Clippy using MSRV.
-clippy-msrv: downgrade-for-msrv (clippy msrv_rustup)
+clippy-msrv: downgrade-for-msrv
+    @just toolchain={{ msrv_rustup }} clippy
 
 # Test workspace code.
 [macos]
 [windows]
-test toolchain="":
+test:
     cargo {{ toolchain }} test --lib --tests --package=actix-macros
     cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros --no-default-features
     cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros {{ all_crate_features }}
 
 # Test workspace code.
 [linux]
-test toolchain="":
+test:
     cargo {{ toolchain }} test --lib --tests --package=actix-macros
     cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros --no-default-features
     cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros {{ non_linux_all_features_list }}
     cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros {{ all_crate_features }}
 
 # Test workspace using MSRV.
-test-msrv: downgrade-for-msrv (test msrv_rustup)
+test-msrv: downgrade-for-msrv
+    @just toolchain={{ msrv_rustup }} test
 
 # Test workspace docs.
-test-docs toolchain="": && doc
+test-docs: && doc
     cargo {{ toolchain }} test --doc --workspace {{ all_crate_features }} --no-fail-fast -- --nocapture
 
 # Test workspace.
-test-all toolchain="": (test toolchain) (test-docs toolchain)
+test-all: test test-docs
 
 # Document crates in workspace.
 doc *args: && doc-set-workspace-crates
@@ -96,12 +99,12 @@ doc-watch:
     cargo watch -- just doc
 
 # Check for unintentional external type exposure on all crates in workspace.
-check-external-types-all toolchain="+nightly":
+check-external-types-all:
     #!/usr/bin/env bash
     set -euo pipefail
     exit=0
     for f in $(find . -mindepth 2 -maxdepth 2 -name Cargo.toml | grep -vE "\-codegen/|\-derive/|\-macros/"); do
-        if ! just check-external-types-manifest "$f" {{ toolchain }}; then exit=1; fi
+        if ! just toolchain="+nightly" check-external-types-manifest "$f"; then exit=1; fi
         echo
         echo
     done
@@ -114,9 +117,9 @@ check-external-types-all-table toolchain="+nightly":
     for f in $(find . -mindepth 2 -maxdepth 2 -name Cargo.toml | grep -vE "\-codegen/|\-derive/|\-macros/"); do
         echo
         echo "Checking for $f"
-        just check-external-types-manifest "$f" {{ toolchain }} --output-format=markdown-table
+        just toolchain="+nightly" check-external-types-manifest "$f" --output-format=markdown-table
     done
 
 # Check for unintentional external type exposure on a crate.
-check-external-types-manifest manifest_path toolchain="+nightly" *extra_args="":
+check-external-types-manifest manifest_path *extra_args="":
     cargo {{ toolchain }} check-external-types --manifest-path "{{ manifest_path }}" {{ extra_args }}

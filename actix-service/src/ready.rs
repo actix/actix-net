@@ -1,4 +1,4 @@
-//! When MSRV is 1.48, replace with `core::future::Ready` and `core::future::ready()`.
+//! When MSRV is 1.82, replace with `core::future::Ready` and `core::future::ready()`.
 
 use core::{
     future::Future,
