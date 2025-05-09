@@ -44,7 +44,9 @@ actix-rt = "2.8"
 bytes = "1"
 futures-util = { version = "0.3.17", default-features = false, features = ["sink", "async-await-macro"] }
 pretty_env_logger = "0.5"
-tokio = { version = "1.44.2", features = ["io-util", "rt-multi-thread", "macros", "fs"] }
+static_assertions = "1"
+tokio = { version = "1.44.2", features = ["io-util", "rt-multi-thread", "macros", "fs", "time"] }
+tokio-util = "0.7"
 
 [lints]
 workspace = true

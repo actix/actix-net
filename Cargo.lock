@@ -56,8 +56,10 @@ dependencies = [
  "mio",
  "pretty_env_logger",
  "socket2 0.5.9",
+ "static_assertions",
  "tokio",
  "tokio-uring",
+ "tokio-util",
  "tracing",
 ]
 
