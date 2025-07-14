@@ -29,7 +29,7 @@ actix-utils = "3"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
 mio = { version = "1", features = ["os-poll", "net"] }
-socket2 = "0.5"
+socket2 = "0.6"
 tokio = { version = "1.44.2", features = ["sync"] }
 tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
