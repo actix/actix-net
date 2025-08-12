@@ -56,7 +56,7 @@ jobs:
           toolchain: ${{ vars.RUST_VERSION_EXTERNAL_TYPES }}
 
       - name: Install just
-        uses: taiki-e/install-action@v2.56.19
+        uses: taiki-e/install-action@v2.58.9
         with:
           tool: just
 
