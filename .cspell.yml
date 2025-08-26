@@ -2,7 +2,9 @@ version: "0.2"
 words:
   - actix
   - addrs
+  - clippy
   - mptcp
+  - MSRV
   - nonblocking
   - oneshot
   - rustup
