@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 mod system {
     pub use actix_rt::System as MySystem;
 }
