@@ -159,8 +159,7 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.get_mut() {
-            Self::InvalidDns => Poll::Ready(Err(io::Error::new(
-                io::ErrorKind::Other,
+            Self::InvalidDns => Poll::Ready(Err(io::Error::other(
                 "Rustls v0.20 can only handle hostname-based connections. Enable the `rustls-0_21` \
                 feature and use the Rustls v0.21 utilities to gain this feature.",
             ))),

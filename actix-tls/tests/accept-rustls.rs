@@ -87,7 +87,7 @@ async fn accepts_connections() {
             let tls_acceptor = Acceptor::new(rustls_server_config(cert.clone(), key.clone()));
 
             tls_acceptor
-                .map_err(|err| println!("Rustls error: {:?}", err))
+                .map_err(|err| println!("Rustls error: {err:?}"))
                 .and_then(move |_stream: TlsStream<TcpStream>| ok(()))
         }
     });

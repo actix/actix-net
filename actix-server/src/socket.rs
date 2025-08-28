@@ -105,9 +105,9 @@ impl From<StdUnixListener> for MioListener {
 impl fmt::Debug for MioListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            MioListener::Tcp(ref lst) => write!(f, "{:?}", lst),
+            MioListener::Tcp(ref lst) => write!(f, "{lst:?}"),
             #[cfg(unix)]
-            MioListener::Uds(ref lst) => write!(f, "{:?}", lst),
+            MioListener::Uds(ref lst) => write!(f, "{lst:?}"),
         }
     }
 }
@@ -115,9 +115,9 @@ impl fmt::Debug for MioListener {
 impl fmt::Display for MioListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            MioListener::Tcp(ref lst) => write!(f, "{:?}", lst),
+            MioListener::Tcp(ref lst) => write!(f, "{lst:?}"),
             #[cfg(unix)]
-            MioListener::Uds(ref lst) => write!(f, "{:?}", lst),
+            MioListener::Uds(ref lst) => write!(f, "{lst:?}"),
         }
     }
 }
@@ -133,9 +133,9 @@ impl fmt::Display for SocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Self::Unknown => write!(f, "Unknown SocketAddr"),
-            Self::Tcp(ref addr) => write!(f, "{}", addr),
+            Self::Tcp(ref addr) => write!(f, "{addr}"),
             #[cfg(unix)]
-            Self::Uds(ref addr) => write!(f, "{:?}", addr),
+            Self::Uds(ref addr) => write!(f, "{addr:?}"),
         }
     }
 }
@@ -144,9 +144,9 @@ impl fmt::Debug for SocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Self::Unknown => write!(f, "Unknown SocketAddr"),
-            Self::Tcp(ref addr) => write!(f, "{:?}", addr),
+            Self::Tcp(ref addr) => write!(f, "{addr:?}"),
             #[cfg(unix)]
-            Self::Uds(ref addr) => write!(f, "{:?}", addr),
+            Self::Uds(ref addr) => write!(f, "{addr:?}"),
         }
     }
 }
@@ -266,14 +266,14 @@ mod tests {
     #[test]
     fn socket_addr() {
         let addr = SocketAddr::Tcp("127.0.0.1:8080".parse().unwrap());
-        assert!(format!("{:?}", addr).contains("127.0.0.1:8080"));
-        assert_eq!(format!("{}", addr), "127.0.0.1:8080");
+        assert!(format!("{addr:?}").contains("127.0.0.1:8080"));
+        assert_eq!(format!("{addr}"), "127.0.0.1:8080");
 
         let addr: StdSocketAddr = "127.0.0.1:0".parse().unwrap();
         let lst = create_mio_tcp_listener(addr, 128, &MpTcp::Disabled).unwrap();
         let lst = MioListener::Tcp(lst);
-        assert!(format!("{:?}", lst).contains("TcpListener"));
-        assert!(format!("{}", lst).contains("127.0.0.1"));
+        assert!(format!("{lst:?}").contains("TcpListener"));
+        assert!(format!("{lst}").contains("127.0.0.1"));
     }
 
     #[test]
@@ -283,12 +283,12 @@ mod tests {
         if let Ok(socket) = MioUnixListener::bind("/tmp/sock.xxxxx") {
             let addr = socket.local_addr().expect("Couldn't get local address");
             let a = SocketAddr::Uds(addr);
-            assert!(format!("{:?}", a).contains("/tmp/sock.xxxxx"));
-            assert!(format!("{}", a).contains("/tmp/sock.xxxxx"));
+            assert!(format!("{a:?}").contains("/tmp/sock.xxxxx"));
+            assert!(format!("{a}").contains("/tmp/sock.xxxxx"));
 
             let lst = MioListener::Uds(socket);
-            assert!(format!("{:?}", lst).contains("/tmp/sock.xxxxx"));
-            assert!(format!("{}", lst).contains("/tmp/sock.xxxxx"));
+            assert!(format!("{lst:?}").contains("/tmp/sock.xxxxx"));
+            assert!(format!("{lst}").contains("/tmp/sock.xxxxx"));
         }
     }
 }

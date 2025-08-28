@@ -1,0 +1,4 @@
+disallowed-names = [
+  "..", # defaults
+  "e",  # prefer `err`
+]

@@ -3,8 +3,16 @@ words:
   - actix
   - addrs
   - clippy
+  - deque
+  - itertools
   - mptcp
   - MSRV
   - nonblocking
   - oneshot
+  - pemfile
+  - rcgen
+  - Rustls
   - rustup
+  - spki
+  - uring
+  - webpki

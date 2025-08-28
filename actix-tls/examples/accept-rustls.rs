@@ -80,7 +80,7 @@ async fn main() -> io::Result<()> {
             // Set up TLS service factory
             tls_acceptor
                 .clone()
-                .map_err(|err| println!("Rustls error: {:?}", err))
+                .map_err(|err| println!("Rustls error: {err:?}"))
                 .and_then(move |stream: TlsStream<TcpStream>| {
                     let num = count.fetch_add(1, Ordering::Relaxed);
                     info!("[{}] Got TLS connection: {:?}", num, &*stream);

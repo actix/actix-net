@@ -26,7 +26,7 @@ async fn custom_resolver() {
             port: u16,
         ) -> LocalBoxFuture<'a, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>> {
             Box::pin(async move {
-                let local = format!("127.0.0.1:{}", port).parse().unwrap();
+                let local = format!("127.0.0.1:{port}").parse().unwrap();
                 Ok(vec![local])
             })
         }

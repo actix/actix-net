@@ -115,7 +115,7 @@ impl Arbiter {
         let system_id = sys.id();
         let arb_id = COUNT.fetch_add(1, Ordering::Relaxed);
 
-        let name = format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id);
+        let name = format!("actix-rt|system:{system_id}|arbiter:{arb_id}");
         let (tx, rx) = mpsc::unbounded_channel();
 
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();

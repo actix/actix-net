@@ -126,7 +126,7 @@ async fn accepts_connections() {
             let tls_acceptor = Acceptor::new(openssl_acceptor);
 
             tls_acceptor
-                .map_err(|err| println!("OpenSSL error: {:?}", err))
+                .map_err(|err| println!("OpenSSL error: {err:?}"))
                 .and_then(move |_stream: TlsStream<TcpStream>| ok(()))
         }
     });

@@ -141,10 +141,7 @@ where
             }
             Err(err) => {
                 trace!("TLS handshake error: {:?}", err);
-                Poll::Ready(Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("{}", err),
-                )))
+                Poll::Ready(Err(io::Error::other(format!("{err}"))))
             }
         }
     }

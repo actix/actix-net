@@ -187,7 +187,7 @@ impl SystemRunner {
 
         match exit_code {
             0 => Ok(()),
-            nonzero => Err(io::Error::other(format!("Non-zero exit code: {}", nonzero))),
+            nonzero => Err(io::Error::other(format!("Non-zero exit code: {nonzero}"))),
         }
     }
 

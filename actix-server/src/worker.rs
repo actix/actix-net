@@ -325,7 +325,7 @@ impl ServerWorker {
             // no actix system
             (None, Some(rt_handle)) => {
                 std::thread::Builder::new()
-                    .name(format!("actix-server worker {}", idx))
+                    .name(format!("actix-server worker {idx}"))
                     .spawn(move || {
                         let (worker_stopped_tx, worker_stopped_rx) = oneshot::channel();
 

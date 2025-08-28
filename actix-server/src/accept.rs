@@ -130,7 +130,7 @@ impl Accept {
             if let Err(err) = self.poll.poll(&mut events, self.timeout) {
                 match err.kind() {
                     io::ErrorKind::Interrupted => {}
-                    _ => panic!("Poll error: {}", err),
+                    _ => panic!("Poll error: {err}"),
                 }
             }
 
@@ -165,7 +165,6 @@ impl Accept {
             // task is done. Take care not to take the guard again inside this loop.
             let mut guard = self.waker_queue.guard();
 
-            #[allow(clippy::significant_drop_in_scrutinee)]
             match guard.pop_front() {
                 // Worker notified it became available.
                 Some(WakerInterest::WorkerAvailable(idx)) => {
@@ -455,8 +454,8 @@ impl Accept {
 /// All other errors will incur a timeout before next `accept()` call is attempted. The timeout is
 /// useful to handle resource exhaustion errors like `ENFILE` and `EMFILE`. Otherwise, it could
 /// enter into a temporary spin loop.
-fn connection_error(e: &io::Error) -> bool {
-    e.kind() == io::ErrorKind::ConnectionRefused
-        || e.kind() == io::ErrorKind::ConnectionAborted
-        || e.kind() == io::ErrorKind::ConnectionReset
+fn connection_error(err: &io::Error) -> bool {
+    err.kind() == io::ErrorKind::ConnectionRefused
+        || err.kind() == io::ErrorKind::ConnectionAborted
+        || err.kind() == io::ErrorKind::ConnectionReset
 }

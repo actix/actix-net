@@ -81,9 +81,9 @@ where
                     trace!("TLS handshake success: {:?}", stream.hostname());
                     stream.replace_io(res).1
                 })
-                .map_err(|e| {
-                    trace!("TLS handshake error: {:?}", e);
-                    io::Error::new(io::ErrorKind::Other, format!("{}", e))
+                .map_err(|err| {
+                    trace!("TLS handshake error: {err:?}");
+                    io::Error::other(format!("{err}"))
                 })
         })
     }

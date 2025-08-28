@@ -92,11 +92,9 @@ impl OsSignals {
                 .filter_map(|(kind, sig)| {
                     unix::signal(*kind)
                         .map(|tokio_sig| (*sig, tokio_sig))
-                        .map_err(|e| {
+                        .map_err(|err| {
                             tracing::error!(
-                                "can not initialize stream handler for {:?} err: {}",
-                                sig,
-                                e
+                                "can not initialize stream handler for {sig:?} err: {err}",
                             )
                         })
                         .ok()

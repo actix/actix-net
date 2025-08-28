@@ -57,7 +57,7 @@ impl Write for Bilateral {
                 Ok(data.len())
             }
             Some(Err(err)) => Err(err),
-            None => panic!("unexpected write; {:?}", src),
+            None => panic!("unexpected write; {src:?}"),
         }
     }
 
