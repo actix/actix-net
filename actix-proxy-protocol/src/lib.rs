@@ -1,20 +1,8 @@
 //! PROXY protocol.
 
-#![deny(rust_2018_idioms, nonstandard_style)]
-#![warn(future_incompatible)]
-// #![warn(missing_docs)]
-#![allow(unused)]
+#![expect(dead_code)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
-
-use std::{
-    convert::TryFrom as _,
-    fmt, io,
-    net::{IpAddr, SocketAddr},
-};
-
-use arrayvec::{ArrayString, ArrayVec};
-use tokio::io::{AsyncWrite, AsyncWriteExt as _};
 
 pub mod tlv;
 pub mod v1;
@@ -107,7 +95,7 @@ pub enum AddressFamily {
 }
 
 impl AddressFamily {
-    fn v1_str(&self) -> &'static str {
+    pub(crate) fn v1_str(&self) -> &'static str {
         match self {
             AddressFamily::Inet => "TCP4",
             AddressFamily::Inet6 => "TCP6",

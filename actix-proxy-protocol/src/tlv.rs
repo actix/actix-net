@@ -217,7 +217,7 @@ bitflags::bitflags! {
 
 /// TLS (SSL).
 ///
-/// Heckin broken atm.
+/// Very broken atm.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ssl {
     /// The <client> field is made of a bit field indicating which element is present.
@@ -239,7 +239,7 @@ pub struct Ssl {
 impl Tlv for Ssl {
     const TYPE: u8 = PP2_TYPE_SSL;
 
-    fn try_from_value(value: &[u8]) -> Option<Self> {
+    fn try_from_value(_value: &[u8]) -> Option<Self> {
         /// The PP2_CLIENT_SSL flag indicates that the client connected over SSL/TLS. When
         /// this field is present, the US-ASCII string representation of the TLS version is
         /// appended at the end of the field in the TLV format using the type

@@ -3,7 +3,7 @@ use std::{
     net::{IpAddr, SocketAddr},
 };
 
-use smallvec::{smallvec, SmallVec, ToSmallVec as _};
+use smallvec::{SmallVec, ToSmallVec as _};
 use tokio::io::{AsyncWrite, AsyncWriteExt as _};
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
     AddressFamily, Command, TransportProtocol, Version,
 };
 
-pub(crate) const SIGNATURE: [u8; 12] = [
+pub const SIGNATURE: [u8; 12] = [
     0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A,
 ];
 
@@ -192,7 +192,7 @@ impl Header {
 
         let mut buf = Vec::new();
         this.write_to(&mut buf).unwrap();
-        let mut crc_calc = crc32fast::hash(&buf);
+        let crc_calc = crc32fast::hash(&buf);
 
         Some(crc_sent.checksum == crc_calc)
     }

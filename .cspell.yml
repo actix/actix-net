@@ -2,9 +2,13 @@ version: "0.2"
 words:
   - actix
   - addrs
+  - ALPN
+  - arrayvec
+  - bitflags
   - clippy
   - deque
   - itertools
+  - itoa
   - mptcp
   - MSRV
   - nonblocking
@@ -13,6 +17,7 @@ words:
   - rcgen
   - Rustls
   - rustup
+  - smallvec
   - spki
   - uring
   - webpki
