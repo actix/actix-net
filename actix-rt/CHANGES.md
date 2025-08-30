@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.11.0
+
+- Implement `ActixStream` for `tokio::io::BufReader<IO>`.
+- Deprecate the `pin` re-export.
 - Minimum supported Rust version (MSRV) is now 1.75.
 
 ## 2.10.0

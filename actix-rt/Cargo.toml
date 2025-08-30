@@ -1,13 +1,13 @@
 [package]
 name = "actix-rt"
-version = "2.10.0"
+version = "2.11.0"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>", "Rob Ede <robjtede@icloud.com>"]
 description = "Tokio-based single-threaded async runtime for the Actix ecosystem"
-keywords = ["async", "futures", "io", "runtime"]
-homepage = "https://actix.rs"
-repository = "https://github.com/actix/actix-net"
 categories = ["network-programming", "asynchronous"]
-license = "MIT OR Apache-2.0"
+keywords = ["async", "futures", "io", "runtime"]
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
