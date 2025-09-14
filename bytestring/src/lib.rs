@@ -275,7 +275,7 @@ impl fmt::Display for ByteString {
 mod serde {
     use alloc::string::String;
 
-    use serde::{
+    use serde_core::{
         de::{Deserialize, Deserializer},
         ser::{Serialize, Serializer},
     };
@@ -304,7 +304,7 @@ mod serde {
 
     #[cfg(test)]
     mod serde_impl_tests {
-        use serde::de::DeserializeOwned;
+        use serde_core::de::DeserializeOwned;
         use static_assertions::assert_impl_all;
 
         use super::*;
