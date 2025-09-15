@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Minimum supported Rust version (MSRV) is now 1.75.
+- Switch `serde` to `serde_core`
 
 ## 1.4.0
 
