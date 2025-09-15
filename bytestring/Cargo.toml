@@ -1,6 +1,6 @@
 [package]
 name = "bytestring"
-version = "1.4.0"
+version = "1.5.0"
 description = "A UTF-8 encoded read-only string using `Bytes` as storage"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>", "Rob Ede <robjtede@icloud.com>"]
 keywords = ["string", "bytes", "utf8", "web", "bytestring"]
@@ -14,17 +14,17 @@ rust-version.workspace = true
 [package.metadata.cargo_check_external_types]
 allowed_external_types = ["bytes::*", "serde::*"]
 
+[features]
+serde = ["dep:serde_core"]
+
 [dependencies]
 bytes = { version = "1.2", default-features = false }
-serde_core = { version = "1.0.221", optional = true }
+serde_core = { version = "1", optional = true }
 
 [dev-dependencies]
 ahash = { version = "0.8", default-features = false }
 serde_json = "1"
 static_assertions = "1.1"
-
-[features]
-serde = ["dep:serde_core"]
 
 [lints]
 workspace = true

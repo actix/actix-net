@@ -2,6 +2,7 @@ version: "0.2"
 words:
   - actix
   - addrs
+  - bytestring
   - clippy
   - deque
   - itertools
@@ -13,6 +14,7 @@ words:
   - rcgen
   - Rustls
   - rustup
+  - serde
   - spki
   - uring
   - webpki

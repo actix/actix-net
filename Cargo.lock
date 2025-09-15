@@ -325,7 +325,7 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
 name = "bytestring"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "ahash",
  "bytes",
