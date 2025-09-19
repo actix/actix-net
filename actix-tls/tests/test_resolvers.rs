@@ -50,12 +50,12 @@ async fn custom_resolver_connect() {
         Connector::new(resolver)
     }
 
-    use trust_dns_resolver::TokioAsyncResolver;
+    use hickory_resolver::TokioResolver;
 
     let srv = TestServer::start(|| fn_service(|_io: TcpStream| async { Ok::<_, io::Error>(()) }));
 
     struct MyResolver {
-        trust_dns: TokioAsyncResolver,
+        trust_dns: TokioResolver,
     }
 
     impl Resolve for MyResolver {
@@ -78,7 +78,7 @@ async fn custom_resolver_connect() {
     }
 
     let resolver = MyResolver {
-        trust_dns: TokioAsyncResolver::tokio_from_system_conf().unwrap(),
+        trust_dns: TokioResolver::builder_tokio().unwrap().build(),
     };
 
     let factory = connector_factory(Resolver::custom(resolver));
