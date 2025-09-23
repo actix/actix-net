@@ -13,11 +13,11 @@ use futures_core::future::LocalBoxFuture;
 /// use actix_tls::connect::{Resolve, Resolver};
 /// use futures_util::future::LocalBoxFuture;
 ///
-/// // use trust-dns async tokio resolver
-/// use trust_dns_resolver::TokioAsyncResolver;
+/// // use Hickory DNS tokio resolver
+/// use hickory_resolver::TokioResolver;
 ///
 /// struct MyResolver {
-///     trust_dns: TokioAsyncResolver,
+///     hickory_dns: TokioResolver,
 /// };
 ///
 /// // impl Resolve trait and convert given host address str and port to SocketAddr.
@@ -29,7 +29,7 @@ use futures_core::future::LocalBoxFuture;
 ///     ) -> LocalBoxFuture<'a, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>> {
 ///         Box::pin(async move {
 ///             let res = self
-///                 .trust_dns
+///                 .hickory_dns
 ///                 .lookup_ip(host)
 ///                 .await?
 ///                 .iter()
@@ -41,7 +41,7 @@ use futures_core::future::LocalBoxFuture;
 /// }
 ///
 /// let my_resolver = MyResolver {
-///     trust_dns: TokioAsyncResolver::tokio_from_system_conf().unwrap(),
+///     hickory_dns: TokioResolver::builder_tokio().unwrap().build(),
 /// };
 ///
 /// // wrap custom resolver

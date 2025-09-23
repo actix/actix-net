@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.76.
+
 ## 2.11.0
 
 - Implement `ActixStream` for `tokio::io::BufReader<IO>`.

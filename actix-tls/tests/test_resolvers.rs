@@ -55,7 +55,7 @@ async fn custom_resolver_connect() {
     let srv = TestServer::start(|| fn_service(|_io: TcpStream| async { Ok::<_, io::Error>(()) }));
 
     struct MyResolver {
-        trust_dns: TokioResolver,
+        hickory_dns: TokioResolver,
     }
 
     impl Resolve for MyResolver {
@@ -66,7 +66,7 @@ async fn custom_resolver_connect() {
         ) -> LocalBoxFuture<'a, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>> {
             Box::pin(async move {
                 let res = self
-                    .trust_dns
+                    .hickory_dns
                     .lookup_ip(host)
                     .await?
                     .iter()
@@ -78,7 +78,7 @@ async fn custom_resolver_connect() {
     }
 
     let resolver = MyResolver {
-        trust_dns: TokioResolver::builder_tokio().unwrap().build(),
+        hickory_dns: TokioResolver::builder_tokio().unwrap().build(),
     };
 
     let factory = connector_factory(Resolver::custom(resolver));
