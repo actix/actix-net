@@ -109,7 +109,7 @@ impl Arbiter {
     #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
     pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
     where
-        F: FnOnce() -> tokio::runtime::Runtime + Send + 'static,
+        F: FnOnce() -> std::sync::Arc<tokio::runtime::Runtime> + Send + 'static,
     {
         let sys = System::current();
         let system_id = sys.id();
