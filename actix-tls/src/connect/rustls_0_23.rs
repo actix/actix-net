@@ -40,7 +40,12 @@ pub mod reexports {
 pub fn native_roots_cert_store() -> io::Result<tokio_rustls::rustls::RootCertStore> {
     let mut root_certs = tokio_rustls::rustls::RootCertStore::empty();
 
-    for cert in rustls_native_certs_07::load_native_certs()? {
+    let certs = rustls_native_certs_08::load_native_certs();
+    if let Some(err) = certs.errors.into_iter().next() {
+        return Err(io::Error::other(err));
+    }
+
+    for cert in certs.certs {
         root_certs.add(cert).unwrap();
     }
 
