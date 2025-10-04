@@ -35,7 +35,7 @@ pub mod reexports {
 ///
 /// See [`rustls_native_certs::load_native_certs()`] for more info on behavior and errors.
 ///
-/// [`rustls_native_certs::load_native_certs()`]: rustls_native_certs_07::load_native_certs()
+/// [`rustls_native_certs::load_native_certs()`]: rustls_native_certs_08::load_native_certs()
 #[cfg(feature = "rustls-0_22-native-roots")]
 pub fn native_roots_cert_store() -> io::Result<tokio_rustls::rustls::RootCertStore> {
     let mut root_certs = tokio_rustls::rustls::RootCertStore::empty();
