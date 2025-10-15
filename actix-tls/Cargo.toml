@@ -51,12 +51,12 @@ rustls-0_21-native-roots = ["tokio-rustls-024", "dep:rustls-native-certs-06"]
 # use rustls v0.22 impls
 rustls-0_22 = ["dep:tokio-rustls-025", "dep:rustls-pki-types-1"]
 rustls-0_22-webpki-roots = ["rustls-0_22", "dep:webpki-roots-026"]
-rustls-0_22-native-roots = ["rustls-0_22", "dep:rustls-native-certs-07"]
+rustls-0_22-native-roots = ["rustls-0_22", "dep:rustls-native-certs-08"]
 
 # use rustls v0.23 impls
 rustls-0_23 = ["dep:tokio-rustls-026", "dep:rustls-pki-types-1"]
 rustls-0_23-webpki-roots = ["rustls-0_23", "dep:webpki-roots-026"]
-rustls-0_23-native-roots = ["rustls-0_23", "dep:rustls-native-certs-07"]
+rustls-0_23-native-roots = ["rustls-0_23", "dep:rustls-native-certs-08"]
 
 # use native-tls impls
 native-tls = ["dep:tokio-native-tls"]
@@ -105,7 +105,7 @@ webpki-roots-026 = { package = "webpki-roots", version = "0.26", optional = true
 
 # native root certificates for rustls impls
 rustls-native-certs-06 = { package = "rustls-native-certs", version = "0.6", optional = true }
-rustls-native-certs-07 = { package = "rustls-native-certs", version = "0.7", optional = true }
+rustls-native-certs-08 = { package = "rustls-native-certs", version = "0.8", optional = true }
 
 # native-tls
 tokio-native-tls = { version = "0.3", optional = true }
