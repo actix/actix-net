@@ -8,7 +8,7 @@ use std::{
 use actix_rt::{task::JoinError, Arbiter, System};
 #[cfg(not(feature = "io-uring"))]
 use {
-    std::{sync::mpsc::channel, thread},
+    std::{sync::Arc, sync::mpsc::channel, thread},
     tokio::sync::oneshot,
 };
 
@@ -252,6 +252,7 @@ fn new_system_with_tokio() {
             .on_thread_start(|| {})
             .on_thread_stop(|| {})
             .build()
+            .map(Arc::new)
             .unwrap()
     })
     .block_on(async {
@@ -284,6 +285,7 @@ fn new_arbiter_with_tokio() {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
+            .map(Arc::new)
             .unwrap()
     });
 
