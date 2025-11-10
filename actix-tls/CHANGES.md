@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 3.5.0
+
+- Update `rustls-native-certs` (`0.7`) dependency to `0.8`.
 - Minimum supported Rust version (MSRV) is now 1.76.
 
 ## 3.4.0
