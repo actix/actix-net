@@ -6,7 +6,7 @@
 #![deny(rust_2018_idioms, nonstandard_style)]
 #![warn(future_incompatible, missing_docs)]
 
-use core::{cell::Cell, fmt, marker::PhantomData, task::Waker};
+use core::{cell::UnsafeCell, fmt, marker::PhantomData, task::Waker};
 
 /// A synchronization primitive for task wakeup.
 ///
@@ -27,7 +27,7 @@ use core::{cell::Cell, fmt, marker::PhantomData, task::Waker};
 /// [`wake`]: LocalWaker::wake
 #[derive(Default)]
 pub struct LocalWaker {
-    pub(crate) waker: Cell<Option<Waker>>,
+    pub(crate) waker: UnsafeCell<Option<Waker>>,
     // mark LocalWaker as a !Send type.
     _phantom: PhantomData<*const ()>,
 }
@@ -43,8 +43,15 @@ impl LocalWaker {
     /// Returns `true` if waker was registered before.
     #[inline]
     pub fn register(&self, waker: &Waker) -> bool {
-        let last_waker = self.waker.replace(Some(waker.clone()));
-        last_waker.is_some()
+        let mut registered = false;
+        if let Some(prev) = unsafe { &*self.waker.get() } {
+            if waker.will_wake(prev) {
+                return true;
+            }
+            registered = true;
+        }
+        unsafe { *self.waker.get() = Some(waker.clone()) }
+        registered
     }
 
     /// Calls `wake` on the last `Waker` passed to `register`.
@@ -62,7 +69,7 @@ impl LocalWaker {
     /// If a waker has not been registered, this returns `None`.
     #[inline]
     pub fn take(&self) -> Option<Waker> {
-        self.waker.take()
+        unsafe { (*self.waker.get()).take() }
     }
 }
 
