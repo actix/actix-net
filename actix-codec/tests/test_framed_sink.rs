@@ -23,26 +23,6 @@ macro_rules! bilateral {
     }};
 }
 
-macro_rules! assert_ready {
-    ($e:expr) => {{
-        use core::task::Poll::*;
-        match $e {
-            Ready(v) => v,
-            Pending => panic!("pending"),
-        }
-    }};
-    ($e:expr, $($msg:tt),+) => {{
-        use core::task::Poll::*;
-        match $e {
-            Ready(v) => v,
-            Pending => {
-                let msg = format_args!($($msg),+);
-                panic!("pending; {}", msg)
-            }
-        }
-    }};
-}
-
 #[derive(Debug)]
 pub struct Bilateral {
     pub calls: VecDeque<io::Result<Vec<u8>>>,
