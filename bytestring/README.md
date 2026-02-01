@@ -6,7 +6,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/bytestring?label=latest)](https://crates.io/crates/bytestring)
 [![Documentation](https://docs.rs/bytestring/badge.svg?version=1.5.0)](https://docs.rs/bytestring/1.5.0)
-[![Version](https://img.shields.io/badge/rustc-1.52+-ab6000.svg)](https://blog.rust-lang.org/2021/05/06/Rust-1.52.0.html)
+[![Version](https://img.shields.io/badge/rustc-1.88+-ab6000.svg)](https://blog.rust-lang.org/2021/05/06/Rust-1.52.0.html)
 ![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/bytestring.svg)
 <br />
 [![Dependency Status](https://deps.rs/crate/bytestring/1.5.0/status.svg)](https://deps.rs/crate/bytestring/1.5.0)
