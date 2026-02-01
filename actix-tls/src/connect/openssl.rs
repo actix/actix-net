@@ -2,6 +2,7 @@
 //!
 //! See [`TlsConnector`] for main connector service factory docs.
 
+use core::future::{ready, Ready};
 use std::{
     future::Future,
     io,
@@ -11,7 +12,6 @@ use std::{
 
 use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
-use actix_utils::future::{ok, Ready};
 use futures_core::ready;
 use openssl::ssl::SslConnector;
 use tokio_openssl::SslStream as AsyncSslStream;
@@ -64,9 +64,9 @@ where
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(TlsConnectorService {
+        ready(Ok(TlsConnectorService {
             connector: self.connector.clone(),
-        })
+        }))
     }
 }
 

@@ -1,6 +1,9 @@
-use core::{future::Future, marker::PhantomData};
+use core::{
+    future::{ready, Future, Ready},
+    marker::PhantomData,
+};
 
-use crate::{ok, IntoService, IntoServiceFactory, Ready, Service, ServiceFactory};
+use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
 
 /// Create `ServiceFactory` for function that can act as a `Service`
 pub fn fn_service<F, Fut, Req, Res, Err, Cfg>(f: F) -> FnServiceFactory<F, Fut, Req, Res, Err, Cfg>
@@ -210,7 +213,7 @@ where
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: Cfg) -> Self::Future {
-        ok(FnService::new(self.f.clone()))
+        ready(Ok(FnService::new(self.f.clone())))
     }
 }
 
@@ -346,7 +349,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::task::Poll;
+    use core::{future::ready, task::Poll};
 
     use futures_util::future::lazy;
 
@@ -354,7 +357,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_fn_service() {
-        let new_srv = fn_service(|()| ok::<_, ()>("srv"));
+        let new_srv = fn_service(|()| ready(Ok::<_, ()>("srv")));
 
         let srv = new_srv.new_service(()).await.unwrap();
         let res = srv.call(()).await;
@@ -365,7 +368,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_fn_service_service() {
-        let srv = fn_service(|()| ok::<_, ()>("srv"));
+        let srv = fn_service(|()| ready(Ok::<_, ()>("srv")));
 
         let res = srv.call(()).await;
         assert_eq!(lazy(|cx| srv.poll_ready(cx)).await, Poll::Ready(Ok(())));
@@ -376,7 +379,9 @@ mod tests {
     #[actix_rt::test]
     async fn test_fn_service_with_config() {
         let new_srv = fn_factory_with_config(|cfg: usize| {
-            ok::<_, ()>(fn_service(move |()| ok::<_, ()>(("srv", cfg))))
+            ready(Ok::<_, ()>(fn_service(move |()| {
+                ready(Ok::<_, ()>(("srv", cfg)))
+            })))
         });
 
         let srv = new_srv.new_service(1).await.unwrap();
@@ -392,14 +397,19 @@ mod tests {
 
         use crate::{map_config, ServiceExt, ServiceFactoryExt};
 
-        let srv_1 = fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8)));
+        let srv_1 = fn_service(|_: Rc<u8>| ready(Ok::<_, Rc<u8>>(Rc::new(0u8))));
 
         let fac_1 = fn_factory_with_config(|_: Rc<u8>| {
-            ok::<_, Rc<u8>>(fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8))))
+            ready(Ok::<_, Rc<u8>>(fn_service(|_: Rc<u8>| {
+                ready(Ok::<_, Rc<u8>>(Rc::new(0u8)))
+            })))
         });
 
-        let fac_2 =
-            fn_factory(|| ok::<_, Rc<u8>>(fn_service(|_: Rc<u8>| ok::<_, Rc<u8>>(Rc::new(0u8)))));
+        let fac_2 = fn_factory(|| {
+            ready(Ok::<_, Rc<u8>>(fn_service(|_: Rc<u8>| {
+                ready(Ok::<_, Rc<u8>>(Rc::new(0u8)))
+            })))
+        });
 
         fn is_send<T: Send + Sync + Clone>(_: &T) {}
 

@@ -15,7 +15,8 @@ pin_project! {
     ///
     /// # Examples
     /// ```
-    /// use actix_utils::future::{ready, Ready, Either};
+    /// use actix_utils::future::Either;
+    /// use core::future::{ready, Ready};
     ///
     /// # async fn run() {
     /// let res = Either::<_, Ready<usize>>::left(ready(42));
@@ -81,8 +82,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use core::future::{ready, Ready};
+
     use super::*;
-    use crate::future::{ready, Ready};
 
     #[actix_rt::test]
     async fn test_either() {

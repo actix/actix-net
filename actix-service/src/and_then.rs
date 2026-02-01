@@ -246,15 +246,16 @@ mod tests {
     use alloc::rc::Rc;
     use core::{
         cell::Cell,
+        future::{ready, Ready},
         task::{Context, Poll},
     };
 
     use futures_util::future::lazy;
 
     use crate::{
-        fn_factory, ok,
+        fn_factory,
         pipeline::{pipeline, pipeline_factory},
-        ready, Ready, Service, ServiceFactory,
+        Service, ServiceFactory,
     };
 
     struct Srv1(Rc<Cell<usize>>);
@@ -270,7 +271,7 @@ mod tests {
         }
 
         fn call(&self, req: &'static str) -> Self::Future {
-            ok(req)
+            ready(Ok(req))
         }
     }
 
@@ -288,7 +289,7 @@ mod tests {
         }
 
         fn call(&self, req: &'static str) -> Self::Future {
-            ok((req, "srv2"))
+            ready(Ok((req, "srv2")))
         }
     }
 

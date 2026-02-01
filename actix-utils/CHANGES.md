@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Minimum supported Rust version (MSRV) is now 1.76.
+- Minimum supported Rust version (MSRV) is now 1.88.
+- Deprecate `crate::ready::*` in favor of `core::future::{ready, Ready}`
 
 ## 3.0.1
 
