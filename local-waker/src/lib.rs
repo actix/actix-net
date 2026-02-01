@@ -44,12 +44,18 @@ impl LocalWaker {
     #[inline]
     pub fn register(&self, waker: &Waker) -> bool {
         let mut registered = false;
+
+        // SAFETY: `LocalWaker` is `!Send`, threfore this cannot be called from a separate thread.
+        // And this is an unique access before the assignment below.
         if let Some(prev) = unsafe { &*self.waker.get() } {
             if waker.will_wake(prev) {
                 return true;
             }
             registered = true;
         }
+
+        // SAFETY: This can cause data races if called from a separate thread,
+        // but `LocalWaker` is `!Send` + `!Sync` so this won't happen.
         unsafe { *self.waker.get() = Some(waker.clone()) }
         registered
     }
