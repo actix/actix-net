@@ -3,12 +3,15 @@
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
-use core::marker::PhantomData;
+use core::{
+    future::{ready, Ready},
+    marker::PhantomData,
+};
 
 use actix_service::{
     apply, ApplyTransform, IntoServiceFactory, Service, ServiceFactory, Transform,
 };
-use actix_utils::future::{ok, Either, Ready};
+use actix_utils::future::Either;
 use tracing_futures::{Instrument, Instrumented};
 
 /// A `Service` implementation that automatically enters/exits tracing spans
@@ -84,7 +87,7 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(TracingService::new(service, self.make_span.clone()))
+        ready(Ok(TracingService::new(service, self.make_span.clone())))
     }
 }
 
@@ -118,6 +121,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use core::future::ready;
     use std::{
         cell::RefCell,
         collections::{BTreeMap, BTreeSet},
@@ -221,10 +225,10 @@ mod test {
     #[actix_rt::test]
     async fn service_call() {
         let service_factory = fn_factory(|| {
-            ok::<_, ()>(fn_service(|req: &'static str| {
+            ready(Ok::<_, ()>(fn_service(|req: &'static str| {
                 tracing::event!(Level::TRACE, "It's happening - {}!", req);
-                ok::<_, ()>(())
-            }))
+                ready(Ok::<_, ()>(()))
+            })))
         });
 
         let subscriber = TestSubscriber::default();

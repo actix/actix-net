@@ -2,11 +2,11 @@
 //!
 //! See [`TlsConnector`] for main connector service factory docs.
 
+use core::future::{ready, Ready};
 use std::io;
 
 use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
-use actix_utils::future::{ok, Ready};
 use futures_core::future::LocalBoxFuture;
 use tokio_native_tls::{
     native_tls::TlsConnector as NativeTlsConnector, TlsConnector as AsyncNativeTlsConnector,
@@ -51,7 +51,7 @@ where
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(self.clone())
+        ready(Ok(self.clone()))
     }
 }
 

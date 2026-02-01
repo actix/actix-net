@@ -2,6 +2,7 @@
 //!
 //! See [`Acceptor`] for main service factory docs.
 
+use core::future::{ready, Ready as FutReady};
 use std::{
     convert::Infallible,
     io::{self, IoSlice},
@@ -15,10 +16,7 @@ use actix_rt::{
     time::timeout,
 };
 use actix_service::{Service, ServiceFactory};
-use actix_utils::{
-    counter::Counter,
-    future::{ready, Ready as FutReady},
-};
+use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_native_tls::{native_tls::Error, TlsAcceptor};

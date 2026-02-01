@@ -2,6 +2,7 @@
 //!
 //! See [`Acceptor`] for main service factory docs.
 
+use core::future::{ready, Ready as FutReady};
 use std::{
     convert::Infallible,
     future::Future,
@@ -16,10 +17,7 @@ use actix_rt::{
     time::{sleep, Sleep},
 };
 use actix_service::{Service, ServiceFactory};
-use actix_utils::{
-    counter::{Counter, CounterGuard},
-    future::{ready, Ready as FutReady},
-};
+use actix_utils::counter::{Counter, CounterGuard};
 use openssl::ssl::{Error, Ssl, SslAcceptor};
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};

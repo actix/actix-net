@@ -9,6 +9,7 @@
 
 extern crate tls_openssl as openssl;
 
+use core::future::ready;
 use std::io::{BufReader, Write};
 
 use actix_rt::net::TcpStream;
@@ -18,7 +19,6 @@ use actix_tls::{
     accept::rustls_0_23::{reexports::ServerConfig, Acceptor, TlsStream},
     connect::openssl::reexports::SslConnector,
 };
-use actix_utils::future::ok;
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use rustls_pki_types_1::PrivateKeyDer;
 use tls_openssl::ssl::SslVerifyMode;
@@ -88,7 +88,7 @@ async fn accepts_connections() {
 
             tls_acceptor
                 .map_err(|err| println!("Rustls error: {err:?}"))
-                .and_then(move |_stream: TlsStream<TcpStream>| ok(()))
+                .and_then(move |_stream: TlsStream<TcpStream>| ready(Ok(())))
         }
     });
 
