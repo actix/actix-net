@@ -1,3 +1,4 @@
+use core::future::{ready, Ready};
 use std::{
     future::Future,
     pin::Pin,
@@ -6,7 +7,6 @@ use std::{
 
 use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
-use actix_utils::future::{ok, Ready};
 use futures_core::ready;
 
 use super::{
@@ -49,7 +49,7 @@ impl<R: Host> ServiceFactory<ConnectInfo<R>> for Connector {
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(self.service())
+        ready(Ok(self.service()))
     }
 }
 

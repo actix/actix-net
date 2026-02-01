@@ -63,7 +63,7 @@ impl<T> Future for JoinAll<T> {
 
 #[cfg(test)]
 mod test {
-    use actix_utils::future::ready;
+    use core::future::ready;
 
     use super::*;
 

@@ -2,6 +2,7 @@
 //!
 //! See [`TcpConnector`] for main connector service factory docs.
 
+use core::future::{ready, Ready};
 use std::{
     collections::VecDeque,
     future::Future,
@@ -13,7 +14,6 @@ use std::{
 
 use actix_rt::net::{TcpSocket, TcpStream};
 use actix_service::{Service, ServiceFactory};
-use actix_utils::future::{ok, Ready};
 use futures_core::ready;
 use tokio_util::sync::ReusableBoxFuture;
 use tracing::{error, trace};
@@ -41,7 +41,7 @@ impl<R: Host> ServiceFactory<ConnectInfo<R>> for TcpConnector {
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(self.service())
+        ready(Ok(self.service()))
     }
 }
 

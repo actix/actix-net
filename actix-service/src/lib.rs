@@ -26,13 +26,10 @@ mod map_config;
 mod map_err;
 mod map_init_err;
 mod pipeline;
-mod ready;
 mod then;
 mod transform;
 mod transform_err;
 
-#[allow(unused_imports)]
-use self::ready::{err, ok, ready, Ready};
 pub use self::{
     apply::{apply_fn, apply_fn_factory},
     apply_cfg::{apply_cfg, apply_cfg_factory},

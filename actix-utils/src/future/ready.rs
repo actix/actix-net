@@ -1,4 +1,6 @@
-//! When `core::future::Ready` has a `into_inner()` method, this can be deprecated.
+//! Deprecated. Use `core::future::Ready` instead, it has the same functionality.
+
+#![allow(deprecated)]
 
 use core::{
     future::Future,
@@ -26,6 +28,7 @@ use core::{
 /// ```
 #[derive(Debug, Clone)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
+#[deprecated(since = "3.0.2", note = "Use `core::future::Ready` instead.")]
 pub struct Ready<T> {
     val: Option<T>,
 }
@@ -66,6 +69,7 @@ impl<T> Future for Ready<T> {
 /// assert_eq!(a.into_inner(), 1);
 /// ```
 #[inline]
+#[deprecated(since = "3.0.2", note = "Use `core::future::ready(val)` instead.")]
 pub fn ready<T>(val: T) -> Ready<T> {
     Ready { val: Some(val) }
 }
@@ -82,6 +86,7 @@ pub fn ready<T>(val: T) -> Ready<T> {
 /// # }
 /// ```
 #[inline]
+#[deprecated(since = "3.0.2", note = "Use `core::future::ready(Ok(val))` instead.")]
 pub fn ok<T, E>(val: T) -> Ready<Result<T, E>> {
     Ready { val: Some(Ok(val)) }
 }
@@ -98,6 +103,7 @@ pub fn ok<T, E>(val: T) -> Ready<Result<T, E>> {
 /// # }
 /// ```
 #[inline]
+#[deprecated(since = "3.0.2", note = "Use `core::future::ready(Err(err))` instead.")]
 pub fn err<T, E>(err: E) -> Ready<Result<T, E>> {
     Ready {
         val: Some(Err(err)),
@@ -105,6 +111,7 @@ pub fn err<T, E>(err: E) -> Ready<Result<T, E>> {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use std::rc::Rc;
 

@@ -221,9 +221,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::time::Duration;
-
-    use actix_utils::future::{ready, Ready};
+    use core::{
+        future::{ready, Ready},
+        time::Duration,
+    };
 
     use super::*;
 
