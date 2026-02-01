@@ -75,6 +75,8 @@ impl LocalWaker {
     /// If a waker has not been registered, this returns `None`.
     #[inline]
     pub fn take(&self) -> Option<Waker> {
+        // SAFETY: This can cause data races if called from a separate thread,
+        // but `LocalWaker` is `!Send` + `!Sync` so this won't happen.
         unsafe { (*self.waker.get()).take() }
     }
 }
