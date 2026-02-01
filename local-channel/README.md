@@ -6,7 +6,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/local-channel?label=latest)](https://crates.io/crates/local-channel)
 [![Documentation](https://docs.rs/local-channel/badge.svg?version=0.1.5)](https://docs.rs/local-channel/0.1.5)
-[![Version](https://img.shields.io/badge/rustc-1.52+-ab6000.svg)](https://blog.rust-lang.org/2021/05/06/Rust-1.52.0.html)
+[![Version](https://img.shields.io/badge/rustc-1.88+-ab6000.svg)](https://blog.rust-lang.org/2021/05/06/Rust-1.52.0.html)
 ![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/local-channel.svg)
 <br />
 [![Dependency Status](https://deps.rs/crate/local-channel/0.1.5/status.svg)](https://deps.rs/crate/local-channel/0.1.5)

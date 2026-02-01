@@ -19,7 +19,7 @@ homepage = "https://actix.rs"
 repository = "https://github.com/actix/actix-net"
 license = "MIT OR Apache-2.0"
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.88"
 
 [patch.crates-io]
 actix-codec = { path = "actix-codec" }
