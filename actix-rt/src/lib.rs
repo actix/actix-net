@@ -68,7 +68,7 @@ use tokio::task::JoinHandle;
 pub use self::{
     arbiter::{Arbiter, ArbiterHandle},
     runtime::Runtime,
-    system::{System, SystemRunner},
+    system::{System, SystemRunner, SystemStop},
 };
 
 pub mod signal {

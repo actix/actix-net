@@ -34,6 +34,34 @@ fn run_with_code() {
     assert_eq!(exit_code, 42);
 }
 
+#[cfg(not(feature = "io-uring"))]
+#[test]
+fn stop_future_resolves() {
+    let sys = System::new();
+    let stop = sys.stop_future();
+
+    let exit_code = sys.block_on(async move {
+        System::current().stop_with_code(7);
+        stop.await.expect("stop future should resolve")
+    });
+
+    assert_eq!(exit_code, 7);
+}
+
+#[cfg(not(feature = "io-uring"))]
+#[test]
+fn into_parts_stop_future_resolves() {
+    let sys = System::new();
+    let (rt, stop) = sys.into_parts();
+
+    let exit_code = rt.block_on(async move {
+        System::current().stop_with_code(9);
+        stop.await.expect("stop future should resolve")
+    });
+
+    assert_eq!(exit_code, 9);
+}
+
 #[test]
 fn join_another_arbiter() {
     let time = Duration::from_secs(1);
