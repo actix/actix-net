@@ -1,6 +1,13 @@
-use std::{future::Future, io};
+use std::{future::Future, io, sync::Arc};
 
 use tokio::task::{JoinHandle, LocalSet};
+
+#[derive(Debug)]
+enum RuntimeInner {
+    Owned(tokio::runtime::Runtime),
+    Shared(Arc<tokio::runtime::Runtime>),
+    Static(&'static tokio::runtime::Runtime),
+}
 
 /// A Tokio-based runtime proxy.
 ///
@@ -9,7 +16,7 @@ use tokio::task::{JoinHandle, LocalSet};
 #[derive(Debug)]
 pub struct Runtime {
     local: LocalSet,
-    rt: tokio::runtime::Runtime,
+    rt: RuntimeInner,
 }
 
 pub(crate) fn default_tokio_runtime() -> io::Result<tokio::runtime::Runtime> {
@@ -26,9 +33,17 @@ impl Runtime {
         let rt = default_tokio_runtime()?;
 
         Ok(Runtime {
-            rt,
+            rt: RuntimeInner::Owned(rt),
             local: LocalSet::new(),
         })
+    }
+
+    fn tokio_runtime_ref(&self) -> &tokio::runtime::Runtime {
+        match &self.rt {
+            RuntimeInner::Owned(rt) => rt,
+            RuntimeInner::Shared(rt) => rt,
+            RuntimeInner::Static(rt) => rt,
+        }
     }
 
     /// Offload a future onto the single-threaded runtime.
@@ -114,7 +129,7 @@ impl Runtime {
     /// of the Actix runtime. This is because Tokio is responsible for driving the Actix system,
     /// and blocking tasks could delay or deadlock other tasks in run loop.
     pub fn tokio_runtime(&self) -> &tokio::runtime::Runtime {
-        &self.rt
+        self.tokio_runtime_ref()
     }
 
     /// Runs the provided future, blocking the current thread until the future completes.
@@ -135,7 +150,7 @@ impl Runtime {
     where
         F: Future,
     {
-        self.local.block_on(&self.rt, f)
+        self.local.block_on(self.tokio_runtime_ref(), f)
     }
 }
 
@@ -143,7 +158,25 @@ impl From<tokio::runtime::Runtime> for Runtime {
     fn from(rt: tokio::runtime::Runtime) -> Self {
         Self {
             local: LocalSet::new(),
-            rt,
+            rt: RuntimeInner::Owned(rt),
+        }
+    }
+}
+
+impl From<Arc<tokio::runtime::Runtime>> for Runtime {
+    fn from(rt: Arc<tokio::runtime::Runtime>) -> Self {
+        Self {
+            local: LocalSet::new(),
+            rt: RuntimeInner::Shared(rt),
+        }
+    }
+}
+
+impl From<&'static tokio::runtime::Runtime> for Runtime {
+    fn from(rt: &'static tokio::runtime::Runtime) -> Self {
+        Self {
+            local: LocalSet::new(),
+            rt: RuntimeInner::Static(rt),
         }
     }
 }
