@@ -105,11 +105,17 @@ impl Arbiter {
 
     /// Spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
     ///
+    /// The closure may return any type that can be converted into [`Runtime`], such as
+    /// `tokio::runtime::Runtime`, `Arc<tokio::runtime::Runtime>`, or
+    /// `&'static tokio::runtime::Runtime`.
+    ///
     /// [tokio-runtime]: tokio::runtime::Runtime
+    /// [`Runtime`]: crate::Runtime
     #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
-    pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
+    pub fn with_tokio_rt<F, R>(runtime_factory: F) -> Arbiter
     where
-        F: FnOnce() -> tokio::runtime::Runtime + Send + 'static,
+        F: FnOnce() -> R + Send + 'static,
+        R: Into<crate::runtime::Runtime> + Send + 'static,
     {
         let sys = System::current();
         let system_id = sys.id();
@@ -125,7 +131,7 @@ impl Arbiter {
             .spawn({
                 let tx = tx.clone();
                 move || {
-                    let rt = crate::runtime::Runtime::from(runtime_factory());
+                    let rt = runtime_factory().into();
                     let hnd = ArbiterHandle::new(tx);
 
                     System::set_current(sys);
