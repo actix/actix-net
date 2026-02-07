@@ -10,6 +10,7 @@ fn main() {
             .worker_threads(2)
             .enable_all()
             .build()
+            .map(std::sync::Arc::new)
             .unwrap()
     })
     .block_on(async_main());
