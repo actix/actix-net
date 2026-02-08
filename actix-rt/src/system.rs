@@ -45,15 +45,21 @@ impl System {
 
     /// Create a new System using the [Tokio Runtime](tokio-runtime) returned from a closure.
     ///
+    /// The closure may return any type that can be converted into [`Runtime`], such as
+    /// `tokio::runtime::Runtime`, `Arc<tokio::runtime::Runtime>`, or
+    /// `&'static tokio::runtime::Runtime`.
+    ///
     /// [tokio-runtime]: tokio::runtime::Runtime
-    pub fn with_tokio_rt<F>(runtime_factory: F) -> SystemRunner
+    /// [`Runtime`]: crate::Runtime
+    pub fn with_tokio_rt<F, R>(runtime_factory: F) -> SystemRunner
     where
-        F: FnOnce() -> tokio::runtime::Runtime,
+        F: FnOnce() -> R,
+        R: Into<crate::runtime::Runtime>,
     {
         let (stop_tx, stop_rx) = watch::channel(None);
         let (sys_tx, sys_rx) = mpsc::unbounded_channel();
 
-        let rt = crate::runtime::Runtime::from(runtime_factory());
+        let rt = runtime_factory().into();
         let sys_arbiter = rt.block_on(async { Arbiter::in_new_system() });
         let system = System::construct(sys_tx, sys_arbiter.clone());
 
@@ -85,9 +91,10 @@ impl System {
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
     #[doc(hidden)]
-    pub fn with_tokio_rt<F>(_: F) -> SystemRunner
+    pub fn with_tokio_rt<F, R>(_: F) -> SystemRunner
     where
-        F: FnOnce() -> tokio::runtime::Runtime,
+        F: FnOnce() -> R,
+        R: Into<crate::runtime::Runtime>,
     {
         unimplemented!("System::with_tokio_rt is not implemented for io-uring feature yet")
     }
