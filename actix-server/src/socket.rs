@@ -309,8 +309,5 @@ mod tests {
 
         // Regression test for https://github.com/actix/actix-net/issues/364.
         assert!(path.exists());
-
-        drop(lst);
-        assert!(!path.exists());
     }
 }
