@@ -31,7 +31,7 @@ async fn run() -> io::Result<()> {
     let count = Arc::new(AtomicUsize::new(0));
 
     let addr = ("127.0.0.1", 8080);
-    tracing::info!("starting server on port: {}", &addr.0);
+    tracing::info!("starting server on: {}:{}", &addr.0, &addr.1);
 
     // Bind socket address and start worker(s). By default, the server uses the number of physical
     // CPU cores as the worker count. For this reason, the closure passed to bind needs to return
