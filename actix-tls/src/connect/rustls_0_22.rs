@@ -2,8 +2,8 @@
 //!
 //! See [`TlsConnector`] for main connector service factory docs.
 
+use core::future::{ready, Ready};
 use std::{
-    convert::TryFrom,
     future::Future,
     io,
     pin::Pin,
@@ -13,38 +13,50 @@ use std::{
 
 use actix_rt::net::ActixStream;
 use actix_service::{Service, ServiceFactory};
-use actix_utils::future::{ok, Ready};
 use futures_core::ready;
-use log::trace;
-use tokio_rustls::rustls::{client::ServerName, OwnedTrustAnchor, RootCertStore};
-use tokio_rustls::{client::TlsStream as AsyncTlsStream, rustls::ClientConfig};
-use tokio_rustls::{Connect as RustlsConnect, TlsConnector as RustlsTlsConnector};
-use webpki_roots::TLS_SERVER_ROOTS;
+use rustls_pki_types_1::ServerName;
+use tokio_rustls::{
+    client::TlsStream as AsyncTlsStream, rustls::ClientConfig, Connect as RustlsConnect,
+    TlsConnector as RustlsTlsConnector,
+};
+use tokio_rustls_025 as tokio_rustls;
 
 use crate::connect::{Connection, Host};
 
 pub mod reexports {
-    //! Re-exports from `rustls` and `webpki_roots` that are useful for connectors.
+    //! Re-exports from the `rustls` v0.22 ecosystem that are useful for connectors.
 
-    pub use tokio_rustls::rustls::ClientConfig;
+    pub use tokio_rustls_025::{client::TlsStream as AsyncTlsStream, rustls::ClientConfig};
+    #[cfg(feature = "rustls-0_22-webpki-roots")]
+    pub use webpki_roots_026::TLS_SERVER_ROOTS;
+}
 
-    pub use tokio_rustls::client::TlsStream as AsyncTlsStream;
+/// Returns root certificates via `rustls-native-certs` crate as a rustls certificate store.
+///
+/// See [`rustls_native_certs::load_native_certs()`] for more info on behavior and errors.
+///
+/// [`rustls_native_certs::load_native_certs()`]: rustls_native_certs_08::load_native_certs()
+#[cfg(feature = "rustls-0_22-native-roots")]
+pub fn native_roots_cert_store() -> io::Result<tokio_rustls::rustls::RootCertStore> {
+    let mut root_certs = tokio_rustls::rustls::RootCertStore::empty();
 
-    pub use webpki_roots::TLS_SERVER_ROOTS;
+    let certs = rustls_native_certs_08::load_native_certs();
+    if let Some(err) = certs.errors.into_iter().next() {
+        return Err(io::Error::other(err));
+    }
+
+    for cert in certs.certs {
+        root_certs.add(cert).unwrap();
+    }
+
+    Ok(root_certs)
 }
 
 /// Returns standard root certificates from `webpki-roots` crate as a rustls certificate store.
-pub fn webpki_roots_cert_store() -> RootCertStore {
-    let mut root_certs = RootCertStore::empty();
-    for cert in TLS_SERVER_ROOTS.0 {
-        let cert = OwnedTrustAnchor::from_subject_spki_name_constraints(
-            cert.subject,
-            cert.spki,
-            cert.name_constraints,
-        );
-        let certs = vec![cert].into_iter();
-        root_certs.add_server_trust_anchors(certs);
-    }
+#[cfg(feature = "rustls-0_22-webpki-roots")]
+pub fn webpki_roots_cert_store() -> tokio_rustls::rustls::RootCertStore {
+    let mut root_certs = tokio_rustls::rustls::RootCertStore::empty();
+    root_certs.extend(webpki_roots_026::TLS_SERVER_ROOTS.to_owned());
     root_certs
 }
 
@@ -79,9 +91,9 @@ where
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(TlsConnectorService {
+        ready(Ok(TlsConnectorService {
             connector: self.connector.clone(),
-        })
+        }))
     }
 }
 
@@ -103,24 +115,25 @@ where
     actix_service::always_ready!();
 
     fn call(&self, connection: Connection<R, IO>) -> Self::Future {
-        trace!("SSL Handshake start for: {:?}", connection.hostname());
-        let (stream, connection) = connection.replace_io(());
+        tracing::trace!("TLS handshake start for: {:?}", connection.hostname());
+        let (stream, conn) = connection.replace_io(());
 
-        match ServerName::try_from(connection.hostname()) {
+        match ServerName::try_from(conn.hostname()) {
             Ok(host) => ConnectFut::Future {
-                connect: RustlsTlsConnector::from(self.connector.clone()).connect(host, stream),
-                connection: Some(connection),
+                connect: RustlsTlsConnector::from(Arc::clone(&self.connector))
+                    .connect(host.to_owned(), stream),
+                connection: Some(conn),
             },
-            Err(_) => ConnectFut::InvalidDns,
+            Err(_) => ConnectFut::InvalidServerName,
         }
     }
 }
 
 /// Connect future for Rustls service.
 #[doc(hidden)]
+#[allow(clippy::large_enum_variant)]
 pub enum ConnectFut<R, IO> {
-    /// See issue <https://github.com/briansmith/webpki/issues/54>
-    InvalidDns,
+    InvalidServerName,
     Future {
         connect: RustlsConnect<IO>,
         connection: Option<Connection<R, ()>>,
@@ -132,17 +145,22 @@ where
     R: Host,
     IO: ActixStream,
 {
-    type Output = Result<Connection<R, AsyncTlsStream<IO>>, io::Error>;
+    type Output = io::Result<Connection<R, AsyncTlsStream<IO>>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.get_mut() {
-            Self::InvalidDns => Poll::Ready(Err(
-                io::Error::new(io::ErrorKind::Other, "rustls currently only handles hostname-based connections. See https://github.com/briansmith/webpki/issues/54")
-            )),
-            Self::Future { connect, connection } => {
+            Self::InvalidServerName => Poll::Ready(Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "connection parameters specified invalid server name",
+            ))),
+
+            Self::Future {
+                connect,
+                connection,
+            } => {
                 let stream = ready!(Pin::new(connect).poll(cx))?;
                 let connection = connection.take().unwrap();
-                trace!("SSL Handshake success: {:?}", connection.hostname());
+                tracing::trace!("TLS handshake success: {:?}", connection.hostname());
                 Poll::Ready(Ok(connection.replace_io(stream).1))
             }
         }

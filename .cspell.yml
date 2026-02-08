@@ -1,0 +1,20 @@
+version: "0.2"
+words:
+  - actix
+  - addrs
+  - bytestring
+  - clippy
+  - deque
+  - itertools
+  - mptcp
+  - MSRV
+  - nonblocking
+  - oneshot
+  - pemfile
+  - rcgen
+  - Rustls
+  - rustup
+  - serde
+  - spki
+  - uring
+  - webpki

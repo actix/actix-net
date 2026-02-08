@@ -2,6 +2,7 @@
 //!
 //! See [`Acceptor`] for main service factory docs.
 
+use core::future::{ready, Ready as FutReady};
 use std::{
     convert::Infallible,
     io::{self, IoSlice},
@@ -10,21 +11,17 @@ use std::{
     time::Duration,
 };
 
-use actix_codec::{AsyncRead, AsyncWrite, ReadBuf};
 use actix_rt::{
     net::{ActixStream, Ready},
     time::timeout,
 };
 use actix_service::{Service, ServiceFactory};
-use actix_utils::{
-    counter::Counter,
-    future::{ready, Ready as FutReady},
-};
+use actix_utils::counter::Counter;
 use futures_core::future::LocalBoxFuture;
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_native_tls::{native_tls::Error, TlsAcceptor};
 
 use super::{TlsError, DEFAULT_TLS_HANDSHAKE_TIMEOUT, MAX_CONN_COUNTER};
-use crate::impl_more;
 
 pub mod reexports {
     //! Re-exports from `native-tls` that are useful for acceptors.
@@ -35,9 +32,8 @@ pub mod reexports {
 /// Wraps a `native-tls` based async TLS stream in order to implement [`ActixStream`].
 pub struct TlsStream<IO>(tokio_native_tls::TlsStream<IO>);
 
-impl_more::from! { tokio_native_tls::TlsStream<IO> => TlsStream<IO> }
-impl_more::deref! { TlsStream<IO> => 0: tokio_native_tls::TlsStream<IO> }
-impl_more::deref_mut! { TlsStream<IO> => 0 }
+impl_more::impl_from!(<IO> in tokio_native_tls::TlsStream<IO> => TlsStream<IO>);
+impl_more::impl_deref_and_mut!(<IO> in TlsStream<IO> => tokio_native_tls::TlsStream<IO>);
 
 impl<IO: ActixStream> AsyncRead for TlsStream<IO> {
     fn poll_read(
@@ -75,17 +71,17 @@ impl<IO: ActixStream> AsyncWrite for TlsStream<IO> {
     }
 
     fn is_write_vectored(&self) -> bool {
-        (&**self).is_write_vectored()
+        (**self).is_write_vectored()
     }
 }
 
 impl<IO: ActixStream> ActixStream for TlsStream<IO> {
     fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        IO::poll_read_ready((&**self).get_ref().get_ref().get_ref(), cx)
+        IO::poll_read_ready((**self).get_ref().get_ref().get_ref(), cx)
     }
 
     fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
-        IO::poll_write_ready((&**self).get_ref().get_ref().get_ref(), cx)
+        IO::poll_write_ready((**self).get_ref().get_ref().get_ref(), cx)
     }
 }
 

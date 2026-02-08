@@ -1,7 +1,5 @@
 //! General purpose TCP server.
 
-#![deny(rust_2018_idioms, nonstandard_style)]
-#![warn(future_incompatible)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 
@@ -18,14 +16,15 @@ mod test_server;
 mod waker_queue;
 mod worker;
 
-pub use self::builder::ServerBuilder;
-pub use self::handle::ServerHandle;
-pub use self::server::Server;
-pub use self::service::ServerServiceFactory;
-pub use self::test_server::TestServer;
-
 #[doc(hidden)]
 pub use self::socket::FromStream;
+pub use self::{
+    builder::{MpTcp, ServerBuilder},
+    handle::ServerHandle,
+    server::Server,
+    service::ServerServiceFactory,
+    test_server::TestServer,
+};
 
 /// Start server building process
 #[doc(hidden)]

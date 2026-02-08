@@ -3,21 +3,22 @@ use std::{
     io, mem,
     pin::Pin,
     task::{Context, Poll},
+    thread,
     time::Duration,
 };
 
 use actix_rt::{time::sleep, System};
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::stream::StreamExt as _;
-use log::{error, info};
 use tokio::sync::{mpsc::UnboundedReceiver, oneshot};
+use tracing::{error, info};
 
 use crate::{
     accept::Accept,
     builder::ServerBuilder,
     join_all::join_all,
     service::InternalServiceFactory,
-    signals::{SignalKind, Signals},
+    signals::{OsSignals, SignalKind, StopSignal},
     waker_queue::{WakerInterest, WakerQueue},
     worker::{ServerWorker, ServerWorkerConfig, WorkerHandleServer},
     ServerHandle,
@@ -65,7 +66,7 @@ pub(crate) enum ServerCommand {
 /// server has fully shut down.
 ///
 /// # Shutdown Signals
-/// On UNIX systems, `SIGQUIT` will start a graceful shutdown and `SIGTERM` or `SIGINT` will start a
+/// On UNIX systems, `SIGTERM` will start a graceful shutdown and `SIGQUIT` or `SIGINT` will start a
 /// forced shutdown. On Windows, a Ctrl-C signal will start a forced shutdown.
 ///
 /// A graceful shutdown will wait for all workers to stop first.
@@ -158,6 +159,7 @@ impl Future for Server {
 
 pub struct ServerInner {
     worker_handles: Vec<WorkerHandleServer>,
+    accept_handle: Option<thread::JoinHandle<()>>,
     worker_config: ServerWorkerConfig,
     services: Vec<Box<dyn InternalServiceFactory>>,
     waker_queue: WakerQueue,
@@ -181,11 +183,6 @@ impl ServerInner {
     }
 
     fn run_sync(mut builder: ServerBuilder) -> io::Result<(Self, ServerEventMultiplexer)> {
-        let sockets = mem::take(&mut builder.sockets)
-            .into_iter()
-            .map(|t| (t.0, t.2))
-            .collect();
-
         // Give log information on what runtime will be used.
         let is_actix = actix_rt::System::try_current().is_some();
         let is_tokio = tokio::runtime::Handle::try_current().is_ok();
@@ -198,22 +195,33 @@ impl ServerInner {
 
         for (_, name, lst) in &builder.sockets {
             info!(
-                r#"Starting service: "{}", workers: {}, listening on: {}"#,
+                r#"starting service: "{}", workers: {}, listening on: {}"#,
                 name,
                 builder.threads,
                 lst.local_addr()
             );
         }
 
-        let (waker_queue, worker_handles) = Accept::start(sockets, &builder)?;
+        let sockets = mem::take(&mut builder.sockets)
+            .into_iter()
+            .map(|t| (t.0, t.2))
+            .collect();
+
+        let (waker_queue, worker_handles, accept_handle) = Accept::start(sockets, &builder)?;
 
         let mux = ServerEventMultiplexer {
-            signal_fut: (builder.listen_os_signals).then(Signals::new),
+            signal_fut: builder.shutdown_signal.map(StopSignal::Cancel).or_else(|| {
+                builder
+                    .listen_os_signals
+                    .then(OsSignals::new)
+                    .map(StopSignal::Os)
+            }),
             cmd_rx: builder.cmd_rx,
         };
 
         let server = ServerInner {
             waker_queue,
+            accept_handle: Some(accept_handle),
             worker_handles,
             worker_config: builder.worker_config,
             services: builder.factories,
@@ -243,7 +251,8 @@ impl ServerInner {
             } => {
                 self.stopping = true;
 
-                // stop accept thread
+                // Signal accept thread to stop.
+                // Signal is non-blocking; we wait for thread to stop later.
                 self.waker_queue.wake(WakerInterest::Stop);
 
                 // send stop signal to workers
@@ -257,6 +266,13 @@ impl ServerInner {
                     // wait for all workers to shut down
                     let _ = join_all(workers_stop).await;
                 }
+
+                // wait for accept thread stop
+                self.accept_handle
+                    .take()
+                    .unwrap()
+                    .join()
+                    .expect("Accept thread must not panic in any case");
 
                 if let Some(tx) = completion {
                     let _ = tx.send(());
@@ -272,7 +288,7 @@ impl ServerInner {
                 // TODO: maybe just return with warning log if not found ?
                 assert!(self.worker_handles.iter().any(|wrk| wrk.idx == idx));
 
-                error!("Worker {} has died; restarting", idx);
+                error!("worker {} has died; restarting", idx);
 
                 let factories = self
                     .services
@@ -304,7 +320,16 @@ impl ServerInner {
 
     fn map_signal(signal: SignalKind) -> ServerCommand {
         match signal {
-            SignalKind::Int => {
+            SignalKind::Cancel => {
+                info!("Cancellation token/channel received; starting graceful shutdown");
+                ServerCommand::Stop {
+                    graceful: true,
+                    completion: None,
+                    force_system_stop: true,
+                }
+            }
+
+            SignalKind::OsInt => {
                 info!("SIGINT received; starting forced shutdown");
                 ServerCommand::Stop {
                     graceful: false,
@@ -313,7 +338,7 @@ impl ServerInner {
                 }
             }
 
-            SignalKind::Term => {
+            SignalKind::OsTerm => {
                 info!("SIGTERM received; starting graceful shutdown");
                 ServerCommand::Stop {
                     graceful: true,
@@ -322,7 +347,7 @@ impl ServerInner {
                 }
             }
 
-            SignalKind::Quit => {
+            SignalKind::OsQuit => {
                 info!("SIGQUIT received; starting forced shutdown");
                 ServerCommand::Stop {
                     graceful: false,
@@ -336,7 +361,7 @@ impl ServerInner {
 
 struct ServerEventMultiplexer {
     cmd_rx: UnboundedReceiver<ServerCommand>,
-    signal_fut: Option<Signals>,
+    signal_fut: Option<StopSignal>,
 }
 
 impl Stream for ServerEventMultiplexer {
@@ -352,6 +377,6 @@ impl Stream for ServerEventMultiplexer {
             }
         }
 
-        Pin::new(&mut this.cmd_rx).poll_recv(cx)
+        this.cmd_rx.poll_recv(cx)
     }
 }

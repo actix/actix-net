@@ -202,13 +202,12 @@ where
 
 #[cfg(test)]
 mod tests {
+    use core::future::{ready, Ready};
+
     use futures_util::future::lazy;
 
     use super::*;
-    use crate::{
-        err, ok, IntoServiceFactory, Ready, Service, ServiceExt, ServiceFactory,
-        ServiceFactoryExt,
-    };
+    use crate::{IntoServiceFactory, ServiceExt, ServiceFactoryExt};
 
     struct Srv;
 
@@ -222,7 +221,7 @@ mod tests {
         }
 
         fn call(&self, _: ()) -> Self::Future {
-            err(())
+            ready(Err(()))
         }
     }
 
@@ -243,7 +242,9 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_new_service() {
-        let new_srv = (|| ok::<_, ()>(Srv)).into_factory().map_err(|_| "error");
+        let new_srv = (|| ready(Ok::<_, ()>(Srv)))
+            .into_factory()
+            .map_err(|_| "error");
         let srv = new_srv.new_service(&()).await.unwrap();
         let res = srv.call(()).await;
         assert!(res.is_err());

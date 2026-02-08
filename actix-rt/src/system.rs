@@ -9,14 +9,14 @@ use std::{
 };
 
 use futures_core::ready;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, watch};
 
 use crate::{arbiter::ArbiterHandle, Arbiter};
 
 static SYSTEM_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 thread_local!(
-    static CURRENT: RefCell<Option<System>> = RefCell::new(None);
+    static CURRENT: RefCell<Option<System>> = const { RefCell::new(None) };
 );
 
 /// A manager for a per-thread distributed async runtime.
@@ -45,15 +45,21 @@ impl System {
 
     /// Create a new System using the [Tokio Runtime](tokio-runtime) returned from a closure.
     ///
+    /// The closure may return any type that can be converted into [`Runtime`], such as
+    /// `tokio::runtime::Runtime`, `Arc<tokio::runtime::Runtime>`, or
+    /// `&'static tokio::runtime::Runtime`.
+    ///
     /// [tokio-runtime]: tokio::runtime::Runtime
-    pub fn with_tokio_rt<F>(runtime_factory: F) -> SystemRunner
+    /// [`Runtime`]: crate::Runtime
+    pub fn with_tokio_rt<F, R>(runtime_factory: F) -> SystemRunner
     where
-        F: Fn() -> tokio::runtime::Runtime,
+        F: FnOnce() -> R,
+        R: Into<crate::runtime::Runtime>,
     {
-        let (stop_tx, stop_rx) = oneshot::channel();
+        let (stop_tx, stop_rx) = watch::channel(None);
         let (sys_tx, sys_rx) = mpsc::unbounded_channel();
 
-        let rt = crate::runtime::Runtime::from(runtime_factory());
+        let rt = runtime_factory().into();
         let sys_arbiter = rt.block_on(async { Arbiter::in_new_system() });
         let system = System::construct(sys_tx, sys_arbiter.clone());
 
@@ -85,9 +91,10 @@ impl System {
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
     #[doc(hidden)]
-    pub fn with_tokio_rt<F>(_: F) -> SystemRunner
+    pub fn with_tokio_rt<F, R>(_: F) -> SystemRunner
     where
-        F: Fn() -> tokio::runtime::Runtime,
+        F: FnOnce() -> R,
+        R: Into<crate::runtime::Runtime>,
     {
         unimplemented!("System::with_tokio_rt is not implemented for io-uring feature yet")
     }
@@ -176,7 +183,7 @@ impl System {
 #[derive(Debug)]
 pub struct SystemRunner {
     rt: crate::runtime::Runtime,
-    stop_rx: oneshot::Receiver<i32>,
+    stop_rx: watch::Receiver<Option<i32>>,
 }
 
 #[cfg(not(feature = "io-uring"))]
@@ -187,10 +194,7 @@ impl SystemRunner {
 
         match exit_code {
             0 => Ok(()),
-            nonzero => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("Non-zero exit code: {}", nonzero),
-            )),
+            nonzero => Err(io::Error::other(format!("Non-zero exit code: {nonzero}"))),
         }
     }
 
@@ -199,11 +203,82 @@ impl SystemRunner {
         let SystemRunner { rt, stop_rx, .. } = self;
 
         // run loop
-        rt.block_on(stop_rx)
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
+        rt.block_on(wait_for_stop(stop_rx))
+    }
+
+    /// Retrieves a reference to the underlying [Actix runtime](crate::Runtime) associated with this
+    /// `SystemRunner` instance.
+    ///
+    /// The Actix runtime is responsible for managing the event loop for an Actix system and
+    /// executing asynchronous tasks. This method provides access to the runtime, allowing direct
+    /// interaction with its features.
+    ///
+    /// In a typical use case, you might need to share the same runtime between different
+    /// parts of your project. For example, some components might require a [`Runtime`] to spawn
+    /// tasks on the same runtime.
+    ///
+    /// Read more in the documentation for [`Runtime`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let system_runner = actix_rt::System::new();
+    /// let actix_runtime = system_runner.runtime();
+    ///
+    /// // Use the runtime to spawn an async task or perform other operations
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// While this method provides an immutable reference to the Actix runtime, which is safe to
+    /// share across threads, be aware that spawning blocking tasks on the Actix runtime could
+    /// potentially impact system performance. This is because the Actix runtime is responsible for
+    /// driving the system, and blocking tasks could delay other tasks in the run loop.
+    ///
+    /// [`Runtime`]: crate::Runtime
+    pub fn runtime(&self) -> &crate::runtime::Runtime {
+        &self.rt
+    }
+
+    /// Returns a future that resolves with the system's exit code when it is stopped.
+    ///
+    /// This can be used to react to a system stop signal while running a future with
+    /// [`SystemRunner::block_on`], such as when coordinating shutdown with `tokio::select!`.
+    ///
+    /// # Examples
+    /// ```no_run
+    /// use std::process::ExitCode;
+    /// use actix_rt::System;
+    ///
+    /// let sys = System::new();
+    /// let stop = sys.stop_future();
+    ///
+    /// let exit = sys.block_on(async move {
+    ///     actix_rt::spawn(async {
+    ///         System::current().stop_with_code(0);
+    ///     });
+    ///
+    ///     let code = stop.await.unwrap_or(1);
+    ///     ExitCode::from(code as u8)
+    /// });
+    ///
+    /// # drop(exit);
+    /// ```
+    pub fn stop_future(&self) -> SystemStop {
+        SystemStop::new(self.stop_rx.clone())
+    }
+
+    /// Splits this runner into its runtime and a future that resolves when the system stops.
+    ///
+    /// After calling this method, [`SystemRunner::run`] and [`SystemRunner::run_with_code`] can no
+    /// longer be used.
+    pub fn into_parts(self) -> (crate::runtime::Runtime, SystemStop) {
+        let SystemRunner { rt, stop_rx } = self;
+        (rt, SystemStop::new(stop_rx))
     }
 
     /// Runs the provided future, blocking the current thread until the future completes.
+    #[track_caller]
     #[inline]
     pub fn block_on<F: Future>(&self, fut: F) -> F::Output {
         self.rt.block_on(fut)
@@ -225,16 +300,24 @@ impl SystemRunner {
 
     /// Runs the event loop until [stopped](System::stop_with_code), returning the exit code.
     pub fn run_with_code(self) -> io::Result<i32> {
-        unimplemented!(
-            "SystemRunner::run_with_code is not implemented for io-uring feature yet"
-        );
+        unimplemented!("SystemRunner::run_with_code is not implemented for io-uring feature yet");
+    }
+
+    /// Returns a future that resolves with the system's exit code when it is stopped.
+    pub fn stop_future(&self) -> SystemStop {
+        unimplemented!("SystemRunner::stop_future is not implemented for io-uring feature yet");
+    }
+
+    /// Splits this runner into its runtime and a future that resolves when the system stops.
+    pub fn into_parts(self) -> (crate::runtime::Runtime, SystemStop) {
+        unimplemented!("SystemRunner::into_parts is not implemented for io-uring feature yet");
     }
 
     /// Runs the provided future, blocking the current thread until the future completes.
     #[inline]
     pub fn block_on<F: Future>(&self, fut: F) -> F::Output {
         tokio_uring::start(async move {
-            let (stop_tx, stop_rx) = oneshot::channel();
+            let (stop_tx, stop_rx) = watch::channel(None);
             let (sys_tx, sys_rx) = mpsc::unbounded_channel();
 
             let sys_arbiter = Arbiter::in_new_system();
@@ -256,6 +339,40 @@ impl SystemRunner {
     }
 }
 
+/// Future that resolves with the exit code when a [`System`] is stopped.
+#[must_use = "SystemStop does nothing unless polled or awaited."]
+pub struct SystemStop {
+    inner: Pin<Box<dyn Future<Output = io::Result<i32>> + 'static>>,
+}
+
+impl SystemStop {
+    #[cfg_attr(feature = "io-uring", allow(dead_code))]
+    fn new(stop_rx: watch::Receiver<Option<i32>>) -> Self {
+        Self {
+            inner: Box::pin(wait_for_stop(stop_rx)),
+        }
+    }
+}
+
+impl Future for SystemStop {
+    type Output = io::Result<i32>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.inner.as_mut().poll(cx)
+    }
+}
+
+#[cfg_attr(feature = "io-uring", allow(dead_code))]
+async fn wait_for_stop(mut stop_rx: watch::Receiver<Option<i32>>) -> io::Result<i32> {
+    loop {
+        if let Some(code) = *stop_rx.borrow() {
+            return Ok(code);
+        }
+
+        stop_rx.changed().await.map_err(io::Error::other)?;
+    }
+}
+
 #[derive(Debug)]
 pub(crate) enum SystemCommand {
     Exit(i32),
@@ -267,7 +384,7 @@ pub(crate) enum SystemCommand {
 /// [Arbiter]s and is able to distribute a system-wide stop command.
 #[derive(Debug)]
 pub(crate) struct SystemController {
-    stop_tx: Option<oneshot::Sender<i32>>,
+    stop_tx: Option<watch::Sender<Option<i32>>>,
     cmd_rx: mpsc::UnboundedReceiver<SystemCommand>,
     arbiters: HashMap<usize, ArbiterHandle>,
 }
@@ -275,7 +392,7 @@ pub(crate) struct SystemController {
 impl SystemController {
     pub(crate) fn new(
         cmd_rx: mpsc::UnboundedReceiver<SystemCommand>,
-        stop_tx: oneshot::Sender<i32>,
+        stop_tx: watch::Sender<Option<i32>>,
     ) -> Self {
         SystemController {
             cmd_rx,
@@ -291,7 +408,7 @@ impl Future for SystemController {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // process all items currently buffered in channel
         loop {
-            match ready!(Pin::new(&mut self.cmd_rx).poll_recv(cx)) {
+            match ready!(self.cmd_rx.poll_recv(cx)) {
                 // channel closed; no more messages can be received
                 None => return Poll::Ready(()),
 
@@ -306,7 +423,7 @@ impl Future for SystemController {
                         // stop event loop
                         // will only fire once
                         if let Some(stop_tx) = self.stop_tx.take() {
-                            let _ = stop_tx.send(code);
+                            let _ = stop_tx.send(Some(code));
                         }
                     }
 

@@ -52,7 +52,7 @@ impl WakerQueue {
 
         waker
             .wake()
-            .unwrap_or_else(|e| panic!("can not wake up Accept Poll: {}", e));
+            .unwrap_or_else(|err| panic!("can not wake up Accept Poll: {err}"));
     }
 
     /// Get a MutexGuard of the waker queue.
@@ -62,7 +62,7 @@ impl WakerQueue {
 
     /// Reset the waker queue so it does not grow infinitely.
     pub(crate) fn reset(queue: &mut VecDeque<WakerInterest>) {
-        std::mem::swap(&mut VecDeque::<WakerInterest>::with_capacity(16), queue);
+        *queue = VecDeque::<WakerInterest>::with_capacity(16);
     }
 }
 

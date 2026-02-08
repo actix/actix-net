@@ -22,25 +22,45 @@ mod resolver;
 pub mod tcp;
 
 #[cfg(feature = "uri")]
-#[cfg_attr(docsrs, doc(cfg(feature = "uri")))]
 mod uri;
 
 #[cfg(feature = "openssl")]
-#[cfg_attr(docsrs, doc(cfg(feature = "openssl")))]
 pub mod openssl;
 
-#[cfg(feature = "rustls")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rustls")))]
-pub mod rustls;
+#[cfg(any(
+    feature = "rustls-0_20-webpki-roots",
+    feature = "rustls-0_20-native-roots",
+))]
+pub mod rustls_0_20;
+
+#[doc(hidden)]
+#[cfg(any(
+    feature = "rustls-0_20-webpki-roots",
+    feature = "rustls-0_20-native-roots",
+))]
+pub use rustls_0_20 as rustls;
+
+#[cfg(any(
+    feature = "rustls-0_21-webpki-roots",
+    feature = "rustls-0_21-native-roots",
+))]
+pub mod rustls_0_21;
+
+#[cfg(feature = "rustls-0_22")]
+pub mod rustls_0_22;
+
+#[cfg(feature = "rustls-0_23")]
+pub mod rustls_0_23;
 
 #[cfg(feature = "native-tls")]
-#[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
 pub mod native_tls;
 
-pub use self::connection::Connection;
-pub use self::connector::{Connector, ConnectorService};
-pub use self::error::ConnectError;
-pub use self::host::Host;
-pub use self::info::ConnectInfo;
-pub use self::resolve::Resolve;
-pub use self::resolver::{Resolver, ResolverService};
+pub use self::{
+    connection::Connection,
+    connector::{Connector, ConnectorService},
+    error::ConnectError,
+    host::Host,
+    info::ConnectInfo,
+    resolve::Resolve,
+    resolver::{Resolver, ResolverService},
+};

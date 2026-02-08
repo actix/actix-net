@@ -221,14 +221,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::time::Duration;
-
-    use actix_utils::future::{ready, Ready};
+    use core::{
+        future::{ready, Ready},
+        time::Duration,
+    };
 
     use super::*;
-    use crate::Service;
 
     // pseudo-doctest for Transform trait
+    #[allow(unused)]
     pub struct TimeoutTransform {
         timeout: Duration,
     }
@@ -250,6 +251,7 @@ mod tests {
     }
 
     // pseudo-doctest for Transform trait
+    #[allow(unused)]
     pub struct Timeout<S> {
         service: S,
         _timeout: Duration,

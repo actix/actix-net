@@ -6,12 +6,14 @@ use core::{
     task::{Context, Poll},
 };
 
-use crate::and_then::{AndThenService, AndThenServiceFactory};
-use crate::map::{Map, MapServiceFactory};
-use crate::map_err::{MapErr, MapErrServiceFactory};
-use crate::map_init_err::MapInitErr;
-use crate::then::{ThenService, ThenServiceFactory};
-use crate::{IntoService, IntoServiceFactory, Service, ServiceFactory};
+use crate::{
+    and_then::{AndThenService, AndThenServiceFactory},
+    map::{Map, MapServiceFactory},
+    map_err::{MapErr, MapErrServiceFactory},
+    map_init_err::MapInitErr,
+    then::{ThenService, ThenServiceFactory},
+    IntoService, IntoServiceFactory, Service, ServiceFactory,
+};
 
 /// Construct new pipeline with one service in pipeline chain.
 pub(crate) fn pipeline<I, S, Req>(service: I) -> Pipeline<S, Req>
@@ -50,7 +52,7 @@ where
     /// Call another service after call to this one has resolved successfully.
     ///
     /// This function can be used to chain two services together and ensure that
-    /// the second service isn't called until call to the fist service have
+    /// the second service isn't called until call to the first service have
     /// finished. Result of the call to the first service is used as an
     /// input parameter for the second service's call.
     ///
@@ -252,10 +254,7 @@ where
     }
 
     /// Map this service's error to a different error, returning a new service.
-    pub fn map_err<F, E>(
-        self,
-        f: F,
-    ) -> PipelineFactory<MapErrServiceFactory<SF, Req, F, E>, Req>
+    pub fn map_err<F, E>(self, f: F) -> PipelineFactory<MapErrServiceFactory<SF, Req, F, E>, Req>
     where
         Self: Sized,
         F: Fn(SF::Error) -> E + Clone,

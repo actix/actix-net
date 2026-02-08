@@ -1,18 +1,34 @@
-use std::{io, time::Duration};
+use std::{future::Future, io, num::NonZeroUsize, time::Duration};
 
 use actix_rt::net::TcpStream;
-use log::{info, trace};
+use futures_core::future::BoxFuture;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::{
     server::ServerCommand,
     service::{InternalServiceFactory, ServerServiceFactory, StreamNewService},
-    socket::{
-        create_mio_tcp_listener, MioListener, MioTcpListener, StdTcpListener, ToSocketAddrs,
-    },
+    socket::{create_mio_tcp_listener, MioListener, MioTcpListener, StdTcpListener, ToSocketAddrs},
     worker::ServerWorkerConfig,
     Server,
 };
+
+/// Multipath TCP (MPTCP) preference.
+///
+/// Currently only useful on Linux.
+///
+#[cfg_attr(target_os = "linux", doc = "Also see [`ServerBuilder::mptcp()`].")]
+#[derive(Debug, Clone)]
+pub enum MpTcp {
+    /// MPTCP will not be used when binding sockets.
+    Disabled,
+
+    /// MPTCP will be attempted when binding sockets. If errors occur, regular TCP will be
+    /// attempted, too.
+    TcpFallback,
+
+    /// MPTCP will be used when binding sockets (with no fallback).
+    NoFallback,
+}
 
 /// [Server] builder.
 pub struct ServerBuilder {
@@ -21,8 +37,10 @@ pub struct ServerBuilder {
     pub(crate) backlog: u32,
     pub(crate) factories: Vec<Box<dyn InternalServiceFactory>>,
     pub(crate) sockets: Vec<(usize, String, MioListener)>,
+    pub(crate) mptcp: MpTcp,
     pub(crate) exit: bool,
     pub(crate) listen_os_signals: bool,
+    pub(crate) shutdown_signal: Option<BoxFuture<'static, ()>>,
     pub(crate) cmd_tx: UnboundedSender<ServerCommand>,
     pub(crate) cmd_rx: UnboundedReceiver<ServerCommand>,
     pub(crate) worker_config: ServerWorkerConfig,
@@ -40,26 +58,34 @@ impl ServerBuilder {
         let (cmd_tx, cmd_rx) = unbounded_channel();
 
         ServerBuilder {
-            threads: num_cpus::get_physical(),
+            threads: std::thread::available_parallelism().map_or(2, NonZeroUsize::get),
             token: 0,
             factories: Vec::new(),
             sockets: Vec::new(),
             backlog: 2048,
+            mptcp: MpTcp::Disabled,
             exit: false,
             listen_os_signals: true,
+            shutdown_signal: None,
             cmd_tx,
             cmd_rx,
             worker_config: ServerWorkerConfig::default(),
         }
     }
 
-    /// Set number of workers to start.
+    /// Sets number of workers to start.
+    ///
+    /// See [`bind()`](Self::bind()) for more details on how worker count affects the number of
+    /// server factory instantiations.
+    ///
+    /// The default worker count is the determined by [`std::thread::available_parallelism()`]. See
+    /// its documentation to determine what behavior you should expect when server is run.
     ///
     /// `num` must be greater than 0.
     ///
-    /// The default worker count is the number of physical CPU cores available. If your benchmark
-    /// testing indicates that simultaneous multi-threading is beneficial to your app, you can use
-    /// the [`num_cpus`] crate to acquire the _logical_ core count instead.
+    /// # Panics
+    ///
+    /// Panics if `num` is 0.
     pub fn workers(mut self, num: usize) -> Self {
         assert_ne!(num, 0, "workers must be greater than 0");
         self.threads = num;
@@ -98,6 +124,24 @@ impl ServerBuilder {
         self
     }
 
+    /// Sets MultiPath TCP (MPTCP) preference on bound sockets.
+    ///
+    /// Multipath TCP (MPTCP) builds on top of TCP to improve connection redundancy and performance
+    /// by sharing a network data stream across multiple underlying TCP sessions. See [mptcp.dev]
+    /// for more info about MPTCP itself.
+    ///
+    /// MPTCP is available on Linux kernel version 5.6 and higher. In addition, you'll also need to
+    /// ensure the kernel option is enabled using `sysctl net.mptcp.enabled=1`.
+    ///
+    /// This method will have no effect if called after a `bind()`.
+    ///
+    /// [mptcp.dev]: https://www.mptcp.dev
+    #[cfg(target_os = "linux")]
+    pub fn mptcp(mut self, mptcp_enabled: MpTcp) -> Self {
+        self.mptcp = mptcp_enabled;
+        self
+    }
+
     /// Sets the maximum per-worker number of concurrent connections.
     ///
     /// All socket listeners will stop accepting connections when this limit is reached for
@@ -115,15 +159,52 @@ impl ServerBuilder {
         self.max_concurrent_connections(num)
     }
 
-    /// Stop Actix `System` after server shutdown.
+    /// Sets flag to stop Actix `System` after server shutdown.
+    ///
+    /// This has no effect when server is running in a Tokio-only runtime.
     pub fn system_exit(mut self) -> Self {
         self.exit = true;
         self
     }
 
-    /// Disable OS signal handling.
+    /// Disables OS signal handling.
     pub fn disable_signals(mut self) -> Self {
         self.listen_os_signals = false;
+        self
+    }
+
+    /// Specify shutdown signal from a future.
+    ///
+    /// Using this method will prevent OS signal handlers being set up.
+    ///
+    /// Typically, a `CancellationToken` will be used, but any future _can_ be.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::io;
+    /// # use tokio::net::TcpStream;
+    /// # use actix_server::Server;
+    /// # async fn run() -> io::Result<()> {
+    /// use actix_service::fn_service;
+    /// use tokio_util::sync::CancellationToken;
+    ///
+    /// let stop_signal = CancellationToken::new();
+    ///
+    /// Server::build()
+    ///     .bind("shutdown-signal", "127.0.0.1:12345", || {
+    ///         fn_service(|_stream: TcpStream| async { Ok::<_, io::Error>(()) })
+    ///     })?
+    ///     .shutdown_signal(stop_signal.cancelled_owned())
+    ///     .run()
+    ///     .await
+    /// # }
+    /// ```
+    pub fn shutdown_signal<Fut>(mut self, shutdown_signal: Fut) -> Self
+    where
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        self.shutdown_signal = Some(Box::pin(shutdown_signal));
         self
     }
 
@@ -139,25 +220,49 @@ impl ServerBuilder {
         self
     }
 
-    /// Add new service to the server.
-    pub fn bind<F, U, N>(mut self, name: N, addr: U, factory: F) -> io::Result<Self>
+    /// Adds new service to the server.
+    ///
+    /// Note that, if a DNS lookup is required, resolving hostnames is a blocking operation.
+    ///
+    /// # Worker Count
+    ///
+    /// The `factory` will be instantiated multiple times in most scenarios. The number of
+    /// instantiations is number of [`workers`](Self::workers()) × number of sockets resolved by
+    /// `addrs`.
+    ///
+    /// For example, if you've manually set [`workers`](Self::workers()) to 2, and use `127.0.0.1`
+    /// as the bind `addrs`, then `factory` will be instantiated twice. However, using `localhost`
+    /// as the bind `addrs` can often resolve to both `127.0.0.1` (IPv4) _and_ `::1` (IPv6), causing
+    /// the `factory` to be instantiated 4 times (2 workers × 2 bind addresses).
+    ///
+    /// Using a bind address of `0.0.0.0`, which signals to use all interfaces, may also multiple
+    /// the number of instantiations in a similar way.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `io::Error` if:
+    /// - `addrs` cannot be resolved into one or more socket addresses;
+    /// - all the resolved socket addresses are already bound.
+    pub fn bind<F, U, N>(mut self, name: N, addrs: U, factory: F) -> io::Result<Self>
     where
         F: ServerServiceFactory<TcpStream>,
         U: ToSocketAddrs,
         N: AsRef<str>,
     {
-        let sockets = bind_addr(addr, self.backlog)?;
+        let sockets = bind_addr(addrs, self.backlog, &self.mptcp)?;
 
-        trace!("binding server to: {:?}", &sockets);
+        tracing::trace!("binding server to: {sockets:?}");
 
         for lst in sockets {
             let token = self.next_token();
+
             self.factories.push(StreamNewService::create(
                 name.as_ref().to_string(),
                 token,
                 factory.clone(),
                 lst.local_addr()?,
             ));
+
             self.sockets
                 .push((token, name.as_ref().to_string(), MioListener::Tcp(lst)));
         }
@@ -165,7 +270,12 @@ impl ServerBuilder {
         Ok(self)
     }
 
-    /// Add new service to the server.
+    /// Adds service to the server using a socket listener already bound.
+    ///
+    /// # Worker Count
+    ///
+    /// The `factory` will be instantiated multiple times in most scenarios. The number of
+    /// instantiations is: number of [`workers`](Self::workers()).
     pub fn listen<F, N: AsRef<str>>(
         mut self,
         name: N,
@@ -197,7 +307,7 @@ impl ServerBuilder {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
         } else {
-            info!("Starting {} workers", self.threads);
+            tracing::info!("starting {} workers", self.threads);
             Server::new(self)
         }
     }
@@ -211,7 +321,12 @@ impl ServerBuilder {
 
 #[cfg(unix)]
 impl ServerBuilder {
-    /// Add new unix domain service to the server.
+    /// Adds new service to the server using a UDS (unix domain socket) address.
+    ///
+    /// # Worker Count
+    ///
+    /// The `factory` will be instantiated multiple times in most scenarios. The number of
+    /// instantiations is: number of [`workers`](Self::workers()).
     pub fn bind_uds<F, U, N>(self, name: N, addr: U, factory: F) -> io::Result<Self>
     where
         F: ServerServiceFactory<actix_rt::net::UnixStream>,
@@ -231,9 +346,14 @@ impl ServerBuilder {
         self.listen_uds(name, lst, factory)
     }
 
-    /// Add new unix domain service to the server.
+    /// Adds new service to the server using a UDS (unix domain socket) listener already bound.
     ///
     /// Useful when running as a systemd service and a socket FD is acquired externally.
+    ///
+    /// # Worker Count
+    ///
+    /// The `factory` will be instantiated multiple times in most scenarios. The number of
+    /// instantiations is: number of [`workers`](Self::workers()).
     pub fn listen_uds<F, N: AsRef<str>>(
         mut self,
         name: N,
@@ -244,18 +364,22 @@ impl ServerBuilder {
         F: ServerServiceFactory<actix_rt::net::UnixStream>,
     {
         use std::net::{IpAddr, Ipv4Addr};
+
         lst.set_nonblocking(true)?;
+
         let token = self.next_token();
-        let addr =
-            crate::socket::StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let addr = crate::socket::StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+
         self.factories.push(StreamNewService::create(
             name.as_ref().to_string(),
             token,
             factory,
             addr,
         ));
+
         self.sockets
             .push((token, name.as_ref().to_string(), MioListener::from(lst)));
+
         Ok(self)
     }
 }
@@ -263,13 +387,14 @@ impl ServerBuilder {
 pub(super) fn bind_addr<S: ToSocketAddrs>(
     addr: S,
     backlog: u32,
+    mptcp: &MpTcp,
 ) -> io::Result<Vec<MioTcpListener>> {
     let mut opt_err = None;
     let mut success = false;
     let mut sockets = Vec::new();
 
     for addr in addr.to_socket_addrs()? {
-        match create_mio_tcp_listener(addr, backlog) {
+        match create_mio_tcp_listener(addr, backlog, mptcp) {
             Ok(lst) => {
                 success = true;
                 sockets.push(lst);
@@ -283,9 +408,6 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
     } else if let Some(err) = opt_err.take() {
         Err(err)
     } else {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            "Can not bind to address.",
-        ))
+        Err(io::Error::other("Can not bind to address."))
     }
 }

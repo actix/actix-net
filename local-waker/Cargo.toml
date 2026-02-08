@@ -1,15 +1,13 @@
 [package]
 name = "local-waker"
-version = "0.1.2"
+version = "0.1.4"
 description = "A synchronization primitive for thread-local task wakeup"
-authors = [
-    "Nikolay Kim <fafhrd91@gmail.com>",
-    "Rob Ede <robjtede@icloud.com>",
-]
+authors = ["Nikolay Kim <fafhrd91@gmail.com>", "Rob Ede <robjtede@icloud.com>"]
+repository = "https://github.com/actix/actix-net"
 keywords = ["waker", "local", "futures", "no-std"]
-repository = "https://github.com/actix/actix-net.git"
 categories = ["asynchronous", "no-std"]
-license = "MIT OR Apache-2.0"
-edition = "2018"
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]

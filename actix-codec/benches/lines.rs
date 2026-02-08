@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bytes::BytesMut;
 use criterion::{criterion_group, criterion_main, Criterion};
 

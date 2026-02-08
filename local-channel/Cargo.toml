@@ -1,21 +1,22 @@
 [package]
 name = "local-channel"
-version = "0.1.2"
+version = "0.1.5"
 description = "A non-threadsafe multi-producer, single-consumer, futures-aware, FIFO queue"
-authors = [
-    "Nikolay Kim <fafhrd91@gmail.com>",
-    "Rob Ede <robjtede@icloud.com>",
-]
-repository = "https://github.com/actix/actix-net.git"
+authors = ["Nikolay Kim <fafhrd91@gmail.com>", "Rob Ede <robjtede@icloud.com>"]
+repository = "https://github.com/actix/actix-net"
 keywords = ["channel", "local", "futures"]
-license = "MIT OR Apache-2.0"
-edition = "2018"
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.cargo_check_external_types]
+allowed_external_types = ["futures_core::*", "futures_sink::*"]
 
 [dependencies]
-futures-core = { version = "0.3.7", default-features = false }
-futures-sink = { version = "0.3.7", default-features = false }
-futures-util = { version = "0.3.7", default-features = false }
+futures-core = "0.3.17"
+futures-sink = "0.3.17"
 local-waker = "0.1"
 
 [dev-dependencies]
-tokio = { version = "1.13.1", features = ["rt", "macros"] }
+futures-util = { version = "0.3.17", default-features = false }
+tokio = { version = "1.44.2", features = ["rt", "macros"] }

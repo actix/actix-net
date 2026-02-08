@@ -2,6 +2,7 @@
 //!
 //! See [`TcpConnector`] for main connector service factory docs.
 
+use core::future::{ready, Ready};
 use std::{
     collections::VecDeque,
     future::Future,
@@ -13,10 +14,9 @@ use std::{
 
 use actix_rt::net::{TcpSocket, TcpStream};
 use actix_service::{Service, ServiceFactory};
-use actix_utils::future::{ok, Ready};
 use futures_core::ready;
-use log::{error, trace};
 use tokio_util::sync::ReusableBoxFuture;
+use tracing::{error, trace};
 
 use super::{connect_addrs::ConnectAddrs, error::ConnectError, ConnectInfo, Connection, Host};
 
@@ -41,7 +41,7 @@ impl<R: Host> ServiceFactory<ConnectInfo<R>> for TcpConnector {
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(self.service())
+        ready(Ok(self.service()))
     }
 }
 
@@ -79,7 +79,7 @@ pub enum TcpConnectorFut<R> {
         port: u16,
         local_addr: Option<IpAddr>,
         addrs: Option<VecDeque<SocketAddr>>,
-        stream: ReusableBoxFuture<Result<TcpStream, io::Error>>,
+        stream: ReusableBoxFuture<'static, Result<TcpStream, io::Error>>,
     },
 
     Error(Option<ConnectError>),
@@ -114,8 +114,8 @@ impl<R: Host> TcpConnectorFut<R> {
                 stream: ReusableBoxFuture::new(connect(addr, local_addr)),
             },
 
-            // when resolver returns multiple socket addr for request they would be popped from
-            // front end of queue and returns with the first successful tcp connection.
+            // When resolver returns multiple socket addr for request they would be popped from
+            // front end of queue and returns with the first successful TCP connection.
             ConnectAddrs::Multi(mut addrs) => {
                 let addr = addrs.pop_front().unwrap();
 

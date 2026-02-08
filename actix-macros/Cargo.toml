@@ -1,27 +1,39 @@
 [package]
 name = "actix-macros"
-version = "0.2.3"
+version = "0.2.4"
 authors = [
-    "Nikolay Kim <fafhrd91@gmail.com>",
-    "Ibraheem Ahmed <ibrah1440@gmail.com>",
-    "Rob Ede <robjtede@icloud.com>",
+  "Nikolay Kim <fafhrd91@gmail.com>",
+  "Ibraheem Ahmed <ibrah1440@gmail.com>",
+  "Rob Ede <robjtede@icloud.com>",
 ]
 description = "Macros for Actix system and runtime"
-repository = "https://github.com/actix/actix-net.git"
+repository = "https://github.com/actix/actix-net"
 categories = ["network-programming", "asynchronous"]
-license = "MIT OR Apache-2.0"
-edition = "2018"
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = [
+  "proc_macro2", # specified for minimal versions compat
+]
 
 [lib]
 proc-macro = true
 
 [dependencies]
-quote = "1.0.3"
-syn = { version = "^1", features = ["full"] }
+quote = "1"
+syn = { version = "2", features = ["full"] }
+
+# minimal versions compat
+[target.'cfg(any())'.dependencies]
+proc-macro2 = "1.0.60"
 
 [dev-dependencies]
-actix-rt = "2.0.0"
-
-futures-util = { version = "0.3.7", default-features = false }
-rustversion = "1"
+actix-rt = "2"
+futures-util = { version = "0.3.17", default-features = false }
+rustversion-msrv = "0.100"
 trybuild = "1"
+
+[lints]
+workspace = true

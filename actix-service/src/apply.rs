@@ -140,8 +140,7 @@ where
     }
 }
 
-impl<SF, F, Fut, Req, In, Res, Err> ServiceFactory<Req>
-    for ApplyFactory<SF, F, Req, In, Res, Err>
+impl<SF, F, Fut, Req, In, Res, Err> ServiceFactory<Req> for ApplyFactory<SF, F, Req, In, Res, Err>
 where
     SF: ServiceFactory<In, Error = Err>,
     F: Fn(Req, &SF::Service) -> Fut + Clone,
@@ -209,16 +208,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::task::Poll;
+    use core::future::{ready, Ready};
 
     use futures_util::future::lazy;
 
     use super::*;
-    use crate::{
-        ok,
-        pipeline::{pipeline, pipeline_factory},
-        Ready, Service, ServiceFactory,
-    };
+    use crate::pipeline::{pipeline, pipeline_factory};
 
     #[derive(Clone)]
     struct Srv;
@@ -231,7 +226,7 @@ mod tests {
         crate::always_ready!();
 
         fn call(&self, _: ()) -> Self::Future {
-            ok(())
+            ready(Ok(()))
         }
     }
 
@@ -255,7 +250,7 @@ mod tests {
     #[actix_rt::test]
     async fn test_new_service() {
         let new_srv = pipeline_factory(apply_fn_factory(
-            || ok::<_, ()>(Srv),
+            || ready(Ok::<_, ()>(Srv)),
             |req: &'static str, srv| {
                 let fut = srv.call(());
                 async move {

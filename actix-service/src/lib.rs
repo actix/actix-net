@@ -1,8 +1,6 @@
 //! See [`Service`] docs for information on this crate's foundational trait.
 
 #![no_std]
-#![deny(rust_2018_idioms, nonstandard_style)]
-#![warn(future_incompatible, missing_docs)]
 #![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
@@ -28,20 +26,18 @@ mod map_config;
 mod map_err;
 mod map_init_err;
 mod pipeline;
-mod ready;
 mod then;
 mod transform;
 mod transform_err;
 
-pub use self::apply::{apply_fn, apply_fn_factory};
-pub use self::apply_cfg::{apply_cfg, apply_cfg_factory};
-pub use self::ext::{ServiceExt, ServiceFactoryExt, TransformExt};
-pub use self::fn_service::{fn_factory, fn_factory_with_config, fn_service};
-pub use self::map_config::{map_config, unit_config};
-pub use self::transform::{apply, ApplyTransform, Transform};
-
-#[allow(unused_imports)]
-use self::ready::{err, ok, ready, Ready};
+pub use self::{
+    apply::{apply_fn, apply_fn_factory},
+    apply_cfg::{apply_cfg, apply_cfg_factory},
+    ext::{ServiceExt, ServiceFactoryExt, TransformExt},
+    fn_service::{fn_factory, fn_factory_with_config, fn_service},
+    map_config::{map_config, unit_config},
+    transform::{apply, ApplyTransform, Transform},
+};
 
 /// An asynchronous operation from `Request` to a `Response`.
 ///

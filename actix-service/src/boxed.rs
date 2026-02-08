@@ -3,36 +3,38 @@
 use alloc::{boxed::Box, rc::Rc};
 use core::{future::Future, pin::Pin};
 
-use paste::paste;
-
 use crate::{Service, ServiceFactory};
 
 /// A boxed future with no send bound or lifetime parameters.
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T>>>;
 
-macro_rules! service_object {
-    ($name: ident, $type: tt, $fn_name: ident) => {
-        paste! {
-            #[doc = "Type alias for service trait object using `" $type "`."]
-            pub type $name<Req, Res, Err> = $type<
-                dyn Service<Req, Response = Res, Error = Err, Future = BoxFuture<Result<Res, Err>>>,
-            >;
+/// Type alias for service trait object using [`Box`].
+pub type BoxService<Req, Res, Err> =
+    Box<dyn Service<Req, Response = Res, Error = Err, Future = BoxFuture<Result<Res, Err>>>>;
 
-            #[doc = "Wraps service as a trait object using [`" $name "`]."]
-            pub fn $fn_name<S, Req>(service: S) -> $name<Req, S::Response, S::Error>
-            where
-                S: Service<Req> + 'static,
-                Req: 'static,
-                S::Future: 'static,
-            {
-                $type::new(ServiceWrapper::new(service))
-            }
-        }
-    };
+/// Wraps service as a trait object using [`BoxService`].
+pub fn service<S, Req>(service: S) -> BoxService<Req, S::Response, S::Error>
+where
+    S: Service<Req> + 'static,
+    Req: 'static,
+    S::Future: 'static,
+{
+    Box::new(ServiceWrapper::new(service))
 }
 
-service_object!(BoxService, Box, service);
-service_object!(RcService, Rc, rc_service);
+/// Type alias for service trait object using [`Rc`].
+pub type RcService<Req, Res, Err> =
+    Rc<dyn Service<Req, Response = Res, Error = Err, Future = BoxFuture<Result<Res, Err>>>>;
+
+/// Wraps service as a trait object using [`RcService`].
+pub fn rc_service<S, Req>(service: S) -> RcService<Req, S::Response, S::Error>
+where
+    S: Service<Req> + 'static,
+    Req: 'static,
+    S::Future: 'static,
+{
+    Rc::new(ServiceWrapper::new(service))
+}
 
 struct ServiceWrapper<S> {
     inner: S,
@@ -91,8 +93,7 @@ type Inner<C, Req, Res, Err, InitErr> = Box<
     >,
 >;
 
-impl<C, Req, Res, Err, InitErr> ServiceFactory<Req>
-    for BoxServiceFactory<C, Req, Res, Err, InitErr>
+impl<C, Req, Res, Err, InitErr> ServiceFactory<Req> for BoxServiceFactory<C, Req, Res, Err, InitErr>
 where
     Req: 'static,
     Res: 'static,

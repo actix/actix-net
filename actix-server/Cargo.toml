@@ -1,50 +1,53 @@
 [package]
 name = "actix-server"
-version = "2.0.0"
+version = "2.6.0"
 authors = [
-    "Nikolay Kim <fafhrd91@gmail.com>",
-    "fakeshadow <24548779@qq.com>",
-    "Rob Ede <robjtede@icloud.com>",
-    "Ali MJ Al-Nasrawy <alimjalnasrawy@gmail.com>",
+  "Nikolay Kim <fafhrd91@gmail.com>",
+  "Rob Ede <robjtede@icloud.com>",
+  "Ali MJ Al-Nasrawy <alimjalnasrawy@gmail.com>",
 ]
 description = "General purpose TCP server built for the Actix ecosystem"
 keywords = ["network", "tcp", "server", "framework", "async"]
 categories = ["network-programming", "asynchronous"]
 homepage = "https://actix.rs"
-repository = "https://github.com/actix/actix-net.git"
+repository = "https://github.com/actix/actix-net/tree/main/actix-server"
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition.workspace = true
+rust-version.workspace = true
 
-[lib]
-name = "actix_server"
-path = "src/lib.rs"
+[package.metadata.cargo_check_external_types]
+allowed_external_types = ["tokio::*"]
 
 [features]
 default = []
 io-uring = ["tokio-uring", "actix-rt/io-uring"]
 
 [dependencies]
-actix-rt = { version = "2.6.0", default-features = false }
-actix-service = "2.0.0"
-actix-utils = "3.0.0"
+actix-rt = { version = "2.10", default-features = false }
+actix-service = "2"
+actix-utils = "3"
+futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
+futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
+mio = { version = "1", features = ["os-poll", "net"] }
+socket2 = "0.6"
+tokio = { version = "1.44.2", features = ["sync"] }
+tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
-futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }
-futures-util = { version = "0.3.7", default-features = false, features = ["alloc"] }
-log = "0.4"
-mio = { version = "0.8", features = ["os-poll", "net"] }
-num_cpus = "1.13"
-socket2 = "0.4.2"
-tokio = { version = "1.13.1", features = ["sync"] }
-
-# runtime for io-uring feature
+# runtime for `io-uring` feature
 [target.'cfg(target_os = "linux")'.dependencies]
-tokio-uring = { version = "0.2", optional = true }
+tokio-uring = { version = "0.5", optional = true }
 
 [dev-dependencies]
-actix-codec = "0.4.2"
-actix-rt = "2.6.0"
+actix-codec = "0.5"
+actix-rt = "2.8"
 
 bytes = "1"
-env_logger = "0.9"
-futures-util = { version = "0.3.7", default-features = false, features = ["sink", "async-await-macro"] }
-tokio = { version = "1.13.1", features = ["io-util", "rt-multi-thread", "macros", "fs"] }
+futures-util = { version = "0.3.17", default-features = false, features = ["sink", "async-await-macro"] }
+pretty_env_logger = "0.5"
+static_assertions = "1"
+tokio = { version = "1.44.2", features = ["io-util", "rt-multi-thread", "macros", "fs", "time"] }
+tokio-util = "0.7"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+
+[lints]
+workspace = true

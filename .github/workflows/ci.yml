@@ -1,171 +1,133 @@
 name: CI
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-  push:
-    branches: [master]
+  pull_request: {}
+  merge_group: { types: [checks_requested] }
+  push: { branches: [main] }
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  read_msrv:
+    name: Read MSRV
+    uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@v0.1.0
+
   build_and_test:
+    needs:
+      - read_msrv
+
     strategy:
       fail-fast: false
       matrix:
+        # prettier-ignore
         target:
           - { name: Linux, os: ubuntu-latest, triple: x86_64-unknown-linux-gnu }
           - { name: macOS, os: macos-latest, triple: x86_64-apple-darwin }
           - { name: Windows, os: windows-latest, triple: x86_64-pc-windows-msvc }
           - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
-          - { name: Windows (32-bit), os: windows-latest, triple: i686-pc-windows-msvc }
         version:
-          - 1.52.0 # MSRV for -server and -tls
-          - stable
+          - { name: msrv, version: "${{ needs.read_msrv.outputs.msrv }}" }
+          - { name: stable, version: stable }
 
-    name: ${{ matrix.target.name }} / ${{ matrix.version }}
+    name: ${{ matrix.target.name }} / ${{ matrix.version.name }}
     runs-on: ${{ matrix.target.os }}
 
-    env:
-      VCPKGRS_DYNAMIC: 1
+    env: {}
 
     steps:
       - name: Setup Routing
         if: matrix.target.os == 'macos-latest'
         run: sudo ifconfig lo0 alias 127.0.0.3
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
-      # install OpenSSL on Windows
-      - name: Set vcpkg root
-        if: matrix.target.triple == 'x86_64-pc-windows-msvc' || matrix.target.triple == 'i686-pc-windows-msvc'
-        run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Free Disk Space
+        if: matrix.target.os == 'ubuntu-latest'
+        run: ./scripts/free-disk-space.sh
+
+      - name: Setup mold linker
+        if: matrix.target.os == 'ubuntu-latest'
+        uses: rui314/setup-mold@v1
+
+      - name: Install nasm
+        if: matrix.target.os == 'windows-latest'
+        uses: ilammy/setup-nasm@v1.5.2
+
       - name: Install OpenSSL
-        if: matrix.target.triple == 'x86_64-pc-windows-msvc'
-        run: vcpkg install openssl:x64-windows
-      - name: Install OpenSSL
-        if: matrix.target.triple == 'i686-pc-windows-msvc'
-        run: vcpkg install openssl:x86-windows
+        if: matrix.target.os == 'windows-latest'
+        shell: bash
+        run: |
+          set -e
+          choco install openssl --version=1.1.1.2100 -y --no-progress
+          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL' >> $GITHUB_ENV
+          echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
 
-      - name: Install ${{ matrix.version }}
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust (${{ matrix.version.name }})
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
         with:
-          toolchain: ${{ matrix.version }}-${{ matrix.target.triple }}
-          profile: minimal
-          override: true
+          toolchain: ${{ matrix.version.version }}
 
-      # - name: Install MSYS2
-      #   if: matrix.target.triple == 'x86_64-pc-windows-gnu'
-      #   uses: msys2/setup-msys2@v2
-      # - name: Install MinGW Packages
-      #   if: matrix.target.triple == 'x86_64-pc-windows-gnu'
-      #   run: |
-      #     msys2 -c 'pacman -Sy --noconfirm pacman'
-      #     msys2 -c 'pacman --noconfirm -S base-devel pkg-config'
-
-      # - name: Generate Cargo.lock
-      #   uses: actions-rs/cargo@v1
-      #   with: { command: generate-lockfile }
-      # - name: Cache Dependencies
-      #   uses: Swatinem/rust-cache@v1.2.0
-
-      - name: Install cargo-hack
-        uses: actions-rs/cargo@v1
+      - name: Install just, cargo-hack, cargo-nextest, cargo-ci-cache-clean
+        uses: taiki-e/install-action@v2.67.18
         with:
-          command: install
-          args: cargo-hack
+          tool: just,cargo-hack,cargo-nextest,cargo-ci-cache-clean
+
+      - name: Generate Cargo.lock
+        run: cargo generate-lockfile
+
+      - name: workaround MSRV issues
+        if: matrix.version.name == 'msrv'
+        run: just downgrade-for-msrv
 
       - name: check lib
         if: >
           matrix.target.os != 'ubuntu-latest'
           && matrix.target.triple != 'x86_64-pc-windows-gnu'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-lib }
+        run: cargo ci-check-lib
       - name: check lib
         if: matrix.target.os == 'ubuntu-latest'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-lib-linux }
+        run: cargo ci-check-lib-linux
       - name: check lib
-        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-min }
+        if: matrix.target.triple != 'x86_64-pc-windows-gnu'
+        run: cargo ci-check-min
 
       - name: check full
         # TODO: compile OpenSSL and run tests on MinGW
         if: >
           matrix.target.os != 'ubuntu-latest'
           && matrix.target.triple != 'x86_64-pc-windows-gnu'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check }
+        run: cargo ci-check
       - name: check all
         if: matrix.target.os == 'ubuntu-latest'
-        uses: actions-rs/cargo@v1
-        with: { command: ci-check-linux }
+        run: cargo ci-check-linux
 
       - name: tests
-        if: >
-          matrix.target.os != 'ubuntu-latest'
-          && matrix.target.triple != 'x86_64-pc-windows-gnu'
-        run: |
-          cargo ci-test
-          cargo ci-test-rt
-          cargo ci-test-server
-      - name: tests
-        if: matrix.target.os == 'ubuntu-latest'
-        run: |
-          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rt-linux && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-server-linux"
+        run: just test
 
-      - name: Clear the cargo caches
-        run: |
-          cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
-          cargo-cache
+      - name: CI cache clean
+        run: cargo-ci-cache-clean
 
-  build_and_test_lower_msrv:
-    name: Linux / 1.46 (lower MSRV)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Install 1.46.0 # MSRV for all but -server and -tls
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.46.0-x86_64-unknown-linux-gnu
-          profile: minimal
-          override: true
-
-      - name: Install cargo-hack
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-hack
-
-      - name: tests
-        run: |
-          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=1.46 cargo ci-test-lower-msrv"
-
-      - name: Clear the cargo caches
-        run: |
-          cargo install cargo-cache --version 0.6.2 --no-default-features --features ci-autoclean
-          cargo-cache
-
-  rustdoc:
-    name: rustdoc
+  docs:
+    name: Documentation
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
       - name: Install Rust (nightly)
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
         with:
-          toolchain: nightly-x86_64-unknown-linux-gnu
-          profile: minimal
-          override: true
+          toolchain: nightly
 
-      - name: Generate Cargo.lock
-        uses: actions-rs/cargo@v1
-        with: { command: generate-lockfile }
-      - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v1.3.0
+      - name: Install just
+        uses: taiki-e/install-action@v2.67.18
+        with:
+          tool: just
 
-      - name: doc tests io-uring
-        run: |
-          sudo bash -c "ulimit -Sl 512 && ulimit -Hl 512 && PATH=$PATH:/usr/share/rust/.cargo/bin && RUSTUP_TOOLCHAIN=nightly cargo ci-doctest"
+      - name: doc tests
+        run: just test-docs

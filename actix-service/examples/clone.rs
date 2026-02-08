@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use std::{future::Future, sync::mpsc, time::Duration};
 
 async fn oracle<F, Fut>(f: F) -> (u32, u32)

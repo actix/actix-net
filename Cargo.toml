@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
   "actix-codec",
   "actix-macros",
@@ -12,6 +13,13 @@ members = [
   "local-channel",
   "local-waker",
 ]
+
+[workspace.package]
+homepage = "https://actix.rs"
+repository = "https://github.com/actix/actix-net"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+rust-version = "1.88"
 
 [patch.crates-io]
 actix-codec = { path = "actix-codec" }
@@ -30,3 +38,13 @@ local-waker = { path = "local-waker" }
 lto = true
 opt-level = 3
 codegen-units = 1
+
+[workspace.lints.rust]
+rust-2018-idioms = "deny"
+nonstandard-style = "deny"
+future-incompatible = "deny"
+missing-docs = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+uninlined-format-args = "warn"
+disallowed-names = "warn"

@@ -117,13 +117,15 @@ impl TestServerHandle {
 
     /// Stop server.
     fn stop(&mut self) {
-        let _ = self.server_handle.stop(false);
+        drop(self.server_handle.stop(false));
         self.thread_handle.take().unwrap().join().unwrap().unwrap();
     }
 
     /// Connect to server, returning a Tokio `TcpStream`.
     pub fn connect(&self) -> io::Result<TcpStream> {
-        TcpStream::from_std(net::TcpStream::connect(self.addr)?)
+        let stream = net::TcpStream::connect(self.addr)?;
+        stream.set_nonblocking(true)?;
+        TcpStream::from_std(stream)
     }
 }
 

@@ -18,6 +18,7 @@ const LW: usize = 1024;
 const HW: usize = 8 * 1024;
 
 bitflags! {
+    #[derive(Debug, Clone, Copy)]
     struct Flags: u8 {
         const EOF = 0b0001;
         const READABLE = 0b0010;
@@ -197,11 +198,11 @@ impl<T, U> Framed<T, U> {
                     }
                 }
 
-                log::trace!("attempting to decode a frame");
+                tracing::trace!("attempting to decode a frame");
 
                 match this.codec.decode(this.read_buf) {
                     Ok(Some(frame)) => {
-                        log::trace!("frame decoded from buffer");
+                        tracing::trace!("frame decoded from buffer");
                         return Poll::Ready(Some(Ok(frame)));
                     }
                     Err(err) => return Poll::Ready(Some(Err(err))),
@@ -233,19 +234,16 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Flush write buffer to underlying I/O stream.
-    pub fn flush<I>(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), U::Error>>
+    pub fn flush<I>(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
     where
         T: AsyncWrite,
         U: Encoder<I>,
     {
         let mut this = self.as_mut().project();
-        log::trace!("flushing framed transport");
+        tracing::trace!("flushing framed transport");
 
         while !this.write_buf.is_empty() {
-            log::trace!("writing; remaining={}", this.write_buf.len());
+            tracing::trace!("writing; remaining={}", this.write_buf.len());
 
             let n = ready!(this.io.as_mut().poll_write(cx, this.write_buf))?;
 
@@ -264,15 +262,12 @@ impl<T, U> Framed<T, U> {
         // Try flushing the underlying IO
         ready!(this.io.poll_flush(cx))?;
 
-        log::trace!("framed transport flushed");
+        tracing::trace!("framed transport flushed");
         Poll::Ready(Ok(()))
     }
 
     /// Flush write buffer and shutdown underlying I/O stream.
-    pub fn close<I>(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), U::Error>>
+    pub fn close<I>(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), U::Error>>
     where
         T: AsyncWrite,
         U: Encoder<I>,

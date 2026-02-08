@@ -1,6 +1,7 @@
 use std::{
     future::Future,
     io, mem,
+    num::NonZeroUsize,
     pin::Pin,
     rc::Rc,
     sync::{
@@ -17,11 +18,11 @@ use actix_rt::{
     Arbiter, ArbiterHandle, System,
 };
 use futures_core::{future::LocalBoxFuture, ready};
-use log::{error, info, trace};
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
+use tracing::{error, info, trace};
 
 use crate::{
     service::{BoxedServerService, InternalServiceFactory},
@@ -249,8 +250,11 @@ pub(crate) struct ServerWorkerConfig {
 
 impl Default for ServerWorkerConfig {
     fn default() -> Self {
-        // 512 is the default max blocking thread count of tokio runtime.
-        let max_blocking_threads = std::cmp::max(512 / num_cpus::get_physical(), 1);
+        let parallelism = std::thread::available_parallelism().map_or(2, NonZeroUsize::get);
+
+        // 512 is the default max blocking thread count of a Tokio runtime.
+        let max_blocking_threads = std::cmp::max(512 / parallelism, 1);
+
         Self {
             shutdown_timeout: Duration::from_secs(30),
             max_blocking_threads,
@@ -321,7 +325,7 @@ impl ServerWorker {
             // no actix system
             (None, Some(rt_handle)) => {
                 std::thread::Builder::new()
-                    .name(format!("actix-server worker {}", idx))
+                    .name(format!("actix-server worker {idx}"))
                     .spawn(move || {
                         let (worker_stopped_tx, worker_stopped_rx) = oneshot::channel();
 
@@ -337,11 +341,10 @@ impl ServerWorker {
                                     Ok((token, svc)) => services.push((idx, token, svc)),
 
                                     Err(err) => {
-                                        error!("Can not start worker: {:?}", err);
-                                        return Err(io::Error::new(
-                                            io::ErrorKind::Other,
-                                            format!("can not start server service {}", idx),
-                                        ));
+                                        error!("can not start worker: {err:?}");
+                                        return Err(io::Error::other(format!(
+                                            "can not start server service {idx}",
+                                        )));
                                     }
                                 }
                             }
@@ -436,13 +439,12 @@ impl ServerWorker {
                                 Ok((token, svc)) => services.push((idx, token, svc)),
 
                                 Err(err) => {
-                                    error!("Can not start worker: {:?}", err);
+                                    error!("can not start worker: {err:?}");
                                     Arbiter::current().stop();
                                     factory_tx
-                                        .send(Err(io::Error::new(
-                                            io::ErrorKind::Other,
-                                            format!("can not start server service {}", idx),
-                                        )))
+                                        .send(Err(io::Error::other(format!(
+                                            "can not start server service {idx}",
+                                        ))))
                                         .unwrap();
                                     return;
                                 }
@@ -476,7 +478,7 @@ impl ServerWorker {
 
     fn restart_service(&mut self, idx: usize, factory_id: usize) {
         let factory = &self.factories[factory_id];
-        trace!("Service {:?} failed, restarting", factory.name(idx));
+        trace!("service {:?} failed, restarting", factory.name(idx));
         self.services[idx].status = WorkerServiceStatus::Restarting;
         self.state = WorkerState::Restarting(Restart {
             factory_id,
@@ -508,7 +510,7 @@ impl ServerWorker {
                     Poll::Ready(Ok(_)) => {
                         if srv.status == WorkerServiceStatus::Unavailable {
                             trace!(
-                                "Service {:?} is available",
+                                "service {:?} is available",
                                 self.factories[srv.factory_idx].name(idx)
                             );
                             srv.status = WorkerServiceStatus::Available;
@@ -519,7 +521,7 @@ impl ServerWorker {
 
                         if srv.status == WorkerServiceStatus::Available {
                             trace!(
-                                "Service {:?} is unavailable",
+                                "service {:?} is unavailable",
                                 self.factories[srv.factory_idx].name(idx)
                             );
                             srv.status = WorkerServiceStatus::Unavailable;
@@ -527,7 +529,7 @@ impl ServerWorker {
                     }
                     Poll::Ready(Err(_)) => {
                         error!(
-                            "Service {:?} readiness check returned error, restarting",
+                            "service {:?} readiness check returned error, restarting",
                             self.factories[srv.factory_idx].name(idx)
                         );
                         srv.status = WorkerServiceStatus::Failed;
@@ -585,16 +587,14 @@ impl Future for ServerWorker {
         let this = self.as_mut().get_mut();
 
         // `StopWorker` message handler
-        if let Poll::Ready(Some(Stop { graceful, tx })) =
-            Pin::new(&mut this.stop_rx).poll_recv(cx)
-        {
+        if let Poll::Ready(Some(Stop { graceful, tx })) = this.stop_rx.poll_recv(cx) {
             let num = this.counter.total();
             if num == 0 {
-                info!("Shutting down idle worker");
+                info!("shutting down idle worker");
                 let _ = tx.send(true);
                 return Poll::Ready(());
             } else if graceful {
-                info!("Graceful worker shutdown; finishing {} connections", num);
+                info!("graceful worker shutdown; finishing {} connections", num);
                 this.shutdown(false);
 
                 this.state = WorkerState::Shutdown(Shutdown {
@@ -603,7 +603,7 @@ impl Future for ServerWorker {
                     tx,
                 });
             } else {
-                info!("Force shutdown worker, closing {} connections", num);
+                info!("force shutdown worker, closing {} connections", num);
                 this.shutdown(true);
 
                 let _ = tx.send(false);
@@ -623,12 +623,13 @@ impl Future for ServerWorker {
                     self.poll(cx)
                 }
             },
+
             WorkerState::Restarting(ref mut restart) => {
                 let factory_id = restart.factory_id;
                 let token = restart.token;
 
-                let (token_new, service) = ready!(restart.fut.as_mut().poll(cx))
-                    .unwrap_or_else(|_| {
+                let (token_new, service) =
+                    ready!(restart.fut.as_mut().poll(cx)).unwrap_or_else(|_| {
                         panic!(
                             "Can not restart {:?} service",
                             this.factories[factory_id].name(token)
@@ -638,7 +639,7 @@ impl Future for ServerWorker {
                 assert_eq!(token, token_new);
 
                 trace!(
-                    "Service {:?} has been restarted",
+                    "service {:?} has been restarted",
                     this.factories[factory_id].name(token)
                 );
 
@@ -647,9 +648,10 @@ impl Future for ServerWorker {
 
                 self.poll(cx)
             }
+
             WorkerState::Shutdown(ref mut shutdown) => {
                 // drop all pending connections in rx channel.
-                while let Poll::Ready(Some(conn)) = Pin::new(&mut this.conn_rx).poll_recv(cx) {
+                while let Poll::Ready(Some(conn)) = this.conn_rx.poll_recv(cx) {
                     // WorkerCounterGuard is needed as Accept thread has incremented counter.
                     // It's guard's job to decrement the counter together with drop of Conn.
                     let guard = this.counter.guard();
@@ -680,12 +682,13 @@ impl Future for ServerWorker {
                     shutdown.timer.as_mut().poll(cx)
                 }
             }
+
             // actively poll stream and handle worker command
             WorkerState::Available => loop {
                 match this.check_readiness(cx) {
                     Ok(true) => {}
                     Ok(false) => {
-                        trace!("Worker is unavailable");
+                        trace!("worker is unavailable");
                         this.state = WorkerState::Unavailable;
                         return self.poll(cx);
                     }
@@ -696,10 +699,13 @@ impl Future for ServerWorker {
                 }
 
                 // handle incoming io stream
-                match ready!(Pin::new(&mut this.conn_rx).poll_recv(cx)) {
+                match ready!(this.conn_rx.poll_recv(cx)) {
                     Some(msg) => {
                         let guard = this.counter.guard();
-                        let _ = this.services[msg.token].service.call((guard, msg.io));
+                        let _ = this.services[msg.token]
+                            .service
+                            .call((guard, msg.io))
+                            .into_inner();
                     }
                     None => return Poll::Ready(()),
                 };
@@ -708,9 +714,7 @@ impl Future for ServerWorker {
     }
 }
 
-fn wrap_worker_services(
-    services: Vec<(usize, usize, BoxedServerService)>,
-) -> Vec<WorkerService> {
+fn wrap_worker_services(services: Vec<(usize, usize, BoxedServerService)>) -> Vec<WorkerService> {
     services
         .into_iter()
         .fold(Vec::new(), |mut services, (idx, token, service)| {

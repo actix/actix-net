@@ -1,36 +1,36 @@
 [package]
 name = "actix-codec"
-version = "0.4.2"
-authors = [
-    "Nikolay Kim <fafhrd91@gmail.com>",
-    "Rob Ede <robjtede@icloud.com>",
-]
+version = "0.5.2"
+authors = ["Nikolay Kim <fafhrd91@gmail.com>", "Rob Ede <robjtede@icloud.com>"]
 description = "Codec utilities for working with framed protocols"
 keywords = ["network", "framework", "async", "futures"]
 repository = "https://github.com/actix/actix-net"
 categories = ["network-programming", "asynchronous"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition.workspace = true
+rust-version.workspace = true
 
-[lib]
-name = "actix_codec"
-path = "src/lib.rs"
+[package.metadata.cargo_check_external_types]
+allowed_external_types = ["bytes::*", "futures_core::*", "futures_sink::*", "tokio::*", "tokio_util::*"]
 
 [dependencies]
-bitflags = "1.2.1"
+bitflags = "2"
 bytes = "1"
 futures-core = { version = "0.3.7", default-features = false }
 futures-sink = { version = "0.3.7", default-features = false }
-log = "0.4"
 memchr = "2.3"
 pin-project-lite = "0.2"
-tokio = "1.13.1"
-tokio-util = { version = "0.6", features = ["codec", "io"] }
+tokio = "1.44.2"
+tokio-util = { version = "0.7", features = ["codec", "io"] }
+tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
 [dev-dependencies]
-criterion = { version = "0.3", features = ["html_reports"] }
+criterion = { version = "0.5", features = ["html_reports"] }
 tokio-test = "0.4.2"
 
 [[bench]]
 name = "lines"
 harness = false
+
+[lints]
+workspace = true

@@ -1,12 +1,18 @@
+#![allow(missing_docs)]
+
+use std::{
+    collections::VecDeque,
+    io::{self, Write},
+    pin::Pin,
+    task::{
+        Context,
+        Poll::{self, Pending, Ready},
+    },
+};
+
 use actix_codec::*;
-use bytes::Buf;
-use bytes::{BufMut, BytesMut};
+use bytes::{Buf as _, BufMut as _, BytesMut};
 use futures_sink::Sink;
-use std::collections::VecDeque;
-use std::io::{self, Write};
-use std::pin::Pin;
-use std::task::Poll::{Pending, Ready};
-use std::task::{Context, Poll};
 use tokio_test::{assert_ready, task};
 
 macro_rules! bilateral {
@@ -14,26 +20,6 @@ macro_rules! bilateral {
         let mut v = VecDeque::new();
         v.extend(vec![$($x),*]);
         Bilateral { calls: v }
-    }};
-}
-
-macro_rules! assert_ready {
-    ($e:expr) => {{
-        use core::task::Poll::*;
-        match $e {
-            Ready(v) => v,
-            Pending => panic!("pending"),
-        }
-    }};
-    ($e:expr, $($msg:tt),+) => {{
-        use core::task::Poll::*;
-        match $e {
-            Ready(v) => v,
-            Pending => {
-                let msg = format_args!($($msg),+);
-                panic!("pending; {}", msg)
-            }
-        }
     }};
 }
 
@@ -51,7 +37,7 @@ impl Write for Bilateral {
                 Ok(data.len())
             }
             Some(Err(err)) => Err(err),
-            None => panic!("unexpected write; {:?}", src),
+            None => panic!("unexpected write; {src:?}"),
         }
     }
 
@@ -77,10 +63,7 @@ impl AsyncWrite for Bilateral {
             other => Ready(other),
         }
     }
-    fn poll_shutdown(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<Result<(), io::Error>> {
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         unimplemented!()
     }
 }

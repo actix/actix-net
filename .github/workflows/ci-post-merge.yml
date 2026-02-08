@@ -1,0 +1,129 @@
+name: CI (post-merge)
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_and_test_nightly:
+    strategy:
+      fail-fast: false
+      matrix:
+        # prettier-ignore
+        target:
+          - { name: Linux, os: ubuntu-latest, triple: x86_64-unknown-linux-gnu }
+          - { name: macOS, os: macos-latest, triple: x86_64-apple-darwin }
+          - { name: Windows, os: windows-latest, triple: x86_64-pc-windows-msvc }
+          - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
+        version:
+          - nightly
+
+    name: ${{ matrix.target.name }} / ${{ matrix.version }}
+    runs-on: ${{ matrix.target.os }}
+
+    env: {}
+
+    steps:
+      - name: Setup Routing
+        if: matrix.target.os == 'macos-latest'
+        run: sudo ifconfig lo0 alias 127.0.0.3
+
+      - uses: actions/checkout@v6
+
+      - name: Free Disk Space
+        if: matrix.target.os == 'ubuntu-latest'
+        run: ./scripts/free-disk-space.sh
+
+      - name: Setup mold linker
+        if: matrix.target.os == 'ubuntu-latest'
+        uses: rui314/setup-mold@v1
+
+      - name: Install nasm
+        if: matrix.target.os == 'windows-latest'
+        uses: ilammy/setup-nasm@v1.5.2
+
+      - name: Install OpenSSL
+        if: matrix.target.os == 'windows-latest'
+        shell: bash
+        run: |
+          set -e
+          choco install openssl --version=1.1.1.2100 -y --no-progress
+          echo 'OPENSSL_DIR=C:\Program Files\OpenSSL' >> $GITHUB_ENV
+          echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
+
+      - name: Install Rust (${{ matrix.version }})
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+        with:
+          toolchain: ${{ matrix.version }}
+
+      - name: Install just, cargo-hack, cargo-nextest, cargo-ci-cache-clean
+        uses: taiki-e/install-action@v2.67.18
+        with:
+          tool: just,cargo-hack,cargo-nextest,cargo-ci-cache-clean
+
+      - name: check lib
+        if: >
+          matrix.target.os != 'ubuntu-latest'
+          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        run: cargo ci-check-lib
+      - name: check lib
+        if: matrix.target.os == 'ubuntu-latest'
+        run: cargo ci-check-lib-linux
+      - name: check lib
+        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
+        run: cargo ci-check-min
+
+      - name: check full
+        # TODO: compile OpenSSL and run tests on MinGW
+        if: >
+          matrix.target.os != 'ubuntu-latest'
+          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        run: cargo ci-check
+      - name: check all
+        if: matrix.target.os == 'ubuntu-latest'
+        run: cargo ci-check-linux
+
+      - name: tests
+        run: just test
+
+      # TODO: re-instate some io-uring tests PRs
+      # - name: tests
+      #   if: matrix.target.os == 'ubuntu-latest'
+      #   run: >-
+      #     sudo bash -c "
+      #     ulimit -Sl 512
+      #     && ulimit -Hl 512
+      #     && PATH=$PATH:/usr/share/rust/.cargo/bin
+      #     && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-020
+      #     && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-021
+      #     && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux
+      #     "
+
+      - name: CI cache clean
+        run: cargo-ci-cache-clean
+
+  minimal-versions:
+    name: minimal versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust (nightly)
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+        with:
+          toolchain: nightly
+
+      - name: Install cargo-hack & cargo-minimal-versions
+        uses: taiki-e/install-action@v2.67.18
+        with:
+          tool: cargo-hack,cargo-minimal-versions
+
+      - name: Check With Minimal Versions
+        run: cargo minimal-versions check

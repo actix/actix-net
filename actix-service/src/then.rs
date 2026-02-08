@@ -241,15 +241,15 @@ mod tests {
     use alloc::rc::Rc;
     use core::{
         cell::Cell,
+        future::{ready, Ready},
         task::{Context, Poll},
     };
 
     use futures_util::future::lazy;
 
     use crate::{
-        err, ok,
         pipeline::{pipeline, pipeline_factory},
-        ready, Ready, Service, ServiceFactory,
+        Service, ServiceFactory,
     };
 
     #[derive(Clone)]
@@ -267,8 +267,8 @@ mod tests {
 
         fn call(&self, req: Result<&'static str, &'static str>) -> Self::Future {
             match req {
-                Ok(msg) => ok(msg),
-                Err(_) => err(()),
+                Ok(msg) => ready(Ok(msg)),
+                Err(_) => ready(Err(())),
             }
         }
     }
@@ -287,8 +287,8 @@ mod tests {
 
         fn call(&self, req: Result<&'static str, ()>) -> Self::Future {
             match req {
-                Ok(msg) => ok((msg, "ok")),
-                Err(()) => ok(("srv2", "err")),
+                Ok(msg) => ready(Ok((msg, "ok"))),
+                Err(()) => ready(Ok(("srv2", "err"))),
             }
         }
     }

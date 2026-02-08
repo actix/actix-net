@@ -3,7 +3,7 @@
 > A collection of lower-level libraries for composable network services.
 
 [![CI](https://github.com/actix/actix-net/actions/workflows/ci.yml/badge.svg?event=push&style=flat-square)](https://github.com/actix/actix-net/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/actix/actix-net/branch/master/graph/badge.svg)](https://codecov.io/gh/actix/actix-net)
+[![codecov](https://codecov.io/gh/actix/actix-net/graph/badge.svg?token=8rKIZKtLLm)](https://codecov.io/gh/actix/actix-net)
 [![Chat on Discord](https://img.shields.io/discord/771444961383153695?label=chat&logo=discord)](https://discord.gg/NWpN5mmg3x)
 [![Dependency Status](https://deps.rs/repo/github/actix/actix-net/status.svg)](https://deps.rs/repo/github/actix/actix-net)
 
@@ -11,10 +11,9 @@
 
 See example folders for [`actix-server`](./actix-server/examples) and [`actix-tls`](./actix-tls/examples).
 
-### MSRV
+## MSRV
 
-Most crates in this repo's have a Minimum Supported Rust Version (MSRV) of 1.46.0. Only `actix-tls`
-and `actix-server` have MSRV of 1.52.0.
+Crates in this repo currently have a Minimum Supported Rust Version (MSRV) of 1.88. As a policy, we permit MSRV increases in non-breaking releases.
 
 ## License
 

@@ -1,3 +1,4 @@
+use core::future::{ready, Ready};
 use std::{
     future::Future,
     io,
@@ -10,9 +11,8 @@ use std::{
 
 use actix_rt::task::{spawn_blocking, JoinHandle};
 use actix_service::{Service, ServiceFactory};
-use actix_utils::future::{ok, Ready};
 use futures_core::{future::LocalBoxFuture, ready};
-use log::trace;
+use tracing::trace;
 
 use super::{ConnectError, ConnectInfo, Host, Resolve};
 
@@ -45,7 +45,7 @@ impl<R: Host> ServiceFactory<ConnectInfo<R>> for Resolver {
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(self.resolver.clone())
+        ready(Ok(self.resolver.clone()))
     }
 }
 

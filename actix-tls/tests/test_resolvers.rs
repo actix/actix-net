@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(feature = "connect")]
 
 use std::{
@@ -8,11 +9,10 @@ use std::{
 use actix_rt::net::TcpStream;
 use actix_server::TestServer;
 use actix_service::{fn_service, Service, ServiceFactory};
-use futures_core::future::LocalBoxFuture;
-
 use actix_tls::connect::{
     ConnectError, ConnectInfo, Connection, Connector, Host, Resolve, Resolver,
 };
+use futures_core::future::LocalBoxFuture;
 
 #[actix_rt::test]
 async fn custom_resolver() {
@@ -26,7 +26,7 @@ async fn custom_resolver() {
             port: u16,
         ) -> LocalBoxFuture<'a, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>> {
             Box::pin(async move {
-                let local = format!("127.0.0.1:{}", port).parse().unwrap();
+                let local = format!("127.0.0.1:{port}").parse().unwrap();
                 Ok(vec![local])
             })
         }
@@ -50,13 +50,12 @@ async fn custom_resolver_connect() {
         Connector::new(resolver)
     }
 
-    use trust_dns_resolver::TokioAsyncResolver;
+    use hickory_resolver::TokioResolver;
 
-    let srv =
-        TestServer::start(|| fn_service(|_io: TcpStream| async { Ok::<_, io::Error>(()) }));
+    let srv = TestServer::start(|| fn_service(|_io: TcpStream| async { Ok::<_, io::Error>(()) }));
 
     struct MyResolver {
-        trust_dns: TokioAsyncResolver,
+        hickory_dns: TokioResolver,
     }
 
     impl Resolve for MyResolver {
@@ -67,7 +66,7 @@ async fn custom_resolver_connect() {
         ) -> LocalBoxFuture<'a, Result<Vec<SocketAddr>, Box<dyn std::error::Error>>> {
             Box::pin(async move {
                 let res = self
-                    .trust_dns
+                    .hickory_dns
                     .lookup_ip(host)
                     .await?
                     .iter()
@@ -79,7 +78,7 @@ async fn custom_resolver_connect() {
     }
 
     let resolver = MyResolver {
-        trust_dns: TokioAsyncResolver::tokio_from_system_conf().unwrap(),
+        hickory_dns: TokioResolver::builder_tokio().unwrap().build(),
     };
 
     let factory = connector_factory(Resolver::custom(resolver));

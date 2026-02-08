@@ -1,10 +1,11 @@
+#![allow(missing_docs)]
+
 use std::{
     future::Future,
     time::{Duration, Instant},
 };
 
 use actix_rt::{task::JoinError, Arbiter, System};
-
 #[cfg(not(feature = "io-uring"))]
 use {
     std::{sync::mpsc::channel, thread},
@@ -31,6 +32,34 @@ fn run_with_code() {
     System::current().stop_with_code(42);
     let exit_code = sys.run_with_code().expect("system stop should not error");
     assert_eq!(exit_code, 42);
+}
+
+#[cfg(not(feature = "io-uring"))]
+#[test]
+fn stop_future_resolves() {
+    let sys = System::new();
+    let stop = sys.stop_future();
+
+    let exit_code = sys.block_on(async move {
+        System::current().stop_with_code(7);
+        stop.await.expect("stop future should resolve")
+    });
+
+    assert_eq!(exit_code, 7);
+}
+
+#[cfg(not(feature = "io-uring"))]
+#[test]
+fn into_parts_stop_future_resolves() {
+    let sys = System::new();
+    let (rt, stop) = sys.into_parts();
+
+    let exit_code = rt.block_on(async move {
+        System::current().stop_with_code(9);
+        stop.await.expect("stop future should resolve")
+    });
+
+    assert_eq!(exit_code, 9);
 }
 
 #[test]
@@ -271,6 +300,65 @@ fn new_system_with_tokio() {
 
 #[cfg(not(feature = "io-uring"))]
 #[test]
+fn new_system_with_shared_tokio_runtime() {
+    use std::sync::Arc;
+
+    let (tx, rx) = channel();
+
+    let rt = Arc::new(
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_io()
+            .enable_time()
+            .worker_threads(2)
+            .max_blocking_threads(2)
+            .build()
+            .unwrap(),
+    );
+
+    let res = System::with_tokio_rt({
+        let rt = rt.clone();
+        move || rt
+    })
+    .block_on(async {
+        actix_rt::time::sleep(Duration::from_millis(1)).await;
+
+        tokio::task::spawn(async move {
+            tx.send(7).unwrap();
+        })
+        .await
+        .unwrap();
+
+        321usize
+    });
+
+    assert_eq!(res, 321);
+    assert_eq!(rx.recv().unwrap(), 7);
+}
+
+#[cfg(not(feature = "io-uring"))]
+#[test]
+fn new_system_with_static_tokio_runtime() {
+    use std::sync::OnceLock;
+
+    static TOKIO: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+
+    let res = System::with_tokio_rt(|| -> &'static tokio::runtime::Runtime {
+        TOKIO.get_or_init(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_io()
+                .enable_time()
+                .worker_threads(1)
+                .build()
+                .unwrap()
+        })
+    })
+    .block_on(async { 7usize });
+
+    assert_eq!(res, 7);
+}
+
+#[cfg(not(feature = "io-uring"))]
+#[test]
 fn new_arbiter_with_tokio() {
     use std::sync::{
         atomic::{AtomicBool, Ordering},
@@ -300,6 +388,45 @@ fn new_arbiter_with_tokio() {
     arb.join().unwrap();
 
     assert!(!counter.load(Ordering::SeqCst));
+}
+
+#[cfg(not(feature = "io-uring"))]
+#[test]
+fn new_arbiter_with_shared_tokio_runtime() {
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
+    let _ = System::new();
+
+    let rt = Arc::new(
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .worker_threads(2)
+            .build()
+            .unwrap(),
+    );
+
+    let arb = Arbiter::with_tokio_rt({
+        let rt = rt.clone();
+        move || rt
+    });
+
+    let flag = Arc::new(AtomicBool::new(false));
+
+    let flag1 = flag.clone();
+    let did_spawn = arb.spawn(async move {
+        actix_rt::time::sleep(Duration::from_millis(1)).await;
+        flag1.store(true, Ordering::SeqCst);
+        Arbiter::current().stop();
+    });
+
+    assert!(did_spawn);
+
+    arb.join().unwrap();
+
+    assert!(flag.load(Ordering::SeqCst));
 }
 
 #[test]
@@ -359,7 +486,7 @@ fn tokio_uring_arbiter() {
                 let f = tokio_uring::fs::File::create("test.txt").await.unwrap();
                 let buf = b"Hello World!";
 
-                let (res, _) = f.write_at(&buf[..], 0).await;
+                let (res, _) = f.write_all_at(&buf[..], 0).await;
                 assert!(res.is_ok());
 
                 f.sync_all().await.unwrap();

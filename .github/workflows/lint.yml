@@ -1,0 +1,69 @@
+name: Lint
+
+on:
+  pull_request: {}
+  merge_group: { types: [checks_requested] }
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+        with:
+          toolchain: nightly
+          components: rustfmt
+
+      - name: Rustfmt Check
+        run: cargo fmt --all -- --check
+
+  clippy:
+    permissions:
+      contents: write
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+        with: { components: clippy }
+
+      - uses: giraffate/clippy-action@v1.0.1
+        with:
+          reporter: "github-pr-check"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          clippy_flags: --workspace --all-features --tests --examples --bins -- -Dclippy::todo -Aunknown_lints
+
+  check-external-types:
+    if: false # rustdoc mismatch currently
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust (${{ vars.RUST_VERSION_EXTERNAL_TYPES }})
+        uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
+        with:
+          toolchain: ${{ vars.RUST_VERSION_EXTERNAL_TYPES }}
+
+      - name: Install just
+        uses: taiki-e/install-action@v2.67.18
+        with:
+          tool: just
+
+      - name: Install cargo-check-external-types
+        uses: taiki-e/cache-cargo-install-action@v3.0.1
+        with:
+          tool: cargo-check-external-types
+
+      - name: check external types
+        run: just check-external-types-all +${{ vars.RUST_VERSION_EXTERNAL_TYPES }}

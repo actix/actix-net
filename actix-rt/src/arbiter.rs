@@ -16,7 +16,7 @@ use crate::system::{System, SystemCommand};
 pub(crate) static COUNT: AtomicUsize = AtomicUsize::new(0);
 
 thread_local!(
-    static HANDLE: RefCell<Option<ArbiterHandle>> = RefCell::new(None);
+    static HANDLE: RefCell<Option<ArbiterHandle>> = const { RefCell::new(None) };
 );
 
 pub(crate) enum ArbiterCommand {
@@ -99,24 +99,29 @@ impl Arbiter {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Arbiter {
         Self::with_tokio_rt(|| {
-            crate::runtime::default_tokio_runtime()
-                .expect("Cannot create new Arbiter's Runtime.")
+            crate::runtime::default_tokio_runtime().expect("Cannot create new Arbiter's Runtime.")
         })
     }
 
     /// Spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
     ///
+    /// The closure may return any type that can be converted into [`Runtime`], such as
+    /// `tokio::runtime::Runtime`, `Arc<tokio::runtime::Runtime>`, or
+    /// `&'static tokio::runtime::Runtime`.
+    ///
     /// [tokio-runtime]: tokio::runtime::Runtime
+    /// [`Runtime`]: crate::Runtime
     #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
-    pub fn with_tokio_rt<F>(runtime_factory: F) -> Arbiter
+    pub fn with_tokio_rt<F, R>(runtime_factory: F) -> Arbiter
     where
-        F: Fn() -> tokio::runtime::Runtime + Send + 'static,
+        F: FnOnce() -> R + Send + 'static,
+        R: Into<crate::runtime::Runtime> + Send + 'static,
     {
         let sys = System::current();
         let system_id = sys.id();
         let arb_id = COUNT.fetch_add(1, Ordering::Relaxed);
 
-        let name = format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id);
+        let name = format!("actix-rt|system:{system_id}|arbiter:{arb_id}");
         let (tx, rx) = mpsc::unbounded_channel();
 
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
@@ -126,7 +131,7 @@ impl Arbiter {
             .spawn({
                 let tx = tx.clone();
                 move || {
-                    let rt = crate::runtime::Runtime::from(runtime_factory());
+                    let rt = runtime_factory().into();
                     let hnd = ArbiterHandle::new(tx);
 
                     System::set_current(sys);
@@ -149,9 +154,7 @@ impl Arbiter {
                         .send(SystemCommand::DeregisterArbiter(arb_id));
                 }
             })
-            .unwrap_or_else(|err| {
-                panic!("Cannot spawn Arbiter's thread: {:?}. {:?}", &name, err)
-            });
+            .unwrap_or_else(|err| panic!("Cannot spawn Arbiter's thread: {name:?}: {err:?}"));
 
         ready_rx.recv().unwrap();
 
@@ -201,9 +204,7 @@ impl Arbiter {
                         .send(SystemCommand::DeregisterArbiter(arb_id));
                 }
             })
-            .unwrap_or_else(|err| {
-                panic!("Cannot spawn Arbiter's thread: {:?}. {:?}", &name, err)
-            });
+            .unwrap_or_else(|err| panic!("Cannot spawn Arbiter's thread: {name:?}: {err:?}"));
 
         ready_rx.recv().unwrap();
 
@@ -260,6 +261,7 @@ impl Arbiter {
     /// If you require a result, include a response channel in the future.
     ///
     /// Returns true if future was sent successfully and false if the Arbiter has died.
+    #[track_caller]
     pub fn spawn<Fut>(&self, future: Fut) -> bool
     where
         Fut: Future<Output = ()> + Send + 'static,
@@ -275,6 +277,7 @@ impl Arbiter {
     /// channel in the function.
     ///
     /// Returns true if function was sent successfully and false if the Arbiter has died.
+    #[track_caller]
     pub fn spawn_fn<F>(&self, f: F) -> bool
     where
         F: FnOnce() + Send + 'static,
@@ -301,7 +304,7 @@ impl Future for ArbiterRunner {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // process all items currently buffered in channel
         loop {
-            match ready!(Pin::new(&mut self.rx).poll_recv(cx)) {
+            match ready!(self.rx.poll_recv(cx)) {
                 // channel closed; no more messages can be received
                 None => return Poll::Ready(()),
 

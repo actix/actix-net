@@ -34,14 +34,13 @@
 //! ```
 //!
 //! # `io-uring` Support
+//!
 //! There is experimental support for using io-uring with this crate by enabling the
 //! `io-uring` feature. For now, it is semver exempt.
 //!
 //! Note that there are currently some unimplemented parts of using `actix-rt` with `io-uring`.
 //! In particular, when running a `System`, only `System::block_on` is supported.
 
-#![deny(rust_2018_idioms, nonstandard_style)]
-#![warn(future_incompatible, missing_docs)]
 #![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
@@ -51,13 +50,10 @@ compile_error!("io_uring is a linux only feature.");
 
 use std::future::Future;
 
-use tokio::task::JoinHandle;
-
 // Cannot define a main macro when compiled into test harness.
 // Workaround for https://github.com/rust-lang/rust/issues/62127.
 #[cfg(all(feature = "macros", not(test)))]
 pub use actix_macros::main;
-
 #[cfg(feature = "macros")]
 pub use actix_macros::test;
 
@@ -65,11 +61,15 @@ mod arbiter;
 mod runtime;
 mod system;
 
-pub use self::arbiter::{Arbiter, ArbiterHandle};
-pub use self::runtime::Runtime;
-pub use self::system::{System, SystemRunner};
-
+#[deprecated(since = "2.11.0", note = "Prefer `std::pin::pin!`.")]
 pub use tokio::pin;
+use tokio::task::JoinHandle;
+
+pub use self::{
+    arbiter::{Arbiter, ArbiterHandle},
+    runtime::Runtime,
+    system::{System, SystemRunner, SystemStop},
+};
 
 pub mod signal {
     //! Asynchronous signal handling (Tokio re-exports).
@@ -88,16 +88,17 @@ pub mod net {
     use std::{
         future::Future,
         io,
+        pin::pin,
         task::{Context, Poll},
     };
 
-    pub use tokio::io::Ready;
-    use tokio::io::{AsyncRead, AsyncWrite, Interest};
-    pub use tokio::net::UdpSocket;
-    pub use tokio::net::{TcpListener, TcpSocket, TcpStream};
-
+    use tokio::io::{AsyncRead, AsyncWrite, BufReader, Interest};
     #[cfg(unix)]
     pub use tokio::net::{UnixDatagram, UnixListener, UnixStream};
+    pub use tokio::{
+        io::Ready,
+        net::{TcpListener, TcpSocket, TcpStream, UdpSocket},
+    };
 
     /// Extension trait over async read+write types that can also signal readiness.
     #[doc(hidden)]
@@ -116,14 +117,12 @@ pub mod net {
     impl ActixStream for TcpStream {
         fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
             let ready = self.ready(Interest::READABLE);
-            tokio::pin!(ready);
-            ready.poll(cx)
+            pin!(ready).poll(cx)
         }
 
         fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
             let ready = self.ready(Interest::WRITABLE);
-            tokio::pin!(ready);
-            ready.poll(cx)
+            pin!(ready).poll(cx)
         }
     }
 
@@ -131,14 +130,12 @@ pub mod net {
     impl ActixStream for UnixStream {
         fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
             let ready = self.ready(Interest::READABLE);
-            tokio::pin!(ready);
-            ready.poll(cx)
+            pin!(ready).poll(cx)
         }
 
         fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
             let ready = self.ready(Interest::WRITABLE);
-            tokio::pin!(ready);
-            ready.poll(cx)
+            pin!(ready).poll(cx)
         }
     }
 
@@ -151,15 +148,24 @@ pub mod net {
             (**self).poll_write_ready(cx)
         }
     }
+
+    impl<Io: ActixStream> ActixStream for BufReader<Io> {
+        fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            self.get_ref().poll_read_ready(cx)
+        }
+
+        fn poll_write_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<Ready>> {
+            self.get_ref().poll_write_ready(cx)
+        }
+    }
 }
 
 pub mod time {
     //! Utilities for tracking time (Tokio re-exports).
 
-    pub use tokio::time::Instant;
-    pub use tokio::time::{interval, interval_at, Interval};
-    pub use tokio::time::{sleep, sleep_until, Sleep};
-    pub use tokio::time::{timeout, Timeout};
+    pub use tokio::time::{
+        interval, interval_at, sleep, sleep_until, timeout, Instant, Interval, Sleep, Timeout,
+    };
 }
 
 pub mod task {
@@ -198,6 +204,7 @@ pub mod task {
 /// assert!(handle.await.unwrap_err().is_cancelled());
 /// # });
 /// ```
+#[track_caller]
 #[inline]
 pub fn spawn<Fut>(f: Fut) -> JoinHandle<Fut::Output>
 where
