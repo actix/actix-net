@@ -49,21 +49,16 @@ impl<R: Host> ServiceFactory<ConnectInfo<R>> for Resolver {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 enum ResolverKind {
     /// Built-in DNS resolver.
     ///
     /// See [`std::net::ToSocketAddrs`] trait.
+    #[default]
     Default,
 
     /// Custom, user-provided DNS resolver.
     Custom(Rc<dyn Resolve>),
-}
-
-impl Default for ResolverKind {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 /// DNS resolver service.

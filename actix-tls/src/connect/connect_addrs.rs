@@ -4,8 +4,9 @@ use std::{
     net::SocketAddr,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub(crate) enum ConnectAddrs {
+    #[default]
     None,
     One(SocketAddr),
     // TODO: consider using smallvec
@@ -19,12 +20,6 @@ impl ConnectAddrs {
 
     pub(crate) fn is_resolved(&self) -> bool {
         !self.is_unresolved()
-    }
-}
-
-impl Default for ConnectAddrs {
-    fn default() -> Self {
-        Self::None
     }
 }
 
