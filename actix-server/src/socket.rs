@@ -281,4 +281,36 @@ mod tests {
             assert!(format!("{lst}").contains("/tmp/sock.xxxxx"));
         }
     }
+
+    #[test]
+    #[cfg(unix)]
+    fn uds_deregister_does_not_unlink_socket_file() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        static CNT: AtomicUsize = AtomicUsize::new(0);
+
+        let name = format!(
+            "actix-server-test-uds-{}-{}.sock",
+            std::process::id(),
+            CNT.fetch_add(1, Ordering::Relaxed)
+        );
+        let path = std::env::temp_dir().join(name);
+
+        let _ = std::fs::remove_file(&path);
+
+        let mut lst = MioListener::Uds(MioUnixListener::bind(&path).unwrap());
+        assert!(path.exists());
+
+        let poll = mio::Poll::new().unwrap();
+        poll.registry()
+            .register(&mut lst, mio::Token(0), mio::Interest::READABLE)
+            .unwrap();
+        poll.registry().deregister(&mut lst).unwrap();
+
+        // Regression test for https://github.com/actix/actix-net/issues/364.
+        assert!(path.exists());
+
+        drop(lst);
+        assert!(!path.exists());
+    }
 }
