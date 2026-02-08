@@ -224,20 +224,15 @@ impl WorkerService {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum WorkerServiceStatus {
     Available,
+    #[default]
     Unavailable,
     Failed,
     Restarting,
     Stopping,
     Stopped,
-}
-
-impl Default for WorkerServiceStatus {
-    fn default() -> Self {
-        Self::Unavailable
-    }
 }
 
 /// Config for worker behavior passed down from server builder.
@@ -543,8 +538,10 @@ impl ServerWorker {
     }
 }
 
+#[derive(Default)]
 enum WorkerState {
     Available,
+    #[default]
     Unavailable,
     Restarting(Restart),
     Shutdown(Shutdown),
@@ -566,12 +563,6 @@ struct Shutdown {
 
     /// Notify caller of the shutdown outcome (graceful/force).
     tx: oneshot::Sender<bool>,
-}
-
-impl Default for WorkerState {
-    fn default() -> Self {
-        Self::Unavailable
-    }
 }
 
 impl Drop for ServerWorker {
