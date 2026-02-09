@@ -57,7 +57,7 @@ where
         AndThenServiceResponse {
             state: State::A {
                 fut: self.0 .0.call(req),
-                b: Some(self.0.clone()),
+                b: self.0.clone(),
             },
         }
     }
@@ -84,7 +84,7 @@ pin_project! {
         A {
             #[pin]
             fut: A::Future,
-            b: Option<Rc<(A, B)>>,
+            b: Rc<(A, B)>,
         },
         B {
             #[pin]
@@ -101,17 +101,17 @@ where
     type Output = Result<B::Response, A::Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.as_mut().project();
+        loop {
+            let mut this = self.as_mut().project();
 
-        match this.state.as_mut().project() {
-            StateProj::A { fut, b } => {
-                let res = ready!(fut.poll(cx))?;
-                let b = b.take().unwrap();
-                let fut = b.1.call(res);
-                this.state.set(State::B { fut });
-                self.poll(cx)
+            match this.state.as_mut().project() {
+                StateProj::A { fut, b } => {
+                    let res = ready!(fut.poll(cx))?;
+                    let fut = b.1.call(res);
+                    this.state.set(State::B { fut });
+                }
+                StateProj::B { fut } => return fut.poll(cx),
             }
-            StateProj::B { fut } => fut.poll(cx),
         }
     }
 }

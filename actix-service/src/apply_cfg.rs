@@ -209,24 +209,26 @@ where
     type Output = Result<S, SF::InitError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.as_mut().project();
+        loop {
+            let mut this = self.as_mut().project();
 
-        match this.state.as_mut().project() {
-            StateProj::A { fut } => {
-                let svc = ready!(fut.poll(cx))?;
-                this.state.set(State::B { svc });
-                self.poll(cx)
-            }
-            StateProj::B { svc } => {
-                ready!(svc.poll_ready(cx))?;
-                {
-                    let (_, f) = &**this.store;
-                    let fut = f(this.cfg.take().unwrap(), svc);
+            match this.state.as_mut().project() {
+                StateProj::A { fut } => {
+                    let svc = ready!(fut.poll(cx))?;
+                    this.state.set(State::B { svc });
+                }
+                StateProj::B { svc } => {
+                    ready!(svc.poll_ready(cx))?;
+
+                    let fut = {
+                        let (_, f) = &**this.store;
+                        f(this.cfg.take().unwrap(), svc)
+                    };
+
                     this.state.set(State::C { fut });
                 }
-                self.poll(cx)
+                StateProj::C { fut } => return fut.poll(cx),
             }
-            StateProj::C { fut } => fut.poll(cx),
         }
     }
 }
