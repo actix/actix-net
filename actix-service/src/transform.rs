@@ -205,16 +205,17 @@ where
     type Output = Result<T::Transform, T::InitError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.as_mut().project();
+        loop {
+            let mut this = self.as_mut().project();
 
-        match this.state.as_mut().project() {
-            ApplyTransformFutureStateProj::A { fut } => {
-                let srv = ready!(fut.poll(cx))?;
-                let fut = this.store.0.new_transform(srv);
-                this.state.set(ApplyTransformFutureState::B { fut });
-                self.poll(cx)
+            match this.state.as_mut().project() {
+                ApplyTransformFutureStateProj::A { fut } => {
+                    let srv = ready!(fut.poll(cx))?;
+                    let fut = this.store.0.new_transform(srv);
+                    this.state.set(ApplyTransformFutureState::B { fut });
+                }
+                ApplyTransformFutureStateProj::B { fut } => return fut.poll(cx),
             }
-            ApplyTransformFutureStateProj::B { fut } => fut.poll(cx),
         }
     }
 }
