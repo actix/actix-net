@@ -9,9 +9,51 @@ use super::{Decoder, Encoder};
 ///
 /// Will split input up by LF or CRLF delimiters. Carriage return characters at the end of lines are
 /// not preserved.
-#[derive(Debug, Copy, Clone, Default)]
+///
+/// # Security
+///
+/// When used with untrusted input, it is recommended to set a maximum line length with
+/// [`LinesCodec::new_with_max_length`]. Without a length limit, the internal read buffer can grow
+/// without bound if a peer sends an unbounded amount of data without a `\n`, potentially leading
+/// to memory exhaustion (DoS).
+#[derive(Debug, Copy, Clone)]
 #[non_exhaustive]
-pub struct LinesCodec;
+pub struct LinesCodec {
+    max_length: usize,
+}
+
+impl LinesCodec {
+    /// Creates a new `LinesCodec` with no maximum line length.
+    ///
+    /// Consider using [`LinesCodec::new_with_max_length`] when working with untrusted input.
+    pub const fn new() -> Self {
+        Self {
+            max_length: usize::MAX,
+        }
+    }
+
+    /// Creates a new `LinesCodec` with a maximum line length, in bytes.
+    ///
+    /// The limit applies to the bytes before the line delimiter (`\n`). If present, a trailing
+    /// carriage return (`\r`) in `\r\n` sequences is not counted towards the limit.
+    ///
+    /// Using a length limit is recommended when working with untrusted input to avoid unbounded
+    /// buffering.
+    pub const fn new_with_max_length(max_length: usize) -> Self {
+        Self { max_length }
+    }
+
+    /// Returns the maximum permitted line length, in bytes.
+    pub const fn max_length(&self) -> usize {
+        self.max_length
+    }
+}
+
+impl Default for LinesCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl<T: AsRef<str>> Encoder<T> for LinesCodec {
     type Error = io::Error;
@@ -38,9 +80,32 @@ impl Decoder for LinesCodec {
         let len = match memchr(b'\n', src) {
             Some(n) => n,
             None => {
+                // No delimiter yet; if current buffered data already exceeds the maximum line
+                // length, abort to avoid unbounded memory growth.
+                let max = self.max_length;
+                let max_cr = max.saturating_add(1);
+
+                if src.len() > max && !(src.len() == max_cr && src.last() == Some(&b'\r')) {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "max line length exceeded",
+                    ));
+                }
+
                 return Ok(None);
             }
         };
+
+        // Reject overly long lines before splitting/advancing buffers.
+        let max = self.max_length;
+        let max_cr = max.saturating_add(1);
+
+        if len > max && !(len == max_cr && src.get(len - 1) == Some(&b'\r')) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "max line length exceeded",
+            ));
+        }
 
         // split up to new line char
         let mut buf = src.split_to(len);
@@ -154,5 +219,14 @@ mod tests {
         let mut buf = BytesMut::new();
         codec.encode("1234567891112131", &mut buf).unwrap();
         assert_eq!(&buf[..], b"1234567891112131\n");
+    }
+
+    #[test]
+    fn lines_decoder_errors_on_overlong_line_without_delimiter() {
+        let mut codec = LinesCodec::new_with_max_length(4);
+        let mut buf = BytesMut::from(&b"aaaaa"[..]);
+
+        let err = codec.decode(&mut buf).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
     }
 }
