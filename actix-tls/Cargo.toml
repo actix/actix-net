@@ -20,7 +20,7 @@ allowed_external_types = ["actix_service::*", "actix_utils::*", "futures_core::*
 [package.metadata.cargo-machete]
 ignored = [
   "rustls_021",         # specified to force version with add_trust_anchors method
-  "rustls_webpki_0101", # specified to force secure version
+  "rustls_webpki_0103", # specified to force secure version
 ]
 
 [features]
@@ -112,7 +112,7 @@ tokio-native-tls = { version = "0.3", optional = true }
 
 [target.'cfg(any())'.dependencies]
 rustls-021 = { package = "rustls", version = "0.21.6", optional = true }                 # force version with add_trust_anchors method
-rustls-webpki-0101 = { package = "rustls-webpki", version = "0.101.4", optional = true } # force secure version
+rustls-webpki-0103 = { package = "rustls-webpki", version = "0.103.10", optional = true } # force secure version
 
 [dev-dependencies]
 actix-codec = "0.5"
