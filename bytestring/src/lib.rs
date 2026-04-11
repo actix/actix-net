@@ -6,11 +6,7 @@
 
 extern crate alloc;
 
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{borrow::Borrow, fmt, hash, ops, str};
 
 use bytes::Bytes;
@@ -189,7 +185,7 @@ impl From<Box<str>> for ByteString {
 impl From<ByteString> for String {
     #[inline]
     fn from(value: ByteString) -> Self {
-        value.to_string()
+        String::from_utf8(value.0.into()).expect("ByteString invariant violated")
     }
 }
 
