@@ -185,7 +185,8 @@ impl From<Box<str>> for ByteString {
 impl From<ByteString> for String {
     #[inline]
     fn from(value: ByteString) -> Self {
-        String::from_utf8(value.0.into()).expect("ByteString invariant violated")
+        // SAFETY: UTF-8 validity is guaranteed during construction.
+        unsafe { String::from_utf8_unchecked(value.0.into()) }
     }
 }
 
