@@ -195,6 +195,10 @@ impl TryFrom<&[u8]> for ByteString {
 
     #[inline]
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.is_ascii() {
+            return Ok(ByteString(Bytes::copy_from_slice(value)));
+        }
+
         let _ = str::from_utf8(value)?;
         Ok(ByteString(Bytes::copy_from_slice(value)))
     }
@@ -205,6 +209,10 @@ impl TryFrom<Vec<u8>> for ByteString {
 
     #[inline]
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        if value.is_ascii() {
+            return Ok(ByteString(Bytes::from(value)));
+        }
+
         let buf = String::from_utf8(value).map_err(|err| err.utf8_error())?;
         Ok(ByteString(Bytes::from(buf)))
     }
@@ -215,6 +223,10 @@ impl TryFrom<Bytes> for ByteString {
 
     #[inline]
     fn try_from(value: Bytes) -> Result<Self, Self::Error> {
+        if value.is_ascii() {
+            return Ok(ByteString(value));
+        }
+
         let _ = str::from_utf8(value.as_ref())?;
         Ok(ByteString(value))
     }
@@ -225,6 +237,10 @@ impl TryFrom<bytes::BytesMut> for ByteString {
 
     #[inline]
     fn try_from(value: bytes::BytesMut) -> Result<Self, Self::Error> {
+        if value.is_ascii() {
+            return Ok(ByteString(value.freeze()));
+        }
+
         let _ = str::from_utf8(&value)?;
         Ok(ByteString(value.freeze()))
     }
@@ -413,7 +429,10 @@ mod test {
 
     #[test]
     fn try_from_slice() {
+        let heart = "\u{1f496}";
         let _ = ByteString::try_from(b"nice bytes").unwrap();
+        assert_eq!(ByteString::try_from(heart.as_bytes()).unwrap(), heart);
+        ByteString::try_from(&[0, 159, 146, 150][..]).unwrap_err();
     }
 
     #[test]
@@ -432,12 +451,22 @@ mod test {
 
     #[test]
     fn try_from_bytes() {
+        let heart = "\u{1f496}";
         let _ = ByteString::try_from(Bytes::from_static(b"nice bytes")).unwrap();
+        assert_eq!(
+            ByteString::try_from(Bytes::from_static(heart.as_bytes())).unwrap(),
+            heart
+        );
     }
 
     #[test]
     fn try_from_bytes_mut() {
+        let heart = "\u{1f496}";
         let _ = ByteString::try_from(bytes::BytesMut::from(&b"nice bytes"[..])).unwrap();
+        assert_eq!(
+            ByteString::try_from(bytes::BytesMut::from(heart.as_bytes())).unwrap(),
+            heart
+        );
     }
 
     #[test]
