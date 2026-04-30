@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.5.1
+
 - Minimum supported Rust version (MSRV) is now 1.88.
 - Improve `From<ByteString> for String` performance.
 - Improve ASCII `TryFrom` conversions performance.
