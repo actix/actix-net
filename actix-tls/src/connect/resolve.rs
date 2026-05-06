@@ -41,7 +41,7 @@ use futures_core::future::LocalBoxFuture;
 /// }
 ///
 /// let my_resolver = MyResolver {
-///     hickory_dns: TokioResolver::builder_tokio().unwrap().build(),
+///     hickory_dns: TokioResolver::builder_tokio().unwrap().build().unwrap(),
 /// };
 ///
 /// // wrap custom resolver

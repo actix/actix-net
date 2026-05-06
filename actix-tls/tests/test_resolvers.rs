@@ -78,7 +78,7 @@ async fn custom_resolver_connect() {
     }
 
     let resolver = MyResolver {
-        hickory_dns: TokioResolver::builder_tokio().unwrap().build(),
+        hickory_dns: TokioResolver::builder_tokio().unwrap().build().unwrap(),
     };
 
     let factory = connector_factory(Resolver::custom(resolver));
