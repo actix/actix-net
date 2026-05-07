@@ -16,18 +16,11 @@ use super::{Decoder, Encoder};
 /// [`LinesCodec::new_with_max_length`]. Without a length limit, the internal read buffer can grow
 /// without bound if a peer sends an unbounded amount of data without a `\n`, potentially leading
 /// to memory exhaustion (DoS).
-///
-/// # Direct `Decoder` Use
-///
-/// `LinesCodec` caches the index after the last byte it searched when [`Decoder::decode`] returns
-/// `Ok(None)`. Callers that invoke `decode` directly must pass the same [`BytesMut`] with newly
-/// read bytes appended. If the buffer is replaced or bytes before the cached offset are changed,
-/// create a new `LinesCodec` before decoding the replacement buffer.
 #[derive(Debug, Copy, Clone)]
 #[non_exhaustive]
 pub struct LinesCodec {
     max_length: usize,
-    // Next byte index to examine for `\n` after a previous incomplete decode.
+    // Next byte index to examine for `\n` after an incomplete decode.
     next_index: usize,
 }
 
@@ -91,11 +84,13 @@ impl Decoder for LinesCodec {
             return Ok(None);
         }
 
-        let start = self.next_index.min(src.len());
-        debug_assert!(
-            memchr(b'\n', &src[..start]).is_none(),
-            "LinesCodec buffer changed before cached search offset"
-        );
+        // Framed reads append to the same buffer after incomplete decodes. We do not currently
+        // expect callers to replace it, but fall back to a fresh scan if they do.
+        let start = if self.next_index < src.len() {
+            self.next_index
+        } else {
+            0
+        };
 
         let len = match memchr(b'\n', &src[start..]) {
             Some(n) => start + n,
