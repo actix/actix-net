@@ -33,11 +33,12 @@ use tokio::sync::watch;
 /// service future for the worker to complete a graceful shutdown.
 #[derive(Clone, Debug)]
 pub struct GracefulShutdownSignal {
-    rx: watch::Receiver<bool>,
+    /// Receiver retained at the pre-shutdown version so each clone observes the shutdown update.
+    rx: watch::Receiver<()>,
 }
 
 impl GracefulShutdownSignal {
-    pub(crate) fn new(rx: watch::Receiver<bool>) -> Self {
+    pub(crate) fn new(rx: watch::Receiver<()>) -> Self {
         Self { rx }
     }
 
@@ -46,14 +47,8 @@ impl GracefulShutdownSignal {
     pub async fn notified(&self) {
         let mut rx = self.rx.clone();
 
-        loop {
-            if *rx.borrow_and_update() {
-                return;
-            }
-
-            if rx.changed().await.is_err() {
-                pending::<()>().await;
-            }
+        if rx.changed().await.is_err() {
+            pending::<()>().await;
         }
     }
 }
@@ -68,19 +63,22 @@ mod tests {
 
     #[actix_rt::test]
     async fn set_signal_notifies_listener() {
-        let (tx, rx) = tokio::sync::watch::channel(false);
+        let (tx, rx) = tokio::sync::watch::channel(());
         let signal = GracefulShutdownSignal::new(rx);
 
-        tx.send_replace(true);
+        tx.send_replace(());
 
         timeout(Duration::from_millis(100), signal.notified())
             .await
             .expect("set signal did not notify listener");
+        timeout(Duration::from_millis(100), signal.notified())
+            .await
+            .expect("set signal did not notify later listener");
     }
 
     #[actix_rt::test]
     async fn closed_unset_signal_does_not_notify_listener() {
-        let (tx, rx) = tokio::sync::watch::channel(false);
+        let (tx, rx) = tokio::sync::watch::channel(());
         let signal = GracefulShutdownSignal::new(rx);
 
         drop(tx);

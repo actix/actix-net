@@ -44,7 +44,7 @@ pub struct ServerBuilder {
     pub(crate) exit: bool,
     pub(crate) listen_os_signals: bool,
     pub(crate) shutdown_signal: Option<BoxFuture<'static, ()>>,
-    pub(crate) graceful_shutdown_tx: watch::Sender<bool>,
+    pub(crate) graceful_shutdown_tx: watch::Sender<()>,
     pub(crate) cmd_tx: UnboundedSender<ServerCommand>,
     pub(crate) cmd_rx: UnboundedReceiver<ServerCommand>,
     pub(crate) worker_config: ServerWorkerConfig,
@@ -60,7 +60,7 @@ impl ServerBuilder {
     /// Create new Server builder instance
     pub fn new() -> ServerBuilder {
         let (cmd_tx, cmd_rx) = unbounded_channel();
-        let (graceful_shutdown_tx, _) = watch::channel(false);
+        let (graceful_shutdown_tx, _) = watch::channel(());
 
         ServerBuilder {
             threads: std::thread::available_parallelism().map_or(2, NonZeroUsize::get),

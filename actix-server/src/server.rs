@@ -165,7 +165,7 @@ pub struct ServerInner {
     waker_queue: WakerQueue,
     system_stop: bool,
     stopping: bool,
-    graceful_shutdown_tx: watch::Sender<bool>,
+    graceful_shutdown_tx: watch::Sender<()>,
 }
 
 impl ServerInner {
@@ -254,7 +254,7 @@ impl ServerInner {
                 self.stopping = true;
 
                 if graceful {
-                    self.graceful_shutdown_tx.send_replace(true);
+                    self.graceful_shutdown_tx.send_replace(());
                 }
 
                 // Signal accept thread to stop.
