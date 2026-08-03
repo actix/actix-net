@@ -10,7 +10,7 @@ use std::{
 use actix_rt::{time::sleep, System};
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::stream::StreamExt as _;
-use tokio::sync::{mpsc::UnboundedReceiver, oneshot};
+use tokio::sync::{mpsc::UnboundedReceiver, oneshot, watch};
 use tracing::{error, info};
 
 use crate::{
@@ -165,6 +165,7 @@ pub struct ServerInner {
     waker_queue: WakerQueue,
     system_stop: bool,
     stopping: bool,
+    graceful_shutdown_tx: watch::Sender<bool>,
 }
 
 impl ServerInner {
@@ -227,6 +228,7 @@ impl ServerInner {
             services: builder.factories,
             system_stop: builder.exit,
             stopping: false,
+            graceful_shutdown_tx: builder.graceful_shutdown_tx,
         };
 
         Ok((server, mux))
@@ -250,6 +252,10 @@ impl ServerInner {
                 force_system_stop,
             } => {
                 self.stopping = true;
+
+                if graceful {
+                    self.graceful_shutdown_tx.send_replace(true);
+                }
 
                 // Signal accept thread to stop.
                 // Signal is non-blocking; we wait for thread to stop later.

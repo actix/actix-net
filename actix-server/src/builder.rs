@@ -2,7 +2,10 @@ use std::{future::Future, io, num::NonZeroUsize, time::Duration};
 
 use actix_rt::net::TcpStream;
 use futures_core::future::BoxFuture;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::{
+    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    watch,
+};
 
 use crate::{
     server::ServerCommand,
@@ -41,6 +44,7 @@ pub struct ServerBuilder {
     pub(crate) exit: bool,
     pub(crate) listen_os_signals: bool,
     pub(crate) shutdown_signal: Option<BoxFuture<'static, ()>>,
+    pub(crate) graceful_shutdown_tx: watch::Sender<bool>,
     pub(crate) cmd_tx: UnboundedSender<ServerCommand>,
     pub(crate) cmd_rx: UnboundedReceiver<ServerCommand>,
     pub(crate) worker_config: ServerWorkerConfig,
@@ -56,6 +60,7 @@ impl ServerBuilder {
     /// Create new Server builder instance
     pub fn new() -> ServerBuilder {
         let (cmd_tx, cmd_rx) = unbounded_channel();
+        let (graceful_shutdown_tx, _) = watch::channel(false);
 
         ServerBuilder {
             threads: std::thread::available_parallelism().map_or(2, NonZeroUsize::get),
@@ -67,10 +72,19 @@ impl ServerBuilder {
             exit: false,
             listen_os_signals: true,
             shutdown_signal: None,
+            graceful_shutdown_tx,
             cmd_tx,
             cmd_rx,
             worker_config: ServerWorkerConfig::default(),
         }
+    }
+
+    /// Returns a signal that resolves when this server starts a graceful shutdown.
+    ///
+    /// The signal cannot stop the server. It only propagates a shutdown that was started by an OS
+    /// signal, [`ServerHandle::stop`](crate::ServerHandle::stop), or [`Self::shutdown_signal`].
+    pub fn graceful_shutdown_signal(&self) -> crate::GracefulShutdownSignal {
+        crate::GracefulShutdownSignal::new(self.graceful_shutdown_tx.subscribe())
     }
 
     /// Sets number of workers to start.
