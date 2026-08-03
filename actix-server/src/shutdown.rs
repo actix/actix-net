@@ -41,7 +41,8 @@ impl GracefulShutdownSignal {
         Self { rx }
     }
 
-    /// Resolves when the server starts a graceful shutdown.
+    /// Resolves when the server starts a graceful shutdown, or immediately if graceful shutdown
+    /// has already started.
     pub async fn notified(&self) {
         let mut rx = self.rx.clone();
 
