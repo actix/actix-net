@@ -26,10 +26,10 @@ jobs:
       matrix:
         # prettier-ignore
         target:
-          - { name: Linux, os: ubuntu-latest, triple: x86_64-unknown-linux-gnu }
-          - { name: macOS, os: macos-latest, triple: x86_64-apple-darwin }
-          - { name: Windows, os: windows-latest, triple: x86_64-pc-windows-msvc }
-          - { name: Windows (MinGW), os: windows-latest, triple: x86_64-pc-windows-gnu }
+          - { name: Linux, os: blacksmith-2vcpu-ubuntu-2404, triple: x86_64-unknown-linux-gnu }
+          - { name: macOS, os: blacksmith-6vcpu-macos-latest, triple: x86_64-apple-darwin }
+          - { name: Windows, os: blacksmith-2vcpu-windows-2025, triple: x86_64-pc-windows-msvc }
+          - { name: Windows (MinGW), os: blacksmith-2vcpu-windows-2025, triple: x86_64-pc-windows-gnu }
         version:
           - { name: msrv, version: "${{ needs.read_msrv.outputs.msrv }}" }
           - { name: stable, version: stable }
@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Setup Routing
-        if: matrix.target.os == 'macos-latest'
+        if: contains(matrix.target.os, 'macos')
         run: sudo ifconfig lo0 alias 127.0.0.3
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,19 +49,19 @@ jobs:
           persist-credentials: false
 
       - name: Free Disk Space
-        if: matrix.target.os == 'ubuntu-latest'
+        if: contains(matrix.target.os, 'ubuntu')
         run: ./scripts/free-disk-space.sh
 
       - name: Setup mold linker
-        if: matrix.target.os == 'ubuntu-latest'
+        if: contains(matrix.target.os, 'ubuntu')
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # staging
 
       - name: Install nasm
-        if: matrix.target.os == 'windows-latest'
+        if: contains(matrix.target.os, 'windows')
         uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
 
       - name: Install OpenSSL
-        if: matrix.target.os == 'windows-latest'
+        if: contains(matrix.target.os, 'windows')
         shell: bash
         run: |
           set -e
@@ -87,12 +87,10 @@ jobs:
         run: just downgrade-for-msrv
 
       - name: check lib
-        if: >
-          matrix.target.os != 'ubuntu-latest'
-          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        if: ${{ !contains(matrix.target.os, 'ubuntu') && matrix.target.triple != 'x86_64-pc-windows-gnu' }}
         run: cargo ci-check-lib
       - name: check lib
-        if: matrix.target.os == 'ubuntu-latest'
+        if: contains(matrix.target.os, 'ubuntu')
         run: cargo ci-check-lib-linux
       - name: check lib
         if: matrix.target.triple != 'x86_64-pc-windows-gnu'
@@ -100,12 +98,10 @@ jobs:
 
       - name: check full
         # TODO: compile OpenSSL and run tests on MinGW
-        if: >
-          matrix.target.os != 'ubuntu-latest'
-          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        if: ${{ !contains(matrix.target.os, 'ubuntu') && matrix.target.triple != 'x86_64-pc-windows-gnu' }}
         run: cargo ci-check
       - name: check all
-        if: matrix.target.os == 'ubuntu-latest'
+        if: contains(matrix.target.os, 'ubuntu')
         run: cargo ci-check-linux
 
       - name: tests
@@ -115,7 +111,7 @@ jobs:
         run: cargo-ci-cache-clean
 
       - name: deny check
-        if: matrix.version.name == 'stable' && matrix.target.os == 'ubuntu-latest'
+        if: matrix.version.name == 'stable' && contains(matrix.target.os, 'ubuntu')
         uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
 
   docs:
