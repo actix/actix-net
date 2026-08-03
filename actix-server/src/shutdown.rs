@@ -13,10 +13,9 @@ use tokio::sync::watch;
 /// When this signal is notified, the [`Server`](crate::Server) has accepted a graceful shutdown
 /// command, but shutdown is not complete. The server sends this notification before it tells the
 /// accept loop and workers to stop. Therefore, a listener can briefly overlap with connection
-/// acceptance and normal worker operation. A service future created during this overlap observes
-/// the retained notification immediately.
+/// acceptance and normal worker operation.
 ///
-/// Immediately after notification, the server stops accepting connections and asks each worker to
+/// Very shortly after notification, the server stops accepting connections and tells each worker to
 /// stop its services. Active service futures can continue until they finish or the
 /// [`ServerBuilder::shutdown_timeout`](crate::ServerBuilder::shutdown_timeout) expires.
 ///
@@ -65,7 +64,12 @@ mod tests {
     #[actix_rt::test]
     async fn set_signal_notifies_listener() {
         let (tx, rx) = tokio::sync::watch::channel(());
+
         let signal = GracefulShutdownSignal::new(rx);
+
+        timeout(Duration::from_millis(100), signal.notified())
+            .await
+            .expect_err("signal notified listener before shutdown");
 
         tx.send_replace(());
 
