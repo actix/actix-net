@@ -13,7 +13,8 @@ use tokio::sync::watch;
 /// When this signal is notified, the [`Server`](crate::Server) has accepted a graceful shutdown
 /// command, but shutdown is not complete. The server sends this notification before it tells the
 /// accept loop and workers to stop. Therefore, a listener can briefly overlap with connection
-/// acceptance and normal worker operation.
+/// acceptance and normal worker operation. A service future created during this overlap observes
+/// the retained notification immediately.
 ///
 /// Immediately after notification, the server stops accepting connections and asks each worker to
 /// stop its services. Active service futures can continue until they finish or the
