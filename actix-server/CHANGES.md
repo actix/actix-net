@@ -2,12 +2,11 @@
 
 ## Unreleased
 
-- Add `ServerBuilder::graceful_shutdown_signal()` to propagate graceful shutdown to services.
-- Minimum supported Rust version (MSRV) is now 1.88.
-- internal: Use `core::future::{ready, Ready}` instead of actix-utils'
-- actix-server no longer removes the uds socket [#442]
+## 2.7.0
 
-[#442]: https://github.com/actix/actix-net/pull/442
+- Add `ServerBuilder::graceful_shutdown_signal()` to propagate graceful shutdown to services.
+- UDS sockets are no longer removed on pause.
+- Minimum supported Rust version (MSRV) is now 1.88.
 
 ## 2.6.0
 
