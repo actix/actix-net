@@ -30,14 +30,7 @@ msrv := ```
     | sed -E 's/^1\.([0-9]{2})$/1\.\1\.0/'
 ```
 msrv_rustup := "+" + msrv
-non_linux_all_features_list := ```
-    cargo metadata --format-version=1 \
-    | jq '.packages[] | select(.source == null) | .features | keys' \
-    | jq -r --slurp \
-        --arg exclusions "tokio-uring,io-uring" \
-        'add | unique | . - ($exclusions | split(",")) | join(",")'
-```
-all_crate_features := if os() == "linux" { "--all-features" } else { "--features='" + non_linux_all_features_list + "'" }
+all_crate_features := "--all-features"
 
 # Run Clippy over workspace.
 clippy:
@@ -60,7 +53,6 @@ test:
 test:
     cargo {{ toolchain }} test --lib --tests --package=actix-macros
     cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros --no-default-features
-    cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros {{ non_linux_all_features_list }}
     cargo {{ toolchain }} nextest run --no-tests=warn --workspace --exclude=actix-macros {{ all_crate_features }}
 
 # Test workspace using MSRV.

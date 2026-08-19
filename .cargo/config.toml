@@ -4,12 +4,12 @@ lint-all = "clippy --workspace --all-features --tests --examples --bins -- -Dcli
 
 # just check the library (without dev deps)
 ci-check-min = "hack --workspace check --no-default-features"
-ci-check-lib = "hack --workspace --feature-powerset --depth=2 --exclude-features=io-uring check"
+ci-check-lib = "hack --workspace --feature-powerset --depth=2 check"
 ci-check-lib-linux = "hack --workspace --feature-powerset --depth=2 check"
 
 # check everything
-ci-check = "hack --workspace --feature-powerset --depth=2 --exclude-features=io-uring check --tests --examples"
+ci-check = "hack --workspace --feature-powerset --depth=2 check --tests --examples"
 ci-check-linux = "hack --workspace --feature-powerset --depth=2 check --tests --examples"
 
-# tests avoiding io-uring feature
-ci-test = "hack --feature-powerset --depth=2 --exclude-features=io-uring test --lib --tests --no-fail-fast -- --nocapture"
+# test workspace code
+ci-test = "hack --feature-powerset --depth=2 test --lib --tests --no-fail-fast -- --nocapture"

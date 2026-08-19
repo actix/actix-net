@@ -2,15 +2,13 @@
 
 use std::{
     future::Future,
+    sync::mpsc::channel,
+    thread,
     time::{Duration, Instant},
 };
 
 use actix_rt::{task::JoinError, Arbiter, System};
-#[cfg(not(feature = "io-uring"))]
-use {
-    std::{sync::mpsc::channel, thread},
-    tokio::sync::oneshot,
-};
+use tokio::sync::oneshot;
 
 #[test]
 fn await_for_timer() {
@@ -25,7 +23,6 @@ fn await_for_timer() {
     );
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn run_with_code() {
     let sys = System::new();
@@ -34,7 +31,6 @@ fn run_with_code() {
     assert_eq!(exit_code, 42);
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn stop_future_resolves() {
     let sys = System::new();
@@ -48,7 +44,6 @@ fn stop_future_resolves() {
     assert_eq!(exit_code, 7);
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn into_parts_stop_future_resolves() {
     let sys = System::new();
@@ -144,10 +139,6 @@ fn wait_for_spawns() {
     assert!(rt.block_on(handle).is_err());
 }
 
-// Temporary disabled tests for io-uring feature.
-// They should be enabled when possible.
-
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_spawn_fn_runs() {
     let _ = System::new();
@@ -164,7 +155,6 @@ fn arbiter_spawn_fn_runs() {
     arbiter.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_handle_spawn_fn_runs() {
     let sys = System::new();
@@ -187,7 +177,6 @@ fn arbiter_handle_spawn_fn_runs() {
     sys.run().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_drop_no_panic_fn() {
     let _ = System::new();
@@ -199,7 +188,6 @@ fn arbiter_drop_no_panic_fn() {
     arbiter.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn arbiter_drop_no_panic_fut() {
     let _ = System::new();
@@ -211,7 +199,6 @@ fn arbiter_drop_no_panic_fut() {
     arbiter.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn system_arbiter_spawn() {
     let runner = System::new();
@@ -242,7 +229,6 @@ fn system_arbiter_spawn() {
     thread.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn system_stop_stops_arbiters() {
     let sys = System::new();
@@ -265,7 +251,6 @@ fn system_stop_stops_arbiters() {
     arb.join().unwrap();
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn new_system_with_tokio() {
     let (tx, rx) = channel();
@@ -298,7 +283,6 @@ fn new_system_with_tokio() {
     assert_eq!(rx.recv().unwrap(), 42);
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn new_system_with_shared_tokio_runtime() {
     use std::sync::Arc;
@@ -335,7 +319,6 @@ fn new_system_with_shared_tokio_runtime() {
     assert_eq!(rx.recv().unwrap(), 7);
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn new_system_with_static_tokio_runtime() {
     use std::sync::OnceLock;
@@ -357,7 +340,6 @@ fn new_system_with_static_tokio_runtime() {
     assert_eq!(res, 7);
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn new_arbiter_with_tokio() {
     use std::sync::{
@@ -390,7 +372,6 @@ fn new_arbiter_with_tokio() {
     assert!(!counter.load(Ordering::SeqCst));
 }
 
-#[cfg(not(feature = "io-uring"))]
 #[test]
 fn new_arbiter_with_shared_tokio_runtime() {
     use std::sync::{
@@ -472,33 +453,5 @@ fn spawn_local() {
         fn h<F: Future<Output = Result<R, JoinError>>, R>(_f: F) {}
         h(actix_rt::spawn(async {}));
         h(actix_rt::spawn(async { 1 }));
-    })
-}
-
-#[cfg(all(target_os = "linux", feature = "io-uring"))]
-#[test]
-fn tokio_uring_arbiter() {
-    System::new().block_on(async {
-        let (tx, rx) = std::sync::mpsc::channel();
-
-        Arbiter::new().spawn(async move {
-            let handle = actix_rt::spawn(async move {
-                let f = tokio_uring::fs::File::create("test.txt").await.unwrap();
-                let buf = b"Hello World!";
-
-                let (res, _) = f.write_all_at(&buf[..], 0).await;
-                assert!(res.is_ok());
-
-                f.sync_all().await.unwrap();
-                f.close().await.unwrap();
-
-                std::fs::remove_file("test.txt").unwrap();
-            });
-
-            handle.await.unwrap();
-            tx.send(true).unwrap();
-        });
-
-        assert!(rx.recv().unwrap());
     })
 }
