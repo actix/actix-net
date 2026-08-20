@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.8.0
+
+- No significant changes since `2.7.0`.
+
 ## 2.7.0
 
 - Add `ServerBuilder::graceful_shutdown_signal()` to propagate graceful shutdown to services.

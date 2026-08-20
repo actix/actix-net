@@ -1,6 +1,6 @@
 [package]
 name = "actix-rt"
-version = "2.11.0"
+version = "2.12.0"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>", "Rob Ede <robjtede@icloud.com>"]
 description = "Tokio-based single-threaded async runtime for the Actix ecosystem"
 categories = ["network-programming", "asynchronous"]
