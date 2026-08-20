@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.8.0
+
+- Remove experimental `io-uring` support.
+
 ## 2.7.0
 
 - Add `ServerBuilder::graceful_shutdown_signal()` to propagate graceful shutdown to services.

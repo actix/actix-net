@@ -296,19 +296,6 @@ impl ServerWorker {
         // service factories initialization channel
         let (factory_tx, factory_rx) = std::sync::mpsc::sync_channel::<io::Result<()>>(1);
 
-        // outline of following code:
-        //
-        // if system exists
-        //   if uring enabled
-        //     start arbiter using uring method
-        //   else
-        //     start arbiter with regular tokio
-        // else
-        //   if uring enabled
-        //     start uring in spawned thread
-        //   else
-        //     start regular tokio in spawned thread
-
         // every worker runs in it's own thread and tokio runtime.
         // use a custom tokio runtime builder to change the settings of runtime.
 
@@ -381,39 +368,19 @@ impl ServerWorker {
                             worker_stopped_rx.await.unwrap();
                         };
 
-                        #[cfg(all(target_os = "linux", feature = "io-uring"))]
-                        {
-                            // TODO: pass max blocking thread config when tokio-uring enable configuration
-                            // on building runtime.
-                            let _ = config.max_blocking_threads;
-                            tokio_uring::start(worker_fut);
-                        }
+                        let rt = tokio::runtime::Builder::new_current_thread()
+                            .enable_all()
+                            .max_blocking_threads(config.max_blocking_threads)
+                            .build()
+                            .unwrap();
 
-                        #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
-                        {
-                            let rt = tokio::runtime::Builder::new_current_thread()
-                                .enable_all()
-                                .max_blocking_threads(config.max_blocking_threads)
-                                .build()
-                                .unwrap();
-
-                            rt.block_on(ls.run_until(worker_fut));
-                        }
+                        rt.block_on(ls.run_until(worker_fut));
                     })
                     .expect("cannot spawn server worker thread");
             }
 
             // with actix system
             (Some(_sys), _) => {
-                #[cfg(all(target_os = "linux", feature = "io-uring"))]
-                let arbiter = {
-                    // TODO: pass max blocking thread config when tokio-uring enable configuration
-                    // on building runtime.
-                    let _ = config.max_blocking_threads;
-                    Arbiter::new()
-                };
-
-                #[cfg(not(all(target_os = "linux", feature = "io-uring")))]
                 let arbiter = {
                     Arbiter::with_tokio_rt(move || {
                         tokio::runtime::Builder::new_current_thread()

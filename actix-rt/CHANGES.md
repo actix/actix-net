@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 2.12.0
+
+- Remove experimental `io-uring` support.
 - Minimum supported Rust version (MSRV) is now 1.88.
 - Add `SystemRunner::stop_future` and `SystemRunner::into_parts` for awaiting system stop inside `block_on`.
 - Allow `{System, Arbiter}::with_tokio_rt` to accept shared Tokio runtimes (e.g. `Arc<tokio::runtime::Runtime>` or `&'static tokio::runtime::Runtime`).
