@@ -4,7 +4,7 @@
 
 ## 2.8.0
 
-- No significant changes since `2.7.0`.
+- Remove experimental `io-uring` support.
 
 ## 2.7.0
 
