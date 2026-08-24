@@ -12,7 +12,7 @@ use std::{
 
 use actix_rt::{net::TcpStream, time::sleep};
 use actix_server::{Server, TestServer};
-use actix_service::fn_service;
+use actix_service::{fn_factory, fn_service};
 
 fn unused_addr() -> net::SocketAddr {
     TestServer::unused_addr()
@@ -97,7 +97,10 @@ fn plain_tokio_runtime() {
                 .workers(1)
                 .disable_signals()
                 .bind("test", addr, move || {
-                    fn_service(|_| async { Ok::<_, ()>(()) })
+                    fn_factory(|| async {
+                        sleep(Duration::from_millis(10)).await;
+                        Ok::<_, ()>(fn_service(|_| async { Ok::<_, ()>(()) }))
+                    })
                 })?
                 .run();
 

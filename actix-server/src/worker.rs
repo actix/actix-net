@@ -18,9 +18,12 @@ use actix_rt::{
     Arbiter, ArbiterHandle, System,
 };
 use futures_core::{future::LocalBoxFuture, ready};
-use tokio::sync::{
-    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-    oneshot,
+use tokio::{
+    runtime::{Builder, LocalOptions},
+    sync::{
+        mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+        oneshot,
+    },
 };
 use tracing::{error, info, trace};
 
@@ -305,17 +308,20 @@ impl ServerWorker {
             }
 
             // no actix system
-            (None, Some(rt_handle)) => {
+            (None, Some(_)) => {
                 std::thread::Builder::new()
                     .name(format!("actix-server worker {idx}"))
                     .spawn(move || {
                         let (worker_stopped_tx, worker_stopped_rx) = oneshot::channel();
 
-                        // local set for running service init futures and worker services
-                        let ls = tokio::task::LocalSet::new();
+                        let rt = Builder::new_current_thread()
+                            .enable_all()
+                            .max_blocking_threads(config.max_blocking_threads)
+                            .build_local(LocalOptions::default())
+                            .unwrap();
 
-                        // init services using existing Tokio runtime (so probably on main thread)
-                        let services = rt_handle.block_on(ls.run_until(async {
+                        // init services using the worker's local runtime
+                        let services = rt.block_on(async {
                             let mut services = Vec::new();
 
                             for (idx, factory) in factories.iter().enumerate() {
@@ -332,7 +338,7 @@ impl ServerWorker {
                             }
 
                             Ok(services)
-                        }));
+                        });
 
                         let services = match services {
                             Ok(services) => {
@@ -368,13 +374,7 @@ impl ServerWorker {
                             worker_stopped_rx.await.unwrap();
                         };
 
-                        let rt = tokio::runtime::Builder::new_current_thread()
-                            .enable_all()
-                            .max_blocking_threads(config.max_blocking_threads)
-                            .build()
-                            .unwrap();
-
-                        rt.block_on(ls.run_until(worker_fut));
+                        rt.block_on(worker_fut);
                     })
                     .expect("cannot spawn server worker thread");
             }
