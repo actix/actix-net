@@ -665,7 +665,12 @@ impl Future for ServerWorker {
                             .call((guard, msg.io))
                             .into_inner();
                     }
-                    None => return Poll::Ready(()),
+                    None => {
+                        // The accept channel can close before the server's stop command reaches
+                        // this worker. `stop_rx` was polled above and will wake this worker when
+                        // the command arrives.
+                        return Poll::Pending;
+                    }
                 };
             },
         }
