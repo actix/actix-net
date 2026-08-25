@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.9.0
+
+- Use Tokio `LocalRuntime`s for workers instead of `LocalSet`s.
+
 ## 2.8.0
 
 - Remove experimental `io-uring` support.
