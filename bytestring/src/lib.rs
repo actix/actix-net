@@ -367,6 +367,12 @@ mod test {
     }
 
     #[test]
+    fn into_bytes() {
+        let buf = ByteString::from("hello");
+        assert_eq!(buf.into_bytes(), Bytes::from_static(b"hello"));
+    }
+
+    #[test]
     fn from_bytes_unchecked() {
         let buf = unsafe { ByteString::from_bytes_unchecked(Bytes::new()) };
         assert!(buf.is_empty());
@@ -441,11 +447,28 @@ mod test {
             ByteString::try_from([b'h', b'i']).unwrap(),
             ByteString::from_static("hi")
         );
+
+        let empty = [];
+        assert_eq!(ByteString::try_from(empty).unwrap(), "");
+        assert_eq!(ByteString::try_from(&empty).unwrap(), "");
+
+        let heart = [0xf0, 0x9f, 0x92, 0x96];
+        assert_eq!(ByteString::try_from(heart).unwrap(), "\u{1f496}");
+        assert_eq!(ByteString::try_from(&heart).unwrap(), "\u{1f496}");
+
+        let invalid = [0, 159, 146, 150];
+        ByteString::try_from(invalid).unwrap_err();
+        ByteString::try_from(&invalid).unwrap_err();
     }
 
     #[test]
     fn try_from_vec() {
         let _ = ByteString::try_from(vec![b'f', b'o', b'o']).unwrap();
+        let heart = "\u{1f496}";
+        assert_eq!(
+            ByteString::try_from(heart.as_bytes().to_owned()).unwrap(),
+            heart
+        );
         ByteString::try_from(vec![0, 159, 146, 150]).unwrap_err();
     }
 
@@ -457,6 +480,7 @@ mod test {
             ByteString::try_from(Bytes::from_static(heart.as_bytes())).unwrap(),
             heart
         );
+        ByteString::try_from(Bytes::from_static(b"\x00\x9f\x92\x96")).unwrap_err();
     }
 
     #[test]
@@ -467,6 +491,7 @@ mod test {
             ByteString::try_from(bytes::BytesMut::from(heart.as_bytes())).unwrap(),
             heart
         );
+        ByteString::try_from(bytes::BytesMut::from(&b"\x00\x9f\x92\x96"[..])).unwrap_err();
     }
 
     #[test]
