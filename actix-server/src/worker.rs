@@ -507,10 +507,18 @@ impl ServerWorker {
 
 #[derive(Default)]
 enum WorkerState {
-    Available,
+    /// At least one worker service is not ready. New connections are not dispatched.
     #[default]
     Unavailable,
+
+    /// All worker services are ready and queued connections are dispatched to them.
+    Available,
+
+    /// A failed worker service is being recreated. New connections are not dispatched.
     Restarting(Restart),
+
+    /// The worker is gracefully shutting down. Queued connections are dropped while active
+    /// connections are given time to finish.
     Shutdown(Shutdown),
 }
 
