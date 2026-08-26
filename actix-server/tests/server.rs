@@ -282,7 +282,7 @@ async fn test_max_concurrent_connections() {
     h.join().unwrap().unwrap();
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn graceful_shutdown_drops_queued_connections() {
     let addr = unused_addr();
     let (tx, rx) = mpsc::channel();
