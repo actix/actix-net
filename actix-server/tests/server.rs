@@ -294,7 +294,12 @@ async fn graceful_shutdown_drops_queued_connections() {
         let calls = calls.clone();
 
         move || {
-            actix_rt::System::new().block_on(async {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build_local(tokio::runtime::LocalOptions::default())
+                .unwrap();
+
+            rt.block_on(async {
                 let srv = Server::build()
                     .backlog(1)
                     .max_concurrent_connections(1)
@@ -313,15 +318,14 @@ async fn graceful_shutdown_drops_queued_connections() {
                     })?
                     .run();
 
-                tx.send((srv.handle(), actix_rt::System::current()))
-                    .unwrap();
+                tx.send(srv.handle()).unwrap();
 
                 srv.await
             })
         }
     });
 
-    let (srv, sys) = rx.recv().unwrap();
+    let srv = rx.recv().unwrap();
 
     // Wait until the worker cannot dispatch new connections.
     while ready.load(Ordering::SeqCst) == 0 {
@@ -334,7 +338,6 @@ async fn graceful_shutdown_drops_queued_connections() {
         .await
         .is_ok();
 
-    sys.stop();
     h.join().unwrap().unwrap();
 
     assert!(
