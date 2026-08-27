@@ -507,10 +507,18 @@ impl ServerWorker {
 
 #[derive(Default)]
 enum WorkerState {
-    Available,
+    /// At least one worker service is not ready. New connections are not dispatched.
     #[default]
     Unavailable,
+
+    /// All worker services are ready and queued connections are dispatched to them.
+    Available,
+
+    /// A failed worker service is being recreated. New connections are not dispatched.
     Restarting(Restart),
+
+    /// The worker is gracefully shutting down. Queued connections are dropped while active
+    /// connections are given time to finish.
     Shutdown(Shutdown),
 }
 
@@ -665,7 +673,12 @@ impl Future for ServerWorker {
                             .call((guard, msg.io))
                             .into_inner();
                     }
-                    None => return Poll::Ready(()),
+                    None => {
+                        // The accept channel can close before the server's stop command reaches
+                        // this worker. `stop_rx` was polled above and will wake this worker when
+                        // the command arrives.
+                        return Poll::Pending;
+                    }
                 };
             },
         }
