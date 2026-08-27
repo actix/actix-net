@@ -2,8 +2,10 @@
 
 ## Unreleased
 
-- Added `LinesCodec::new_with_max_length` to enforce a maximum line length and mitigate potential
-  unbounded-buffer DoS when handling untrusted input.
+## 0.5.3
+
+- Added `LinesCodec::new_with_max_length` to enforce a maximum line length and mitigate potential unbounded-buffer DoS when handling untrusted input.
+- Improved performance of `LinesCodec`.
 - Minimum supported Rust version (MSRV) is now 1.88.
 
 ## 0.5.2
