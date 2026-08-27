@@ -35,7 +35,7 @@ jobs:
         if: matrix.target.os == 'macos-latest'
         run: sudo ifconfig lo0 alias 127.0.0.3
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -61,12 +61,12 @@ jobs:
           echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
 
       - name: Install Rust (${{ matrix.version }})
-        uses: actions-rust-lang/setup-rust-toolchain@2b1f5e9b395427c92ee4e3331786ca3c37afe2d7 # v1.16.0
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
         with:
           toolchain: ${{ matrix.version }}
 
       - name: Install just, cargo-hack, cargo-nextest, cargo-ci-cache-clean
-        uses: taiki-e/install-action@481c34c1cf3a84c68b5e46f4eccfc82af798415a # v2.75.23
+        uses: taiki-e/install-action@b6b84cf49ebfe0176417bdce007c624f0db37f20 # v2.86.2
         with:
           tool: just,cargo-hack,cargo-nextest,cargo-ci-cache-clean
 
@@ -95,19 +95,6 @@ jobs:
       - name: tests
         run: just test
 
-      # TODO: re-instate some io-uring tests PRs
-      # - name: tests
-      #   if: matrix.target.os == 'ubuntu-latest'
-      #   run: >-
-      #     sudo bash -c "
-      #     ulimit -Sl 512
-      #     && ulimit -Hl 512
-      #     && PATH=$PATH:/usr/share/rust/.cargo/bin
-      #     && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-020
-      #     && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-rustls-021
-      #     && RUSTUP_TOOLCHAIN=${{ matrix.version }} cargo ci-test-linux
-      #     "
-
       - name: CI cache clean
         run: cargo-ci-cache-clean
 
@@ -115,17 +102,17 @@ jobs:
     name: minimal versions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install Rust (nightly)
-        uses: actions-rust-lang/setup-rust-toolchain@2b1f5e9b395427c92ee4e3331786ca3c37afe2d7 # v1.16.0
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
         with:
           toolchain: nightly
 
       - name: Install cargo-hack & cargo-minimal-versions
-        uses: taiki-e/install-action@481c34c1cf3a84c68b5e46f4eccfc82af798415a # v2.75.23
+        uses: taiki-e/install-action@b6b84cf49ebfe0176417bdce007c624f0db37f20 # v2.86.2
         with:
           tool: cargo-hack,cargo-minimal-versions
 

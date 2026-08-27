@@ -33,20 +33,9 @@
 //! arbiter.join().unwrap();
 //! ```
 //!
-//! # `io-uring` Support
-//!
-//! There is experimental support for using io-uring with this crate by enabling the
-//! `io-uring` feature. For now, it is semver exempt.
-//!
-//! Note that there are currently some unimplemented parts of using `actix-rt` with `io-uring`.
-//! In particular, when running a `System`, only `System::block_on` is supported.
-
 #![allow(clippy::type_complexity)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
-
-#[cfg(all(not(target_os = "linux"), feature = "io-uring"))]
-compile_error!("io_uring is a linux only feature.");
 
 use std::future::Future;
 

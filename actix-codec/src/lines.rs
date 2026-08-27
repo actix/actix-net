@@ -183,8 +183,6 @@ fn try_into_utf8(buf: Bytes) -> io::Result<Option<String>> {
 
 #[cfg(test)]
 mod tests {
-    use bytes::BufMut as _;
-
     use super::*;
 
     #[test]

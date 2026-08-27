@@ -10,6 +10,7 @@ mod handle;
 mod join_all;
 mod server;
 mod service;
+mod shutdown;
 mod signals;
 mod socket;
 mod test_server;
@@ -23,6 +24,7 @@ pub use self::{
     handle::ServerHandle,
     server::Server,
     service::ServerServiceFactory,
+    shutdown::GracefulShutdownSignal,
     test_server::TestServer,
 };
 
