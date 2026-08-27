@@ -1,21 +1,44 @@
 #![allow(clippy::let_underscore_future, missing_docs)]
 
 use std::{
+    future::{ready, Ready},
     net,
     sync::{
         atomic::{AtomicUsize, Ordering},
         mpsc, Arc,
     },
+    task::{Context, Poll},
     thread,
     time::Duration,
 };
 
 use actix_rt::{net::TcpStream, time::sleep};
 use actix_server::{Server, TestServer};
-use actix_service::{fn_factory, fn_service};
+use actix_service::{fn_factory, fn_service, Service};
 
 fn unused_addr() -> net::SocketAddr {
     TestServer::unused_addr()
+}
+
+struct PendingService {
+    ready: Arc<AtomicUsize>,
+    calls: Arc<AtomicUsize>,
+}
+
+impl Service<TcpStream> for PendingService {
+    type Response = ();
+    type Error = ();
+    type Future = Ready<Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.ready.store(1, Ordering::SeqCst);
+        Poll::Pending
+    }
+
+    fn call(&self, _: TcpStream) -> Self::Future {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        ready(Ok(()))
+    }
 }
 
 #[test]
@@ -257,6 +280,71 @@ async fn test_max_concurrent_connections() {
     srv.stop(false).await;
     sys.stop();
     h.join().unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn graceful_shutdown_drops_queued_connections() {
+    let addr = unused_addr();
+    let (tx, rx) = mpsc::channel();
+    let ready = Arc::new(AtomicUsize::new(0));
+    let calls = Arc::new(AtomicUsize::new(0));
+
+    let h = thread::spawn({
+        let ready = ready.clone();
+        let calls = calls.clone();
+
+        move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build_local(tokio::runtime::LocalOptions::default())
+                .unwrap();
+
+            rt.block_on(async {
+                let srv = Server::build()
+                    .backlog(1)
+                    .max_concurrent_connections(1)
+                    .workers(1)
+                    .disable_signals()
+                    .shutdown_timeout(5)
+                    .bind("test", addr, move || {
+                        let ready = ready.clone();
+                        let calls = calls.clone();
+
+                        fn_factory(move || {
+                            let ready = ready.clone();
+                            let calls = calls.clone();
+                            async move { Ok::<_, ()>(PendingService { ready, calls }) }
+                        })
+                    })?
+                    .run();
+
+                tx.send(srv.handle()).unwrap();
+
+                srv.await
+            })
+        }
+    });
+
+    let srv = rx.recv().unwrap();
+
+    // Wait until the worker cannot dispatch new connections.
+    while ready.load(Ordering::SeqCst) == 0 {
+        sleep(Duration::from_millis(10)).await;
+    }
+
+    let _conn = tokio::net::TcpStream::connect(addr).await.unwrap();
+    sleep(Duration::from_millis(100)).await;
+    let stopped = tokio::time::timeout(Duration::from_secs(3), srv.stop(true))
+        .await
+        .is_ok();
+
+    h.join().unwrap().unwrap();
+
+    assert!(
+        stopped,
+        "graceful shutdown timed out with a queued connection"
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
 
 // TODO: race-y failures detected due to integer underflow when calling Counter::total
