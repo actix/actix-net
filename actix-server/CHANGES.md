@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.9.1
+
+- Fix race condition where accept thread shutdown cause cause workers to be dropped prematurely.
+
 ## 2.9.0
 
 - Use Tokio `LocalRuntime`s for workers instead of `LocalSet`s.
