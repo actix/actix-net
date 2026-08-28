@@ -183,7 +183,7 @@ impl Arbiter {
                     .tx()
                     .send(SystemCommand::RegisterArbiter(arb_id, hnd));
 
-                if let Err(_) = ready_tx.send(Ok(())) {
+                if ready_tx.send(Ok(())).is_err() {
                     unreachable!("Arbiter ready signal receiver should not be dropped before send");
                 }
 

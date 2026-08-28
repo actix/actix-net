@@ -444,7 +444,7 @@ mod test {
     #[test]
     fn try_from_array() {
         assert_eq!(
-            ByteString::try_from([b'h', b'i']).unwrap(),
+            ByteString::try_from(*b"hi").unwrap(),
             ByteString::from_static("hi")
         );
 

@@ -23,13 +23,13 @@
 # dependencies not shared by any other crates, would be ignored, as the target
 # list here is effectively saying which targets you are building for.
 targets = [
-    # The triple can be any string, but only the target triples built in to
-    # rustc (as of 1.40) can be checked against actual config expressions
-    #"x86_64-unknown-linux-musl",
-    # You can also specify which target_features you promise are enabled for a
-    # particular target. target_features are currently not validated against
-    # the actual valid features supported by the target architecture.
-    #{ triple = "wasm32-unknown-unknown", features = ["atomics"] },
+  # The triple can be any string, but only the target triples built in to
+  # rustc (as of 1.40) can be checked against actual config expressions
+  #"x86_64-unknown-linux-musl",
+  # You can also specify which target_features you promise are enabled for a
+  # particular target. target_features are currently not validated against
+  # the actual valid features supported by the target architecture.
+  #{ triple = "wasm32-unknown-unknown", features = ["atomics"] },
 ]
 # When creating the dependency graph used as the source of truth when checks are
 # executed, this field can be used to prune crates from the graph, removing them
@@ -70,14 +70,14 @@ feature-depth = 1
 # A list of advisory IDs to ignore. Note that ignored advisories will still
 # output a note when they are encountered.
 ignore = [
-    { id = "RUSTSEC-2025-0009", reason = "for compatibility" },
-    { id = "RUSTSEC-2025-0010", reason = "for compatibility" },
-    { id = "RUSTSEC-2024-0336", reason = "for compatibility" },
-    { id = "RUSTSEC-2025-0134", reason = "for compatibility" },
-    { id = "RUSTSEC-2026-0049", reason = "for compatibility" },
-    { id = "RUSTSEC-2026-0098", reason = "for compatibility" },
-    { id = "RUSTSEC-2026-0099", reason = "for compatibility" },
-    { id = "RUSTSEC-2026-0104", reason = "for compatibility" },
+  { id = "RUSTSEC-2025-0009", reason = "for compatibility" },
+  { id = "RUSTSEC-2025-0010", reason = "for compatibility" },
+  { id = "RUSTSEC-2024-0336", reason = "for compatibility" },
+  { id = "RUSTSEC-2025-0134", reason = "for compatibility" },
+  { id = "RUSTSEC-2026-0049", reason = "for compatibility" },
+  { id = "RUSTSEC-2026-0098", reason = "for compatibility" },
+  { id = "RUSTSEC-2026-0099", reason = "for compatibility" },
+  { id = "RUSTSEC-2026-0104", reason = "for compatibility" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
@@ -93,15 +93,15 @@ ignore = [
 # See https://spdx.org/licenses/ for list of possible licenses
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
 allow = [
-    "MIT",
-    "Apache-2.0",
-    "CDLA-Permissive-2.0",
-    "MPL-2.0", # should be dropped after we stop supporting old webpki-roots versions
-    "ISC",
-    "Unicode-3.0",
-    "BSD-3-Clause",
-    "MIT-0",
-    "OpenSSL",
+  "MIT",
+  "Apache-2.0",
+  "CDLA-Permissive-2.0",
+  "MPL-2.0",             # should be dropped after we stop supporting old webpki-roots versions
+  "ISC",
+  "Unicode-3.0",
+  "BSD-3-Clause",
+  "MIT-0",
+  "OpenSSL",
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the
@@ -111,9 +111,9 @@ confidence-threshold = 0.8
 # Allow 1 or more licenses on a per-crate basis, so that particular licenses
 # aren't accepted for every possible crate as with the normal allow list
 exceptions = [
-    # Each entry is the crate and version constraint, and its specific allow
-    # list
-    #{ allow = ["Zlib"], crate = "adler32" },
+  # Each entry is the crate and version constraint, and its specific allow
+  # list
+  #{ allow = ["Zlib"], crate = "adler32" },
 ]
 
 [[licenses.clarify]]
@@ -132,7 +132,7 @@ ignore = false
 # is only published to private registries, and ignore is true, the crate will
 # not have its license(s) checked
 registries = [
-    #"https://sekretz.com/registry
+  #"https://sekretz.com/registry
 ]
 
 # This section is considered when running `cargo deny check bans`.
@@ -159,8 +159,8 @@ workspace-default-features = "allow"
 external-default-features = "allow"
 # List of crates that are allowed. Use with care!
 allow = [
-    #"ansi_term@0.11.0",
-    #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason it is allowed" },
+  #"ansi_term@0.11.0",
+  #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason it is allowed" },
 ]
 # If true, workspace members are automatically allowed even when using deny-by-default
 # This is useful for organizations that want to deny all external dependencies by default
@@ -168,11 +168,11 @@ allow = [
 allow-workspace = false
 # List of crates to deny
 deny = [
-    #"ansi_term@0.11.0",
-    #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason it is banned" },
-    # Wrapper crates can optionally be specified to allow the crate when it
-    # is a direct dependency of the otherwise banned crate
-    #{ crate = "ansi_term@0.11.0", wrappers = ["this-crate-directly-depends-on-ansi_term"] },
+  #"ansi_term@0.11.0",
+  #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason it is banned" },
+  # Wrapper crates can optionally be specified to allow the crate when it
+  # is a direct dependency of the otherwise banned crate
+  #{ crate = "ansi_term@0.11.0", wrappers = ["this-crate-directly-depends-on-ansi_term"] },
 ]
 
 # List of features to allow/deny
@@ -200,16 +200,16 @@ deny = [
 
 # Certain crates/versions that will be skipped when doing duplicate detection.
 skip = [
-    #"ansi_term@0.11.0",
-    #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason why it can't be updated/removed" },
+  #"ansi_term@0.11.0",
+  #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason why it can't be updated/removed" },
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
 # dependencies starting at the specified crate, up to a certain depth, which is
 # by default infinite.
 skip-tree = [
-    #"ansi_term@0.11.0", # will be skipped along with _all_ of its direct and transitive dependencies
-    #{ crate = "ansi_term@0.11.0", depth = 20 },
+  #"ansi_term@0.11.0", # will be skipped along with _all_ of its direct and transitive dependencies
+  #{ crate = "ansi_term@0.11.0", depth = 20 },
 ]
 
 # This section is considered when running `cargo deny check sources`.
