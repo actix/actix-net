@@ -2,6 +2,7 @@
 
 use std::{
     future::Future,
+    io,
     sync::mpsc::channel,
     thread,
     time::{Duration, Instant},
@@ -460,25 +461,25 @@ fn spawn_local() {
 fn arbiter_spawn_failure_does_not_panic_creator() {
     let _ = System::new();
 
-    // 1. Happy path: try_new succeeds when System is active
+    // Happy path: try_new succeeds when System is active.
     let arb = Arbiter::try_new().expect("Arbiter::try_new should succeed");
     arb.stop();
     arb.join().unwrap();
 
-    // 2. Simulated runtime factory failure (e.g. OS error 24 EMFILE / FD exhaustion)
-    let res = Arbiter::try_with_tokio_rt(|| {
-        Err::<tokio::runtime::Runtime, _>(std::io::Error::from_raw_os_error(24))
-    });
-    assert!(res.is_err());
-    assert_eq!(res.unwrap_err().raw_os_error(), Some(24));
+    // Simulated runtime factory failure (e.g. OS error 24 EMFILE / FD exhaustion)
+    let err = Arbiter::try_with_tokio_rt(|| {
+        Err::<tokio::runtime::Runtime, _>(io::Error::from_raw_os_error(24))
+    })
+    .unwrap_err();
+    assert_eq!(err.raw_os_error(), Some(24));
 
-    // 3. Simulated panic in background thread during runtime initialization
+    // Simulated panic in background thread during runtime initialization.
     let (panic_tx, panic_rx) = channel();
-    let res = Arbiter::try_with_tokio_rt(move || -> std::io::Result<tokio::runtime::Runtime> {
+    let err = Arbiter::try_with_tokio_rt(move || -> io::Result<tokio::runtime::Runtime> {
         panic_tx.send(()).unwrap();
-        panic!("simulated tokio runtime initialization panic");
-    });
-
-    assert_eq!(panic_rx.recv(), Ok(()));
-    assert!(res.is_err());
+        panic!("oops");
+    })
+    .unwrap_err();
+    assert!(format!("{err}").contains("panicked during intialization"));
+    panic_rx.recv().unwrap();
 }

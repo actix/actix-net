@@ -206,7 +206,7 @@ impl Arbiter {
             Err(_) => {
                 let _ = thread_handle.join();
                 Err(io::Error::other(format!(
-                    "Arbiter thread {name} failed to initialize"
+                    "Arbiter thread {name} panicked during intialization"
                 )))
             }
         }
