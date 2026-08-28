@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `Arbiter::try_new` and `Arbiter::try_with_tokio_rt` for fallible Arbiter initialization without panicking the creator thread.
+
 ## 2.12.0
 
 - Add `SystemRunner::stop_future` and `SystemRunner::into_parts` for awaiting system stop inside `block_on`.
