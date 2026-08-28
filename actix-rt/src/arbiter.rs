@@ -99,7 +99,7 @@ impl Arbiter {
     /// thread or Tokio runtime fails.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Arbiter {
-        Self::try_new().expect("Cannot create new Arbiter's Runtime.")
+        Self::try_new().expect("Failed to create new Arbiter")
     }
 
     /// Try to spawn a new Arbiter thread and start its event loop with the default Tokio runtime.
@@ -130,8 +130,7 @@ impl Arbiter {
         F: FnOnce() -> R + Send + 'static,
         R: Into<crate::runtime::Runtime> + Send + 'static,
     {
-        Self::try_with_tokio_rt(|| Ok::<_, io::Error>(runtime_factory()))
-            .unwrap_or_else(|err| panic!("Cannot create new Arbiter: {err:?}"))
+        Self::try_with_tokio_rt(|| Ok(runtime_factory())).expect("Failed to create new Arbiter")
     }
 
     /// Try to spawn a new Arbiter using the [Tokio Runtime](tokio-runtime) returned from a closure.
@@ -184,8 +183,8 @@ impl Arbiter {
                     .tx()
                     .send(SystemCommand::RegisterArbiter(arb_id, hnd));
 
-                if ready_tx.send(Ok(())).is_err() {
-                    return;
+                if let Err(_) = ready_tx.send(Ok(())) {
+                    unreachable!("Arbiter ready signal receiver should not be dropped before send");
                 }
 
                 // run arbiter event processing loop
