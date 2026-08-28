@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.13.0
+
 - Add `Arbiter::try_new()` and `Arbiter::try_with_tokio_rt()` for fallible Arbiter initialization.
 
 ## 2.12.0
