@@ -386,3 +386,21 @@ impl Stream for ServerEventMultiplexer {
         this.cmd_rx.poll_recv(cx)
     }
 }
+
+impl Drop for ServerInner {
+    fn drop(&mut self) {
+        if !self.stopping {
+            self.stopping = true;
+
+            self.waker_queue.wake(WakerInterest::Stop);
+
+            for worker in &self.worker_handles {
+                let _completion_rx = worker.stop(false);
+            }
+
+            if let Some(handle) = self.accept_handle.take() {
+                let _ = handle.join();
+            }
+        }
+    }
+}
