@@ -104,7 +104,11 @@ impl Counter {
     /// Decrement counter by 1 and return true if crossing limit.
     #[inline(always)]
     pub(crate) fn dec(&self) -> bool {
-        self.counter.fetch_sub(1, Ordering::Relaxed) == self.limit
+        let previous = self.counter.fetch_sub(1, Ordering::Relaxed);
+
+        // Return true when the worker was at its connection limit before decrementing.
+        // The raw count is offset by one, and fetch_sub returns the value before decrementing.
+        self.limit.checked_add(1) == Some(previous)
     }
 
     pub(crate) fn total(&self) -> usize {
