@@ -626,3 +626,33 @@ fn no_runtime_on_init() {
     })
     .unwrap();
 }
+
+#[actix_rt::test]
+async fn server_drop_release_port() {
+    let addr = unused_addr();
+    let noop = || fn_service(|_| async { Ok::<_, ()>(()) });
+
+    let srv = Server::build()
+        .workers(1)
+        .disable_signals()
+        .bind("test", addr, noop)
+        .unwrap()
+        .run();
+
+    let task = actix_rt::spawn(srv);
+    sleep(Duration::from_millis(100)).await;
+
+    task.abort();
+    let _ = task.await;
+
+    let new_srv = Server::build()
+        .workers(1)
+        .disable_signals()
+        .bind("test2", addr, noop);
+
+    assert!(
+        new_srv.is_ok(),
+        "failed to re-bind port after server was dropped: {:?}",
+        new_srv.err()
+    );
+}

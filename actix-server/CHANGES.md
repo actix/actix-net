@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Clean up acceptor and worker threads when `Server` is dropped or cancelled, immediately releasing bound listening sockets and ports. Reported by Istvan Zolyomi ([@izolyomi](https://github.com/izolyomi)).
+
 ## 2.9.1
 
 - Fix race condition where accept thread shutdown cause cause workers to be dropped prematurely.
