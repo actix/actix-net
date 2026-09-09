@@ -4,7 +4,7 @@
 
 ## 2.9.1
 
-- Fix race condition where accept thread shutdown cause cause workers to be dropped prematurely.
+- Fix race condition where accept thread shutdown could cause workers to be dropped prematurely.
 
 ## 2.9.0
 
