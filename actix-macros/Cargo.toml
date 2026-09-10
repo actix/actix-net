@@ -1,6 +1,6 @@
 [package]
 name = "actix-macros"
-version = "0.2.4"
+version = "0.2.5"
 authors = [
   "Nikolay Kim <fafhrd91@gmail.com>",
   "Ibraheem Ahmed <ibrah1440@gmail.com>",
@@ -23,7 +23,7 @@ proc-macro = true
 
 [dependencies]
 quote = "1"
-syn = { version = "2", features = ["full"] }
+syn = { version = "3", features = ["full"] }
 
 # minimal versions compat
 [target.'cfg(any())'.dependencies]
