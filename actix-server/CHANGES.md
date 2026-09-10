@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.9.2
+
 - Close listeners and request forced worker shutdown when a running server is dropped, including during graceful shutdown.
 
 ## 2.9.1
