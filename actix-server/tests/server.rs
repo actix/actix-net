@@ -20,6 +20,10 @@ use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio_test::{assert_pending, assert_ready, assert_ready_ok};
 use tokio_util::future::FutureExt as _;
 
+fn unused_addr() -> net::SocketAddr {
+    TestServer::unused_addr()
+}
+
 struct PendingService {
     ready: Arc<AtomicUsize>,
     calls: Arc<AtomicUsize>,
@@ -43,7 +47,7 @@ impl Service<TcpStream> for PendingService {
 
 #[test]
 fn test_bind() {
-    let addr = TestServer::unused_addr();
+    let addr = unused_addr();
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
@@ -150,7 +154,7 @@ fn test_start() {
     use bytes::Bytes;
     use futures_util::sink::SinkExt;
 
-    let addr = TestServer::unused_addr();
+    let addr = unused_addr();
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
@@ -220,7 +224,7 @@ async fn test_max_concurrent_connections() {
 
     use tokio::io::AsyncWriteExt;
 
-    let addr = TestServer::unused_addr();
+    let addr = unused_addr();
     let (tx, rx) = mpsc::channel();
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -307,7 +311,7 @@ async fn test_max_concurrent_connections_releases_capacity() {
 
 #[tokio::test]
 async fn graceful_shutdown_drops_queued_connections() {
-    let addr = TestServer::unused_addr();
+    let addr = unused_addr();
     let (tx, rx) = mpsc::channel();
     let ready = Arc::new(AtomicUsize::new(0));
     let calls = Arc::new(AtomicUsize::new(0));
@@ -402,8 +406,8 @@ async fn test_service_restart() {
         }
     }
 
-    let addr1 = TestServer::unused_addr();
-    let addr2 = TestServer::unused_addr();
+    let addr1 = unused_addr();
+    let addr2 = unused_addr();
     let (tx, rx) = mpsc::channel();
     let num = Arc::new(AtomicUsize::new(0));
     let num2 = Arc::new(AtomicUsize::new(0));
