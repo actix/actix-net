@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `TestServer::unused_listener()` to return a TCP listener and its local address while keeping the port reserved.
+
 ## 2.9.4
 
 - Cap the default worker count at 512 and reject explicit counts above 512 in `ServerBuilder::workers()` before starting workers.
