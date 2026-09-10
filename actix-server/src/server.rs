@@ -66,12 +66,22 @@ pub(crate) enum ServerCommand {
 /// server has fully shut down.
 ///
 /// # Shutdown Signals
+///
 /// On UNIX systems, `SIGTERM` will start a graceful shutdown and `SIGQUIT` or `SIGINT` will start a
 /// forced shutdown. On Windows, a Ctrl-C signal will start a forced shutdown.
 ///
 /// A graceful shutdown will wait for all workers to stop first.
 ///
+/// # Drop Behavior
+///
+/// Dropping a running server closes its listeners and requests **forced** worker shutdown,
+/// including when graceful shutdown is still in progress.
+///
+/// Drop waits for the acceptor thread to exit, but does not wait for worker threads to exit. Keep
+/// polling the server until it completes to finish a graceful shutdown.
+///
 /// # Examples
+///
 /// The following is a TCP echo server. Test using `telnet 127.0.0.1 8080`.
 ///
 /// ```no_run
@@ -384,5 +394,24 @@ impl Stream for ServerEventMultiplexer {
         }
 
         this.cmd_rx.poll_recv(cx)
+    }
+}
+
+impl Drop for ServerInner {
+    fn drop(&mut self) {
+        if let Some(handle) = self.accept_handle.take() {
+            // Shutdown may have started without completing. Do not wake an acceptor
+            // that has already received Stop and may have dropped its poll instance.
+            if !self.stopping {
+                self.waker_queue.wake(WakerInterest::Stop);
+            }
+
+            for worker in &self.worker_handles {
+                drop(worker.stop(false));
+            }
+
+            // The acceptor owns the listeners. Wait for it to release them.
+            let _ = handle.join();
+        }
     }
 }

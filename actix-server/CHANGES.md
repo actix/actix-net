@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Close listeners and request forced worker shutdown when a running server is dropped, including during graceful shutdown.
+
 ## 2.9.1
 
 - Fix race condition where accept thread shutdown could cause workers to be dropped prematurely.
