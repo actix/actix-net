@@ -14,6 +14,7 @@ use core::{
 ///
 /// # Examples
 /// ```
+/// # #![allow(deprecated)]
 /// use actix_utils::future::ready;
 ///
 /// // async
@@ -57,6 +58,7 @@ impl<T> Future for Ready<T> {
 ///
 /// # Examples
 /// ```no_run
+/// # #![allow(deprecated)]
 /// use actix_utils::future::ready;
 ///
 /// # async fn run() {
@@ -78,6 +80,7 @@ pub fn ready<T>(val: T) -> Ready<T> {
 ///
 /// # Examples
 /// ```no_run
+/// # #![allow(deprecated)]
 /// use actix_utils::future::ok;
 ///
 /// # async fn run() {
@@ -95,6 +98,7 @@ pub fn ok<T, E>(val: T) -> Ready<Result<T, E>> {
 ///
 /// # Examples
 /// ```no_run
+/// # #![allow(deprecated)]
 /// use actix_utils::future::err;
 ///
 /// # async fn run() {
