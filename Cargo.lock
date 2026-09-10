@@ -57,6 +57,7 @@ dependencies = [
  "socket2",
  "static_assertions",
  "tokio",
+ "tokio-test",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
@@ -2436,6 +2437,7 @@ dependencies = [
  "futures-sink",
  "libc",
  "pin-project-lite",
+ "slab",
  "tokio",
 ]
 
