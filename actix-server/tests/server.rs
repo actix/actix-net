@@ -20,10 +20,6 @@ use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio_test::{assert_pending, assert_ready, assert_ready_ok};
 use tokio_util::future::FutureExt as _;
 
-fn unused_addr() -> net::SocketAddr {
-    TestServer::unused_addr()
-}
-
 struct PendingService {
     ready: Arc<AtomicUsize>,
     calls: Arc<AtomicUsize>,
@@ -47,7 +43,7 @@ impl Service<TcpStream> for PendingService {
 
 #[test]
 fn test_bind() {
-    let addr = unused_addr();
+    let addr = TestServer::unused_addr();
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
@@ -78,9 +74,8 @@ fn test_bind() {
 
 #[test]
 fn test_listen() {
-    let addr = unused_addr();
+    let (lst, addr) = TestServer::unused_listener();
     let (tx, rx) = mpsc::channel();
-    let lst = net::TcpListener::bind(addr).unwrap();
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
@@ -110,7 +105,7 @@ fn test_listen() {
 
 #[test]
 fn plain_tokio_runtime() {
-    let addr = unused_addr();
+    let (lst, addr) = TestServer::unused_listener();
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
@@ -123,7 +118,7 @@ fn plain_tokio_runtime() {
             let srv = Server::build()
                 .workers(1)
                 .disable_signals()
-                .bind("test", addr, move || {
+                .listen("test", lst, move || {
                     fn_factory(|| async {
                         sleep(Duration::from_millis(10)).await;
                         Ok::<_, ()>(fn_service(|_| async { Ok::<_, ()>(()) }))
@@ -155,15 +150,15 @@ fn test_start() {
     use bytes::Bytes;
     use futures_util::sink::SinkExt;
 
-    let addr = unused_addr();
+    let (lst, addr) = TestServer::unused_listener();
+    socket2::SockRef::from(&lst).listen(100).unwrap();
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
-                .backlog(100)
                 .disable_signals()
-                .bind("test", addr, move || {
+                .listen("test", lst, move || {
                     fn_service(|io: TcpStream| async move {
                         let mut f = Framed::new(io, BytesCodec);
                         f.send(Bytes::from_static(b"test")).await.unwrap();
@@ -225,7 +220,8 @@ async fn test_max_concurrent_connections() {
 
     use tokio::io::AsyncWriteExt;
 
-    let addr = unused_addr();
+    let (lst, addr) = TestServer::unused_listener();
+    socket2::SockRef::from(&lst).listen(12).unwrap();
     let (tx, rx) = mpsc::channel();
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -236,13 +232,11 @@ async fn test_max_concurrent_connections() {
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
-                // Set a relative higher backlog.
-                .backlog(12)
                 // max connection for a worker is 3.
                 .max_concurrent_connections(max_conn)
                 .workers(1)
                 .disable_signals()
-                .bind("test", addr, move || {
+                .listen("test", lst, move || {
                     let counter = counter.clone();
                     fn_service(move |_io: TcpStream| {
                         let counter = counter.clone();
@@ -312,7 +306,8 @@ async fn test_max_concurrent_connections_releases_capacity() {
 
 #[tokio::test]
 async fn graceful_shutdown_drops_queued_connections() {
-    let addr = unused_addr();
+    let (lst, addr) = TestServer::unused_listener();
+    socket2::SockRef::from(&lst).listen(1).unwrap();
     let (tx, rx) = mpsc::channel();
     let ready = Arc::new(AtomicUsize::new(0));
     let calls = Arc::new(AtomicUsize::new(0));
@@ -329,12 +324,11 @@ async fn graceful_shutdown_drops_queued_connections() {
 
             rt.block_on(async {
                 let srv = Server::build()
-                    .backlog(1)
                     .max_concurrent_connections(1)
                     .workers(1)
                     .disable_signals()
                     .shutdown_timeout(5)
-                    .bind("test", addr, move || {
+                    .listen("test", lst, move || {
                         let ready = ready.clone();
                         let calls = calls.clone();
 
@@ -407,8 +401,10 @@ async fn test_service_restart() {
         }
     }
 
-    let addr1 = unused_addr();
-    let addr2 = unused_addr();
+    let (lst1, addr1) = TestServer::unused_listener();
+    let (lst2, addr2) = TestServer::unused_listener();
+    socket2::SockRef::from(&lst1).listen(1).unwrap();
+    socket2::SockRef::from(&lst2).listen(1).unwrap();
     let (tx, rx) = mpsc::channel();
     let num = Arc::new(AtomicUsize::new(0));
     let num2 = Arc::new(AtomicUsize::new(0));
@@ -420,16 +416,15 @@ async fn test_service_restart() {
         let num = num.clone();
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
-                .backlog(1)
                 .disable_signals()
-                .bind("addr1", addr1, move || {
+                .listen("addr1", lst1, move || {
                     let num = num.clone();
                     fn_factory(move || {
                         let num = num.clone();
                         async move { Ok::<_, ()>(TestService(num)) }
                     })
                 })?
-                .bind("addr2", addr2, move || {
+                .listen("addr2", lst2, move || {
                     let num2 = num2.clone();
                     fn_factory(move || {
                         let num2 = num2.clone();
@@ -530,7 +525,7 @@ async fn worker_restart() {
         }
     }
 
-    let addr = unused_addr();
+    let (lst, addr) = TestServer::unused_listener();
     let (tx, rx) = mpsc::channel();
 
     let counter = Arc::new(AtomicUsize::new(1));
@@ -539,7 +534,7 @@ async fn worker_restart() {
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
                 .disable_signals()
-                .bind("addr", addr, move || TestServiceFactory(counter.clone()))?
+                .listen("addr", lst, move || TestServiceFactory(counter.clone()))?
                 .workers(2)
                 .run();
 
@@ -614,13 +609,13 @@ async fn worker_restart() {
 fn no_runtime_on_init() {
     use std::{thread::sleep, time::Duration};
 
-    let addr = unused_addr();
+    let (lst, _addr) = TestServer::unused_listener();
     let counter = Arc::new(AtomicUsize::new(0));
 
     let mut srv = Server::build()
         .workers(2)
         .disable_signals()
-        .bind("test", addr, {
+        .listen("test", lst, {
             let counter = counter.clone();
             move || {
                 counter.fetch_add(1, Ordering::SeqCst);

@@ -73,11 +73,11 @@ async fn testing_server_echo() {
 
 #[tokio::test]
 async fn new_with_builder() {
-    let alt_addr = TestServer::unused_addr();
+    let (alt_listener, alt_addr) = TestServer::unused_listener();
 
     let srv = TestServer::start_with_builder(
         Server::build()
-            .bind("alt", alt_addr, || {
+            .listen("alt", alt_listener, || {
                 fn_service(|_| async { Ok::<_, ()>(()) })
             })
             .unwrap(),
