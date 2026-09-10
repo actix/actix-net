@@ -235,7 +235,7 @@ impl SystemRunner {
     ///     ExitCode::from(code as u8)
     /// });
     ///
-    /// # drop(exit);
+    /// # let _ = exit;
     /// ```
     pub fn stop_future(&self) -> SystemStop {
         SystemStop::new(self.stop_rx.clone())
