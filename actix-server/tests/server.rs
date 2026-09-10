@@ -150,15 +150,15 @@ fn test_start() {
     use bytes::Bytes;
     use futures_util::sink::SinkExt;
 
-    let (lst, addr) = TestServer::unused_listener();
-    socket2::SockRef::from(&lst).listen(100).unwrap();
+    let addr = TestServer::unused_addr();
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
+                .backlog(100)
                 .disable_signals()
-                .listen("test", lst, move || {
+                .bind("test", addr, move || {
                     fn_service(|io: TcpStream| async move {
                         let mut f = Framed::new(io, BytesCodec);
                         f.send(Bytes::from_static(b"test")).await.unwrap();
@@ -220,8 +220,7 @@ async fn test_max_concurrent_connections() {
 
     use tokio::io::AsyncWriteExt;
 
-    let (lst, addr) = TestServer::unused_listener();
-    socket2::SockRef::from(&lst).listen(12).unwrap();
+    let addr = TestServer::unused_addr();
     let (tx, rx) = mpsc::channel();
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -232,11 +231,13 @@ async fn test_max_concurrent_connections() {
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
+                // Set a relative higher backlog.
+                .backlog(12)
                 // max connection for a worker is 3.
                 .max_concurrent_connections(max_conn)
                 .workers(1)
                 .disable_signals()
-                .listen("test", lst, move || {
+                .bind("test", addr, move || {
                     let counter = counter.clone();
                     fn_service(move |_io: TcpStream| {
                         let counter = counter.clone();
@@ -306,8 +307,7 @@ async fn test_max_concurrent_connections_releases_capacity() {
 
 #[tokio::test]
 async fn graceful_shutdown_drops_queued_connections() {
-    let (lst, addr) = TestServer::unused_listener();
-    socket2::SockRef::from(&lst).listen(1).unwrap();
+    let addr = TestServer::unused_addr();
     let (tx, rx) = mpsc::channel();
     let ready = Arc::new(AtomicUsize::new(0));
     let calls = Arc::new(AtomicUsize::new(0));
@@ -324,11 +324,12 @@ async fn graceful_shutdown_drops_queued_connections() {
 
             rt.block_on(async {
                 let srv = Server::build()
+                    .backlog(1)
                     .max_concurrent_connections(1)
                     .workers(1)
                     .disable_signals()
                     .shutdown_timeout(5)
-                    .listen("test", lst, move || {
+                    .bind("test", addr, move || {
                         let ready = ready.clone();
                         let calls = calls.clone();
 
@@ -401,10 +402,8 @@ async fn test_service_restart() {
         }
     }
 
-    let (lst1, addr1) = TestServer::unused_listener();
-    let (lst2, addr2) = TestServer::unused_listener();
-    socket2::SockRef::from(&lst1).listen(1).unwrap();
-    socket2::SockRef::from(&lst2).listen(1).unwrap();
+    let addr1 = TestServer::unused_addr();
+    let addr2 = TestServer::unused_addr();
     let (tx, rx) = mpsc::channel();
     let num = Arc::new(AtomicUsize::new(0));
     let num2 = Arc::new(AtomicUsize::new(0));
@@ -416,15 +415,16 @@ async fn test_service_restart() {
         let num = num.clone();
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
+                .backlog(1)
                 .disable_signals()
-                .listen("addr1", lst1, move || {
+                .bind("addr1", addr1, move || {
                     let num = num.clone();
                     fn_factory(move || {
                         let num = num.clone();
                         async move { Ok::<_, ()>(TestService(num)) }
                     })
                 })?
-                .listen("addr2", lst2, move || {
+                .bind("addr2", addr2, move || {
                     let num2 = num2.clone();
                     fn_factory(move || {
                         let num2 = num2.clone();
