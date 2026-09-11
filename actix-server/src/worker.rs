@@ -64,26 +64,45 @@ fn handle_pair(
     (accept, server)
 }
 
-/// counter: Arc<AtomicUsize> field is owned by `Accept` thread and `ServerWorker` thread.
+/// Shared connection counter for the accept thread and one server worker.
 ///
-/// `Accept` would increment the counter and `ServerWorker` would decrement it.
+/// The accept thread increments the counter after it sends a connection to the worker. The worker
+/// decrements the counter when the connection's guard is dropped.
 ///
-/// # Atomic Ordering:
+/// # Worker Availability From The Accept Thread's Perspective
 ///
-/// `Accept` always look into it's cached `Availability` field for `ServerWorker` state.
-/// It lazily increment counter after successful dispatching new work to `ServerWorker`.
-/// On reaching counter limit `Accept` update it's cached `Availability` and mark worker as
-/// unable to accept any work.
+/// The accept thread has access to each worker's counter through [`WorkerHandleAccept`], but uses
+/// its cached [`Availability`] flags to choose a worker. After it sends a connection, it increments
+/// that worker's counter. If the increment reaches the connection limit, it marks the worker
+/// unavailable and stops sending it connections until the worker reports that capacity is available.
 ///
-/// `ServerWorker` always decrement the counter when every work received from `Accept` is done.
-/// On reaching counter limit worker would use `mio::Waker` and `WakerQueue` to wake up `Accept`
-/// and notify it to update cached `Availability` again to mark worker as able to accept work again.
+/// # Counter Offset
 ///
-/// Hence, a wake up would only happen after `Accept` increment it to limit.
-/// And a decrement to limit always wake up `Accept`.
+/// The raw counter starts at one to prevent an underflow during the following (race) condition. An
+/// idle worker has a raw count of one. If it receives and finishes a connection before the accept
+/// thread increments the counter, dropping the connection's guard changes the raw count from one to
+/// zero. Another read can observe zero until the accept thread performs the pending increment,
+/// which restores the idle value of one.
+///
+/// # Restoring Worker Availability
+///
+/// When a decrement takes the connection count below the limit (signalled by the return value of
+/// [`dec`]), the worker queues a `WorkerAvailable` notification in `WakerQueue` and wakes the
+/// accept thread through `mio::Waker`. The accept thread updates its cached availability flag and
+/// resumes accepting connections unless the server is paused. Further decrements below the limit do
+/// not need to wake the accept thread.
+///
+/// [`Availability`]: crate::availability::Availability
+/// [`dec`]: Self::dec
 #[derive(Clone)]
 pub(crate) struct Counter {
+    /// Raw counter value.
+    ///
+    /// Always one higher than the actual connection count except in the rare race condition
+    /// described in the struct docs.
     counter: Arc<AtomicUsize>,
+
+    /// The connection limit.
     limit: usize,
 }
 
@@ -95,18 +114,27 @@ impl Counter {
         }
     }
 
-    /// Increment counter by 1 and return true when hitting limit
+    /// Increments the counter by one.
+    ///
+    /// Returns true if connection limit was reached with this increment.
     #[inline(always)]
     pub(crate) fn inc(&self) -> bool {
-        self.counter.fetch_add(1, Ordering::Relaxed) != self.limit
+        let prev = self.counter.fetch_add(1, Ordering::Relaxed);
+
+        prev != self.limit
     }
 
-    /// Decrement counter by 1 and return true if crossing limit.
+    /// Decrements the counter by one.
+    ///
+    /// Returns true when connection count drops below the limit.
     #[inline(always)]
     pub(crate) fn dec(&self) -> bool {
-        self.counter.fetch_sub(1, Ordering::Relaxed) == self.limit
+        let prev = self.counter.fetch_sub(1, Ordering::Relaxed);
+
+        Some(prev) == self.limit.checked_add(1)
     }
 
+    /// Returns number of connections currently being handled.
     pub(crate) fn total(&self) -> usize {
         self.counter.load(Ordering::SeqCst) - 1
     }
@@ -697,4 +725,19 @@ fn wrap_worker_services(services: Vec<(usize, usize, BoxedServerService)>) -> Ve
             });
             services
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Counter;
+
+    #[test]
+    fn max_connection_limit_allows_connection_completion() {
+        let counter = Counter::new(usize::MAX);
+
+        assert!(counter.inc());
+        assert_eq!(counter.total(), 1);
+        assert!(!counter.dec());
+        assert_eq!(counter.total(), 0);
+    }
 }

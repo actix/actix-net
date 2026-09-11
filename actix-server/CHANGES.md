@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix workers failing to accept new connections after reaching the configured connection limit, even after existing connections finish.
+
 ## 2.9.1
 
 - Fix race condition where accept thread shutdown cause cause workers to be dropped prematurely.

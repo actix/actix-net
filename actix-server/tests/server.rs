@@ -282,6 +282,30 @@ async fn test_max_concurrent_connections() {
     h.join().unwrap().unwrap();
 }
 
+#[actix_rt::test]
+async fn test_max_concurrent_connections_releases_capacity() {
+    let (tx, rx) = mpsc::channel();
+
+    let srv =
+        TestServer::start_with_builder(Server::build().max_concurrent_connections(1), move || {
+            let tx = tx.clone();
+
+            fn_service(move |_io: TcpStream| {
+                tx.send(()).unwrap();
+                ready(Ok::<_, ()>(()))
+            })
+        });
+
+    let first_conn = srv.connect().unwrap();
+    rx.recv_timeout(Duration::from_secs(5))
+        .expect("first connection was not dispatched");
+    drop(first_conn);
+
+    let _second_conn = srv.connect().unwrap();
+    rx.recv_timeout(Duration::from_secs(5))
+        .expect("worker did not accept a second connection after reaching its connection limit");
+}
+
 #[tokio::test]
 async fn graceful_shutdown_drops_queued_connections() {
     let addr = unused_addr();

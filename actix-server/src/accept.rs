@@ -331,9 +331,10 @@ impl Accept {
             .for_each(|(_, info)| self.deregister_logged(info));
     }
 
-    // Send connection to worker and handle error.
+    /// Sends connection to worker and handles error.
     fn send_connection(&mut self, conn: Conn) -> Result<(), Conn> {
         let next = self.next();
+
         match next.send(conn) {
             Ok(_) => {
                 // Increment counter of WorkerHandle.
