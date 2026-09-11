@@ -33,6 +33,10 @@ use crate::{
     waker_queue::{WakerInterest, WakerQueue},
 };
 
+// Based on the default maximum blocking thread count of a Tokio runtime.
+const DEFAULT_BLOCKING_THREAD_BUDGET: usize = 512;
+const SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_secs(1);
+
 /// Stop worker message. Returns `true` on successful graceful shutdown
 /// and `false` if some connections still alive when shutdown execute.
 pub(crate) struct Stop {
@@ -278,8 +282,7 @@ impl Default for ServerWorkerConfig {
     fn default() -> Self {
         let parallelism = std::thread::available_parallelism().map_or(2, NonZeroUsize::get);
 
-        // 512 is the default max blocking thread count of a Tokio runtime.
-        let max_blocking_threads = std::cmp::max(512 / parallelism, 1);
+        let max_blocking_threads = std::cmp::max(DEFAULT_BLOCKING_THREAD_BUDGET / parallelism, 1);
 
         Self {
             shutdown_timeout: Duration::from_secs(30),
@@ -592,7 +595,7 @@ impl Future for ServerWorker {
                 this.shutdown(false);
 
                 this.state = WorkerState::Shutdown(Shutdown {
-                    timer: Box::pin(sleep(Duration::from_secs(1))),
+                    timer: Box::pin(sleep(SHUTDOWN_POLL_INTERVAL)),
                     start_from: Instant::now(),
                     tx,
                 });
@@ -652,7 +655,7 @@ impl Future for ServerWorker {
                     drop((conn, guard));
                 }
 
-                // wait for 1 second
+                // Wait until the next shutdown check.
                 ready!(shutdown.timer.as_mut().poll(cx));
 
                 if this.counter.total() == 0 {
@@ -670,8 +673,8 @@ impl Future for ServerWorker {
 
                     Poll::Ready(())
                 } else {
-                    // reset timer and wait for 1 second
-                    let time = Instant::now() + Duration::from_secs(1);
+                    // Schedule the next shutdown check.
+                    let time = Instant::now() + SHUTDOWN_POLL_INTERVAL;
                     shutdown.timer.as_mut().reset(time);
                     shutdown.timer.as_mut().poll(cx)
                 }

@@ -24,6 +24,8 @@ use crate::{
     ServerHandle,
 };
 
+const SYSTEM_STOP_DELAY: Duration = Duration::from_millis(300);
+
 #[derive(Debug)]
 pub(crate) enum ServerCommand {
     /// Worker failed to accept connection, indicating a probable panic.
@@ -295,7 +297,7 @@ impl ServerInner {
                 }
 
                 if self.system_stop || force_system_stop {
-                    sleep(Duration::from_millis(300)).await;
+                    sleep(SYSTEM_STOP_DELAY).await;
                     System::try_current().as_ref().map(System::stop);
                 }
             }
