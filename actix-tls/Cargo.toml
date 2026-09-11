@@ -131,5 +131,18 @@ tokio-rustls-026 = { package = "tokio-rustls", version = "0.26" }
 name = "accept-rustls"
 required-features = ["accept", "rustls-0_23"]
 
-[lints]
-workspace = true
+[lints.rust]
+rust_2018_idioms = "deny"
+nonstandard_style = "deny"
+future_incompatible = "deny"
+missing_docs = { level = "warn", priority = -1 }
+
+[lints.clippy]
+uninlined_format_args = "warn"
+disallowed_names = "warn"
+
+# Dependencies are feature-gated across accept, connect, and TLS backends.
+# `cargo ci-check-lib` checks partial combinations, so valid dependencies can
+# appear unused when their feature is not enabled.
+[lints.cargo]
+unused_dependencies = "allow"
