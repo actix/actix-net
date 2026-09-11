@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.9.4
+
 - Cap the default worker count at 512 and reject explicit counts above 512 in `ServerBuilder::workers()` before starting workers.
 
 ## 2.9.3
