@@ -12,7 +12,10 @@ use crate::{
     ServerBuilder, ServerHandle,
 };
 
-const TIMEOUT_DURATION_ON_ERROR: Duration = Duration::from_millis(510);
+const ACCEPT_ERROR_BACKOFF: Duration = Duration::from_millis(500);
+// Allow a 10 ms margin after the listener's retry deadline.
+const ACCEPT_ERROR_POLL_TIMEOUT: Duration =
+    ACCEPT_ERROR_BACKOFF.saturating_add(Duration::from_millis(10));
 
 struct ServerSocketInfo {
     token: usize,
@@ -409,8 +412,8 @@ impl Accept {
                     // sleep after error. write the timeout to socket info as later
                     // the poll would need it mark which socket and when it's
                     // listener should be registered
-                    info.timeout = Some(Instant::now() + Duration::from_millis(500));
-                    self.set_timeout(TIMEOUT_DURATION_ON_ERROR);
+                    info.timeout = Some(Instant::now() + ACCEPT_ERROR_BACKOFF);
+                    self.set_timeout(ACCEPT_ERROR_POLL_TIMEOUT);
 
                     return;
                 }
