@@ -480,6 +480,6 @@ fn arbiter_spawn_failure_does_not_panic_creator() {
         panic!("oops");
     })
     .unwrap_err();
-    assert!(format!("{err}").contains("panicked during intialization"));
+    assert!(format!("{err}").contains("panicked during initialization"));
     panic_rx.recv().unwrap();
 }

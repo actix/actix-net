@@ -16,7 +16,6 @@ pin-project-lite = "0.2"
 
 [dev-dependencies]
 actix-rt = "2"
-actix-utils = "3"
 futures-util = { version = "0.3.17", default-features = false }
 
 [lints]

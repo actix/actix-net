@@ -4,9 +4,13 @@
 
 - Fix workers failing to accept new connections after reaching the configured connection limit, even after existing connections finish.
 
+## 2.9.2
+
+- Close listeners and request forced worker shutdown when a running server is dropped, including during graceful shutdown.
+
 ## 2.9.1
 
-- Fix race condition where accept thread shutdown cause cause workers to be dropped prematurely.
+- Fix race condition where accept thread shutdown could cause workers to be dropped prematurely.
 
 ## 2.9.0
 

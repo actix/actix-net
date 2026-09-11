@@ -1,8 +1,8 @@
 #![allow(clippy::let_underscore_future, missing_docs)]
 
 use std::{
-    future::{ready, Ready},
-    net,
+    future::{pending, ready, Ready},
+    net::{self, SocketAddr},
     sync::{
         atomic::{AtomicUsize, Ordering},
         mpsc, Arc,
@@ -15,6 +15,10 @@ use std::{
 use actix_rt::{net::TcpStream, time::sleep};
 use actix_server::{Server, TestServer};
 use actix_service::{fn_factory, fn_service, Service};
+use futures_util::{task::noop_waker, FutureExt as _};
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tokio_test::{assert_pending, assert_ready, assert_ready_ok};
+use tokio_util::future::FutureExt as _;
 
 fn unused_addr() -> net::SocketAddr {
     TestServer::unused_addr()
@@ -649,4 +653,115 @@ fn no_runtime_on_init() {
         srv.await
     })
     .unwrap();
+}
+
+#[tokio::test]
+async fn dropped_server_releases_listener() {
+    let addr = unused_addr();
+    let mut server = Server::build()
+        .workers(1)
+        .disable_signals()
+        .bind("test", addr, || fn_service(|_| async { Ok::<_, ()>(()) }))
+        .unwrap()
+        .run();
+
+    // Start the acceptor before dropping the server.
+    let waker = noop_waker();
+    let mut cx = Context::from_waker(&waker);
+    assert_pending!(server.poll_unpin(&mut cx));
+    drop(server);
+
+    let _listener =
+        net::TcpListener::bind(addr).expect("listener should close before drop returns");
+}
+
+fn basic_ready_server() -> (Server, SocketAddr) {
+    let addr = unused_addr();
+    let server = Server::build()
+        .workers(1)
+        .disable_signals()
+        .shutdown_timeout(60)
+        .bind("test", addr, || {
+            fn_service(|mut stream: TcpStream| async move {
+                stream.write_all(b"ready").await.unwrap();
+                pending::<()>().await;
+                drop(stream);
+                Ok::<_, ()>(())
+            })
+        })
+        .unwrap()
+        .run();
+
+    (server, addr)
+}
+
+#[tokio::test]
+async fn dropped_server_interrupts_graceful_shutdown() {
+    let (mut server, addr) = basic_ready_server();
+
+    let waker = noop_waker();
+    let mut cx = Context::from_waker(&waker);
+    assert_pending!(server.poll_unpin(&mut cx));
+    let mut client = TcpStream::connect(addr).await.unwrap();
+    let mut ready = [0; 5];
+    client
+        .read_exact(&mut ready)
+        .timeout(Duration::from_secs(5))
+        .await
+        .expect("service should start")
+        .unwrap();
+    assert_eq!(&ready, b"ready");
+
+    let completion = server.handle().stop(true);
+    // Process the stop request, leaving shutdown pending on the active connection.
+    assert_pending!(server.poll_unpin(&mut cx));
+    drop(server);
+    drop(completion);
+
+    let mut buf = [0; 1];
+    let bytes = client
+        .read(&mut buf)
+        .timeout(Duration::from_secs(5))
+        .await
+        .expect("cancellation should close the connection before the graceful shutdown timeout")
+        .unwrap();
+    assert_eq!(bytes, 0);
+
+    let _listener =
+        net::TcpListener::bind(addr).expect("listener should close before drop returns");
+}
+
+#[tokio::test]
+async fn non_graceful_shutdown_completes_before_server_drop() {
+    let (mut server, addr) = basic_ready_server();
+
+    let waker = noop_waker();
+    let mut cx = Context::from_waker(&waker);
+    assert_pending!(server.poll_unpin(&mut cx));
+    let mut client = TcpStream::connect(addr).await.unwrap();
+    let mut ready = [0; 5];
+    client
+        .read_exact(&mut ready)
+        .timeout(Duration::from_secs(5))
+        .await
+        .expect("service should start")
+        .unwrap();
+    assert_eq!(&ready, b"ready");
+
+    let mut completion = Box::pin(server.handle().stop(false));
+    assert_ready_ok!(server.poll_unpin(&mut cx));
+    assert_ready!(completion.poll_unpin(&mut cx));
+    drop(server);
+
+    let mut buf = [0; 1];
+    let bytes = client
+        .read(&mut buf)
+        .timeout(Duration::from_secs(5))
+        .await
+        .expect("forced shutdown should close the active connection")
+        .unwrap();
+    assert_eq!(bytes, 0);
+
+    let _listener =
+        net::TcpListener::bind(addr).expect("listener should close before drop returns");
 }

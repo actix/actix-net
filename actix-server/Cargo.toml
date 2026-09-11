@@ -1,6 +1,6 @@
 [package]
 name = "actix-server"
-version = "2.9.1"
+version = "2.9.2"
 authors = [
   "Nikolay Kim <fafhrd91@gmail.com>",
   "Rob Ede <robjtede@icloud.com>",
@@ -24,7 +24,6 @@ default = []
 [dependencies]
 actix-rt = { version = "2.10", default-features = false }
 actix-service = "2"
-actix-utils = "3"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
 mio = { version = "1", features = ["os-poll", "net"] }
@@ -41,7 +40,8 @@ futures-util = { version = "0.3.17", default-features = false, features = ["sink
 pretty_env_logger = "0.5"
 static_assertions = "1"
 tokio = { version = "1.51", features = ["io-util", "rt-multi-thread", "macros", "fs", "time"] }
-tokio-util = "0.7"
+tokio-test = "0.4"
+tokio-util = { version = "0.7", features = ["time"] }
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 
 [lints]
