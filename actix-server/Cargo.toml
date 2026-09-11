@@ -24,7 +24,6 @@ default = []
 [dependencies]
 actix-rt = { version = "2.10", default-features = false }
 actix-service = "2"
-actix-utils = "3"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
 mio = { version = "1", features = ["os-poll", "net"] }

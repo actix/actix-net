@@ -48,7 +48,6 @@ dependencies = [
  "actix-codec",
  "actix-rt",
  "actix-service",
- "actix-utils",
  "bytes",
  "futures-core",
  "futures-util",
@@ -68,7 +67,6 @@ name = "actix-service"
 version = "2.0.3"
 dependencies = [
  "actix-rt",
- "actix-utils",
  "futures-core",
  "futures-util",
  "pin-project-lite",
