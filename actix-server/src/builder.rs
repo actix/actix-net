@@ -8,6 +8,7 @@ use tokio::sync::{
 };
 
 use crate::{
+    availability::MAX_WORKERS,
     server::ServerCommand,
     service::{InternalServiceFactory, ServerServiceFactory, StreamNewService},
     socket::{create_mio_tcp_listener, MioListener, MioTcpListener, StdTcpListener, ToSocketAddrs},
@@ -59,11 +60,17 @@ impl Default for ServerBuilder {
 impl ServerBuilder {
     /// Create new Server builder instance
     pub fn new() -> ServerBuilder {
+        Self::with_default_workers(
+            std::thread::available_parallelism().map_or(2, NonZeroUsize::get),
+        )
+    }
+
+    fn with_default_workers(threads: usize) -> ServerBuilder {
         let (cmd_tx, cmd_rx) = unbounded_channel();
         let (graceful_shutdown_tx, _) = watch::channel(());
 
         ServerBuilder {
-            threads: std::thread::available_parallelism().map_or(2, NonZeroUsize::get),
+            threads: threads.min(MAX_WORKERS),
             token: 0,
             factories: Vec::new(),
             sockets: Vec::new(),
@@ -92,16 +99,17 @@ impl ServerBuilder {
     /// See [`bind()`](Self::bind()) for more details on how worker count affects the number of
     /// server factory instantiations.
     ///
-    /// The default worker count is the determined by [`std::thread::available_parallelism()`]. See
-    /// its documentation to determine what behavior you should expect when server is run.
+    /// The default worker count is determined by [`std::thread::available_parallelism()`], capped
+    /// at 512. See its documentation for how the available parallelism is determined.
     ///
-    /// `num` must be greater than 0.
+    /// `num` must be in the range 1–512.
     ///
     /// # Panics
     ///
-    /// Panics if `num` is 0.
+    /// Panics if `num` is 0 or greater than 512.
     pub fn workers(mut self, num: usize) -> Self {
         assert_ne!(num, 0, "workers must be greater than 0");
+        assert!(num <= MAX_WORKERS, "workers must not exceed {MAX_WORKERS}");
         self.threads = num;
         self
     }
@@ -317,6 +325,10 @@ impl ServerBuilder {
     }
 
     /// Starts processing incoming connections and return server controller.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no sockets are bound.
     pub fn run(self) -> Server {
         if self.sockets.is_empty() {
             panic!("Server should have at least one bound socket");
@@ -423,5 +435,53 @@ pub(super) fn bind_addr<S: ToSocketAddrs>(
         Err(err)
     } else {
         Err(io::Error::other("Can not bind to address."))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ServerBuilder;
+
+    #[test]
+    #[should_panic(expected = "workers must not exceed 512")]
+    fn rejects_worker_count_above_limit() {
+        ServerBuilder::new().workers(513);
+    }
+
+    #[test]
+    #[should_panic(expected = "workers must be greater than 0")]
+    fn rejects_zero_workers() {
+        ServerBuilder::new().workers(0);
+    }
+
+    #[test]
+    fn accepts_worker_count_boundaries() {
+        ServerBuilder::new().workers(1);
+        ServerBuilder::new().workers(512);
+    }
+
+    #[test]
+    fn default_worker_count_is_capped() {
+        for detected in [513, 768, 1920, usize::MAX] {
+            assert_eq!(ServerBuilder::with_default_workers(detected).threads, 512);
+        }
+    }
+
+    #[test]
+    fn oversized_default_worker_count_can_be_overridden() {
+        assert_eq!(
+            ServerBuilder::with_default_workers(768).workers(1).threads,
+            1
+        );
+    }
+
+    #[test]
+    fn supported_default_worker_count_is_preserved() {
+        for detected in [1, 2, 64, 512] {
+            assert_eq!(
+                ServerBuilder::with_default_workers(detected).threads,
+                detected
+            );
+        }
     }
 }

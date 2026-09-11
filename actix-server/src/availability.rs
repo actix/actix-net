@@ -1,8 +1,10 @@
 use crate::worker::WorkerHandleAccept;
 
+pub(crate) const MAX_WORKERS: usize = 512;
+
 /// Array of u128 with every bit as marker for a worker handle's availability.
 #[derive(Debug, Default)]
-pub(crate) struct Availability([u128; 4]);
+pub(crate) struct Availability([u128; MAX_WORKERS / u128::BITS as usize]);
 
 impl Availability {
     /// Check if any worker handle is available

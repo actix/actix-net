@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Cap the default worker count at 512 and reject explicit counts above 512 in `ServerBuilder::workers()` before starting workers.
+
 ## 2.9.3
 
 - Fix workers failing to accept new connections after reaching the configured connection limit, even after existing connections finish.
