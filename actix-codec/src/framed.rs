@@ -43,14 +43,13 @@ pin_project! {
     }
 }
 
-impl<T, U> Framed<T, U>
-where
-    T: AsyncRead + AsyncWrite,
-    U: Decoder,
-{
-    /// This function returns a *single* object that is both `Stream` and `Sink`; grouping this into
-    /// a single object is often useful for layering things like gzip or TLS, which require both
-    /// read and write access to the underlying object.
+impl<T, U> Framed<T, U> {
+    /// Creates a framed transport from an I/O object and a codec.
+    ///
+    /// The transport implements `Stream` when the I/O object implements `AsyncRead` and the codec
+    /// implements `Decoder`. It implements `Sink<I>` when the I/O object implements `AsyncWrite`
+    /// and the codec implements `Encoder<I>`. Read and write halves can therefore use separate
+    /// codecs.
     pub fn new(io: T, codec: U) -> Framed<T, U> {
         Framed {
             io,

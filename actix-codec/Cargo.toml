@@ -26,6 +26,7 @@ tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }
+tokio = { version = "1.44.2", features = ["io-util"] }
 tokio-test = "0.4.2"
 
 [[bench]]
