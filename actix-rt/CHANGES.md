@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add separate `net` and `signal` features, enabled by default, to make Tokio networking and OS signal support optional. Users who disable default features must explicitly enable `net` and/or `signal` to use the corresponding modules.
+
 ## 2.13.0
 
 - Add `Arbiter::try_new()` and `Arbiter::try_with_tokio_rt()` for fallible Arbiter initialization.

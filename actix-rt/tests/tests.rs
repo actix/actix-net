@@ -11,6 +11,31 @@ use std::{
 use actix_rt::{task::JoinError, Arbiter, System};
 use tokio::sync::oneshot;
 
+#[cfg(feature = "net")]
+#[test]
+fn runtime_drives_tcp() {
+    System::new().block_on(async {
+        let listener = actix_rt::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .unwrap();
+        let addr = listener.local_addr().unwrap();
+        let client =
+            actix_rt::spawn(async move { actix_rt::net::TcpStream::connect(addr).await.unwrap() });
+        let (_, peer) = listener.accept().await.unwrap();
+        assert_eq!(client.await.unwrap().local_addr().unwrap(), peer);
+    });
+}
+
+#[cfg(all(unix, feature = "signal"))]
+#[test]
+fn runtime_registers_signal() {
+    System::new().block_on(async {
+        let _signal =
+            actix_rt::signal::unix::signal(actix_rt::signal::unix::SignalKind::user_defined1())
+                .unwrap();
+    });
+}
+
 #[test]
 fn await_for_timer() {
     let time = Duration::from_secs(1);
@@ -258,8 +283,7 @@ fn new_system_with_tokio() {
 
     let res = System::with_tokio_rt(move || {
         tokio::runtime::Builder::new_multi_thread()
-            .enable_io()
-            .enable_time()
+            .enable_all()
             .thread_keep_alive(Duration::from_millis(1000))
             .worker_threads(2)
             .max_blocking_threads(2)
@@ -292,8 +316,7 @@ fn new_system_with_shared_tokio_runtime() {
 
     let rt = Arc::new(
         tokio::runtime::Builder::new_multi_thread()
-            .enable_io()
-            .enable_time()
+            .enable_all()
             .worker_threads(2)
             .max_blocking_threads(2)
             .build()
@@ -329,8 +352,7 @@ fn new_system_with_static_tokio_runtime() {
     let res = System::with_tokio_rt(|| -> &'static tokio::runtime::Runtime {
         TOKIO.get_or_init(|| {
             tokio::runtime::Builder::new_multi_thread()
-                .enable_io()
-                .enable_time()
+                .enable_all()
                 .worker_threads(1)
                 .build()
                 .unwrap()
