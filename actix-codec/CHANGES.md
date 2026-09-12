@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Relaxed `Framed::new` bounds to support separate read and write halves with decoder-only and encoder-only codecs.
+
 ## 0.5.3
 
 - Added `LinesCodec::new_with_max_length` to enforce a maximum line length and mitigate potential unbounded-buffer DoS when handling untrusted input.
