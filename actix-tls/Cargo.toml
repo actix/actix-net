@@ -65,7 +65,7 @@ native-tls = ["dep:tokio-native-tls"]
 uri = ["dep:http-0_2", "dep:http-1"]
 
 [dependencies]
-actix-rt = { version = "2.2", default-features = false }
+actix-rt = { version = "2.2", default-features = false, features = ["net"] }
 actix-service = "2"
 actix-utils = "3"
 futures-core = { version = "0.3.7", default-features = false, features = ["alloc"] }

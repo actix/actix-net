@@ -15,17 +15,19 @@ rust-version.workspace = true
 allowed_external_types = ["actix_macros::*", "tokio::*"]
 
 [features]
-default = ["macros"]
+default = ["macros", "net", "signal"]
 macros = ["actix-macros"]
+net = ["tokio/net"]
+signal = ["tokio/signal"]
 
 [dependencies]
 actix-macros = { version = "0.2.3", optional = true }
 
 futures-core = { version = "0.3", default-features = false }
-tokio = { version = "1.44.2", features = ["rt", "io-util", "net", "parking_lot", "signal", "sync", "time"] }
+tokio = { version = "1.44.2", features = ["rt", "io-util", "parking_lot", "sync", "time"] }
 
 [dev-dependencies]
-tokio = { version = "1.44.2", features = ["full"] }
+tokio = { version = "1.44.2", features = ["rt-multi-thread"] }
 
 [lints]
 workspace = true
