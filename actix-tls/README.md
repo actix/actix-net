@@ -19,3 +19,4 @@
 
 - [Library Documentation](https://docs.rs/actix-tls)
 - [Examples](/actix-tls/examples)
+- [TLS credential hot reload](examples/hot-reload.md)
