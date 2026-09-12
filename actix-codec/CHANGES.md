@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.4
+
 - Relaxed `Framed::new` bounds to support separate read and write halves with decoder-only and encoder-only codecs.
 
 ## 0.5.3
