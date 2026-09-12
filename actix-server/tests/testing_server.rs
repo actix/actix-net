@@ -18,6 +18,28 @@ macro_rules! await_timeout_ms {
 }
 
 #[tokio::test]
+async fn unused_listener_accepts_connections() {
+    let (listener, addr) = TestServer::unused_listener();
+    assert_eq!(listener.local_addr().unwrap(), addr);
+    assert!(addr.ip().is_loopback());
+    assert_ne!(addr.port(), 0);
+
+    let listener = tokio::net::TcpListener::from_std(listener).unwrap();
+    let client = tokio::time::timeout(std::time::Duration::from_secs(1), TcpStream::connect(addr))
+        .await
+        .unwrap()
+        .unwrap();
+    let (accepted, peer_addr) =
+        tokio::time::timeout(std::time::Duration::from_secs(1), listener.accept())
+            .await
+            .unwrap()
+            .unwrap();
+
+    assert_eq!(accepted.local_addr().unwrap(), addr);
+    assert_eq!(peer_addr, client.local_addr().unwrap());
+}
+
+#[tokio::test]
 async fn testing_server_echo() {
     let srv = TestServer::start(|| {
         fn_service(move |mut stream: TcpStream| async move {
@@ -51,11 +73,11 @@ async fn testing_server_echo() {
 
 #[tokio::test]
 async fn new_with_builder() {
-    let alt_addr = TestServer::unused_addr();
+    let (alt_listener, alt_addr) = TestServer::unused_listener();
 
     let srv = TestServer::start_with_builder(
         Server::build()
-            .bind("alt", alt_addr, || {
+            .listen("alt", alt_listener, || {
                 fn_service(|_| async { Ok::<_, ()>(()) })
             })
             .unwrap(),

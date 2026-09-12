@@ -78,9 +78,8 @@ fn test_bind() {
 
 #[test]
 fn test_listen() {
-    let addr = unused_addr();
+    let (lst, addr) = TestServer::unused_listener();
     let (tx, rx) = mpsc::channel();
-    let lst = net::TcpListener::bind(addr).unwrap();
 
     let h = thread::spawn(move || {
         actix_rt::System::new().block_on(async {
@@ -110,7 +109,7 @@ fn test_listen() {
 
 #[test]
 fn plain_tokio_runtime() {
-    let addr = unused_addr();
+    let (lst, addr) = TestServer::unused_listener();
     let (tx, rx) = mpsc::channel();
 
     let h = thread::spawn(move || {
@@ -123,7 +122,7 @@ fn plain_tokio_runtime() {
             let srv = Server::build()
                 .workers(1)
                 .disable_signals()
-                .bind("test", addr, move || {
+                .listen("test", lst, move || {
                     fn_factory(|| async {
                         sleep(Duration::from_millis(10)).await;
                         Ok::<_, ()>(fn_service(|_| async { Ok::<_, ()>(()) }))
@@ -530,7 +529,7 @@ async fn worker_restart() {
         }
     }
 
-    let addr = unused_addr();
+    let (lst, addr) = TestServer::unused_listener();
     let (tx, rx) = mpsc::channel();
 
     let counter = Arc::new(AtomicUsize::new(1));
@@ -539,7 +538,7 @@ async fn worker_restart() {
         actix_rt::System::new().block_on(async {
             let srv = Server::build()
                 .disable_signals()
-                .bind("addr", addr, move || TestServiceFactory(counter.clone()))?
+                .listen("addr", lst, move || TestServiceFactory(counter.clone()))?
                 .workers(2)
                 .run();
 
@@ -614,13 +613,13 @@ async fn worker_restart() {
 fn no_runtime_on_init() {
     use std::{thread::sleep, time::Duration};
 
-    let addr = unused_addr();
+    let (lst, _addr) = TestServer::unused_listener();
     let counter = Arc::new(AtomicUsize::new(0));
 
     let mut srv = Server::build()
         .workers(2)
         .disable_signals()
-        .bind("test", addr, {
+        .listen("test", lst, {
             let counter = counter.clone();
             move || {
                 counter.fetch_add(1, Ordering::SeqCst);

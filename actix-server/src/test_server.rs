@@ -83,7 +83,19 @@ impl TestServer {
     }
 
     /// Get first available unused local address.
+    ///
+    /// The listener is dropped before this method returns, so the port is no longer reserved.
+    /// Use [`Self::unused_listener()`] to keep the port reserved.
     pub fn unused_addr() -> net::SocketAddr {
+        Self::unused_listener().1
+    }
+
+    /// Bind a TCP listener to an OS-assigned port on the IPv4 loopback address.
+    ///
+    /// Returns the nonblocking listener and its local address. The caller owns the listener, which
+    /// keeps the port reserved until it is dropped. Unlike [`Self::unused_addr()`], this method
+    /// leaves the listener open so it can be passed to [`ServerBuilder::listen()`].
+    pub fn unused_listener() -> (net::TcpListener, net::SocketAddr) {
         use socket2::{Domain, Protocol, Socket, Type};
 
         let addr: net::SocketAddr = "127.0.0.1:0".parse().unwrap();
@@ -95,7 +107,9 @@ impl TestServer {
         socket.bind(&addr.into()).unwrap();
         socket.listen(1024).unwrap();
 
-        net::TcpListener::from(socket).local_addr().unwrap()
+        let listener = net::TcpListener::from(socket);
+        let addr = listener.local_addr().unwrap();
+        (listener, addr)
     }
 }
 
