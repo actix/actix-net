@@ -59,6 +59,15 @@ test:
 test-msrv: downgrade-for-msrv
     @just toolchain={{ msrv_rustup }} test
 
+# Test runtime features without workspace feature unification.
+test-rt-features:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for features in '' macros net signal net,signal; do
+        cargo {{ toolchain }} test -p actix-rt --no-default-features --features "$features"
+    done
+    cargo {{ toolchain }} test -p actix-rt
+
 # Test workspace docs.
 test-docs: && doc
     cargo {{ toolchain }} test --doc --workspace {{ all_crate_features }} --no-fail-fast -- --nocapture
