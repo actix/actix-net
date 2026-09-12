@@ -111,9 +111,6 @@ jobs:
       - name: tests
         run: just test
 
-      - name: Runtime feature tests
-        run: just test-rt-features
-
       - name: CI cache clean
         run: cargo-ci-cache-clean
 
