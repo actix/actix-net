@@ -6,10 +6,9 @@
 extern crate tls_openssl as openssl;
 
 use core::future::ready;
-use std::{io::BufReader, sync::mpsc, time::Duration};
-
 #[cfg(all(feature = "connect", feature = "openssl"))]
 use std::io::Write;
+use std::{io::BufReader, sync::mpsc, time::Duration};
 
 use actix_rt::net::TcpStream;
 use actix_server::TestServer;
