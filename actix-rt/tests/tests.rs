@@ -204,6 +204,27 @@ fn arbiter_handle_spawn_fn_runs() {
 }
 
 #[test]
+fn arbiter_alive() {
+    let _sys = System::new();
+    let arbiter = Arbiter::new();
+    let handle = arbiter.handle();
+
+    assert!(arbiter.alive());
+    assert!(handle.alive());
+
+    assert!(arbiter.stop());
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while arbiter.alive() {
+        assert!(Instant::now() < deadline, "Arbiter did not stop");
+        thread::yield_now();
+    }
+
+    assert!(!handle.alive());
+    arbiter.join().unwrap();
+    assert!(!handle.alive());
+}
+
+#[test]
 fn arbiter_drop_no_panic_fn() {
     let _ = System::new();
 

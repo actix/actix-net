@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `Arbiter::alive()` and `ArbiterHandle::alive()` to check whether the arbiter's command channel is still open.
+
 ## 2.14.0
 
 - Add separate `net` and `signal` features, enabled by default, to make Tokio networking and OS signal support optional. Users who disable default features must explicitly enable `net` and/or `signal` to use the corresponding modules.
