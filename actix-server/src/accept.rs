@@ -43,7 +43,7 @@ pub(crate) struct Accept {
 
     /// Index into `handles` of the next worker to consider for connection dispatch.
     /// Advances after a successful dispatch or when an unavailable worker is skipped.
-    next: usize,
+    next_worker: usize,
 
     /// Index into the listener slice at which the next `accept_all` scan starts.
     /// Rotates between scans so listeners take turns using newly available worker capacity.
@@ -137,7 +137,7 @@ impl Accept {
             waker_queue,
             handles: accept_handles,
             srv: server_handle,
-            next: 0,
+            next_worker: 0,
             next_socket: 0,
             avail,
             timeout: None,
@@ -381,8 +381,8 @@ impl Accept {
                     // All workers are gone and Conn is nowhere to be sent.
                     // Treat this situation as Ok and drop Conn.
                     return Ok(());
-                } else if self.handles.len() <= self.next {
-                    self.next = 0;
+                } else if self.handles.len() <= self.next_worker {
+                    self.next_worker = 0;
                 }
 
                 Err(conn)
@@ -464,18 +464,18 @@ impl Accept {
 
     #[inline(always)]
     fn next(&self) -> &WorkerHandleAccept {
-        &self.handles[self.next]
+        &self.handles[self.next_worker]
     }
 
     /// Set next worker handle that would accept connection.
     #[inline(always)]
     fn set_next(&mut self) {
-        self.next = (self.next + 1) % self.handles.len();
+        self.next_worker = (self.next_worker + 1) % self.handles.len();
     }
 
     /// Remove next worker handle that fail to accept connection.
     fn remove_next(&mut self) {
-        let handle = self.handles.swap_remove(self.next);
+        let handle = self.handles.swap_remove(self.next_worker);
         let idx = handle.idx();
         // A message is sent to `ServerBuilder` future to notify it a new worker
         // should be made.
