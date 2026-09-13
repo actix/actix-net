@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.15.0
+
 - Add `Arbiter::alive()` and `ArbiterHandle::alive()` to check whether the arbiter's command channel is still open.
 
 ## 2.14.0
