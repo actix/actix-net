@@ -50,13 +50,15 @@ impl<T, U> Framed<T, U> {
     /// implements `Decoder`. It implements `Sink<I>` when the I/O object implements `AsyncWrite`
     /// and the codec implements `Encoder<I>`. Read and write halves can therefore use separate
     /// codecs.
+    ///
+    /// Read and write buffers are allocated on demand.
     pub fn new(io: T, codec: U) -> Framed<T, U> {
         Framed {
             io,
             codec,
             flags: Flags::empty(),
-            read_buf: BytesMut::with_capacity(HW),
-            write_buf: BytesMut::with_capacity(HW),
+            read_buf: BytesMut::new(),
+            write_buf: BytesMut::new(),
         }
     }
 }
