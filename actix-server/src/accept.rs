@@ -56,7 +56,7 @@ pub(crate) struct Accept {
     /// `None` lets the poll wait indefinitely for an event.
     timeout: Option<Duration>,
 
-    /// Whether accepting connections is paused by a server command.
+    /// True if accepting connections is paused by a server command.
     /// Worker availability notifications do not resume acceptance while this is set.
     paused: bool,
 }
