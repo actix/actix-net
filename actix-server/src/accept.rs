@@ -443,6 +443,14 @@ impl Accept {
         }
     }
 
+    /// Checks every listener for connections, starting at `next_socket` and wrapping around.
+    ///
+    /// Each listener accepts connections until worker capacity is exhausted, no connection is
+    /// ready, or a listener error stops acceptance. The first listener rotates between calls so a
+    /// busy listener cannot always take newly available capacity before the other listeners.
+    /// Rotation applies to whole scans, not to individual connections within a scan.
+    ///
+    /// The listener slice must be nonempty, as required when the server starts.
     fn accept_all(&mut self, sockets: &mut [ServerSocketInfo]) {
         let start = self.next_socket;
         for offset in 0..sockets.len() {
