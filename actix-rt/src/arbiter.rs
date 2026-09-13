@@ -72,6 +72,14 @@ impl ArbiterHandle {
         self.spawn(async { f() })
     }
 
+    /// Returns true if the [Arbiter]'s command channel is still open.
+    ///
+    /// The Arbiter can stop after this check, so this does not guarantee that a subsequent spawn
+    /// call will succeed.
+    pub fn alive(&self) -> bool {
+        !self.tx.is_closed()
+    }
+
     /// Instruct [Arbiter] to stop processing it's event loop.
     ///
     /// Returns true if stop message was sent successfully and false if the [Arbiter] has
@@ -284,6 +292,14 @@ impl Arbiter {
         F: FnOnce() + Send + 'static,
     {
         self.spawn(async { f() })
+    }
+
+    /// Returns true if the Arbiter's command channel is still open.
+    ///
+    /// The Arbiter can stop after this check, so this does not guarantee that a subsequent spawn
+    /// call will succeed.
+    pub fn alive(&self) -> bool {
+        !self.tx.is_closed()
     }
 
     /// Wait for Arbiter's event loop to complete.
