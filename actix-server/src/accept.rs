@@ -452,6 +452,11 @@ impl Accept {
     ///
     /// The listener slice must be nonempty, as required when the server starts.
     fn accept_all(&mut self, sockets: &mut [ServerSocketInfo]) {
+        if sockets.len() == 1 {
+            self.accept(sockets, sockets[0].token);
+            return;
+        }
+
         let start = self.next_listener;
         for offset in 0..sockets.len() {
             let idx = (start + offset) % sockets.len();
