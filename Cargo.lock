@@ -43,7 +43,7 @@ dependencies = [
 
 [[package]]
 name = "actix-server"
-version = "2.9.4"
+version = "2.9.5"
 dependencies = [
  "actix-codec",
  "actix-rt",

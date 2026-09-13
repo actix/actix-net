@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.9.5
+
 - Add `TestServer::unused_listener()` to return a TCP listener and its local address while keeping the port reserved.
 
 ## 2.9.4
