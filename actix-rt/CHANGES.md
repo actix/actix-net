@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.14.0
+
 - Add separate `net` and `signal` features, enabled by default, to make Tokio networking and OS signal support optional. Users who disable default features must explicitly enable `net` and/or `signal` to use the corresponding modules.
 
 ## 2.13.0
