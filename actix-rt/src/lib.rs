@@ -14,6 +14,12 @@
 //! backlogged threads. Tasks that are disproportionately expensive should be offloaded to the
 //! blocking task thread-pool using [`task::spawn_blocking`].
 //!
+//! # Features
+//!
+//! The `macros`, `net`, and `signal` features are enabled by default. `net` enables
+//! socket types and `signal` enables OS signal handling. Disable default features to
+//! use the runtime without either facility, then enable the features you need.
+//!
 //! # Examples
 //! ```no_run
 //! use std::sync::mpsc;
@@ -60,6 +66,7 @@ pub use self::{
     system::{System, SystemRunner, SystemStop},
 };
 
+#[cfg(feature = "signal")]
 pub mod signal {
     //! Asynchronous signal handling (Tokio re-exports).
 
@@ -71,6 +78,7 @@ pub mod signal {
     pub use tokio::signal::ctrl_c;
 }
 
+#[cfg(feature = "net")]
 pub mod net {
     //! TCP/UDP/Unix bindings (mostly Tokio re-exports).
 

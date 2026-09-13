@@ -2,8 +2,10 @@
 
 ## Unreleased
 
+## 3.6.0
+
+- Use `core::future::{ready, Ready}` instead of `actix-utils` types.
 - Minimum supported Rust version (MSRV) is now 1.88.
-- breaking: Use `core::future::{ready, Ready}` instead of actix-utils'
 
 ## 3.5.0
 

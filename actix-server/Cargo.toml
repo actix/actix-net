@@ -1,6 +1,6 @@
 [package]
 name = "actix-server"
-version = "2.9.4"
+version = "2.9.5"
 authors = [
   "Nikolay Kim <fafhrd91@gmail.com>",
   "Rob Ede <robjtede@icloud.com>",
@@ -22,7 +22,7 @@ allowed_external_types = ["tokio::*"]
 default = []
 
 [dependencies]
-actix-rt = { version = "2.10", default-features = false }
+actix-rt = { version = "2.14", default-features = false, features = ["net", "signal"] }
 actix-service = "2"
 futures-core = { version = "0.3.17", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
