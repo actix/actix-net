@@ -34,6 +34,8 @@ pub(crate) struct Accept {
     handles: Vec<WorkerHandleAccept>,
     srv: ServerHandle,
     next: usize,
+    /// First listener to check when worker capacity becomes available.
+    next_socket: usize,
     avail: Availability,
     /// use the smallest duration from sockets timeout.
     timeout: Option<Duration>,
@@ -117,6 +119,7 @@ impl Accept {
             handles: accept_handles,
             srv: server_handle,
             next: 0,
+            next_socket: 0,
             avail,
             timeout: None,
             paused: false,
@@ -422,12 +425,14 @@ impl Accept {
     }
 
     fn accept_all(&mut self, sockets: &mut [ServerSocketInfo]) {
-        sockets
-            .iter_mut()
-            .map(|info| info.token)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .for_each(|idx| self.accept(sockets, idx))
+        let start = self.next_socket;
+        for offset in 0..sockets.len() {
+            let idx = (start + offset) % sockets.len();
+            self.accept(sockets, sockets[idx].token);
+        }
+
+        // Let each listener use newly available capacity before the others.
+        self.next_socket = (start + 1) % sockets.len();
     }
 
     #[inline(always)]
