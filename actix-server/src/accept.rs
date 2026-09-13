@@ -27,18 +27,37 @@ struct ServerSocketInfo {
     timeout: Option<actix_rt::time::Instant>,
 }
 
-/// Poll instance of the server.
+/// Accepts connections from listeners and dispatches them to workers.
 pub(crate) struct Accept {
+    /// Waits for listener readiness and notifications from the waker queue.
     poll: Poll,
+
+    /// Shared queue for server commands, worker availability, and replacement worker handles.
     waker_queue: WakerQueue,
+
+    /// Worker handles used to send accepted connections and update connection counts.
     handles: Vec<WorkerHandleAccept>,
+
+    /// Notifies the server when a worker fails so it can start a replacement.
     srv: ServerHandle,
+
+    /// Index into `handles` of the next worker to consider for connection dispatch.
+    /// Advances after a successful dispatch or when an unavailable worker is skipped.
     next: usize,
-    /// First listener to check when worker capacity becomes available.
+
+    /// Index into the listener slice at which the next `accept_all` scan starts.
+    /// Rotates between scans so listeners take turns using newly available worker capacity.
     next_socket: usize,
+
+    /// Cached connection capacity flags, indexed by worker ID rather than position in `handles`.
     avail: Availability,
-    /// use the smallest duration from sockets timeout.
+
+    /// Poll timeout used to retry listeners after accept errors, taking the shortest requested wait.
+    /// `None` lets the poll wait indefinitely for an event.
     timeout: Option<Duration>,
+
+    /// Whether accepting connections is paused by a server command.
+    /// Worker availability notifications do not resume acceptance while this is set.
     paused: bool,
 }
 
