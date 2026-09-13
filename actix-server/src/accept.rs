@@ -47,7 +47,7 @@ pub(crate) struct Accept {
 
     /// Index into the listener slice at which the next `accept_all` scan starts.
     /// Rotates between scans so listeners take turns using newly available worker capacity.
-    next_socket: usize,
+    next_listener: usize,
 
     /// Cached connection capacity flags, indexed by worker ID rather than position in `handles`.
     avail: Availability,
@@ -138,7 +138,7 @@ impl Accept {
             handles: accept_handles,
             srv: server_handle,
             next_worker: 0,
-            next_socket: 0,
+            next_listener: 0,
             avail,
             timeout: None,
             paused: false,
@@ -443,7 +443,7 @@ impl Accept {
         }
     }
 
-    /// Checks every listener for connections, starting at `next_socket` and wrapping around.
+    /// Checks every listener for connections, starting at `next_listener` and wrapping around.
     ///
     /// Each listener accepts connections until worker capacity is exhausted, no connection is
     /// ready, or a listener error stops acceptance. The first listener rotates between calls so a
@@ -452,14 +452,14 @@ impl Accept {
     ///
     /// The listener slice must be nonempty, as required when the server starts.
     fn accept_all(&mut self, sockets: &mut [ServerSocketInfo]) {
-        let start = self.next_socket;
+        let start = self.next_listener;
         for offset in 0..sockets.len() {
             let idx = (start + offset) % sockets.len();
             self.accept(sockets, sockets[idx].token);
         }
 
         // Let each listener use newly available capacity before the others.
-        self.next_socket = (start + 1) % sockets.len();
+        self.next_listener = (start + 1) % sockets.len();
     }
 
     #[inline(always)]
