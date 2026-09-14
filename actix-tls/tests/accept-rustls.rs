@@ -8,7 +8,11 @@ extern crate tls_openssl as openssl;
 use core::future::ready;
 #[cfg(all(feature = "connect", feature = "openssl"))]
 use std::io::Write;
-use std::{io::BufReader, sync::mpsc, time::Duration};
+use std::{
+    io::{self, BufReader},
+    sync::{mpsc, Arc},
+    time::Duration,
+};
 
 use actix_rt::net::TcpStream;
 use actix_server::TestServer;
@@ -18,7 +22,12 @@ use actix_tls::accept::{
     TlsError,
 };
 use rustls_pemfile::{certs, pkcs8_private_keys};
-use rustls_pki_types_1::PrivateKeyDer;
+use rustls_pki_types_1::{CertificateDer, PrivateKeyDer, ServerName};
+use tokio_rustls_026::rustls::{
+    client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
+    server::WebPkiClientVerifier,
+    ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme,
+};
 
 fn new_cert_and_key() -> (String, String) {
     let rcgen::CertifiedKey { cert, signing_key } =
@@ -148,4 +157,123 @@ async fn handshake_timeout() {
         .expect("server should emit timeout error for stalled handshake");
 
     assert!(matches!(err, TlsError::Timeout));
+}
+
+#[derive(Debug)]
+struct NoServerCertVerification;
+
+impl ServerCertVerifier for NoServerCertVerification {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp: &[u8],
+        _now: rustls_pki_types_1::UnixTime,
+    ) -> Result<ServerCertVerified, tokio_rustls_026::rustls::Error> {
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, tokio_rustls_026::rustls::Error> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, tokio_rustls_026::rustls::Error> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        tokio_rustls_026::rustls::crypto::aws_lc_rs::default_provider()
+            .signature_verification_algorithms
+            .supported_schemes()
+    }
+}
+
+#[actix_rt::test]
+async fn rejects_untrusted_client_certificate() {
+    init_crypto();
+    let (srv_cert, srv_key) = new_cert_and_key();
+    let (client_cert, client_key) = new_cert_and_key();
+    let (tx, rx) = mpsc::channel();
+
+    // Server requires a client cert signed by trusted CA
+    let (ca_cert, _) = new_cert_and_key();
+    let mut roots = RootCertStore::empty();
+    let mut ca_der = certs(&mut BufReader::new(ca_cert.as_bytes()))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    roots.add(ca_der.remove(0)).unwrap();
+    let verifier = WebPkiClientVerifier::builder(Arc::new(roots))
+        .build()
+        .unwrap();
+
+    let srv_cert_chain = certs(&mut BufReader::new(srv_cert.as_bytes()))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    let mut srv_keys = pkcs8_private_keys(&mut BufReader::new(srv_key.as_bytes()))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    let srv_config = ServerConfig::builder()
+        .with_client_cert_verifier(verifier)
+        .with_single_cert(srv_cert_chain, PrivateKeyDer::Pkcs8(srv_keys.remove(0)))
+        .unwrap();
+
+    // Client connects with its untrusted self-signed certificate
+    let client_cert_chain = certs(&mut BufReader::new(client_cert.as_bytes()))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    let mut client_keys = pkcs8_private_keys(&mut BufReader::new(client_key.as_bytes()))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    let mut client_config = ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(NoServerCertVerification))
+        .with_client_auth_cert(
+            client_cert_chain,
+            PrivateKeyDer::Pkcs8(client_keys.remove(0)),
+        )
+        .unwrap();
+    client_config.alpn_protocols = vec![b"http/1.1".to_vec()];
+
+    let connector = tokio_rustls_026::TlsConnector::from(Arc::new(client_config));
+
+    let srv = TestServer::start(move || {
+        let tx = tx.clone();
+        let tls_acceptor = Acceptor::new(srv_config.clone());
+
+        tls_acceptor
+            .map_err(move |err| {
+                let _ = tx.send(err);
+            })
+            .and_then(move |_stream: TlsStream<TcpStream>| ready(Ok(())))
+    });
+
+    let sock = srv.connect().expect("cannot connect to test server");
+    let _ = connector
+        .connect(ServerName::try_from("localhost").unwrap(), sock)
+        .await;
+
+    // Server Acceptor thread must reject the untrusted client certificate during the handshake
+    let err = rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("server should emit error for untrusted client cert");
+
+    match err {
+        TlsError::Tls(io_err) => {
+            assert_eq!(io_err.kind(), io::ErrorKind::InvalidData);
+        }
+        other => panic!("expected TlsError::Tls(InvalidData), got {other:?}"),
+    }
 }
