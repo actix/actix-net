@@ -6,9 +6,11 @@
 extern crate tls_openssl as openssl;
 
 use core::future::ready;
-#[cfg(all(feature = "connect", feature = "openssl"))]
-use std::io::Write;
-use std::{io::BufReader, sync::mpsc, time::Duration};
+use std::{
+    io::{self, BufReader, Write},
+    sync::mpsc,
+    time::Duration,
+};
 
 use actix_rt::net::TcpStream;
 use actix_server::TestServer;
@@ -148,4 +150,89 @@ async fn handshake_timeout() {
         .expect("server should emit timeout error for stalled handshake");
 
     assert!(matches!(err, TlsError::Timeout));
+}
+
+#[actix_rt::test]
+async fn rejects_plaintext_request() {
+    init_crypto();
+    let (cert, key) = new_cert_and_key();
+    let (tx, rx) = mpsc::channel();
+
+    let srv = TestServer::start({
+        let cert = cert.clone();
+        let key = key.clone();
+
+        move || {
+            let tx = tx.clone();
+            let tls_acceptor = Acceptor::new(rustls_server_config(cert.clone(), key.clone()));
+
+            tls_acceptor
+                .map_err(move |err| {
+                    let _ = tx.send(err);
+                })
+                .and_then(move |_stream: TlsStream<TcpStream>| ready(Ok(())))
+        }
+    });
+
+    let mut sock = srv
+        .connect()
+        .expect("cannot connect to test server")
+        .into_std()
+        .unwrap();
+
+    sock.write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
+        .unwrap();
+
+    let err = rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("server should emit error for plaintext request");
+
+    match err {
+        TlsError::Tls(io_err) => {
+            assert_eq!(io_err.kind(), io::ErrorKind::InvalidData);
+        }
+        other => panic!("expected TlsError::Tls(InvalidData), got {other:?}"),
+    }
+}
+
+#[actix_rt::test]
+async fn rejects_corrupted_framing() {
+    init_crypto();
+    let (cert, key) = new_cert_and_key();
+    let (tx, rx) = mpsc::channel();
+
+    let srv = TestServer::start({
+        let cert = cert.clone();
+        let key = key.clone();
+
+        move || {
+            let tx = tx.clone();
+            let tls_acceptor = Acceptor::new(rustls_server_config(cert.clone(), key.clone()));
+
+            tls_acceptor
+                .map_err(move |err| {
+                    let _ = tx.send(err);
+                })
+                .and_then(move |_stream: TlsStream<TcpStream>| ready(Ok(())))
+        }
+    });
+
+    let mut sock = srv
+        .connect()
+        .expect("cannot connect to test server")
+        .into_std()
+        .unwrap();
+
+    sock.write_all(b"          ").unwrap();
+
+    let err = rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("server should emit error for invalid record header");
+
+    match err {
+        TlsError::Tls(io_err) => {
+            assert_eq!(io_err.kind(), io::ErrorKind::InvalidData);
+        }
+        other => panic!("expected TlsError::Tls(InvalidData), got {other:?}"),
+    }
 }
