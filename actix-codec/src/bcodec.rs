@@ -30,3 +30,30 @@ impl Decoder for BytesCodec {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bytes_codec_appends_and_decodes_all_bytes() {
+        let mut codec = BytesCodec;
+        let mut buf = BytesMut::from(&b"prefix"[..]);
+
+        codec
+            .encode(Bytes::from_static(b"\0\xff"), &mut buf)
+            .unwrap();
+        codec.encode(Bytes::new(), &mut buf).unwrap();
+        assert_eq!(
+            codec.decode(&mut buf).unwrap().unwrap(),
+            &b"prefix\0\xff"[..]
+        );
+        assert!(buf.is_empty());
+        assert!(codec.decode(&mut buf).unwrap().is_none());
+
+        buf.extend_from_slice(b"last");
+
+        assert_eq!(codec.decode_eof(&mut buf).unwrap().unwrap(), "last");
+        assert!(codec.decode_eof(&mut buf).unwrap().is_none());
+    }
+}

@@ -323,4 +323,116 @@ mod tests {
         buf.put_slice(b"next\n");
         assert_eq!("next", codec.decode(&mut buf).unwrap().unwrap());
     }
+
+    #[test]
+    fn lines_max_length_matches_configuration() {
+        assert_eq!(LinesCodec::new().max_length(), usize::MAX);
+        assert_eq!(LinesCodec::default().max_length(), usize::MAX);
+        assert_eq!(LinesCodec::new_with_max_length(4).max_length(), 4);
+    }
+
+    #[test]
+    fn lines_accept_exact_byte_limit_with_lf_or_crlf() {
+        for input in ["éé\n", "éé\r\n"] {
+            let mut codec = LinesCodec::new_with_max_length(4);
+            let mut buf = BytesMut::from(input);
+
+            assert_eq!(codec.decode(&mut buf).unwrap().as_deref(), Some("éé"));
+            assert!(buf.is_empty());
+        }
+    }
+
+    #[test]
+    fn lines_accept_crlf_split_at_limit() {
+        let mut codec = LinesCodec::new_with_max_length(4);
+        let mut buf = BytesMut::from("test\r");
+
+        assert!(codec.decode(&mut buf).unwrap().is_none());
+
+        buf.extend_from_slice(b"\nnext\n");
+
+        assert_eq!(codec.decode(&mut buf).unwrap().as_deref(), Some("test"));
+        assert_eq!(codec.decode(&mut buf).unwrap().as_deref(), Some("next"));
+    }
+
+    #[test]
+    fn lines_reject_overlong_delimited_input_without_consuming_it() {
+        for input in ["abcde\n", "abcde\r\n", "ééé\n"] {
+            let mut codec = LinesCodec::new_with_max_length(4);
+            let mut buf = BytesMut::from(input);
+
+            assert_eq!(
+                codec.decode(&mut buf).unwrap_err().kind(),
+                io::ErrorKind::InvalidData
+            );
+            assert_eq!(buf, input);
+        }
+    }
+
+    #[test]
+    fn lines_zero_limit_accepts_only_empty_lines() {
+        for input in ["\n", "\r\n"] {
+            let mut codec = LinesCodec::new_with_max_length(0);
+
+            assert_eq!(
+                codec.decode(&mut BytesMut::from(input)).unwrap().as_deref(),
+                Some("")
+            );
+        }
+
+        for input in ["a", "a\n", "a\r\n"] {
+            let mut codec = LinesCodec::new_with_max_length(0);
+
+            assert_eq!(
+                codec.decode(&mut BytesMut::from(input)).unwrap_err().kind(),
+                io::ErrorKind::InvalidData
+            );
+        }
+    }
+
+    #[test]
+    fn lines_decode_eof_returns_delimited_and_unterminated_frames() {
+        let mut codec = LinesCodec::new();
+        let mut buf = BytesMut::from("first\nlast\r");
+
+        assert_eq!(
+            codec.decode_eof(&mut buf).unwrap().as_deref(),
+            Some("first")
+        );
+        assert_eq!(codec.decode_eof(&mut buf).unwrap().as_deref(), Some("last"));
+        assert!(codec.decode_eof(&mut buf).unwrap().is_none());
+    }
+
+    #[test]
+    fn lines_reject_invalid_utf8_with_and_without_delimiter() {
+        for input in [&b"\xff\n"[..], &b"\xff"[..]] {
+            let mut codec = LinesCodec::new();
+
+            assert_eq!(
+                codec
+                    .decode_eof(&mut BytesMut::from(input))
+                    .unwrap_err()
+                    .kind(),
+                io::ErrorKind::InvalidData
+            );
+        }
+    }
+
+    #[test]
+    fn lines_rescan_a_shorter_replacement_buffer() {
+        let mut codec = LinesCodec::new();
+
+        assert!(codec
+            .decode(&mut BytesMut::from("partial"))
+            .unwrap()
+            .is_none());
+
+        assert_eq!(
+            codec
+                .decode(&mut BytesMut::from("ok\n"))
+                .unwrap()
+                .as_deref(),
+            Some("ok")
+        );
+    }
 }
