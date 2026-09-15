@@ -20,7 +20,7 @@ use actix_service::{fn_service, ServiceFactoryExt as _};
 use bytes::BytesMut;
 use futures_util::future::ok;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
-use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
+use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, EnvFilter};
 
 async fn run() -> io::Result<()> {
     tracing_subscriber::fmt()
@@ -30,6 +30,7 @@ async fn run() -> io::Result<()> {
         )
         .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
         .with_ansi(false)
+        .finish()
         .init();
 
     let addr = ("127.0.0.1", 8080);
