@@ -1,5 +1,8 @@
 //! Simple composite-service TCP echo server.
 //!
+//! Run with `cargo run -p actix-server --example tcp-echo`. The default tracing filter shows
+//! connection spans and their worker IDs. Set `RUST_LOG` to override the filter.
+//!
 //! Using the following command:
 //!
 //! ```sh
@@ -9,13 +12,7 @@
 //! Start typing. When you press enter the typed line will be echoed back. The server will log
 //! the length of each line it echos and the total size of data sent when the connection is closed.
 
-use std::{
-    io,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
+use std::io;
 
 use actix_rt::net::TcpStream;
 use actix_server::Server;
@@ -23,12 +20,17 @@ use actix_service::{fn_service, ServiceFactoryExt as _};
 use bytes::BytesMut;
 use futures_util::future::ok;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 
 async fn run() -> io::Result<()> {
-    pretty_env_logger::formatted_timed_builder()
-        .parse_env(pretty_env_logger::env_logger::Env::default().default_filter_or("info"));
-
-    let count = Arc::new(AtomicUsize::new(0));
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info,actix_server=debug")),
+        )
+        .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
+        .with_ansi(false)
+        .init();
 
     let addr = ("127.0.0.1", 8080);
     tracing::info!("starting server on: {}:{}", &addr.0, &addr.1);
@@ -37,17 +39,9 @@ async fn run() -> io::Result<()> {
     // CPU cores as the worker count. For this reason, the closure passed to bind needs to return
     // a service *factory*; so it can be created once per worker.
     Server::build()
-        .bind("echo", addr, move || {
-            let count = Arc::clone(&count);
-            let num2 = Arc::clone(&count);
-
+        .bind("echo", addr, || {
             fn_service(move |mut stream: TcpStream| {
-                let count = Arc::clone(&count);
-
                 async move {
-                    let num = count.fetch_add(1, Ordering::SeqCst);
-                    let num = num + 1;
-
                     let mut size = 0;
                     let mut buf = BytesMut::new();
 
@@ -58,7 +52,7 @@ async fn run() -> io::Result<()> {
 
                             // more bytes to process
                             Ok(bytes_read) => {
-                                tracing::info!("[{}] read {} bytes", num, bytes_read);
+                                tracing::info!(bytes_read, "received data");
                                 stream.write_all(&buf[size..]).await.unwrap();
                                 size += bytes_read;
                             }
@@ -77,8 +71,7 @@ async fn run() -> io::Result<()> {
             })
             .map_err(|err| tracing::error!("service error: {:?}", err))
             .and_then(move |(_, size)| {
-                let num = num2.load(Ordering::SeqCst);
-                tracing::info!("[{}] total bytes read: {}", num, size);
+                tracing::info!(total_bytes = size, "connection finished");
                 ok(size)
             })
         })?
