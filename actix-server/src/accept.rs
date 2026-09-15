@@ -27,16 +27,37 @@ struct ServerSocketInfo {
     timeout: Option<actix_rt::time::Instant>,
 }
 
-/// Poll instance of the server.
+/// Accepts connections from listeners and dispatches them to workers.
 pub(crate) struct Accept {
+    /// Waits for listener readiness and notifications from the waker queue.
     poll: Poll,
+
+    /// Shared queue for server commands, worker availability, and replacement worker handles.
     waker_queue: WakerQueue,
+
+    /// Worker handles used to send accepted connections and update connection counts.
     handles: Vec<WorkerHandleAccept>,
+
+    /// Notifies the server when a worker fails so it can start a replacement.
     srv: ServerHandle,
-    next: usize,
+
+    /// Index into `handles` of the next worker to consider for connection dispatch.
+    /// Advances after a successful dispatch or when an unavailable worker is skipped.
+    next_worker: usize,
+
+    /// Index into the listener slice at which the next `accept_all` scan starts.
+    /// Rotates between scans so listeners take turns using newly available worker capacity.
+    next_listener: usize,
+
+    /// Cached connection capacity flags, indexed by worker ID rather than position in `handles`.
     avail: Availability,
-    /// use the smallest duration from sockets timeout.
+
+    /// Poll timeout used to retry listeners after accept errors, taking the shortest requested wait.
+    /// `None` lets the poll wait indefinitely for an event.
     timeout: Option<Duration>,
+
+    /// True if accepting connections is paused by a server command.
+    /// Worker availability notifications do not resume acceptance while this is set.
     paused: bool,
 }
 
@@ -116,7 +137,8 @@ impl Accept {
             waker_queue,
             handles: accept_handles,
             srv: server_handle,
-            next: 0,
+            next_worker: 0,
+            next_listener: 0,
             avail,
             timeout: None,
             paused: false,
@@ -359,8 +381,8 @@ impl Accept {
                     // All workers are gone and Conn is nowhere to be sent.
                     // Treat this situation as Ok and drop Conn.
                     return Ok(());
-                } else if self.handles.len() <= self.next {
-                    self.next = 0;
+                } else if self.handles.len() <= self.next_worker {
+                    self.next_worker = 0;
                 }
 
                 Err(conn)
@@ -421,29 +443,44 @@ impl Accept {
         }
     }
 
+    /// Checks every listener for connections, starting at `next_listener` and wrapping around.
+    ///
+    /// Each listener accepts connections until worker capacity is exhausted, no connection is
+    /// ready, or a listener error stops acceptance. The first listener rotates between calls so a
+    /// busy listener cannot always take newly available capacity before the other listeners.
+    /// Rotation applies to whole scans, not to individual connections within a scan.
+    ///
+    /// The listener slice must be nonempty, as required when the server starts.
     fn accept_all(&mut self, sockets: &mut [ServerSocketInfo]) {
-        sockets
-            .iter_mut()
-            .map(|info| info.token)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .for_each(|idx| self.accept(sockets, idx))
+        if sockets.len() == 1 {
+            self.accept(sockets, sockets[0].token);
+            return;
+        }
+
+        let start = self.next_listener;
+        for offset in 0..sockets.len() {
+            let idx = (start + offset) % sockets.len();
+            self.accept(sockets, sockets[idx].token);
+        }
+
+        // Let each listener use newly available capacity before the others.
+        self.next_listener = (start + 1) % sockets.len();
     }
 
     #[inline(always)]
     fn next(&self) -> &WorkerHandleAccept {
-        &self.handles[self.next]
+        &self.handles[self.next_worker]
     }
 
     /// Set next worker handle that would accept connection.
     #[inline(always)]
     fn set_next(&mut self) {
-        self.next = (self.next + 1) % self.handles.len();
+        self.next_worker = (self.next_worker + 1) % self.handles.len();
     }
 
     /// Remove next worker handle that fail to accept connection.
     fn remove_next(&mut self) {
-        let handle = self.handles.swap_remove(self.next);
+        let handle = self.handles.swap_remove(self.next_worker);
         let idx = handle.idx();
         // A message is sent to `ServerBuilder` future to notify it a new worker
         // should be made.

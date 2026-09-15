@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix busy listeners starving other listeners when worker connection capacity becomes available by rotating the first listener checked.
+
 ## 2.9.5
 
 - Add `TestServer::unused_listener()` to return a TCP listener and its local address while keeping the port reserved.

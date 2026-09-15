@@ -309,6 +309,74 @@ async fn test_max_concurrent_connections_releases_capacity() {
         .expect("worker did not accept a second connection after reaching its connection limit");
 }
 
+#[test]
+fn saturated_listener_does_not_starve_another_listener() {
+    use std::io::Write as _;
+
+    let (hot_listener, hot_addr) = TestServer::unused_listener();
+    let (cold_listener, cold_addr) = TestServer::unused_listener();
+    let (server_tx, server_rx) = mpsc::channel();
+    let (accepted_tx, accepted_rx) = mpsc::channel();
+    let cold_tx = accepted_tx.clone();
+
+    let thread = thread::spawn(move || {
+        actix_rt::System::new().block_on(async {
+            let server = Server::build()
+                .workers(1)
+                .max_concurrent_connections(1)
+                .disable_signals()
+                .listen("hot", hot_listener, move || {
+                    let tx = accepted_tx.clone();
+                    fn_service(move |mut stream: TcpStream| {
+                        tx.send("hot").unwrap();
+                        async move {
+                            // Hold the only connection slot until the client releases it.
+                            stream.read_exact(&mut [0]).await.map(|_| ())
+                        }
+                    })
+                })?
+                .listen("cold", cold_listener, move || {
+                    let tx = cold_tx.clone();
+                    fn_service(move |_stream: TcpStream| {
+                        tx.send("cold").unwrap();
+                        ready(Ok::<_, ()>(()))
+                    })
+                })?
+                .run();
+            server_tx.send(server.handle()).unwrap();
+            server.await
+        })
+    });
+    let server = server_rx.recv().unwrap();
+    let mut first = net::TcpStream::connect(hot_addr).unwrap();
+    assert_eq!(
+        accepted_rx.recv_timeout(Duration::from_secs(5)).unwrap(),
+        "hot"
+    );
+
+    // Both listeners have queued connections before capacity becomes available.
+    let mut queued = (0..4)
+        .map(|_| net::TcpStream::connect(hot_addr).unwrap())
+        .collect::<Vec<_>>();
+    let _cold = net::TcpStream::connect(cold_addr).unwrap();
+    first.write_all(&[0]).unwrap();
+
+    let next = accepted_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let served_cold = if next == "cold" {
+        true
+    } else {
+        queued[0].write_all(&[0]).unwrap();
+        accepted_rx.recv_timeout(Duration::from_secs(5)).unwrap() == "cold"
+    };
+
+    drop(server.stop(false));
+    thread.join().unwrap().unwrap();
+    assert!(
+        served_cold,
+        "busy listener consumed successive capacity releases"
+    );
+}
+
 #[tokio::test]
 async fn graceful_shutdown_drops_queued_connections() {
     let addr = unused_addr();
