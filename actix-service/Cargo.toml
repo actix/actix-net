@@ -15,8 +15,8 @@ futures-core = { version = "0.3.17", default-features = false }
 pin-project-lite = "0.2"
 
 [dev-dependencies]
-actix-rt = "2"
 futures-util = { version = "0.3.17", default-features = false }
+tokio = { version = "1.51", features = ["macros", "rt"] }
 
 [lints]
 workspace = true

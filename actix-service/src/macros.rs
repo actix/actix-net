@@ -8,8 +8,8 @@
 ///
 /// # Examples
 /// ```no_run
+/// use std::future::{ready, Ready};
 /// use actix_service::Service;
-/// use futures_util::future::{ready, Ready};
 ///
 /// struct IdentityService;
 ///
@@ -49,8 +49,8 @@ macro_rules! always_ready {
 ///
 /// # Examples
 /// ```no_run
+/// use std::future::{ready, Ready};
 /// use actix_service::Service;
-/// use futures_util::future::{ready, Ready};
 ///
 /// struct WrapperService<S> {
 ///     inner: S,
@@ -91,13 +91,11 @@ mod tests {
     use core::{
         cell::Cell,
         convert::Infallible,
+        future::{ready, Ready},
         task::{self, Context, Poll},
     };
 
-    use futures_util::{
-        future::{ready, Ready},
-        task::noop_waker,
-    };
+    use futures_util::task::noop_waker;
 
     use crate::Service;
 

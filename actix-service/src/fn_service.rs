@@ -18,9 +18,8 @@ where
 ///
 /// # Examples
 /// ```
-/// use std::io;
+/// use std::{io, future::ready};
 /// use actix_service::{fn_factory, fn_service, Service, ServiceFactory};
-/// use futures_util::future::ok;
 ///
 /// /// Service that divides two usize values.
 /// async fn div((x, y): (usize, usize)) -> Result<usize, io::Error> {
@@ -31,11 +30,11 @@ where
 ///     }
 /// }
 ///
-/// #[actix_rt::main]
+/// #[tokio::main(flavor = "local")]
 /// async fn main() -> io::Result<()> {
 ///     // Create service factory that produces `div` services
 ///     let factory = fn_factory(|| {
-///         ok::<_, io::Error>(fn_service(div))
+///         ready(Ok::<_, io::Error>(fn_service(div)))
 ///     });
 ///
 ///     // construct new service
@@ -65,16 +64,17 @@ where
 ///
 /// # Examples
 /// ```
-/// use std::io;
+/// use std::{io, future::ready};
 /// use actix_service::{fn_factory_with_config, fn_service, Service, ServiceFactory};
-/// use futures_util::future::ok;
 ///
-/// #[actix_rt::main]
+/// #[tokio::main(flavor = "local")]
 /// async fn main() -> io::Result<()> {
 ///     // Create service factory. factory uses config argument for
 ///     // services it generates.
 ///     let factory = fn_factory_with_config(|y: usize| {
-///         ok::<_, io::Error>(fn_service(move |x: usize| ok::<_, io::Error>(x * y)))
+///         ready(Ok::<_, io::Error>(
+///             fn_service(move |x: usize| ready(Ok::<_, io::Error>(x * y))),
+///         ))
 ///     });
 ///
 ///     // construct new service with config argument
@@ -355,7 +355,7 @@ mod tests {
 
     use super::*;
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_fn_service() {
         let new_srv = fn_service(|()| ready(Ok::<_, ()>("srv")));
 
@@ -366,7 +366,7 @@ mod tests {
         assert_eq!(res.unwrap(), "srv");
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_fn_service_service() {
         let srv = fn_service(|()| ready(Ok::<_, ()>("srv")));
 
@@ -376,7 +376,7 @@ mod tests {
         assert_eq!(res.unwrap(), "srv");
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_fn_service_with_config() {
         let new_srv = fn_factory_with_config(|cfg: usize| {
             ready(Ok::<_, ()>(fn_service(move |()| {
@@ -391,7 +391,7 @@ mod tests {
         assert_eq!(res.unwrap(), ("srv", 1));
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_auto_impl_send() {
         use alloc::rc::Rc;
 
