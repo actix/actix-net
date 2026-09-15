@@ -149,3 +149,37 @@ async fn handshake_timeout() {
 
     assert!(matches!(err, TlsError::Timeout));
 }
+
+#[actix_rt::test]
+async fn handshake_error() {
+    use tokio::io::AsyncWriteExt as _;
+
+    init_crypto();
+
+    let (cert, key) = new_cert_and_key();
+    let config = rustls_server_config(cert, key);
+    let (tx, rx) = mpsc::channel();
+
+    let srv = TestServer::start(move || {
+        let tx = tx.clone();
+
+        Acceptor::new(config.clone())
+            .map_err(move |err| {
+                let _ = tx.send(err);
+            })
+            .and_then(|_stream: TlsStream<TcpStream>| ready(Ok(())))
+    });
+
+    let mut sock = srv.connect().expect("cannot connect to test server");
+
+    // Send a complete TLS record with an invalid content type.
+    sock.write_all(&[0xff, 0x03, 0x03, 0x00, 0x01, 0x00])
+        .await
+        .unwrap();
+
+    let err = rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("server should emit error for malformed TLS record");
+
+    assert!(matches!(err, TlsError::Tls(err) if err.kind() == std::io::ErrorKind::InvalidData));
+}
