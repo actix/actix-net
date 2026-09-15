@@ -220,14 +220,14 @@ mod tests {
         }
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_poll_ready() {
         let srv = Srv.map(|_| "ok");
         let res = lazy(|cx| srv.poll_ready(cx)).await;
         assert_eq!(res, Poll::Ready(Ok(())));
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_call() {
         let srv = Srv.map(|_| "ok");
         let res = srv.call(()).await;
@@ -235,7 +235,7 @@ mod tests {
         assert_eq!(res.unwrap(), "ok");
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_new_service() {
         let new_srv = (|| ready(Ok::<_, ()>(Srv))).into_factory().map(|_| "ok");
         let srv = new_srv.new_service(&()).await.unwrap();

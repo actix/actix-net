@@ -66,10 +66,10 @@ dependencies = [
 name = "actix-service"
 version = "2.0.3"
 dependencies = [
- "actix-rt",
  "futures-core",
  "futures-util",
  "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]

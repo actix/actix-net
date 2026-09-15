@@ -230,7 +230,7 @@ mod tests {
         }
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_call() {
         let srv = pipeline(apply_fn(Srv, |req: &'static str, srv| {
             let fut = srv.call(());
@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(res.unwrap(), ("srv", ()));
     }
 
-    #[actix_rt::test]
+    #[tokio::test]
     async fn test_new_service() {
         let new_srv = pipeline_factory(apply_fn_factory(
             || ready(Ok::<_, ()>(Srv)),

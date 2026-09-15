@@ -7,13 +7,13 @@ where
     F: FnOnce() -> Fut + Clone + Send + 'static,
     Fut: Future<Output = u32> + 'static,
 {
-    let f1 = actix_rt::spawn(f.clone()());
-    let f2 = actix_rt::spawn(f());
+    let f1 = tokio::task::spawn_local(f.clone()());
+    let f2 = tokio::task::spawn_local(f());
 
     (f1.await.unwrap(), f2.await.unwrap())
 }
 
-#[actix_rt::main]
+#[tokio::main(flavor = "local")]
 async fn main() {
     let (tx, rx) = mpsc::channel();
 
@@ -26,10 +26,13 @@ async fn main() {
         }
     })
     .await;
+
     assert_eq!(r1, r2);
 
     tx.send(()).unwrap();
 
     rx.recv_timeout(Duration::from_millis(100)).unwrap();
     rx.recv_timeout(Duration::from_millis(100)).unwrap();
+
+    println!("Done! Both cloned calls returned {r1}.");
 }
