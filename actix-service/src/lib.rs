@@ -25,6 +25,7 @@ mod map;
 mod map_config;
 mod map_err;
 mod map_init_err;
+mod optional;
 mod pipeline;
 mod then;
 mod transform;
@@ -36,6 +37,7 @@ pub use self::{
     ext::{ServiceExt, ServiceFactoryExt, TransformExt},
     fn_service::{fn_factory, fn_factory_with_config, fn_service},
     map_config::{map_config, unit_config},
+    optional::{OptionalService, OptionalServiceFuture, OptionalTransformFuture},
     transform::{apply, ApplyTransform, Transform},
 };
 
