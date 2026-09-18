@@ -240,6 +240,7 @@ pub(crate) struct ServerWorker {
     conn_rx: UnboundedReceiver<Conn>,
     stop_rx: UnboundedReceiver<Stop>,
     counter: WorkerCounter,
+    next_connection_id: u64,
     services: Box<[WorkerService]>,
     factories: Box<[Box<dyn InternalServiceFactory>]>,
     state: WorkerState,
@@ -392,6 +393,7 @@ impl ServerWorker {
                                     stop_rx,
                                     services: worker_services.into_boxed_slice(),
                                     counter: WorkerCounter::new(idx, waker_queue, counter),
+                                    next_connection_id: 0,
                                     factories: factories.into_boxed_slice(),
                                     state: WorkerState::default(),
                                     shutdown_timeout: config.shutdown_timeout,
@@ -454,6 +456,7 @@ impl ServerWorker {
                             stop_rx,
                             services: worker_services.into_boxed_slice(),
                             counter: WorkerCounter::new(idx, waker_queue, counter),
+                            next_connection_id: 0,
                             factories: factories.into_boxed_slice(),
                             state: Default::default(),
                             shutdown_timeout: config.shutdown_timeout,
@@ -699,6 +702,22 @@ impl Future for ServerWorker {
                 match ready!(this.conn_rx.poll_recv(cx)) {
                     Some(msg) => {
                         let guard = this.counter.guard();
+
+                        let span = tracing::debug_span!(
+                            parent: None,
+                            "connection",
+                            worker_id = this.counter.idx,
+                            connection_id = this.next_connection_id,
+                            service = this.factories[this.services[msg.token].factory_idx]
+                                .name(msg.token),
+                            local_addr = %this.factories[this.services[msg.token].factory_idx]
+                                .local_addr(),
+                        );
+
+                        this.next_connection_id = this.next_connection_id.wrapping_add(1);
+
+                        let _entered = span.enter();
+
                         let _ = this.services[msg.token]
                             .service
                             .call((guard, msg.io))
