@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix parsing of bracketed IPv6 hosts and ports in `Host` for `String` and `&'static str`.
+
 ## 3.6.0
 
 - Use `core::future::{ready, Ready}` instead of `actix-utils` types.
