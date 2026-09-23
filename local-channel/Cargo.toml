@@ -20,6 +20,7 @@ local-waker = "0.1"
 [dev-dependencies]
 futures-util = { version = "0.3.17", default-features = false }
 tokio = { version = "1.44.2", features = ["rt", "macros"] }
+tokio-test = "0.4"
 
 [lints]
 workspace = true
