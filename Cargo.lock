@@ -1152,6 +1152,7 @@ dependencies = [
  "futures-util",
  "local-waker",
  "tokio",
+ "tokio-test",
 ]
 
 [[package]]
