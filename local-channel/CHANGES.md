@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.6
+
 - Close the channel when `mpsc::Sender` is closed using `Sink::poll_close()`.
 - Minimum supported Rust version (MSRV) is now 1.88.
 
