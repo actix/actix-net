@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 3.6.1
+
 - Fix parsing of bracketed IPv6 hosts and ports in `Host` for `String` and `&'static str`.
 
 ## 3.6.0
