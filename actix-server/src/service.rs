@@ -1,16 +1,15 @@
 use core::future::{ready, Ready};
 use std::{
     marker::PhantomData,
-    net::SocketAddr,
     task::{Context, Poll},
 };
 
 use actix_service::{Service, ServiceFactory as BaseServiceFactory};
 use futures_core::future::LocalBoxFuture;
-use tracing::error;
+use tracing::{error, Instrument as _};
 
 use crate::{
-    socket::{FromStream, MioStream},
+    socket::{FromStream, MioStream, SocketAddr},
     worker::WorkerCounterGuard,
 };
 
@@ -23,6 +22,8 @@ pub trait ServerServiceFactory<Stream: FromStream>: Send + Clone + 'static {
 
 pub(crate) trait InternalServiceFactory: Send {
     fn name(&self, token: usize) -> &str;
+
+    fn local_addr(&self) -> &SocketAddr;
 
     fn clone_factory(&self) -> Box<dyn InternalServiceFactory>;
 
@@ -71,10 +72,13 @@ where
         ready(match FromStream::from_mio(req) {
             Ok(stream) => {
                 let f = self.service.call(stream);
-                actix_rt::spawn(async move {
-                    let _ = f.await;
-                    drop(guard);
-                });
+                actix_rt::spawn(
+                    async move {
+                        let _ = f.await;
+                        drop(guard);
+                    }
+                    .in_current_span(),
+                );
                 Ok(())
             }
             Err(err) => {
@@ -123,12 +127,16 @@ where
         &self.name
     }
 
+    fn local_addr(&self) -> &SocketAddr {
+        &self.addr
+    }
+
     fn clone_factory(&self) -> Box<dyn InternalServiceFactory> {
         Box::new(Self {
             name: self.name.clone(),
             inner: self.inner.clone(),
             token: self.token,
-            addr: self.addr,
+            addr: self.addr.clone(),
             _t: PhantomData,
         })
     }
