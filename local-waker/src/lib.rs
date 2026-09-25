@@ -38,7 +38,7 @@ impl LocalWaker {
 
     /// Registers the waker to be notified on calls to `wake`.
     ///
-    /// Returns `true` if waker was registered before.
+    /// Returns `true` if a waker was registered before.
     #[inline]
     pub fn register(&self, waker: &Waker) -> bool {
         let mut registered = false;
@@ -49,12 +49,14 @@ impl LocalWaker {
             if waker.will_wake(prev) {
                 return true;
             }
+
             registered = true;
         }
 
         // SAFETY: This can cause data races if called from a separate thread,
         // but `LocalWaker` is `!Send` + `!Sync` so this won't happen.
         unsafe { *self.waker.get() = Some(waker.clone()) }
+
         registered
     }
 
@@ -83,4 +85,11 @@ impl fmt::Debug for LocalWaker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "LocalWaker")
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static_assertions::assert_not_impl_all!(LocalWaker: Send, Sync);
 }
