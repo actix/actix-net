@@ -29,3 +29,5 @@ jobs:
 
       - name: Test local-waker with Miri
         run: cargo miri test -p local-waker
+        env:
+          CARGO_BUILD_WARNINGS: warn
