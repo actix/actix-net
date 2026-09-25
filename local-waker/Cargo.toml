@@ -12,5 +12,8 @@ rust-version.workspace = true
 
 [dependencies]
 
+[dev-dependencies]
+static_assertions = "1"
+
 [lints]
 workspace = true

@@ -1151,6 +1151,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "local-waker",
+ "static_assertions",
  "tokio",
  "tokio-test",
 ]
@@ -1158,6 +1159,9 @@ dependencies = [
 [[package]]
 name = "local-waker"
 version = "0.1.4"
+dependencies = [
+ "static_assertions",
+]
 
 [[package]]
 name = "lock_api"

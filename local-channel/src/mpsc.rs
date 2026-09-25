@@ -213,6 +213,11 @@ mod tests {
 
     use super::*;
 
+    static_assertions::assert_not_impl_all!(Sender<()>: Send, Sync);
+    static_assertions::assert_not_impl_all!(Receiver<()>: Send, Sync);
+    static_assertions::assert_not_impl_all!(Sender<RefCell<()>>: Send, Sync);
+    static_assertions::assert_not_impl_all!(Receiver<RefCell<()>>: Send, Sync);
+
     #[tokio::test]
     async fn test_mpsc() {
         let (tx, mut rx) = channel();
