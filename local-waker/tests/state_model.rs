@@ -42,7 +42,7 @@ impl Wake for ReRegister {
 #[test]
 fn all_short_operation_sequences_match_model() {
     const OPERATION_COUNT: usize = 4;
-    const SEQUENCE_LENGTH: usize = 8;
+    const SEQUENCE_LENGTH: usize = if cfg!(miri) { 6 } else { 8 };
 
     for mut sequence in 0..OPERATION_COUNT.pow(SEQUENCE_LENGTH as u32) {
         let local_waker = LocalWaker::new();
