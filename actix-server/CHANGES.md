@@ -2,7 +2,13 @@
 
 ## Unreleased
 
+## 2.9.7
+
 - Fix busy listeners starving other listeners when worker connection capacity becomes available by rotating the first listener checked.
+
+## 2.9.6
+
+(unreleased)
 
 ## 2.9.5
 
