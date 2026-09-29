@@ -306,6 +306,20 @@ impl ServerWorkerConfig {
     }
 }
 
+/// A worker whose services are still being created on its own thread.
+pub(crate) struct StartingWorker {
+    handles: (WorkerHandleAccept, WorkerHandleServer),
+    factory_rx: std::sync::mpsc::Receiver<io::Result<()>>,
+}
+
+impl StartingWorker {
+    /// Waits for the worker's services to be created.
+    pub(crate) fn ready(self) -> io::Result<(WorkerHandleAccept, WorkerHandleServer)> {
+        self.factory_rx.recv().unwrap()?;
+        Ok(self.handles)
+    }
+}
+
 impl ServerWorker {
     pub(crate) fn start(
         idx: usize,
@@ -313,6 +327,16 @@ impl ServerWorker {
         waker_queue: WakerQueue,
         config: ServerWorkerConfig,
     ) -> io::Result<(WorkerHandleAccept, WorkerHandleServer)> {
+        Self::spawn(idx, factories, waker_queue, config).ready()
+    }
+
+    /// Starts a worker without waiting for its services to be created, so several can start at once.
+    pub(crate) fn spawn(
+        idx: usize,
+        factories: Vec<Box<dyn InternalServiceFactory>>,
+        waker_queue: WakerQueue,
+        config: ServerWorkerConfig,
+    ) -> StartingWorker {
         trace!("starting server worker {}", idx);
 
         let (tx1, conn_rx) = unbounded_channel();
@@ -463,10 +487,10 @@ impl ServerWorker {
             }
         };
 
-        // wait for service factories initialization
-        factory_rx.recv().unwrap()?;
-
-        Ok(pair)
+        StartingWorker {
+            handles: pair,
+            factory_rx,
+        }
     }
 
     fn restart_service(&mut self, idx: usize, factory_id: usize) {

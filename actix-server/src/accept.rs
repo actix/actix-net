@@ -8,7 +8,7 @@ use crate::{
     availability::Availability,
     socket::MioListener,
     waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN},
-    worker::{Conn, ServerWorker, WorkerHandleAccept, WorkerHandleServer},
+    worker::{Conn, ServerWorker, StartingWorker, WorkerHandleAccept, WorkerHandleServer},
     ServerBuilder, ServerHandle,
 };
 
@@ -72,8 +72,8 @@ impl Accept {
         let poll = Poll::new()?;
         let waker_queue = WakerQueue::new(poll.registry())?;
 
-        // start workers and collect handles
-        let (handles_accept, handles_server) = (0..builder.threads)
+        // start every worker before waiting for any, so their services are created in parallel
+        let starting = (0..builder.threads)
             .map(|idx| {
                 // clone service factories
                 let factories = builder
@@ -83,8 +83,16 @@ impl Accept {
                     .collect::<Vec<_>>();
 
                 // start worker using service factories
-                ServerWorker::start(idx, factories, waker_queue.clone(), builder.worker_config)
+                ServerWorker::spawn(idx, factories, waker_queue.clone(), builder.worker_config)
             })
+            .collect::<Vec<_>>();
+
+        // wait for all of them, so none is left sending to a dropped channel when one fails
+        let (handles_accept, handles_server) = starting
+            .into_iter()
+            .map(StartingWorker::ready)
+            .collect::<Vec<_>>()
+            .into_iter()
             .collect::<io::Result<Vec<_>>>()?
             .into_iter()
             .unzip();

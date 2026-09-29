@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Start workers in parallel, so a server with several workers accepts connections sooner.
+
 ## 2.9.7
 
 - Fix busy listeners starving other listeners when worker connection capacity becomes available by rotating the first listener checked.

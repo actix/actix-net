@@ -5,7 +5,7 @@ use std::{
     net::{self, SocketAddr},
     sync::{
         atomic::{AtomicUsize, Ordering},
-        mpsc, Arc,
+        mpsc, Arc, Condvar, Mutex,
     },
     task::{Context, Poll},
     thread,
@@ -715,6 +715,55 @@ fn no_runtime_on_init() {
         // available after the first poll
         sleep(Duration::from_millis(500));
         assert_eq!(counter.load(Ordering::SeqCst), 2);
+
+        let _ = srv.handle().stop(true);
+        srv.await
+    })
+    .unwrap();
+}
+
+#[test]
+fn workers_create_services_in_parallel() {
+    const WORKERS: usize = 4;
+
+    let (lst, _addr) = TestServer::unused_listener();
+    let arrivals = Arc::new((Mutex::new(0), Condvar::new()));
+    let timeouts = Arc::new(AtomicUsize::new(0));
+
+    let mut srv = Server::build()
+        .workers(WORKERS)
+        .disable_signals()
+        .listen("test", lst, {
+            let arrivals = arrivals.clone();
+            let timeouts = timeouts.clone();
+            move || {
+                let (count, all_arrived) = &*arrivals;
+                let mut count = count.lock().unwrap();
+                *count += 1;
+                all_arrived.notify_all();
+
+                let (count, wait) = all_arrived
+                    .wait_timeout_while(count, Duration::from_secs(5), |count| *count < WORKERS)
+                    .unwrap();
+                drop(count);
+                if wait.timed_out() {
+                    timeouts.fetch_add(1, Ordering::SeqCst);
+                }
+
+                fn_service(|_| async { Ok::<_, ()>(()) })
+            }
+        })
+        .unwrap()
+        .run();
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    rt.block_on(async move {
+        let _ = futures_util::poll!(&mut srv);
+        assert_eq!(timeouts.load(Ordering::SeqCst), 0);
 
         let _ = srv.handle().stop(true);
         srv.await
