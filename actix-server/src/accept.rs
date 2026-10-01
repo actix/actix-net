@@ -1,4 +1,4 @@
-use std::{io, thread, time::Duration};
+use std::{io, sync::mpsc, thread, time::Duration};
 
 use actix_rt::time::Instant;
 use mio::{Interest, Poll, Token as MioToken};
@@ -8,7 +8,7 @@ use crate::{
     availability::Availability,
     socket::MioListener,
     waker_queue::{WakerInterest, WakerQueue, WAKER_TOKEN},
-    worker::{Conn, ServerWorker, StartingWorker, WorkerHandleAccept, WorkerHandleServer},
+    worker::{Conn, ServerWorker, WorkerHandleAccept, WorkerHandleServer},
     ServerBuilder, ServerHandle,
 };
 
@@ -73,7 +73,9 @@ impl Accept {
         let waker_queue = WakerQueue::new(poll.registry())?;
 
         // start every worker before waiting for any, so their services are created in parallel
-        let starting = (0..builder.threads)
+        let (startup_tx, startup_rx) = mpsc::channel();
+
+        let (handles_accept, handles_server): (Vec<_>, Vec<_>) = (0..builder.threads)
             .map(|idx| {
                 // clone service factories
                 let factories = builder
@@ -83,19 +85,50 @@ impl Accept {
                     .collect::<Vec<_>>();
 
                 // start worker using service factories
-                ServerWorker::spawn(idx, factories, waker_queue.clone(), builder.worker_config)
+                ServerWorker::spawn(
+                    idx,
+                    factories,
+                    waker_queue.clone(),
+                    builder.worker_config,
+                    startup_tx.clone(),
+                )
             })
-            .collect::<Vec<_>>();
-
-        // wait for all of them, so none is left sending to a dropped channel when one fails
-        let (handles_accept, handles_server) = starting
-            .into_iter()
-            .map(StartingWorker::ready)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .collect::<io::Result<Vec<_>>>()?
-            .into_iter()
             .unzip();
+
+        // keep only the workers' senders, so a worker that dies without reporting disconnects
+        // the channel instead of leaving `recv` waiting forever
+        drop(startup_tx);
+
+        // receive the startup reports as they arrive, so one worker's error is returned without
+        // waiting for another worker's still pending services
+        let mut awaiting = handles_server.len();
+        while awaiting > 0 {
+            match startup_rx.recv() {
+                Ok((_, Ok(()))) => awaiting -= 1,
+
+                Ok((failed_idx, Err(err))) => {
+                    // ask the other workers to stop without waiting for them; a stop request
+                    // also cancels a worker's still pending service creation
+                    for handle in handles_server
+                        .iter()
+                        .filter(|handle| handle.idx != failed_idx)
+                    {
+                        drop(handle.stop(false));
+                    }
+
+                    return Err(err);
+                }
+
+                // a worker died without reporting, e.g. its thread panicked during startup
+                Err(_) => {
+                    for handle in &handles_server {
+                        drop(handle.stop(false));
+                    }
+
+                    return Err(io::Error::other("a worker exited during startup"));
+                }
+            }
+        }
 
         let (mut accept, mut sockets) = Accept::new_with_sockets(
             poll,

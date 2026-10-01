@@ -1,12 +1,12 @@
 use std::{
-    future::Future,
+    future::{poll_fn, Future},
     io, mem,
     num::NonZeroUsize,
-    pin::Pin,
+    pin::{pin, Pin},
     rc::Rc,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc,
+        mpsc, Arc,
     },
     task::{Context, Poll},
     time::Duration,
@@ -306,41 +306,43 @@ impl ServerWorkerConfig {
     }
 }
 
-/// A worker whose services are still being created on its own thread.
-pub(crate) struct StartingWorker {
-    handles: (WorkerHandleAccept, WorkerHandleServer),
-    factory_rx: std::sync::mpsc::Receiver<io::Result<()>>,
-}
-
-impl StartingWorker {
-    /// Waits for the worker's services to be created.
-    pub(crate) fn ready(self) -> io::Result<(WorkerHandleAccept, WorkerHandleServer)> {
-        self.factory_rx.recv().unwrap()?;
-        Ok(self.handles)
-    }
-}
-
 impl ServerWorker {
+    /// Starts a worker and waits for its services to be created.
     pub(crate) fn start(
         idx: usize,
         factories: Vec<Box<dyn InternalServiceFactory>>,
         waker_queue: WakerQueue,
         config: ServerWorkerConfig,
     ) -> io::Result<(WorkerHandleAccept, WorkerHandleServer)> {
-        Self::spawn(idx, factories, waker_queue, config).ready()
+        let (startup_tx, startup_rx) = mpsc::channel();
+        let handles = Self::spawn(idx, factories, waker_queue, config, startup_tx);
+
+        match startup_rx.recv() {
+            Ok((_, res)) => res.map(|()| handles),
+            // the worker exited without reporting, e.g. its thread panicked during startup
+            Err(_) => Err(io::Error::other(format!(
+                "worker {idx} exited during startup"
+            ))),
+        }
     }
 
-    /// Starts a worker without waiting for its services to be created, so several can start at once.
+    /// Starts a worker without waiting for its services to be created, so several workers can
+    /// create their services in parallel.
+    ///
+    /// The worker reports its startup outcome on `startup_tx`, tagged with its index. A worker
+    /// that cannot deliver a success report stops and drops its services. A stop request received
+    /// before the services are created cancels the creation and stops the worker.
     pub(crate) fn spawn(
         idx: usize,
         factories: Vec<Box<dyn InternalServiceFactory>>,
         waker_queue: WakerQueue,
         config: ServerWorkerConfig,
-    ) -> StartingWorker {
+        startup_tx: mpsc::Sender<(usize, io::Result<()>)>,
+    ) -> (WorkerHandleAccept, WorkerHandleServer) {
         trace!("starting server worker {}", idx);
 
         let (tx1, conn_rx) = unbounded_channel();
-        let (tx2, stop_rx) = unbounded_channel();
+        let (tx2, mut stop_rx) = unbounded_channel();
 
         let counter = Counter::new(config.max_concurrent_connections);
         let pair = handle_pair(idx, tx1, tx2, counter.clone());
@@ -350,9 +352,6 @@ impl ServerWorker {
 
         // get tokio runtime handle if it is set
         let tokio_handle = tokio::runtime::Handle::try_current().ok();
-
-        // service factories initialization channel
-        let (factory_tx, factory_rx) = std::sync::mpsc::sync_channel::<io::Result<()>>(1);
 
         // every worker runs in it's own thread and tokio runtime.
         // use a custom tokio runtime builder to change the settings of runtime.
@@ -375,36 +374,29 @@ impl ServerWorker {
                             .build_local(LocalOptions::default())
                             .unwrap();
 
-                        // init services using the worker's local runtime
-                        let services = rt.block_on(async {
-                            let mut services = Vec::new();
+                        // create services using the worker's local runtime
+                        let services = match rt.block_on(create_services(&factories, &mut stop_rx))
+                        {
+                            // a stop request cancelled startup
+                            None => return,
 
-                            for (idx, factory) in factories.iter().enumerate() {
-                                match factory.create().await {
-                                    Ok((token, svc)) => services.push((idx, token, svc)),
+                            Some(Ok(services)) => services,
 
-                                    Err(err) => {
-                                        error!("can not start worker: {err:?}");
-                                        return Err(io::Error::other(format!(
-                                            "can not start server service {idx}",
-                                        )));
-                                    }
-                                }
-                            }
-
-                            Ok(services)
-                        });
-
-                        let services = match services {
-                            Ok(services) => {
-                                factory_tx.send(Ok(())).unwrap();
-                                services
-                            }
-                            Err(err) => {
-                                factory_tx.send(Err(err)).unwrap();
+                            Some(Err(err)) => {
+                                let _ = startup_tx.send((idx, Err(err)));
                                 return;
                             }
                         };
+
+                        // when the success report cannot be delivered, startup was abandoned;
+                        // exit and drop the services instead of serving
+                        if startup_tx.send((idx, Ok(()))).is_err() {
+                            return;
+                        }
+
+                        // release the report channel, so waiting on a worker that dies without
+                        // reporting is not extended by this worker's lifetime
+                        drop(startup_tx);
 
                         let worker_services = wrap_worker_services(services);
 
@@ -449,26 +441,29 @@ impl ServerWorker {
                 arbiter.spawn(async move {
                     // spawn_local to run !Send future tasks.
                     spawn(async move {
-                        let mut services = Vec::new();
-
-                        for (idx, factory) in factories.iter().enumerate() {
-                            match factory.create().await {
-                                Ok((token, svc)) => services.push((idx, token, svc)),
-
-                                Err(err) => {
-                                    error!("can not start worker: {err:?}");
-                                    Arbiter::current().stop();
-                                    factory_tx
-                                        .send(Err(io::Error::other(format!(
-                                            "can not start server service {idx}",
-                                        ))))
-                                        .unwrap();
-                                    return;
-                                }
+                        let services = match create_services(&factories, &mut stop_rx).await {
+                            // a stop request cancelled startup
+                            None => {
+                                Arbiter::current().stop();
+                                return;
                             }
-                        }
 
-                        factory_tx.send(Ok(())).unwrap();
+                            Some(Ok(services)) => services,
+
+                            Some(Err(err)) => {
+                                Arbiter::current().stop();
+                                let _ = startup_tx.send((idx, Err(err)));
+                                return;
+                            }
+                        };
+
+                        // when the success report cannot be delivered, startup was abandoned;
+                        // exit and drop the services instead of serving
+                        if startup_tx.send((idx, Ok(()))).is_err() {
+                            Arbiter::current().stop();
+                            return;
+                        }
+                        drop(startup_tx);
 
                         let worker_services = wrap_worker_services(services);
 
@@ -487,10 +482,7 @@ impl ServerWorker {
             }
         };
 
-        StartingWorker {
-            handles: pair,
-            factory_rx,
-        }
+        pair
     }
 
     fn restart_service(&mut self, idx: usize, factory_id: usize) {
@@ -738,6 +730,46 @@ impl Future for ServerWorker {
             },
         }
     }
+}
+
+/// Creates every service of a starting worker.
+///
+/// Resolves to `None` when a stop request arrives before all services are created: the services
+/// created so far and the pending factory future are dropped, and the stop is confirmed.
+async fn create_services(
+    factories: &[Box<dyn InternalServiceFactory>],
+    stop_rx: &mut UnboundedReceiver<Stop>,
+) -> Option<io::Result<Vec<(usize, usize, BoxedServerService)>>> {
+    let mut create = pin!(async {
+        let mut services = Vec::new();
+
+        for (idx, factory) in factories.iter().enumerate() {
+            match factory.create().await {
+                Ok((token, svc)) => services.push((idx, token, svc)),
+
+                Err(err) => {
+                    error!("can not start worker: {err:?}");
+                    return Err(io::Error::other(format!(
+                        "can not start server service {idx}",
+                    )));
+                }
+            }
+        }
+
+        Ok(services)
+    });
+
+    poll_fn(|cx| {
+        // a stop request cancels service creation; the stop channel is checked here because the
+        // worker starts polling it only after its services are created
+        if let Poll::Ready(Some(Stop { tx, .. })) = stop_rx.poll_recv(cx) {
+            let _ = tx.send(true);
+            return Poll::Ready(None);
+        }
+
+        create.as_mut().poll(cx).map(Some)
+    })
+    .await
 }
 
 fn wrap_worker_services(services: Vec<(usize, usize, BoxedServerService)>) -> Vec<WorkerService> {
