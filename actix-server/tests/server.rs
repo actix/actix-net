@@ -2,14 +2,15 @@
 
 use std::{
     future::{pending, ready, Ready},
+    io,
     net::{self, SocketAddr},
     sync::{
         atomic::{AtomicUsize, Ordering},
-        mpsc, Arc,
+        mpsc, Arc, Condvar, Mutex,
     },
     task::{Context, Poll},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use actix_rt::{net::TcpStream, time::sleep};
@@ -720,6 +721,133 @@ fn no_runtime_on_init() {
         srv.await
     })
     .unwrap();
+}
+
+#[test]
+fn workers_create_services_in_parallel() {
+    const WORKERS: usize = 4;
+
+    let (lst, _addr) = TestServer::unused_listener();
+    let arrivals = Arc::new((Mutex::new(0), Condvar::new()));
+    let timeouts = Arc::new(AtomicUsize::new(0));
+
+    let mut srv = Server::build()
+        .workers(WORKERS)
+        .disable_signals()
+        .listen("test", lst, {
+            let arrivals = arrivals.clone();
+            let timeouts = timeouts.clone();
+            move || {
+                let (count, all_arrived) = &*arrivals;
+                let mut count = count.lock().unwrap();
+                *count += 1;
+                all_arrived.notify_all();
+
+                let (count, wait) = all_arrived
+                    .wait_timeout_while(count, Duration::from_secs(5), |count| *count < WORKERS)
+                    .unwrap();
+                drop(count);
+                if wait.timed_out() {
+                    timeouts.fetch_add(1, Ordering::SeqCst);
+                }
+
+                fn_service(|_| async { Ok::<_, ()>(()) })
+            }
+        })
+        .unwrap()
+        .run();
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    rt.block_on(async move {
+        let _ = futures_util::poll!(&mut srv);
+        assert_eq!(timeouts.load(Ordering::SeqCst), 0);
+
+        let _ = srv.handle().stop(true);
+        srv.await
+    })
+    .unwrap();
+}
+
+/// Checks that one worker's startup error fails the server while another worker's service
+/// creation is still pending, and that every worker then stops: the pending factory future is
+/// dropped and the created services are dropped with the workers holding them.
+fn startup_fails_on_first_worker_error(run_server: fn(Server) -> io::Result<()>) {
+    let (lst, _addr) = TestServer::unused_listener();
+
+    // clones are held by the worker factories, the pending factory future, and the server
+    // itself; the count returns to one only after all of them are dropped
+    let guard = Arc::new(());
+    let arrivals = Arc::new(AtomicUsize::new(0));
+
+    let srv = Server::build()
+        .workers(3)
+        .disable_signals()
+        .listen("test", lst, {
+            let guard = guard.clone();
+            let arrivals = arrivals.clone();
+            move || {
+                let guard = guard.clone();
+                let arrivals = arrivals.clone();
+                fn_factory(move || {
+                    let guard = guard.clone();
+                    // the first worker to arrive stays pending, the second creates its service,
+                    // the third fails
+                    let role = arrivals.fetch_add(1, Ordering::SeqCst);
+                    async move {
+                        match role {
+                            0 => {
+                                let _guard = guard;
+                                pending().await
+                            }
+                            1 => Ok(fn_service(|_: TcpStream| async { Ok::<_, ()>(()) })),
+                            _ => Err(()),
+                        }
+                    }
+                })
+            }
+        })
+        .unwrap()
+        .run();
+
+    let (res_tx, res_rx) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = res_tx.send(run_server(srv));
+    });
+
+    // the error must arrive while another worker's service creation never completes
+    let res = res_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("server should return the error without waiting for the pending worker");
+    assert_eq!(
+        res.unwrap_err().to_string(),
+        "can not start server service 0"
+    );
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Arc::strong_count(&guard) > 1 {
+        assert!(Instant::now() < deadline, "not every worker stopped");
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[test]
+fn startup_fails_on_first_worker_error_tokio() {
+    startup_fails_on_first_worker_error(|srv| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(srv)
+    });
+}
+
+#[test]
+fn startup_fails_on_first_worker_error_actix() {
+    startup_fails_on_first_worker_error(|srv| actix_rt::System::new().block_on(srv));
 }
 
 #[tokio::test]
