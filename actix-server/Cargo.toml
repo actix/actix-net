@@ -1,6 +1,6 @@
 [package]
 name = "actix-server"
-version = "2.9.7"
+version = "2.9.8"
 authors = [
   "Nikolay Kim <fafhrd91@gmail.com>",
   "Rob Ede <robjtede@icloud.com>",
@@ -9,9 +9,9 @@ authors = [
 description = "General purpose TCP server built for the Actix ecosystem"
 keywords = ["network", "tcp", "server", "framework", "async"]
 categories = ["network-programming", "asynchronous"]
-homepage = "https://actix.rs"
+homepage.workspace = true
 repository = "https://github.com/actix/actix-net/tree/main/actix-server"
-license = "MIT OR Apache-2.0"
+license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
@@ -28,7 +28,7 @@ futures-core = { version = "0.3.17", default-features = false, features = ["allo
 futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
 mio = { version = "1", features = ["os-poll", "net"] }
 socket2 = "0.6"
-tokio = { version = "1.51", features = ["rt", "sync"] }
+tokio = { version = "1.51", features = ["macros", "rt", "sync"] }
 tracing = { version = "0.1.30", default-features = false, features = ["log"] }
 
 [dev-dependencies]

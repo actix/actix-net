@@ -1,5 +1,5 @@
 use std::{
-    future::{poll_fn, Future},
+    future::Future,
     io, mem,
     num::NonZeroUsize,
     pin::{pin, Pin},
@@ -321,7 +321,7 @@ impl ServerWorker {
             Ok((_, res)) => res.map(|()| handles),
             // the worker exited without reporting, e.g. its thread panicked during startup
             Err(_) => Err(io::Error::other(format!(
-                "worker {idx} exited during startup"
+                "Worker {idx} exited during startup"
             ))),
         }
     }
@@ -423,7 +423,7 @@ impl ServerWorker {
 
                         rt.block_on(worker_fut);
                     })
-                    .expect("cannot spawn server worker thread");
+                    .expect("Cannot spawn server worker thread");
             }
 
             // with actix system
@@ -487,7 +487,7 @@ impl ServerWorker {
 
     fn restart_service(&mut self, idx: usize, factory_id: usize) {
         let factory = &self.factories[factory_id];
-        trace!("service {:?} failed, restarting", factory.name(idx));
+        trace!("Service {:?} failed, restarting", factory.name(idx));
         self.services[idx].status = WorkerServiceStatus::Restarting;
         self.state = WorkerState::Restarting(Restart {
             factory_id,
@@ -538,7 +538,7 @@ impl ServerWorker {
                     }
                     Poll::Ready(Err(_)) => {
                         error!(
-                            "service {:?} readiness check returned error, restarting",
+                            "Service {:?} readiness check returned error, restarting",
                             self.factories[srv.factory_idx].name(idx)
                         );
                         srv.status = WorkerServiceStatus::Failed;
@@ -740,7 +740,7 @@ async fn create_services(
     factories: &[Box<dyn InternalServiceFactory>],
     stop_rx: &mut UnboundedReceiver<Stop>,
 ) -> Option<io::Result<Vec<(usize, usize, BoxedServerService)>>> {
-    let mut create = pin!(async {
+    let mut create_fut = pin!(async {
         let mut services = Vec::new();
 
         for (idx, factory) in factories.iter().enumerate() {
@@ -748,9 +748,9 @@ async fn create_services(
                 Ok((token, svc)) => services.push((idx, token, svc)),
 
                 Err(err) => {
-                    error!("can not start worker: {err:?}");
+                    error!("Can not start worker: {err:?}");
                     return Err(io::Error::other(format!(
-                        "can not start server service {idx}",
+                        "Can not start server service {idx}",
                     )));
                 }
             }
@@ -759,31 +759,37 @@ async fn create_services(
         Ok(services)
     });
 
-    poll_fn(|cx| {
-        // a stop request cancels service creation; the stop channel is checked here because the
-        // worker starts polling it only after its services are created
-        if let Poll::Ready(Some(Stop { tx, .. })) = stop_rx.poll_recv(cx) {
+    tokio::select! {
+        // A stop request cancels service creation; the stop channel is checked here because the
+        // worker starts polling it only after its services are created.
+        Some(Stop { tx, .. }) = stop_rx.recv() => {
             let _ = tx.send(true);
-            return Poll::Ready(None);
+            None
         }
 
-        create.as_mut().poll(cx).map(Some)
-    })
-    .await
+
+        // Service creation finished (either successfully or with an error).
+        created = create_fut.as_mut() => Some(created)
+    }
 }
 
 fn wrap_worker_services(services: Vec<(usize, usize, BoxedServerService)>) -> Vec<WorkerService> {
-    services
-        .into_iter()
-        .fold(Vec::new(), |mut services, (idx, token, service)| {
+    let n_services = services.len();
+
+    services.into_iter().fold(
+        Vec::with_capacity(n_services),
+        |mut services, (idx, token, service)| {
             assert_eq!(token, services.len());
+
             services.push(WorkerService {
                 factory_idx: idx,
                 service,
                 status: WorkerServiceStatus::Unavailable,
             });
+
             services
-        })
+        },
+    )
 }
 
 #[cfg(test)]

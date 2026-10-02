@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- Start workers in parallel, so a server with several workers accepts connections sooner. When a worker fails to start, the server now returns its error without waiting for the remaining workers and stops the workers that already started.
+## 2.9.8
+
+- Spawn workers in parallel, so a server with many workers will start accepting connections sooner.
+  - Compatibility note: If you server factory closures assumed serial initialization, they may require synchronization changes.
 
 ## 2.9.7
 
