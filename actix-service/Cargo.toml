@@ -5,8 +5,8 @@ authors = ["Nikolay Kim <fafhrd91@gmail.com>", "Rob Ede <robjtede@icloud.com>"]
 description = "Service trait and combinators for representing asynchronous request/response operations."
 keywords = ["network", "framework", "async", "futures", "service"]
 categories = ["network-programming", "asynchronous", "no-std"]
-repository = "https://github.com/actix/actix-net"
-license = "MIT OR Apache-2.0"
+repository = "https://github.com/actix/actix-net/tree/main/actix-service"
+license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 

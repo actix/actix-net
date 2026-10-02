@@ -7,7 +7,7 @@ authors = [
   "Rob Ede <robjtede@icloud.com>",
 ]
 description = "Macros for Actix system and runtime"
-repository = "https://github.com/actix/actix-net"
+repository = "https://github.com/actix/actix-net/tree/main/actix-macros"
 categories = ["network-programming", "asynchronous"]
 license.workspace = true
 edition.workspace = true

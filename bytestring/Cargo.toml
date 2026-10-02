@@ -5,9 +5,9 @@ description = "A UTF-8 encoded read-only string using `Bytes` as storage"
 authors = ["Nikolay Kim <fafhrd91@gmail.com>", "Rob Ede <robjtede@icloud.com>"]
 keywords = ["string", "bytes", "utf8", "web", "bytestring"]
 categories = ["no-std", "web-programming"]
-homepage = "https://actix.rs"
-repository = "https://github.com/actix/actix-net"
-license = "MIT OR Apache-2.0"
+homepage.workspace = true
+repository = "https://github.com/actix/actix-net/tree/main/bytestring"
+license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
