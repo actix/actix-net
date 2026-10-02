@@ -15,7 +15,7 @@ concurrency:
 jobs:
   read_msrv:
     name: Read MSRV
-    uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@b95a3a81b0efee6438b858b41a84aff627e01351 # v0.1.1
+    uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@c55c11665a64124c2592991891bc002df2c5afc9 # v0.1.2
 
   build_and_test:
     needs:
@@ -44,7 +44,8 @@ jobs:
         if: runner.os == 'macOS'
         run: sudo ifconfig lo0 alias 127.0.0.3
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
 
@@ -119,7 +120,8 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2404
 
     steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+      - name: Checkout
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
 
@@ -139,7 +141,8 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2404
 
     steps:
-      - uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+      - name: Checkout
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
         with:
           persist-credentials: false
 
