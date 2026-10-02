@@ -302,12 +302,12 @@ async fn test_max_concurrent_connections_releases_capacity() {
 
     let first_conn = srv.connect().unwrap();
     rx.recv_timeout(Duration::from_secs(5))
-        .expect("first connection was not dispatched");
+        .expect("First connection was not dispatched");
     drop(first_conn);
 
     let _second_conn = srv.connect().unwrap();
     rx.recv_timeout(Duration::from_secs(5))
-        .expect("worker did not accept a second connection after reaching its connection limit");
+        .expect("Worker did not accept a second connection after reaching its connection limit");
 }
 
 #[test]
@@ -374,7 +374,7 @@ fn saturated_listener_does_not_starve_another_listener() {
     thread.join().unwrap().unwrap();
     assert!(
         served_cold,
-        "busy listener consumed successive capacity releases"
+        "Busy listener consumed successive capacity releases"
     );
 }
 
@@ -438,7 +438,7 @@ async fn graceful_shutdown_drops_queued_connections() {
 
     assert!(
         stopped,
-        "graceful shutdown timed out with a queued connection"
+        "Graceful shutdown timed out with a queued connection"
     );
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
@@ -591,7 +591,7 @@ async fn worker_restart() {
 
             // force worker 2 to restart service once.
             if counter == 2 {
-                panic!("panic on purpose")
+                panic!("Panic on purpose")
             } else {
                 Box::pin(async { Ok(()) })
             }
@@ -821,15 +821,15 @@ fn startup_fails_on_first_worker_error(run_server: fn(Server) -> io::Result<()>)
     // the error must arrive while another worker's service creation never completes
     let res = res_rx
         .recv_timeout(Duration::from_secs(5))
-        .expect("server should return the error without waiting for the pending worker");
+        .expect("Server should return the error without waiting for the pending worker");
     assert_eq!(
         res.unwrap_err().to_string(),
-        "can not start server service 0"
+        "Can not start server service 0"
     );
 
     let deadline = Instant::now() + Duration::from_secs(5);
     while Arc::strong_count(&guard) > 1 {
-        assert!(Instant::now() < deadline, "not every worker stopped");
+        assert!(Instant::now() < deadline, "Not every worker stopped");
         thread::sleep(Duration::from_millis(50));
     }
 }
@@ -867,7 +867,7 @@ async fn dropped_server_releases_listener() {
     drop(server);
 
     let _listener =
-        net::TcpListener::bind(addr).expect("listener should close before drop returns");
+        net::TcpListener::bind(addr).expect("Listener should close before drop returns");
 }
 
 fn basic_ready_server() -> (Server, SocketAddr) {
@@ -903,7 +903,7 @@ async fn dropped_server_interrupts_graceful_shutdown() {
         .read_exact(&mut ready)
         .timeout(Duration::from_secs(5))
         .await
-        .expect("service should start")
+        .expect("Service should start")
         .unwrap();
     assert_eq!(&ready, b"ready");
 
@@ -918,12 +918,12 @@ async fn dropped_server_interrupts_graceful_shutdown() {
         .read(&mut buf)
         .timeout(Duration::from_secs(5))
         .await
-        .expect("cancellation should close the connection before the graceful shutdown timeout")
+        .expect("Cancellation should close the connection before the graceful shutdown timeout")
         .unwrap();
     assert_eq!(bytes, 0);
 
     let _listener =
-        net::TcpListener::bind(addr).expect("listener should close before drop returns");
+        net::TcpListener::bind(addr).expect("Listener should close before drop returns");
 }
 
 #[tokio::test]
@@ -939,7 +939,7 @@ async fn non_graceful_shutdown_completes_before_server_drop() {
         .read_exact(&mut ready)
         .timeout(Duration::from_secs(5))
         .await
-        .expect("service should start")
+        .expect("Service should start")
         .unwrap();
     assert_eq!(&ready, b"ready");
 
@@ -953,10 +953,10 @@ async fn non_graceful_shutdown_completes_before_server_drop() {
         .read(&mut buf)
         .timeout(Duration::from_secs(5))
         .await
-        .expect("forced shutdown should close the active connection")
+        .expect("Forced shutdown should close the active connection")
         .unwrap();
     assert_eq!(bytes, 0);
 
     let _listener =
-        net::TcpListener::bind(addr).expect("listener should close before drop returns");
+        net::TcpListener::bind(addr).expect("Listener should close before drop returns");
 }

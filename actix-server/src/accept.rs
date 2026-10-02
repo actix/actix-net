@@ -125,7 +125,7 @@ impl Accept {
                         drop(handle.stop(false));
                     }
 
-                    return Err(io::Error::other("a worker exited during startup"));
+                    return Err(io::Error::other("A worker exited during startup"));
                 }
             }
         }
@@ -365,7 +365,7 @@ impl Accept {
     fn register_logged(&self, info: &mut ServerSocketInfo) {
         match self.register(info) {
             Ok(_) => debug!("resume accepting connections on {}", info.lst.local_addr()),
-            Err(err) => error!("can not register server socket {}", err),
+            Err(err) => error!("Can not register server socket {}", err),
         }
     }
 
@@ -373,7 +373,7 @@ impl Accept {
         match self.poll.registry().deregister(&mut info.lst) {
             Ok(_) => debug!("paused accepting connections on {}", info.lst.local_addr()),
             Err(err) => {
-                error!("can not deregister server socket {}", err)
+                error!("Can not deregister server socket {}", err)
             }
         }
     }
@@ -418,7 +418,7 @@ impl Accept {
                 self.remove_next();
 
                 if self.handles.is_empty() {
-                    error!("no workers");
+                    error!("No workers");
                     // All workers are gone and Conn is nowhere to be sent.
                     // Treat this situation as Ok and drop Conn.
                     return Ok(());
@@ -467,7 +467,7 @@ impl Accept {
                 Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => return,
                 Err(ref err) if connection_error(err) => continue,
                 Err(err) => {
-                    error!("error accepting connection: {}", err);
+                    error!("Error accepting connection: {}", err);
 
                     // deregister listener temporary
                     self.deregister_logged(info);

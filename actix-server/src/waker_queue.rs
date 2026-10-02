@@ -54,7 +54,7 @@ impl WakerQueue {
 
         waker
             .wake()
-            .unwrap_or_else(|err| panic!("can not wake up Accept Poll: {err}"));
+            .unwrap_or_else(|err| panic!("Can not wake up Accept Poll: {err}"));
     }
 
     /// Get a MutexGuard of the waker queue.

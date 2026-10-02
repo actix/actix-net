@@ -108,8 +108,8 @@ impl ServerBuilder {
     ///
     /// Panics if `num` is 0 or greater than 512.
     pub fn workers(mut self, num: usize) -> Self {
-        assert_ne!(num, 0, "workers must be greater than 0");
-        assert!(num <= MAX_WORKERS, "workers must not exceed {MAX_WORKERS}");
+        assert_ne!(num, 0, "Workers must be greater than 0");
+        assert!(num <= MAX_WORKERS, "Workers must not exceed {MAX_WORKERS}");
         self.threads = num;
         self
     }
@@ -443,13 +443,13 @@ mod tests {
     use super::ServerBuilder;
 
     #[test]
-    #[should_panic(expected = "workers must not exceed 512")]
+    #[should_panic(expected = "Workers must not exceed 512")]
     fn rejects_worker_count_above_limit() {
         ServerBuilder::new().workers(513);
     }
 
     #[test]
-    #[should_panic(expected = "workers must be greater than 0")]
+    #[should_panic(expected = "Workers must be greater than 0")]
     fn rejects_zero_workers() {
         ServerBuilder::new().workers(0);
     }

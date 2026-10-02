@@ -233,8 +233,8 @@ pub(crate) fn create_mio_tcp_listener(
         Ok(sock) => sock,
 
         Err(err) if matches!(mptcp, MpTcp::TcpFallback) => {
-            tracing::warn!("binding socket as MPTCP failed: {err}");
-            tracing::warn!("falling back to TCP");
+            tracing::warn!("Binding socket as MPTCP failed: {err}");
+            tracing::warn!("Falling back to TCP");
             Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP))?
         }
 

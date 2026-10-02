@@ -463,6 +463,9 @@ impl ServerWorker {
                             Arbiter::current().stop();
                             return;
                         }
+
+                        // release the report channel, so waiting on a worker that dies without
+                        // reporting is not extended by this worker's lifetime
                         drop(startup_tx);
 
                         let worker_services = wrap_worker_services(services);
@@ -774,22 +777,22 @@ async fn create_services(
 }
 
 fn wrap_worker_services(services: Vec<(usize, usize, BoxedServerService)>) -> Vec<WorkerService> {
-    let n_services = services.len();
+    services
+        .into_iter()
+        .enumerate()
+        .map(|(position, (idx, token, service))| {
+            assert_eq!(
+                token, position,
+                "Token value should match its index in the list",
+            );
 
-    services.into_iter().fold(
-        Vec::with_capacity(n_services),
-        |mut services, (idx, token, service)| {
-            assert_eq!(token, services.len());
-
-            services.push(WorkerService {
+            WorkerService {
                 factory_idx: idx,
                 service,
                 status: WorkerServiceStatus::Unavailable,
-            });
-
-            services
-        },
-    )
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

@@ -69,16 +69,16 @@ mod tests {
 
         timeout(Duration::from_millis(100), signal.notified())
             .await
-            .expect_err("signal notified listener before shutdown");
+            .expect_err("Signal notified listener before shutdown");
 
         tx.send_replace(());
 
         timeout(Duration::from_millis(100), signal.notified())
             .await
-            .expect("set signal did not notify listener");
+            .expect("Set signal did not notify listener");
         timeout(Duration::from_millis(100), signal.notified())
             .await
-            .expect("set signal did not notify later listener");
+            .expect("Set signal did not notify later listener");
     }
 
     #[actix_rt::test]

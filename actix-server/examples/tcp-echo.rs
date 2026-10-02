@@ -65,7 +65,7 @@ async fn run() -> io::Result<()> {
 
                             // stream error; bail from loop with error
                             Err(err) => {
-                                tracing::error!("stream error: {:?}", err);
+                                tracing::error!("Stream error: {:?}", err);
                                 return Err(());
                             }
                         }
@@ -75,7 +75,7 @@ async fn run() -> io::Result<()> {
                     Ok((buf.freeze(), size))
                 }
             })
-            .map_err(|err| tracing::error!("service error: {:?}", err))
+            .map_err(|err| tracing::error!("Service error: {:?}", err))
             .and_then(move |(_, size)| {
                 let num = num2.load(Ordering::SeqCst);
                 tracing::info!("[{}] total bytes read: {}", num, size);

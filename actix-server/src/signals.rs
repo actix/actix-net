@@ -94,7 +94,7 @@ impl OsSignals {
                         .map(|tokio_sig| (*sig, tokio_sig))
                         .map_err(|err| {
                             tracing::error!(
-                                "can not initialize stream handler for {sig:?} err: {err}",
+                                "Can not initialize stream handler for {sig:?} err: {err}",
                             )
                         })
                         .ok()

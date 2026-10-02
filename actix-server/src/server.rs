@@ -306,7 +306,7 @@ impl ServerInner {
                 // TODO: maybe just return with warning log if not found ?
                 assert!(self.worker_handles.iter().any(|wrk| wrk.idx == idx));
 
-                error!("worker {} has died; restarting", idx);
+                error!("Worker {idx} has died; restarting");
 
                 let factories = self
                     .services
@@ -330,7 +330,7 @@ impl ServerInner {
                         self.waker_queue.wake(WakerInterest::Worker(handle_accept));
                     }
 
-                    Err(err) => error!("can not restart worker {}: {}", idx, err),
+                    Err(err) => error!("Can not restart worker {idx}: {err}"),
                 };
             }
         }
