@@ -58,6 +58,11 @@ where
 /// constructed by the factory takes the Service that follows it during execution as a parameter,
 /// assuming ownership of the next Service.
 ///
+/// Use `Option<T>` to apply a transform only when it is `Some`. For example,
+/// `enabled.then(|| middleware)` constructs middleware only when enabled. With `None`, the
+/// inner service is used directly. The transform must preserve the inner service's response
+/// and error types.
+///
 /// A transform for the `Timeout` middleware could look like this:
 ///
 /// ```ignore

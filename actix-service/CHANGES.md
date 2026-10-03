@@ -2,8 +2,9 @@
 
 ## Unreleased
 
+- Implement `Transform` for `Option<T>` to support optional middleware that preserves response and error types.
+- Use `core::future::{ready, Ready}` instead of equivalent from `actix-utils`.
 - Minimum supported Rust version (MSRV) is now 1.88.
-- internal: Use `core::future::{ready, Ready}` instead of hand-crafted one
 
 ## 2.0.3
 
