@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Minimum supported Rust version (MSRV) is now 1.88.
+- Minimum supported Rust version (MSRV) is now 1.89.
 - internal: Use `core::future::{ready, Ready}` instead of hand-crafted one
 
 ## 2.0.3

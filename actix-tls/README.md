@@ -6,7 +6,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/actix-tls?label=latest)](https://crates.io/crates/actix-tls)
 [![Documentation](https://docs.rs/actix-tls/badge.svg?version=3.6.1)](https://docs.rs/actix-tls/3.6.1)
-[![Version](https://img.shields.io/badge/rustc-1.88+-ab6000.svg)](https://blog.rust-lang.org/2021/05/06/Rust-1.52.0.html)
+[![Version](https://img.shields.io/badge/rustc-1.89+-ab6000.svg)](https://blog.rust-lang.org/2021/05/06/Rust-1.52.0.html)
 ![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/actix-tls.svg)
 <br />
 [![Dependency Status](https://deps.rs/crate/actix-tls/3.6.1/status.svg)](https://deps.rs/crate/actix-tls/3.6.1)
@@ -20,3 +20,9 @@
 - [Library Documentation](https://docs.rs/actix-tls)
 - [Examples](/actix-tls/examples)
 - [TLS credential hot reload](examples/hot-reload.md)
+
+## Sponsors
+
+<a href="https://www.blacksmith.sh/">
+  <img src="https://raw.githubusercontent.com/actix/actix-net/main/.github/sponsors/blacksmith.png" alt="CI powered by Blacksmith" width="280" />
+</a>

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.89.
+
 ## 0.5.4
 
 - Relaxed `Framed::new` bounds to support separate read and write halves with decoder-only and encoder-only codecs.

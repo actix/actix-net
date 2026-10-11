@@ -18,7 +18,7 @@ members = [
 homepage = "https://actix.rs"
 license = "MIT OR Apache-2.0"
 edition = "2021"
-rust-version = "1.88"
+rust-version = "1.89"
 
 [patch.crates-io]
 actix-codec = { path = "actix-codec" }
