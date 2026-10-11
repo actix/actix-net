@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.89.
+
 ## 2.15.0
 
 - Add `Arbiter::alive()` and `ArbiterHandle::alive()` to check whether the arbiter's command channel is still open.
