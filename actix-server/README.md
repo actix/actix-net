@@ -19,3 +19,9 @@
 
 - [Library Documentation](https://docs.rs/actix-server)
 - [Examples](/actix-server/examples)
+
+## Sponsors
+
+<a href="https://www.blacksmith.sh/">
+  <img src="https://raw.githubusercontent.com/actix/actix-net/main/.github/sponsors/blacksmith.png" alt="CI powered by Blacksmith" width="280" />
+</a>

@@ -28,3 +28,9 @@ at your option.
 
 Contribution to the actix-net repo is organized under the terms of the Contributor Covenant.
 The Actix team promises to intervene to uphold that code of conduct.
+
+## Sponsors
+
+<a href="https://www.blacksmith.sh/">
+  <img src=".github/sponsors/blacksmith.png" alt="CI powered by Blacksmith" width="280" />
+</a>
