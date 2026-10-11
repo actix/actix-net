@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.89.
+
 ## 3.0.2
 
 - Deprecate `ready` in favor of `core::future::{ready, Ready}`.

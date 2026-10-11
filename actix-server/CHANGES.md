@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.89.
+
 ## 2.9.8
 
 - Spawn workers in parallel, so a server with many workers will start accepting connections sooner.
