@@ -13,7 +13,7 @@ See example folders for [`actix-server`](./actix-server/examples) and [`actix-tl
 
 ## MSRV
 
-Crates in this repo currently have a Minimum Supported Rust Version (MSRV) of 1.88. As a policy, we permit MSRV increases in non-breaking releases.
+Crates in this repo currently have a Minimum Supported Rust Version (MSRV) of 1.89. As a policy, we permit MSRV increases in non-breaking releases.
 
 ## License
 
@@ -28,3 +28,9 @@ at your option.
 
 Contribution to the actix-net repo is organized under the terms of the Contributor Covenant.
 The Actix team promises to intervene to uphold that code of conduct.
+
+## Sponsors
+
+<a href="https://www.blacksmith.sh/">
+  <img src=".github/sponsors/blacksmith.png" alt="CI powered by Blacksmith" width="280" />
+</a>
