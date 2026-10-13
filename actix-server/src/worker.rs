@@ -70,23 +70,20 @@ fn handle_pair(
 
 /// Shared connection counter for the accept thread and one server worker.
 ///
-/// The accept thread increments the counter after it sends a connection to the worker. The worker
-/// decrements the counter when the connection's guard is dropped.
+/// The accept thread increments the counter before it sends a connection to the worker. The worker
+/// decrements the counter when the connection's guard is dropped. A failed send reverses its
+/// increment.
 ///
 /// # Worker Availability From The Accept Thread's Perspective
 ///
 /// The accept thread has access to each worker's counter through [`WorkerHandleAccept`], but uses
-/// its cached [`Availability`] flags to choose a worker. After it sends a connection, it increments
+/// its cached [`Availability`] flags to choose a worker. Before it sends a connection, it increments
 /// that worker's counter. If the increment reaches the connection limit, it marks the worker
 /// unavailable and stops sending it connections until the worker reports that capacity is available.
 ///
 /// # Counter Offset
 ///
-/// The raw counter starts at one to prevent an underflow during the following (race) condition. An
-/// idle worker has a raw count of one. If it receives and finishes a connection before the accept
-/// thread increments the counter, dropping the connection's guard changes the raw count from one to
-/// zero. Another read can observe zero until the accept thread performs the pending increment,
-/// which restores the idle value of one.
+/// The raw counter starts at one and remains one higher than the actual connection count.
 ///
 /// # Restoring Worker Availability
 ///
@@ -102,8 +99,7 @@ fn handle_pair(
 pub(crate) struct Counter {
     /// Raw counter value.
     ///
-    /// Always one higher than the actual connection count except in the rare race condition
-    /// described in the struct docs.
+    /// Always one higher than the actual connection count.
     counter: Arc<AtomicUsize>,
 
     /// The connection limit.
@@ -120,7 +116,7 @@ impl Counter {
 
     /// Increments the counter by one.
     ///
-    /// Returns true if connection limit was reached with this increment.
+    /// Returns true if capacity remains after this increment.
     #[inline(always)]
     pub(crate) fn inc(&self) -> bool {
         let prev = self.counter.fetch_add(1, Ordering::Relaxed);
@@ -204,13 +200,18 @@ impl WorkerHandleAccept {
     }
 
     #[inline(always)]
-    pub(crate) fn send(&self, conn: Conn) -> Result<(), Conn> {
-        self.conn_tx.send(conn).map_err(|msg| msg.0)
-    }
+    pub(crate) fn send(&self, conn: Conn) -> Result<bool, Conn> {
+        // Sending wakes the worker, which can process the connection or check its count for
+        // shutdown before this thread resumes. Count the connection before making it visible.
+        let available = self.counter.inc();
 
-    #[inline(always)]
-    pub(crate) fn inc_counter(&self) -> bool {
-        self.counter.inc()
+        match self.conn_tx.send(conn) {
+            Ok(()) => Ok(available),
+            Err(msg) => {
+                self.counter.dec();
+                Err(msg.0)
+            }
+        }
     }
 }
 
@@ -797,7 +798,49 @@ fn wrap_worker_services(services: Vec<(usize, usize, BoxedServerService)>) -> Ve
 
 #[cfg(test)]
 mod tests {
-    use super::Counter;
+    use std::{
+        sync::{mpsc, Arc, Mutex},
+        task::{Context, Poll, Wake, Waker},
+        thread,
+        time::Duration,
+    };
+
+    use super::{unbounded_channel, Conn, Counter, MioStream, WorkerHandleAccept};
+
+    struct BlockingWaker {
+        wake_started: mpsc::SyncSender<()>,
+        resume: Mutex<mpsc::Receiver<()>>,
+    }
+
+    impl Wake for BlockingWaker {
+        fn wake(self: Arc<Self>) {
+            self.wake_started.send(()).unwrap();
+            self.resume.lock().unwrap().recv().unwrap();
+        }
+    }
+
+    #[cfg(unix)]
+    fn connection() -> Conn {
+        let (server, _client) = mio::net::UnixStream::pair().unwrap();
+
+        Conn {
+            io: MioStream::Uds(server),
+            token: 0,
+        }
+    }
+
+    #[cfg(windows)]
+    fn connection() -> Conn {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let _client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (server, _) = listener.accept().unwrap();
+        server.set_nonblocking(true).unwrap();
+
+        Conn {
+            io: MioStream::Tcp(mio::net::TcpStream::from_std(server)),
+            token: 0,
+        }
+    }
 
     #[test]
     fn max_connection_limit_allows_connection_completion() {
@@ -807,5 +850,47 @@ mod tests {
         assert_eq!(counter.total(), 1);
         assert!(!counter.dec());
         assert_eq!(counter.total(), 0);
+    }
+
+    #[test]
+    fn send_counts_connection_before_waking_worker() {
+        let counter = Counter::new(usize::MAX);
+        let (conn_tx, mut conn_rx) = unbounded_channel();
+        let handle = WorkerHandleAccept {
+            idx: 0,
+            conn_tx,
+            counter: counter.clone(),
+        };
+        let conn = connection();
+
+        let (wake_started_tx, wake_started_rx) = mpsc::sync_channel(0);
+        let (resume_tx, resume_rx) = mpsc::sync_channel(0);
+        let waker = Waker::from(Arc::new(BlockingWaker {
+            wake_started: wake_started_tx,
+            resume: Mutex::new(resume_rx),
+        }));
+        let mut cx = Context::from_waker(&waker);
+
+        assert!(matches!(conn_rx.poll_recv(&mut cx), Poll::Pending));
+
+        thread::scope(|scope| {
+            let send = scope.spawn(move || handle.send(conn));
+
+            wake_started_rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("sending the connection should wake the worker");
+
+            let received = conn_rx.try_recv();
+            let count_while_visible = counter.total();
+
+            resume_tx.send(()).unwrap();
+            assert!(send.join().unwrap().is_ok());
+            received.expect("connection should be visible when the worker is woken");
+
+            assert_eq!(
+                count_while_visible, 1,
+                "the worker can act on a connection as soon as it is woken"
+            );
+        });
     }
 }
