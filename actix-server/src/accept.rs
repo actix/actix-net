@@ -402,10 +402,9 @@ impl Accept {
         let next = self.next();
 
         match next.send(conn) {
-            Ok(_) => {
-                // Increment counter of WorkerHandle.
-                // Set worker to unavailable with it hit max (Return false).
-                if !next.inc_counter() {
+            Ok(available) => {
+                // Stop sending connections when the worker reaches its limit.
+                if !available {
                     let idx = next.idx();
                     self.avail.set_available(idx, false);
                 }
