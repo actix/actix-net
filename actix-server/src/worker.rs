@@ -800,10 +800,12 @@ fn wrap_worker_services(services: Vec<(usize, usize, BoxedServerService)>) -> Ve
 mod tests {
     use std::{
         sync::{mpsc, Arc, Mutex},
-        task::{Context, Poll, Wake, Waker},
+        task::{Context, Wake, Waker},
         thread,
         time::Duration,
     };
+
+    use tokio_test::assert_pending;
 
     use super::{unbounded_channel, Conn, Counter, MioStream, WorkerHandleAccept};
 
@@ -871,7 +873,7 @@ mod tests {
         }));
         let mut cx = Context::from_waker(&waker);
 
-        assert!(matches!(conn_rx.poll_recv(&mut cx), Poll::Pending));
+        assert_pending!(conn_rx.poll_recv(&mut cx));
 
         thread::scope(|scope| {
             let send = scope.spawn(move || handle.send(conn));

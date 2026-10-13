@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.10.0
+
 - Fix a worker connection-count race that could close a connection during graceful shutdown.
 - Minimum supported Rust version (MSRV) is now 1.89.
 
