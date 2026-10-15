@@ -107,6 +107,7 @@ dependencies = [
  "tokio-rustls 0.24.1",
  "tokio-rustls 0.25.0",
  "tokio-rustls 0.26.5",
+ "tokio-test",
  "tokio-util",
  "tracing",
  "webpki-roots 0.22.6",
