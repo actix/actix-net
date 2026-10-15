@@ -12,19 +12,6 @@ use actix_utils::counter::Counter;
 #[cfg(feature = "openssl")]
 pub mod openssl;
 
-#[cfg(feature = "rustls-0_20")]
-pub mod rustls_0_20;
-
-#[doc(hidden)]
-#[cfg(feature = "rustls-0_20")]
-pub use rustls_0_20 as rustls;
-
-#[cfg(feature = "rustls-0_21")]
-pub mod rustls_0_21;
-
-#[cfg(feature = "rustls-0_22")]
-pub mod rustls_0_22;
-
 #[cfg(feature = "rustls-0_23")]
 pub mod rustls_0_23;
 
@@ -33,14 +20,7 @@ pub mod native_tls;
 
 pub(crate) static MAX_CONN: AtomicUsize = AtomicUsize::new(256);
 
-#[cfg(any(
-    feature = "openssl",
-    feature = "rustls-0_20",
-    feature = "rustls-0_21",
-    feature = "rustls-0_22",
-    feature = "rustls-0_23",
-    feature = "native-tls",
-))]
+#[cfg(any(feature = "openssl", feature = "rustls-0_23", feature = "native-tls"))]
 pub(crate) const DEFAULT_TLS_HANDSHAKE_TIMEOUT: std::time::Duration =
     std::time::Duration::from_secs(3);
 
