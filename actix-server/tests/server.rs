@@ -311,6 +311,12 @@ async fn test_max_concurrent_connections_releases_capacity() {
 }
 
 #[test]
+#[should_panic(expected = "Maximum concurrent connections must be greater than 0")]
+fn zero_max_concurrent_connections_panics() {
+    Server::build().max_concurrent_connections(0);
+}
+
+#[test]
 fn saturated_listener_does_not_starve_another_listener() {
     use std::io::Write as _;
 
