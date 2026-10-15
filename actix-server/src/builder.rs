@@ -170,7 +170,16 @@ impl ServerBuilder {
     /// each worker.
     ///
     /// By default max connections is set to a 25k per worker.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `num` is 0.
     pub fn max_concurrent_connections(mut self, num: usize) -> Self {
+        assert_ne!(
+            num, 0,
+            "Maximum concurrent connections must be greater than 0"
+        );
+
         self.worker_config.max_concurrent_connections(num);
         self
     }

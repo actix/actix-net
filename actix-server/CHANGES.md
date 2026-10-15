@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reject a zero connection limit in `ServerBuilder::max_concurrent_connections()` with a panic.
+
 ## 2.10.0
 
 - Fix a worker connection-count race that could close a connection during graceful shutdown.
