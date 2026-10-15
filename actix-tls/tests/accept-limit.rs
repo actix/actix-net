@@ -4,13 +4,14 @@
 
 use std::{net, sync::mpsc, task::Context, thread, time::Duration};
 
-use actix_rt::{net::TcpStream, System};
+use actix_rt::net::TcpStream;
 use actix_service::{Service, ServiceFactory};
 use actix_tls::accept::{
     max_concurrent_tls_connect,
     rustls_0_23::{reexports::ServerConfig, Acceptor, AcceptorService},
 };
 use futures_util::poll;
+use tokio::runtime::Builder;
 use tokio_test::{assert_pending, assert_ready_ok};
 
 // Keep this as the only test in this executable. The setting is process-wide.
@@ -37,7 +38,9 @@ fn initialized_threads_keep_their_tls_handshake_limit() {
     let first_config = config.clone();
 
     let initialized_thread = thread::spawn(move || {
-        System::new().block_on(async move {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+
+        runtime.block_on(async move {
             let acceptor = Acceptor::new(first_config);
             let service = new_service(&acceptor).await;
 
@@ -58,7 +61,9 @@ fn initialized_threads_keep_their_tls_handshake_limit() {
     updated_tx.send(()).unwrap();
 
     let new_thread = thread::spawn(move || {
-        System::new().block_on(async move {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+
+        runtime.block_on(async move {
             let acceptor = Acceptor::new(config);
             let service = new_service(&acceptor).await;
 
