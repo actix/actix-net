@@ -1,6 +1,6 @@
 use std::io;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 use memchr::memchr;
 
 use super::{Decoder, Encoder};
@@ -129,24 +129,15 @@ impl Decoder for LinesCodec {
 
         self.next_index = 0;
 
-        // split up to new line char
-        let mut buf = src.split_to(len);
-        debug_assert_eq!(len, buf.len());
-
-        // remove new line char from source
-        src.advance(1);
-
-        match buf.last() {
-            // remove carriage returns at the end of buf
-            Some(b'\r') => buf.truncate(len - 1),
-
-            // line is empty
-            None => return Ok(Some(String::new())),
-
-            _ => {}
-        }
-
-        try_into_utf8(buf.freeze())
+        let line_len = if src[..len].last() == Some(&b'\r') {
+            len - 1
+        } else {
+            len
+        };
+        // Copy once into the returned String without sharing the input allocation.
+        let line = try_into_utf8(&src[..line_len]);
+        src.advance(len + 1);
+        line
     }
 
     fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -156,26 +147,28 @@ impl Decoder for LinesCodec {
             None => {
                 self.next_index = 0;
 
-                let buf = match src.last() {
+                let len = match src.last() {
                     // if last line ends in a CR then take everything up to it
-                    Some(b'\r') => src.split_to(src.len() - 1),
+                    Some(b'\r') => src.len() - 1,
 
                     // take all bytes from source
-                    _ => src.split(),
+                    _ => src.len(),
                 };
 
-                if buf.is_empty() {
+                if len == 0 {
                     return Ok(None);
                 }
 
-                try_into_utf8(buf.freeze())
+                let line = try_into_utf8(&src[..len]);
+                src.advance(len);
+                line
             }
         }
     }
 }
 
 // Attempts to convert bytes into a `String`.
-fn try_into_utf8(buf: Bytes) -> io::Result<Option<String>> {
+fn try_into_utf8(buf: &[u8]) -> io::Result<Option<String>> {
     String::from_utf8(buf.to_vec())
         .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
         .map(Some)
