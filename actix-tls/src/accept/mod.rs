@@ -48,12 +48,17 @@ thread_local! {
     static MAX_CONN_COUNTER: Counter = Counter::new(MAX_CONN.load(Ordering::Relaxed));
 }
 
-/// Sets the maximum per-worker concurrent TLS connection limit.
+/// Sets the maximum number of concurrent TLS handshakes per thread.
 ///
-/// All listeners will stop accepting connections when this limit is reached.
-/// It can be used to regulate the global TLS CPU usage.
+/// This limit applies to handshakes in progress, not established connections. Each thread captures
+/// the configured limit when its first TLS acceptor service is initialized. Later calls do not
+/// update initialized threads, including new acceptor services created on those threads.
 ///
-/// By default, the connection limit is 256.
+/// Use this as startup configuration. Configure it before workers initialize TLS acceptors.
+///
+/// This can be used to regulate global TLS CPU usage.
+///
+/// By default, the handshake limit is 256.
 pub fn max_concurrent_tls_connect(num: usize) {
     MAX_CONN.store(num, Ordering::Relaxed);
 }
