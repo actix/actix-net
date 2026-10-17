@@ -77,7 +77,11 @@ ignore = [
   { id = "RUSTSEC-2026-0049", reason = "for compatibility" },
   { id = "RUSTSEC-2026-0098", reason = "for compatibility" },
   { id = "RUSTSEC-2026-0099", reason = "for compatibility" },
+  # FIXME: needs to eliminate old rustls dependency
   { id = "RUSTSEC-2026-0104", reason = "for compatibility" },
+  { id = "RUSTSEC-2026-0346", reason = "for compatibility" },
+  { id = "RUSTSEC-2026-0348", reason = "for compatibility" },
+  { id = "RUSTSEC-2026-0349", reason = "for compatibility" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
