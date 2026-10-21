@@ -99,8 +99,8 @@ tokio-rustls-025 = { package = "tokio-rustls", version = "0.25", optional = true
 tokio-rustls-026 = { package = "tokio-rustls", version = "0.26", default-features = false, optional = true }
 
 # webpki-roots used with rustls features
-webpki-roots-022 = { package = "webpki-roots", version = "0.22", optional = true }
-webpki-roots-025 = { package = "webpki-roots", version = "0.25", optional = true }
+webpki-roots-022 = { package = "webpki-roots", version = "1.0.10", optional = true }
+webpki-roots-025 = { package = "webpki-roots", version = "1.0.10", optional = true }
 webpki-roots-026 = { package = "webpki-roots", version = "0.26", optional = true }
 
 # native root certificates for rustls impls
