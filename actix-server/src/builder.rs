@@ -291,7 +291,7 @@ impl ServerBuilder {
                 name.as_ref().to_string(),
                 token,
                 factory.clone(),
-                lst.local_addr()?,
+                crate::socket::SocketAddr::Tcp(lst.local_addr()?),
             ));
 
             self.sockets
@@ -317,7 +317,7 @@ impl ServerBuilder {
         F: ServerServiceFactory<TcpStream>,
     {
         lst.set_nonblocking(true)?;
-        let addr = lst.local_addr()?;
+        let addr = crate::socket::SocketAddr::Tcp(lst.local_addr()?);
 
         let token = self.next_token();
         self.factories.push(StreamNewService::create(
@@ -398,12 +398,10 @@ impl ServerBuilder {
     where
         F: ServerServiceFactory<actix_rt::net::UnixStream>,
     {
-        use std::net::{IpAddr, Ipv4Addr};
-
         lst.set_nonblocking(true)?;
 
         let token = self.next_token();
-        let addr = crate::socket::StdSocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let addr = crate::socket::SocketAddr::Uds(lst.local_addr()?);
 
         self.factories.push(StreamNewService::create(
             name.as_ref().to_string(),
