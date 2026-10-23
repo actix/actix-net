@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+use std::hint::black_box;
+
 use bytes::BytesMut;
 use criterion::{criterion_group, criterion_main, Criterion};
 
@@ -16,7 +18,9 @@ fn bench_lines_codec(c: &mut Criterion) {
 
             let mut codec = actix_codec::LinesCodec::default();
             let mut buf = BytesMut::from(INPUT);
-            while let Ok(Some(_bytes)) = codec.decode_eof(&mut buf) {}
+            while let Some(line) = codec.decode_eof(&mut buf).unwrap() {
+                black_box(line);
+            }
         });
     });
 
@@ -26,7 +30,9 @@ fn bench_lines_codec(c: &mut Criterion) {
 
             let mut codec = tokio_util::codec::LinesCodec::new();
             let mut buf = BytesMut::from(INPUT);
-            while let Ok(Some(_bytes)) = codec.decode_eof(&mut buf) {}
+            while let Some(line) = codec.decode_eof(&mut buf).unwrap() {
+                black_box(line);
+            }
         });
     });
 
@@ -95,5 +101,35 @@ fn bench_lines_codec(c: &mut Criterion) {
     encode_group.finish();
 }
 
-criterion_group!(benches, bench_lines_codec);
+fn bench_fragment_sizes(c: &mut Criterion) {
+    use actix_codec::{Decoder as _, LinesCodec};
+
+    for size in [64, 8192, 1048576] {
+        let input = vec![b'a'; size];
+
+        let mut group = c.benchmark_group(format!("lines fragments/{size}"));
+
+        for chunk in [64, 1024] {
+            group.bench_function(format!("chunk_{chunk}"), |b| {
+                b.iter(|| {
+                    let mut codec = LinesCodec::new();
+                    let mut src = BytesMut::with_capacity(size + 1);
+
+                    for part in input.chunks(chunk) {
+                        src.extend_from_slice(black_box(part));
+                        assert!(codec.decode(&mut src).unwrap().is_none());
+                    }
+
+                    src.extend_from_slice(b"\n");
+
+                    black_box(codec.decode(&mut src).unwrap().unwrap());
+                })
+            });
+        }
+
+        group.finish();
+    }
+}
+
+criterion_group!(benches, bench_lines_codec, bench_fragment_sizes);
 criterion_main!(benches);
