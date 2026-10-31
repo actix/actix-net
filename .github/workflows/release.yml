@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    if: github.repository == 'actix/actix-net'
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2.0.0
+
+      - name: Authenticate with crates.io
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+        id: auth
+
+      - name: release-plz
+        uses: release-plz/action@18641b6c63063cc5ff8786ebf69cd57e8541bae1 # v0.5.140
+        id: release-plz
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Install Nix
+        if: steps.release-plz.outputs.releases_created == 'true'
+        uses: nixbuild/nix-quick-install-action@9f63be77f412a248c9d9a65a4c82cf066cdf8f0c # v35
+
+      - name: Enter Nix devshell
+        if: steps.release-plz.outputs.releases_created == 'true'
+        uses: nicknovitski/nix-develop@9be7cfb4b10451d3390a75dc18ad0465bed4932a # v1.2.1
+        with:
+          arguments: .#ci-release
+
+      - name: Update release notes
+        if: steps.release-plz.outputs.releases_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PLZ_RELEASES_JSON: ${{ steps.release-plz.outputs.releases }}
+        run: |
+          # The shared release tool reads CHANGELOG.md.
+          for changelog in */CHANGES.md; do
+            ln -s CHANGES.md "${changelog%CHANGES.md}CHANGELOG.md"
+          done
+
+          x52-update-release-notes --then-undraft
