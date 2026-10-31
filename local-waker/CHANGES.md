@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 0.1.5
+
+- Avoid `Waker::clone` on second registration.
 - Minimum supported Rust version (MSRV) is now 1.89.
 
 ## 0.1.4

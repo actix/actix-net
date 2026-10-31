@@ -1159,7 +1159,7 @@ dependencies = [
 
 [[package]]
 name = "local-waker"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "static_assertions",
 ]
