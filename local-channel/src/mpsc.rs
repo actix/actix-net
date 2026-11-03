@@ -20,6 +20,7 @@ use local_waker::LocalWaker;
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let shared = Rc::new(RefCell::new(Shared {
         has_receiver: true,
+        front: None,
         buffer: VecDeque::new(),
         blocked_recv: LocalWaker::new(),
     }));
@@ -35,6 +36,8 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 
 #[derive(Debug)]
 struct Shared<T> {
+    // Keep the first message inline; the buffer contains only later messages.
+    front: Option<T>,
     buffer: VecDeque<T>,
     blocked_recv: LocalWaker,
     has_receiver: bool,
@@ -61,7 +64,11 @@ impl<T> Sender<T> {
             return Err(SendError(item));
         };
 
-        shared.buffer.push_back(item);
+        if shared.front.is_none() {
+            shared.front = Some(item);
+        } else {
+            shared.buffer.push_back(item);
+        }
         shared.blocked_recv.wake();
 
         Ok(())
@@ -184,7 +191,8 @@ impl<T> Stream for Receiver<T> {
 
         let mut shared = self.shared.borrow_mut();
 
-        if let Some(msg) = shared.buffer.pop_front() {
+        if let Some(msg) = shared.front.take() {
+            shared.front = shared.buffer.pop_front();
             // Always drain buffered messages before ending the stream.
             Poll::Ready(Some(msg))
         } else if !shared.has_receiver || all_senders_dropped {
@@ -201,6 +209,7 @@ impl<T> Stream for Receiver<T> {
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         let mut shared = self.shared.borrow_mut();
+        shared.front = None;
         shared.buffer.clear();
         shared.has_receiver = false;
     }
@@ -245,6 +254,58 @@ mod tests {
     static_assertions::assert_not_impl_all!(Receiver<()>: Send, Sync);
     static_assertions::assert_not_impl_all!(Sender<RefCell<()>>: Send, Sync);
     static_assertions::assert_not_impl_all!(Receiver<RefCell<()>>: Send, Sync);
+
+    #[tokio::test]
+    async fn fifo_survives_partial_drain_and_receiver_reuse() {
+        let (sender, mut receiver) = channel();
+
+        sender.send(String::from("first")).unwrap();
+        sender.send(String::from("second")).unwrap();
+        assert_eq!(receiver.recv().await.as_deref(), Some("first"));
+
+        sender.send(String::from("third")).unwrap();
+        drop(sender);
+
+        assert_eq!(receiver.recv().await.as_deref(), Some("second"));
+        assert_eq!(receiver.recv().await.as_deref(), Some("third"));
+        assert_eq!(receiver.recv().await, None);
+
+        let mut sender = receiver.sender();
+        sender.send(String::from("fourth")).unwrap();
+        sender.send(String::from("fifth")).unwrap();
+        sender.close();
+
+        assert_eq!(receiver.recv().await.as_deref(), Some("fourth"));
+        assert_eq!(receiver.recv().await.as_deref(), Some("fifth"));
+        assert_eq!(receiver.recv().await, None);
+    }
+
+    #[test]
+    fn receiver_drop_drops_all_queued_values() {
+        use std::cell::Cell;
+
+        struct DropCount(Rc<Cell<usize>>);
+
+        impl Drop for DropCount {
+            fn drop(&mut self) {
+                self.0.set(self.0.get() + 1);
+            }
+        }
+
+        let drops = Rc::new(Cell::new(0));
+        let (sender, receiver) = channel();
+
+        for _ in 0..3 {
+            sender.send(DropCount(drops.clone())).unwrap();
+        }
+        assert_eq!(drops.get(), 0);
+
+        drop(receiver);
+        assert_eq!(drops.get(), 3);
+
+        drop(sender);
+        assert_eq!(drops.get(), 3);
+    }
 
     #[tokio::test]
     async fn test_mpsc() {

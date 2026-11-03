@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Store the first MPSC message inline to avoid a queue allocation for one-message channels.
 - Add inline hints to the MPSC send and receive methods.
 - Minimum supported Rust version (MSRV) is now 1.89.
 
