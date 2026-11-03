@@ -112,6 +112,7 @@ impl fmt::Display for MioListener {
     }
 }
 
+#[derive(Clone)]
 pub(crate) enum SocketAddr {
     Unknown,
     Tcp(StdSocketAddr),
