@@ -52,6 +52,7 @@ impl<T> Unpin for Sender<T> {}
 
 impl<T> Sender<T> {
     /// Sends the provided message along this channel.
+    #[inline]
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
         let mut shared = self.shared.borrow_mut();
 
@@ -135,6 +136,7 @@ impl<T> Receiver<T> {
     ///
     /// If all senders were dropped, [`Self::sender`] can create a new sender and allow more values
     /// to be received. An explicitly closed channel cannot be reopened.
+    #[inline]
     pub async fn recv(&mut self) -> Option<T> {
         let mut this = Pin::new(self);
         poll_fn(|cx| this.as_mut().poll_next(cx)).await
@@ -176,6 +178,7 @@ impl<T> Unpin for Receiver<T> {}
 impl<T> Stream for Receiver<T> {
     type Item = T;
 
+    #[inline]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let all_senders_dropped = Rc::strong_count(&self.shared) == 1;
 
