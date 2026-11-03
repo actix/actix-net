@@ -131,14 +131,39 @@ impl<T> Receiver<T> {
     /// Receive the next value.
     ///
     /// Returns `None` if the channel is empty and has been [closed](Sender::close) explicitly or
-    /// when all senders have been dropped and, therefore, no more values can ever be sent though
-    /// this channel.
+    /// all senders have been dropped. Buffered values are returned before `None`.
+    ///
+    /// If all senders were dropped, [`Self::sender`] can create a new sender and allow more values
+    /// to be received. An explicitly closed channel cannot be reopened.
     pub async fn recv(&mut self) -> Option<T> {
         let mut this = Pin::new(self);
         poll_fn(|cx| this.as_mut().poll_next(cx)).await
     }
 
     /// Create an associated [Sender].
+    ///
+    /// This can create a sender after all previous senders have been dropped, even if
+    /// [`Self::recv`] has returned `None`. It does not reopen an explicitly [closed](Sender::close)
+    /// channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (sender, mut receiver) = local_channel::mpsc::channel();
+    /// drop(sender);
+    /// assert_eq!(receiver.recv().await, None);
+    ///
+    /// let mut sender = receiver.sender();
+    /// sender.send(42).unwrap();
+    /// assert_eq!(receiver.recv().await, Some(42));
+    ///
+    /// sender.close();
+    /// assert!(receiver.sender().send(43).is_err());
+    /// assert_eq!(receiver.recv().await, None);
+    /// # }
+    /// ```
     pub fn sender(&self) -> Sender<T> {
         Sender {
             shared: self.shared.clone(),
