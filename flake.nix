@@ -1,7 +1,13 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     flake-parts.url = "github:hercules-ci/flake-parts";
+
+    x52 = {
+      url = "github:x52dev/nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+    };
   };
 
   outputs = inputs@{ flake-parts, ... }:
@@ -10,18 +16,19 @@
       perSystem = { pkgs, config, inputs', system, lib, ... }: {
         formatter = pkgs.nixpkgs-fmt;
 
+        devShells.ci-release = pkgs.mkShellNoCC {
+          packages = [ inputs'.x52.packages.x52-release-tools ];
+        };
+
         devShells.default = pkgs.mkShell {
           packages = [
             config.formatter
             pkgs.fd
             pkgs.just
-            pkgs.nodePackages.prettier
+            pkgs.prettier
             pkgs.taplo
             pkgs.watchexec
-          ] ++ lib.optional pkgs.stdenv.isDarwin [
-            pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks.Security
-            pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks.CoreFoundation
-            pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks.SystemConfiguration
+          ] ++ lib.optionals pkgs.stdenv.isDarwin [
             pkgs.pkgsBuildHost.libiconv
           ];
         };
