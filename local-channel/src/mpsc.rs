@@ -192,7 +192,7 @@ impl<T> Stream for Receiver<T> {
             Poll::Ready(None)
         } else {
             // Buffer is empty, but channel is open and senders exist.
-            shared.blocked_recv.register(cx.waker());
+            shared.blocked_recv.register(cx);
             Poll::Pending
         }
     }
