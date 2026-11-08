@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.7
+
 - Add inline hints to the MPSC send and receive methods.
 - Minimum supported Rust version (MSRV) is now 1.89.
 
