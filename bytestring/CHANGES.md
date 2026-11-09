@@ -6,6 +6,7 @@
 - Add `ByteString::slice` for shared UTF-8 range slicing.
 - Add `ByteString::from_utf8` and `FromUtf8Error` to recover bytes after invalid UTF-8.
 - Add `ByteString::split_to`, `split_off`, `truncate`, and `advance`.
+- Add `ByteString::from_owner`. Raise the minimum `bytes` version to 1.9.
 
 - Minimum supported Rust version (MSRV) is now 1.89.
 
