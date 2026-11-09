@@ -12,11 +12,30 @@ use core::{borrow::Borrow, fmt, hash, ops, str};
 use bytes::Bytes;
 
 /// An immutable UTF-8 encoded string using [`Bytes`] as the storage.
+#[doc(alias = "BytesStr")]
+#[doc(alias = "ByteStr")]
+#[doc(alias = "Str")]
+#[doc(alias = "String")]
+#[doc(alias = "SharedString")]
+#[doc(alias = "SharedStr")]
+#[doc(alias = "ArcStr")]
+#[doc(alias = "RcStr")]
+#[doc(alias = "ImmutableString")]
+#[doc(alias = "Utf8String")]
+#[doc(alias = "Utf8Bytes")]
+#[doc(alias = "UTF-8")]
+#[doc(alias = "byte string")]
+#[doc(alias = "shared string")]
+#[doc(alias = "reference counted string")]
+#[doc(alias = "immutable string")]
+#[doc(alias = "read-only string")]
+#[doc(alias = "zero-copy string")]
 #[derive(Clone, Default, Eq, PartialOrd, Ord)]
 pub struct ByteString(Bytes);
 
 impl ByteString {
     /// Creates a new empty `ByteString`.
+    #[doc(alias = "empty")]
     #[must_use]
     #[inline]
     pub const fn new() -> Self {
@@ -24,6 +43,8 @@ impl ByteString {
     }
 
     /// Get a reference to the underlying `Bytes` object.
+    #[doc(alias = "as_inner")]
+    #[doc(alias = "as_ref")]
     #[must_use]
     #[inline]
     pub fn as_bytes(&self) -> &Bytes {
@@ -31,6 +52,8 @@ impl ByteString {
     }
 
     /// Unwraps this `ByteString` into the underlying `Bytes` object.
+    #[doc(alias = "into_inner")]
+    #[doc(alias = "unwrap")]
     #[must_use]
     #[inline]
     pub fn into_bytes(self) -> Bytes {
@@ -38,6 +61,7 @@ impl ByteString {
     }
 
     /// Creates a new `ByteString` from a `&'static str`.
+    #[doc(alias = "from_static_str")]
     #[must_use]
     #[inline]
     pub const fn from_static(src: &'static str) -> ByteString {
@@ -51,6 +75,7 @@ impl ByteString {
     /// If this constraint is violated, it may cause memory unsafety issues with future users of
     /// the `ByteString`, as we assume that `ByteString`s are valid UTF-8. However, the most likely
     /// issue is that the data gets corrupted.
+    #[doc(alias = "from_utf8_unchecked")]
     #[must_use]
     #[inline]
     pub const unsafe fn from_bytes_unchecked(src: Bytes) -> ByteString {
@@ -63,6 +88,7 @@ impl ByteString {
     ///
     /// Panics if `mid` is not on a UTF-8 code point boundary, or if it is past the end of the last
     /// code point of the bytestring.
+    #[doc(alias = "split")]
     #[must_use]
     pub fn split_at(&self, mid: usize) -> (ByteString, ByteString) {
         let this: &str = self.as_ref();
@@ -114,6 +140,10 @@ impl ByteString {
     /// // being a logical subset of the string
     /// let _ = ByteString::from_static("foo bar").slice_ref("foo");
     /// ```
+    #[doc(alias = "slice")]
+    #[doc(alias = "substring")]
+    #[doc(alias = "substr")]
+    #[doc(alias = "subslice")]
     #[must_use]
     #[inline]
     pub fn slice_ref(&self, subset: &str) -> Self {
