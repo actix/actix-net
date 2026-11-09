@@ -151,6 +151,34 @@ impl ByteString {
         bytes::Buf::advance(&mut self.0, cnt);
     }
 
+    /// Creates a string whose storage remains owned by `owner`.
+    ///
+    /// The contents are not copied. The owner is dropped when the last shared
+    /// view of the storage is dropped. See [`Bytes::from_owner`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bytestring::ByteString;
+    /// let text = ByteString::from_owner(String::from("hello"));
+    /// assert_eq!(text, "hello");
+    /// ```
+    pub fn from_owner<T>(owner: T) -> Self
+    where
+        T: AsRef<str> + Send + 'static,
+    {
+        struct Owner<T>(T);
+
+        impl<T: AsRef<str>> AsRef<[u8]> for Owner<T> {
+            fn as_ref(&self) -> &[u8] {
+                self.0.as_ref().as_bytes()
+            }
+        }
+
+        // The owner's string reference guarantees that the bytes are valid UTF-8.
+        Self(Bytes::from_owner(Owner(owner)))
+    }
+
     /// Creates a new empty `ByteString`.
     #[doc(alias = "empty")]
     #[must_use]
