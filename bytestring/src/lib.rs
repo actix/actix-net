@@ -68,6 +68,27 @@ impl ByteString {
         self.slice_ref(&self[start..end])
     }
 
+    /// Converts bytes to a string, retaining the bytes if UTF-8 validation fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FromUtf8Error`] if the bytes are not valid UTF-8.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bytes::Bytes;
+    /// use bytestring::ByteString;
+    /// let err = ByteString::from_utf8(Bytes::from_static(b"\xff")).unwrap_err();
+    /// assert_eq!(err.into_bytes(), Bytes::from_static(b"\xff"));
+    /// ```
+    pub fn from_utf8(bytes: Bytes) -> Result<Self, FromUtf8Error> {
+        match str::from_utf8(&bytes) {
+            Ok(_) => Ok(Self(bytes)),
+            Err(error) => Err(FromUtf8Error { bytes, error }),
+        }
+    }
+
     /// Creates a new empty `ByteString`.
     #[doc(alias = "empty")]
     #[must_use]
@@ -652,3 +673,35 @@ mod test {
         let _ = ByteString::from_static("foo").split_at(9);
     }
 }
+
+/// An error from [`ByteString::from_utf8`] that retains the original bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FromUtf8Error {
+    bytes: Bytes,
+    error: str::Utf8Error,
+}
+
+impl FromUtf8Error {
+    /// Returns the bytes that failed UTF-8 validation.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Returns the original bytes without copying them.
+    pub fn into_bytes(self) -> Bytes {
+        self.bytes
+    }
+
+    /// Returns details of the UTF-8 validation failure.
+    pub fn utf8_error(&self) -> str::Utf8Error {
+        self.error
+    }
+}
+
+impl fmt::Display for FromUtf8Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.error.fmt(f)
+    }
+}
+
+impl core::error::Error for FromUtf8Error {}
