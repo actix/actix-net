@@ -16,6 +16,40 @@ use bytes::Bytes;
 pub struct ByteString(Bytes);
 
 impl ByteString {
+    /// Returns a shared slice for the given byte range.
+    ///
+    /// This operation does not copy the string contents.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the range is out of bounds, reversed, or does not start and end
+    /// on UTF-8 code point boundaries.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bytestring::ByteString;
+    /// let text = ByteString::from("aµz");
+    /// assert_eq!(text.slice(1..3), "µ");
+    /// ```
+    pub fn slice(&self, range: impl ops::RangeBounds<usize>) -> Self {
+        use ops::Bound;
+
+        let start = match range.start_bound() {
+            Bound::Included(&n) => n,
+            Bound::Excluded(&n) => n.checked_add(1).expect("range start overflow"),
+            Bound::Unbounded => 0,
+        };
+
+        let end = match range.end_bound() {
+            Bound::Included(&n) => n.checked_add(1).expect("range end overflow"),
+            Bound::Excluded(&n) => n,
+            Bound::Unbounded => self.len(),
+        };
+
+        self.slice_ref(&self[start..end])
+    }
+
     /// Creates a new empty `ByteString`.
     #[must_use]
     #[inline]
