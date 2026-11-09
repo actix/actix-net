@@ -179,6 +179,21 @@ impl ByteString {
         Self(Bytes::from_owner(Owner(owner)))
     }
 
+    /// Returns the string contents as a string slice.
+    pub fn as_str(&self) -> &str {
+        self
+    }
+
+    /// Returns the length in bytes.
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns true if this string is empty.
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Creates a new empty `ByteString`.
     #[doc(alias = "empty")]
     #[must_use]
@@ -353,6 +368,12 @@ impl Borrow<str> for ByteString {
     #[inline]
     fn borrow(&self) -> &str {
         self
+    }
+}
+
+impl From<ByteString> for Bytes {
+    fn from(value: ByteString) -> Self {
+        value.into_bytes()
     }
 }
 
