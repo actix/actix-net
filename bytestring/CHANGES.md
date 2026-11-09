@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add `#[must_use]` to `ByteString` methods and `#[inline]` to small methods and trait implementations.
+- Add `ByteString::slice` for shared UTF-8 range slicing.
 
 - Minimum supported Rust version (MSRV) is now 1.89.
 
