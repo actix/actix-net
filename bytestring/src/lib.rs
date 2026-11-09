@@ -89,6 +89,68 @@ impl ByteString {
         }
     }
 
+    /// Splits off the suffix at the given byte index, retaining the prefix.
+    ///
+    /// The returned string shares storage with this string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at` is out of bounds or is not a UTF-8 code point boundary.
+    #[must_use = "use truncate if the suffix is not needed"]
+    pub fn split_off(&mut self, at: usize) -> Self {
+        assert!(self.is_char_boundary(at), "invalid split boundary");
+
+        Self(self.0.split_off(at))
+    }
+
+    /// Splits off the prefix at the given byte index, retaining the suffix.
+    ///
+    /// The returned string shares storage with this string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at` is out of bounds or is not a UTF-8 code point boundary.
+    #[must_use = "use advance if the prefix is not needed"]
+    pub fn split_to(&mut self, at: usize) -> Self {
+        assert!(self.is_char_boundary(at), "invalid split boundary");
+
+        Self(self.0.split_to(at))
+    }
+
+    /// Retains the first `len` bytes. Does nothing if `len` exceeds the length.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `len` is within the string but is not a UTF-8 code point boundary.
+    pub fn truncate(&mut self, len: usize) {
+        assert!(
+            len >= self.len() || self.is_char_boundary(len),
+            "invalid truncate boundary"
+        );
+
+        self.0.truncate(len);
+    }
+
+    /// Removes the first `cnt` bytes without copying the remaining contents.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cnt` is out of bounds or is not a UTF-8 code point boundary.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bytestring::ByteString;
+    /// let mut text = ByteString::from("µ: value");
+    /// text.advance(4);
+    /// assert_eq!(text, "value");
+    /// ```
+    pub fn advance(&mut self, cnt: usize) {
+        assert!(self.is_char_boundary(cnt), "invalid advance boundary");
+
+        bytes::Buf::advance(&mut self.0, cnt);
+    }
+
     /// Creates a new empty `ByteString`.
     #[doc(alias = "empty")]
     #[must_use]
