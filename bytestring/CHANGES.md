@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `#[must_use]` to `ByteString` methods and `#[inline]` to small methods and trait implementations.
+
 - Minimum supported Rust version (MSRV) is now 1.89.
 
 ## 1.5.1
