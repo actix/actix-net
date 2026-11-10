@@ -53,6 +53,7 @@ impl ByteString {
     /// let text = ByteString::from("aµz");
     /// assert_eq!(text.slice(1..3), "µ");
     /// ```
+    #[must_use]
     pub fn slice(&self, range: impl ops::RangeBounds<usize>) -> Self {
         use ops::Bound;
 
@@ -85,6 +86,8 @@ impl ByteString {
     /// let err = ByteString::from_utf8(Bytes::from_static(b"\xff")).unwrap_err();
     /// assert_eq!(err.into_bytes(), Bytes::from_static(b"\xff"));
     /// ```
+    #[inline]
+    #[must_use]
     pub fn from_utf8(bytes: Bytes) -> Result<Self, FromUtf8Error> {
         match str::from_utf8(&bytes) {
             Ok(_) => Ok(Self(bytes)),
@@ -99,6 +102,7 @@ impl ByteString {
     /// # Panics
     ///
     /// Panics if `at` is out of bounds or is not a UTF-8 code point boundary.
+    #[inline]
     #[must_use = "use truncate if the suffix is not needed"]
     pub fn split_off(&mut self, at: usize) -> Self {
         assert!(self.is_char_boundary(at), "invalid split boundary");
@@ -113,6 +117,7 @@ impl ByteString {
     /// # Panics
     ///
     /// Panics if `at` is out of bounds or is not a UTF-8 code point boundary.
+    #[inline]
     #[must_use = "use advance if the prefix is not needed"]
     pub fn split_to(&mut self, at: usize) -> Self {
         assert!(self.is_char_boundary(at), "invalid split boundary");
@@ -125,6 +130,7 @@ impl ByteString {
     /// # Panics
     ///
     /// Panics if `len` is within the string but is not a UTF-8 code point boundary.
+    #[inline]
     pub fn truncate(&mut self, len: usize) {
         assert!(
             len >= self.len() || self.is_char_boundary(len),
@@ -148,6 +154,7 @@ impl ByteString {
     /// text.advance(4);
     /// assert_eq!(text, "value");
     /// ```
+    #[inline]
     pub fn advance(&mut self, cnt: usize) {
         assert!(self.is_char_boundary(cnt), "invalid advance boundary");
 
@@ -166,6 +173,7 @@ impl ByteString {
     /// let text = ByteString::from_owner(String::from("hello"));
     /// assert_eq!(text, "hello");
     /// ```
+    #[must_use]
     pub fn from_owner<T>(owner: T) -> Self
     where
         T: AsRef<str> + Send + 'static,
@@ -183,24 +191,30 @@ impl ByteString {
     }
 
     /// Returns the string contents as a string slice.
+    #[inline]
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self
     }
 
     /// Returns the length in bytes.
+    #[inline]
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Returns true if this string is empty.
+    #[inline]
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Creates a new empty `ByteString`.
     #[doc(alias = "empty")]
-    #[must_use]
     #[inline]
+    #[must_use]
     pub const fn new() -> Self {
         ByteString(Bytes::new())
     }
@@ -208,25 +222,25 @@ impl ByteString {
     /// Get a reference to the underlying `Bytes` object.
     #[doc(alias = "as_inner")]
     #[doc(alias = "as_ref")]
-    #[must_use]
     #[inline]
-    pub fn as_bytes(&self) -> &Bytes {
+    #[must_use]
+    pub const fn as_bytes(&self) -> &Bytes {
         &self.0
     }
 
     /// Unwraps this `ByteString` into the underlying `Bytes` object.
     #[doc(alias = "into_inner")]
     #[doc(alias = "unwrap")]
-    #[must_use]
     #[inline]
+    #[must_use]
     pub fn into_bytes(self) -> Bytes {
         self.0
     }
 
     /// Creates a new `ByteString` from a `&'static str`.
     #[doc(alias = "from_static_str")]
-    #[must_use]
     #[inline]
+    #[must_use]
     pub const fn from_static(src: &'static str) -> ByteString {
         Self(Bytes::from_static(src.as_bytes()))
     }
@@ -239,8 +253,8 @@ impl ByteString {
     /// the `ByteString`, as we assume that `ByteString`s are valid UTF-8. However, the most likely
     /// issue is that the data gets corrupted.
     #[doc(alias = "from_utf8_unchecked")]
-    #[must_use]
     #[inline]
+    #[must_use]
     pub const unsafe fn from_bytes_unchecked(src: Bytes) -> ByteString {
         Self(src)
     }
@@ -307,8 +321,8 @@ impl ByteString {
     #[doc(alias = "substring")]
     #[doc(alias = "substr")]
     #[doc(alias = "subslice")]
-    #[must_use]
     #[inline]
+    #[must_use]
     pub fn slice_ref(&self, subset: &str) -> Self {
         Self(self.0.slice_ref(subset.as_bytes()))
     }
@@ -513,18 +527,17 @@ pub struct FromUtf8Error {
 }
 
 impl FromUtf8Error {
-    /// Returns the bytes that failed UTF-8 validation.
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-
     /// Returns the original bytes without copying them.
+    #[inline]
+    #[must_use]
     pub fn into_bytes(self) -> Bytes {
         self.bytes
     }
 
     /// Returns details of the UTF-8 validation failure.
-    pub fn utf8_error(&self) -> str::Utf8Error {
+    #[inline]
+    #[must_use]
+    pub const fn utf8_error(&self) -> str::Utf8Error {
         self.error
     }
 }

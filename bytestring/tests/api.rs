@@ -418,7 +418,6 @@ fn error_preserves_bytes_and_details() {
         let expected = std::str::from_utf8(invalid).unwrap_err();
         let err = ByteString::from_utf8(bytes).unwrap_err();
         let _: &dyn std::error::Error = &err;
-        assert_eq!(err.as_bytes(), invalid);
         assert_eq!(err.utf8_error(), expected);
         assert_eq!(err.to_string(), expected.to_string());
         let recovered = err.into_bytes();

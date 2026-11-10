@@ -2,13 +2,14 @@
 
 ## Unreleased
 
-- Add `#[must_use]` to `ByteString` methods and `#[inline]` to small methods and trait implementations.
-- Add `ByteString::slice` for shared UTF-8 range slicing.
-- Add `ByteString::from_utf8` and `FromUtf8Error` to recover bytes after invalid UTF-8.
-- Add `ByteString::split_to`, `split_off`, `truncate`, and `advance`.
-- Add `ByteString::from_owner`. Raise the minimum `bytes` version to 1.9.
-- Add `ByteString::as_str`, const `len` and `is_empty`, and conversion into `Bytes`.
-
+- Add `ByteString::from_owner()` constructor to preserve existing allocations.
+- Add `ByteString::from_utf8()` constructor to recover bytes when UTF-8 conversion fails.
+- Add `ByteString::slice()` method.
+- Add `ByteString::{split_to, split_off}()` methods
+- Add `ByteString::{truncate, advance}()` methods.
+- Add `ByteString::as_str()` method.
+- Add `#[must_use]` to `ByteString` methods
+- Add `#[inline]` to small methods and trait implementations.
 - Minimum supported Rust version (MSRV) is now 1.89.
 
 ## 1.5.1
