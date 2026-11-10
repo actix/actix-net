@@ -1,15 +1,252 @@
 //! Public API integration tests for ByteString.
 
 use std::{
+    borrow::Borrow,
+    fmt,
+    hash::{Hash, Hasher},
     ops::Bound,
+    panic::{RefUnwindSafe, UnwindSafe},
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
 };
 
+use ahash::AHasher;
 use bytes::Bytes;
 use bytestring::ByteString;
+use static_assertions::assert_impl_all;
+
+assert_impl_all!(ByteString: Send, Sync, Unpin, Sized);
+assert_impl_all!(ByteString: Clone, Default, Eq, PartialOrd, Ord);
+assert_impl_all!(ByteString: fmt::Debug, fmt::Display);
+assert_impl_all!(ByteString: UnwindSafe, RefUnwindSafe);
+
+#[cfg(feature = "serde")]
+assert_impl_all!(ByteString: serde_core::Serialize, serde_core::de::DeserializeOwned);
+
+#[test]
+fn eq() {
+    let s: ByteString = ByteString::from_static("test");
+    assert_eq!(s, "test");
+    assert_eq!(s, *"test");
+    assert_eq!(s, "test".to_owned());
+}
+
+#[test]
+fn new() {
+    let _: ByteString = ByteString::new();
+}
+
+#[test]
+fn as_bytes() {
+    let buf = ByteString::new();
+    assert!(buf.as_bytes().is_empty());
+
+    let buf = ByteString::from("hello");
+    assert_eq!(buf.as_bytes(), "hello");
+}
+
+#[test]
+fn into_bytes() {
+    let buf = ByteString::from("hello");
+    assert_eq!(buf.into_bytes(), Bytes::from_static(b"hello"));
+}
+
+#[test]
+fn from_bytes_unchecked() {
+    let buf = unsafe { ByteString::from_bytes_unchecked(Bytes::new()) };
+    assert!(buf.is_empty());
+
+    let buf = unsafe { ByteString::from_bytes_unchecked(Bytes::from("hello")) };
+    assert_eq!(buf, "hello");
+}
+
+#[test]
+fn as_ref() {
+    let buf = ByteString::new();
+
+    let _: &ByteString = buf.as_ref();
+    let _: &[u8] = buf.as_ref();
+}
+
+#[test]
+fn borrow() {
+    let buf = ByteString::new();
+
+    let _: &str = buf.borrow();
+}
+
+#[test]
+fn hash() {
+    let mut hasher1 = AHasher::default();
+    "str".hash(&mut hasher1);
+
+    let mut hasher2 = AHasher::default();
+    let s = ByteString::from_static("str");
+    s.hash(&mut hasher2);
+    assert_eq!(hasher1.finish(), hasher2.finish());
+}
+
+#[test]
+fn from_string() {
+    let s: ByteString = "hello".to_owned().into();
+    assert_eq!(&s, "hello");
+    let t: &str = s.as_ref();
+    assert_eq!(t, "hello");
+}
+
+#[test]
+fn from_str() {
+    let _: ByteString = "str".into();
+    let _: ByteString = "str".to_owned().into_boxed_str().into();
+}
+
+#[test]
+fn to_string() {
+    let buf = ByteString::from("foo");
+    assert_eq!(String::from(buf), "foo");
+}
+
+#[test]
+fn from_static_str() {
+    static _S: ByteString = ByteString::from_static("hello");
+    let _ = ByteString::from_static("str");
+}
+
+#[test]
+fn try_from_slice() {
+    let heart = "\u{1f496}";
+    let _ = ByteString::try_from(b"nice bytes").unwrap();
+    assert_eq!(ByteString::try_from(heart.as_bytes()).unwrap(), heart);
+    ByteString::try_from(&[0, 159, 146, 150][..]).unwrap_err();
+}
+
+#[test]
+fn try_from_array() {
+    assert_eq!(
+        ByteString::try_from(*b"hi").unwrap(),
+        ByteString::from_static("hi")
+    );
+
+    let empty = [];
+    assert_eq!(ByteString::try_from(empty).unwrap(), "");
+    assert_eq!(ByteString::try_from(&empty).unwrap(), "");
+
+    let heart = [0xf0, 0x9f, 0x92, 0x96];
+    assert_eq!(ByteString::try_from(heart).unwrap(), "\u{1f496}");
+    assert_eq!(ByteString::try_from(&heart).unwrap(), "\u{1f496}");
+
+    let invalid = [0, 159, 146, 150];
+    ByteString::try_from(invalid).unwrap_err();
+    ByteString::try_from(&invalid).unwrap_err();
+}
+
+#[test]
+fn try_from_vec() {
+    let _ = ByteString::try_from(vec![b'f', b'o', b'o']).unwrap();
+    let heart = "\u{1f496}";
+    assert_eq!(
+        ByteString::try_from(heart.as_bytes().to_owned()).unwrap(),
+        heart
+    );
+    ByteString::try_from(vec![0, 159, 146, 150]).unwrap_err();
+}
+
+#[test]
+fn try_from_bytes() {
+    let heart = "\u{1f496}";
+    let _ = ByteString::try_from(Bytes::from_static(b"nice bytes")).unwrap();
+    assert_eq!(
+        ByteString::try_from(Bytes::from_static(heart.as_bytes())).unwrap(),
+        heart
+    );
+    ByteString::try_from(Bytes::from_static(b"\x00\x9f\x92\x96")).unwrap_err();
+}
+
+#[test]
+fn try_from_bytes_mut() {
+    let heart = "\u{1f496}";
+    let _ = ByteString::try_from(bytes::BytesMut::from(&b"nice bytes"[..])).unwrap();
+    assert_eq!(
+        ByteString::try_from(bytes::BytesMut::from(heart.as_bytes())).unwrap(),
+        heart
+    );
+    ByteString::try_from(bytes::BytesMut::from(&b"\x00\x9f\x92\x96"[..])).unwrap_err();
+}
+
+#[test]
+fn display() {
+    let buf = ByteString::from("bar");
+    assert_eq!(format!("{buf}"), "bar");
+}
+
+#[test]
+fn debug() {
+    let buf = ByteString::from("baz");
+    assert_eq!(format!("{buf:?}"), r#""baz""#);
+}
+
+#[cfg(feature = "serde")]
+#[test]
+fn serialize() {
+    let s: ByteString = serde_json::from_str(r#""nice bytes""#).unwrap();
+    assert_eq!(s, "nice bytes");
+}
+
+#[cfg(feature = "serde")]
+#[test]
+fn deserialize() {
+    let s = serde_json::to_string(&ByteString::from_static("nice bytes")).unwrap();
+    assert_eq!(s, r#""nice bytes""#);
+}
+
+#[test]
+fn slice_ref() {
+    let string = ByteString::from_static(" foo ");
+    let subset = string.trim();
+    // subset is derived from original byte string
+    let substring = string.slice_ref(subset);
+    assert_eq!(substring, "foo");
+}
+
+#[test]
+#[should_panic]
+fn slice_ref_catches_not_a_subset() {
+    // panics because the given slice is not derived from the original byte string, despite
+    // being a logical subset of the string
+    let _ = ByteString::from_static("foo bar").slice_ref("foo");
+}
+
+#[test]
+fn split_at() {
+    let buf = ByteString::from_static("foo bar");
+
+    let (first, last) = buf.split_at(0);
+    assert_eq!(ByteString::from_static(""), first);
+    assert_eq!(ByteString::from_static("foo bar"), last);
+
+    let (first, last) = buf.split_at(4);
+    assert_eq!(ByteString::from_static("foo "), first);
+    assert_eq!(ByteString::from_static("bar"), last);
+
+    let (first, last) = buf.split_at(7);
+    assert_eq!(ByteString::from_static("foo bar"), first);
+    assert_eq!(ByteString::from_static(""), last);
+}
+
+#[test]
+#[should_panic = "byte index 1 is not a char boundary;"]
+fn split_at_invalid_code_point() {
+    let _ = ByteString::from_static("µ").split_at(1);
+}
+
+#[test]
+#[should_panic = "byte index 9 is out of bounds"]
+fn split_at_outside_string() {
+    let _ = ByteString::from_static("foo").split_at(9);
+}
+
 #[test]
 fn length_queries_work_in_const_contexts() {
     const QUERIES: (usize, bool, bool) = {
