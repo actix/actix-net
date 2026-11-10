@@ -37,6 +37,118 @@ use bytes::Bytes;
 pub struct ByteString(Bytes);
 
 impl ByteString {
+    /// Creates a new empty `ByteString`.
+    #[doc(alias = "empty")]
+    #[inline]
+    #[must_use]
+    pub const fn new() -> Self {
+        ByteString(Bytes::new())
+    }
+
+    /// Creates a new `ByteString` from a `&'static str`.
+    #[doc(alias = "from_static_str")]
+    #[inline]
+    #[must_use]
+    pub const fn from_static(src: &'static str) -> ByteString {
+        Self(Bytes::from_static(src.as_bytes()))
+    }
+
+    /// Creates a string whose storage remains owned by `owner`.
+    ///
+    /// The contents are not copied. The owner is dropped when the last shared
+    /// view of the storage is dropped. See [`Bytes::from_owner`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bytestring::ByteString;
+    /// let text = ByteString::from_owner(String::from("hello"));
+    /// assert_eq!(text, "hello");
+    /// ```
+    #[must_use]
+    pub fn from_owner<T>(owner: T) -> Self
+    where
+        T: AsRef<str> + Send + 'static,
+    {
+        struct Owner<T>(T);
+
+        impl<T: AsRef<str>> AsRef<[u8]> for Owner<T> {
+            fn as_ref(&self) -> &[u8] {
+                self.0.as_ref().as_bytes()
+            }
+        }
+
+        // The owner's string reference guarantees that the bytes are valid UTF-8.
+        Self(Bytes::from_owner(Owner(owner)))
+    }
+
+    /// Converts bytes to a string, retaining the bytes if UTF-8 validation fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FromUtf8Error`] if the bytes are not valid UTF-8.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bytes::Bytes;
+    /// use bytestring::ByteString;
+    /// let err = ByteString::from_utf8(Bytes::from_static(b"\xff")).unwrap_err();
+    /// assert_eq!(err.into_bytes(), Bytes::from_static(b"\xff"));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn from_utf8(bytes: Bytes) -> Result<Self, FromUtf8Error> {
+        match str::from_utf8(&bytes) {
+            Ok(_) => Ok(Self(bytes)),
+            Err(error) => Err(FromUtf8Error { bytes, error }),
+        }
+    }
+
+    /// Creates a new `ByteString` from a Bytes.
+    ///
+    /// # Safety
+    /// This function is unsafe because it does not check the bytes passed to it are valid UTF-8.
+    /// If this constraint is violated, it may cause memory unsafety issues with future users of
+    /// the `ByteString`, as we assume that `ByteString`s are valid UTF-8. However, the most likely
+    /// issue is that the data gets corrupted.
+    #[doc(alias = "from_utf8_unchecked")]
+    #[inline]
+    #[must_use]
+    pub const unsafe fn from_bytes_unchecked(src: Bytes) -> ByteString {
+        Self(src)
+    }
+
+    /// Returns the length in bytes.
+    #[inline]
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns true if this string is empty.
+    #[inline]
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns the string contents as a string slice.
+    #[inline]
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self
+    }
+
+    /// Get a reference to the underlying `Bytes` object.
+    #[doc(alias = "as_inner")]
+    #[doc(alias = "as_ref")]
+    #[inline]
+    #[must_use]
+    pub const fn as_bytes(&self) -> &Bytes {
+        &self.0
+    }
+
     /// Returns a shared slice for the given byte range.
     ///
     /// This operation does not copy the string contents.
@@ -70,217 +182,6 @@ impl ByteString {
         };
 
         self.slice_ref(&self[start..end])
-    }
-
-    /// Converts bytes to a string, retaining the bytes if UTF-8 validation fails.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FromUtf8Error`] if the bytes are not valid UTF-8.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use bytes::Bytes;
-    /// use bytestring::ByteString;
-    /// let err = ByteString::from_utf8(Bytes::from_static(b"\xff")).unwrap_err();
-    /// assert_eq!(err.into_bytes(), Bytes::from_static(b"\xff"));
-    /// ```
-    #[inline]
-    #[must_use]
-    pub fn from_utf8(bytes: Bytes) -> Result<Self, FromUtf8Error> {
-        match str::from_utf8(&bytes) {
-            Ok(_) => Ok(Self(bytes)),
-            Err(error) => Err(FromUtf8Error { bytes, error }),
-        }
-    }
-
-    /// Splits off the suffix at the given byte index, retaining the prefix.
-    ///
-    /// The returned string shares storage with this string.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `at` is out of bounds or is not a UTF-8 code point boundary.
-    #[inline]
-    #[must_use = "use truncate if the suffix is not needed"]
-    pub fn split_off(&mut self, at: usize) -> Self {
-        assert!(self.is_char_boundary(at), "invalid split boundary");
-
-        Self(self.0.split_off(at))
-    }
-
-    /// Splits off the prefix at the given byte index, retaining the suffix.
-    ///
-    /// The returned string shares storage with this string.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `at` is out of bounds or is not a UTF-8 code point boundary.
-    #[inline]
-    #[must_use = "use advance if the prefix is not needed"]
-    pub fn split_to(&mut self, at: usize) -> Self {
-        assert!(self.is_char_boundary(at), "invalid split boundary");
-
-        Self(self.0.split_to(at))
-    }
-
-    /// Retains the first `len` bytes. Does nothing if `len` exceeds the length.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `len` is within the string but is not a UTF-8 code point boundary.
-    #[inline]
-    pub fn truncate(&mut self, len: usize) {
-        assert!(
-            len >= self.len() || self.is_char_boundary(len),
-            "invalid truncate boundary"
-        );
-
-        self.0.truncate(len);
-    }
-
-    /// Removes the first `cnt` bytes without copying the remaining contents.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `cnt` is out of bounds or is not a UTF-8 code point boundary.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use bytestring::ByteString;
-    /// let mut text = ByteString::from("µ: value");
-    /// text.advance(4);
-    /// assert_eq!(text, "value");
-    /// ```
-    #[inline]
-    pub fn advance(&mut self, cnt: usize) {
-        assert!(self.is_char_boundary(cnt), "invalid advance boundary");
-
-        bytes::Buf::advance(&mut self.0, cnt);
-    }
-
-    /// Creates a string whose storage remains owned by `owner`.
-    ///
-    /// The contents are not copied. The owner is dropped when the last shared
-    /// view of the storage is dropped. See [`Bytes::from_owner`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use bytestring::ByteString;
-    /// let text = ByteString::from_owner(String::from("hello"));
-    /// assert_eq!(text, "hello");
-    /// ```
-    #[must_use]
-    pub fn from_owner<T>(owner: T) -> Self
-    where
-        T: AsRef<str> + Send + 'static,
-    {
-        struct Owner<T>(T);
-
-        impl<T: AsRef<str>> AsRef<[u8]> for Owner<T> {
-            fn as_ref(&self) -> &[u8] {
-                self.0.as_ref().as_bytes()
-            }
-        }
-
-        // The owner's string reference guarantees that the bytes are valid UTF-8.
-        Self(Bytes::from_owner(Owner(owner)))
-    }
-
-    /// Returns the string contents as a string slice.
-    #[inline]
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        self
-    }
-
-    /// Returns the length in bytes.
-    #[inline]
-    #[must_use]
-    pub const fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Returns true if this string is empty.
-    #[inline]
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    /// Creates a new empty `ByteString`.
-    #[doc(alias = "empty")]
-    #[inline]
-    #[must_use]
-    pub const fn new() -> Self {
-        ByteString(Bytes::new())
-    }
-
-    /// Get a reference to the underlying `Bytes` object.
-    #[doc(alias = "as_inner")]
-    #[doc(alias = "as_ref")]
-    #[inline]
-    #[must_use]
-    pub const fn as_bytes(&self) -> &Bytes {
-        &self.0
-    }
-
-    /// Unwraps this `ByteString` into the underlying `Bytes` object.
-    #[doc(alias = "into_inner")]
-    #[doc(alias = "unwrap")]
-    #[inline]
-    #[must_use]
-    pub fn into_bytes(self) -> Bytes {
-        self.0
-    }
-
-    /// Creates a new `ByteString` from a `&'static str`.
-    #[doc(alias = "from_static_str")]
-    #[inline]
-    #[must_use]
-    pub const fn from_static(src: &'static str) -> ByteString {
-        Self(Bytes::from_static(src.as_bytes()))
-    }
-
-    /// Creates a new `ByteString` from a Bytes.
-    ///
-    /// # Safety
-    /// This function is unsafe because it does not check the bytes passed to it are valid UTF-8.
-    /// If this constraint is violated, it may cause memory unsafety issues with future users of
-    /// the `ByteString`, as we assume that `ByteString`s are valid UTF-8. However, the most likely
-    /// issue is that the data gets corrupted.
-    #[doc(alias = "from_utf8_unchecked")]
-    #[inline]
-    #[must_use]
-    pub const unsafe fn from_bytes_unchecked(src: Bytes) -> ByteString {
-        Self(src)
-    }
-
-    /// Divides one bytestring into two at an index, returning both parts.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `mid` is not on a UTF-8 code point boundary, or if it is past the end of the last
-    /// code point of the bytestring.
-    #[doc(alias = "split")]
-    #[must_use]
-    pub fn split_at(&self, mid: usize) -> (ByteString, ByteString) {
-        let this: &str = self.as_ref();
-        let _valid_midpoint_check = this.split_at(mid);
-
-        let mut bytes = self.0.clone();
-        let first = bytes.split_to(mid);
-        let last = bytes;
-
-        unsafe {
-            (
-                ByteString::from_bytes_unchecked(first),
-                ByteString::from_bytes_unchecked(last),
-            )
-        }
     }
 
     /// Returns a new `ByteString` that is equivalent to the given `subset`.
@@ -325,6 +226,105 @@ impl ByteString {
     #[must_use]
     pub fn slice_ref(&self, subset: &str) -> Self {
         Self(self.0.slice_ref(subset.as_bytes()))
+    }
+
+    /// Splits off the suffix at the given byte index, retaining the prefix.
+    ///
+    /// The returned string shares storage with this string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at` is out of bounds or is not a UTF-8 code point boundary.
+    #[inline]
+    #[must_use = "use truncate if the suffix is not needed"]
+    pub fn split_off(&mut self, at: usize) -> Self {
+        assert!(self.is_char_boundary(at), "invalid split boundary");
+
+        Self(self.0.split_off(at))
+    }
+
+    /// Splits off the prefix at the given byte index, retaining the suffix.
+    ///
+    /// The returned string shares storage with this string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at` is out of bounds or is not a UTF-8 code point boundary.
+    #[inline]
+    #[must_use = "use advance if the prefix is not needed"]
+    pub fn split_to(&mut self, at: usize) -> Self {
+        assert!(self.is_char_boundary(at), "invalid split boundary");
+
+        Self(self.0.split_to(at))
+    }
+
+    /// Divides one bytestring into two at an index, returning both parts.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `mid` is not on a UTF-8 code point boundary, or if it is past the end of the last
+    /// code point of the bytestring.
+    #[doc(alias = "split")]
+    #[must_use]
+    pub fn split_at(&self, mid: usize) -> (ByteString, ByteString) {
+        let this: &str = self.as_ref();
+        let _valid_midpoint_check = this.split_at(mid);
+
+        let mut bytes = self.0.clone();
+        let first = bytes.split_to(mid);
+        let last = bytes;
+
+        unsafe {
+            (
+                ByteString::from_bytes_unchecked(first),
+                ByteString::from_bytes_unchecked(last),
+            )
+        }
+    }
+
+    /// Retains the first `len` bytes. Does nothing if `len` exceeds the length.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `len` is within the string but is not a UTF-8 code point boundary.
+    #[inline]
+    pub fn truncate(&mut self, len: usize) {
+        assert!(
+            len >= self.len() || self.is_char_boundary(len),
+            "invalid truncate boundary"
+        );
+
+        self.0.truncate(len);
+    }
+
+    /// Removes the first `cnt` bytes without copying the remaining contents.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cnt` is out of bounds or is not a UTF-8 code point boundary.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bytestring::ByteString;
+    /// let mut text = ByteString::from("µ: value");
+    /// text.advance(4);
+    /// assert_eq!(text, "value");
+    /// ```
+    #[inline]
+    pub fn advance(&mut self, cnt: usize) {
+        assert!(self.is_char_boundary(cnt), "invalid advance boundary");
+
+        bytes::Buf::advance(&mut self.0, cnt);
+    }
+
+    /// Unwraps this `ByteString` into the underlying `Bytes` object.
+    #[doc(alias = "into_inner")]
+    #[doc(alias = "unwrap")]
+    #[inline]
+    #[must_use]
+    pub fn into_bytes(self) -> Bytes {
+        self.0
     }
 }
 
