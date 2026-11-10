@@ -565,3 +565,17 @@ impl fmt::Display for FromUtf8Error {
 }
 
 impl core::error::Error for FromUtf8Error {}
+
+#[cfg(test)]
+mod tests {
+    use core::panic::{RefUnwindSafe, UnwindSafe};
+
+    use static_assertions::assert_impl_all;
+
+    use super::*;
+
+    assert_impl_all!(ByteString: Send, Sync, Unpin, Sized);
+    assert_impl_all!(ByteString: Clone, Default, Eq, PartialOrd, Ord);
+    assert_impl_all!(ByteString: fmt::Debug, fmt::Display);
+    assert_impl_all!(ByteString: UnwindSafe, RefUnwindSafe);
+}

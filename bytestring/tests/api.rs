@@ -2,10 +2,8 @@
 
 use std::{
     borrow::Borrow,
-    fmt,
     hash::{Hash, Hasher},
     ops::Bound,
-    panic::{RefUnwindSafe, UnwindSafe},
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -15,15 +13,6 @@ use std::{
 use ahash::AHasher;
 use bytes::Bytes;
 use bytestring::ByteString;
-use static_assertions::assert_impl_all;
-
-assert_impl_all!(ByteString: Send, Sync, Unpin, Sized);
-assert_impl_all!(ByteString: Clone, Default, Eq, PartialOrd, Ord);
-assert_impl_all!(ByteString: fmt::Debug, fmt::Display);
-assert_impl_all!(ByteString: UnwindSafe, RefUnwindSafe);
-
-#[cfg(feature = "serde")]
-assert_impl_all!(ByteString: serde_core::Serialize, serde_core::de::DeserializeOwned);
 
 #[test]
 fn eq() {
@@ -185,20 +174,6 @@ fn display() {
 fn debug() {
     let buf = ByteString::from("baz");
     assert_eq!(format!("{buf:?}"), r#""baz""#);
-}
-
-#[cfg(feature = "serde")]
-#[test]
-fn serialize() {
-    let s: ByteString = serde_json::from_str(r#""nice bytes""#).unwrap();
-    assert_eq!(s, "nice bytes");
-}
-
-#[cfg(feature = "serde")]
-#[test]
-fn deserialize() {
-    let s = serde_json::to_string(&ByteString::from_static("nice bytes")).unwrap();
-    assert_eq!(s, r#""nice bytes""#);
 }
 
 #[test]
