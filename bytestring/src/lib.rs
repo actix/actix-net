@@ -38,6 +38,13 @@ pub struct ByteString(Bytes);
 
 impl ByteString {
     /// Creates a new empty `ByteString`.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let text = ByteString::new();
+    /// assert_eq!(text, "");
+    /// ```
     #[doc(alias = "empty")]
     #[inline]
     #[must_use]
@@ -46,6 +53,13 @@ impl ByteString {
     }
 
     /// Creates a new `ByteString` from a `&'static str`.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let text = ByteString::from_static("hello");
+    /// assert_eq!(text, "hello");
+    /// ```
     #[doc(alias = "from_static_str")]
     #[inline]
     #[must_use]
@@ -59,10 +73,11 @@ impl ByteString {
     /// view of the storage is dropped. See [`Bytes::from_owner`].
     ///
     /// # Examples
-    ///
     /// ```
-    /// use bytestring::ByteString;
-    /// let text = ByteString::from_owner(String::from("hello"));
+    /// # use bytestring::ByteString;
+    /// use std::sync::Arc;
+    ///
+    /// let text = ByteString::from_owner(Arc::<str>::from("hello"));
     /// assert_eq!(text, "hello");
     /// ```
     #[must_use]
@@ -85,16 +100,16 @@ impl ByteString {
     /// Converts bytes to a string, retaining the bytes if UTF-8 validation fails.
     ///
     /// # Errors
-    ///
     /// Returns [`FromUtf8Error`] if the bytes are not valid UTF-8.
     ///
     /// # Examples
-    ///
     /// ```
     /// use bytes::Bytes;
-    /// use bytestring::ByteString;
-    /// let err = ByteString::from_utf8(Bytes::from_static(b"\xff")).unwrap_err();
-    /// assert_eq!(err.into_bytes(), Bytes::from_static(b"\xff"));
+    ///
+    /// # use bytestring::ByteString;
+    /// let err = ByteString::from_utf8(Bytes::from_static(b"hello\xff")).unwrap_err();
+    /// assert_eq!(err.utf8_error().valid_up_to(), 5);
+    /// assert_eq!(err.into_bytes(), Bytes::from_static(b"hello\xff"));
     /// ```
     #[inline]
     #[must_use]
@@ -112,6 +127,16 @@ impl ByteString {
     /// If this constraint is violated, it may cause memory unsafety issues with future users of
     /// the `ByteString`, as we assume that `ByteString`s are valid UTF-8. However, the most likely
     /// issue is that the data gets corrupted.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let bytes = bytes::Bytes::from_static(b"hello");
+    ///
+    /// // SAFETY: The bytes contain valid UTF-8.
+    /// let text = unsafe { ByteString::from_bytes_unchecked(bytes) };
+    /// assert_eq!(text, "hello");
+    /// ```
     #[doc(alias = "from_utf8_unchecked")]
     #[inline]
     #[must_use]
@@ -120,6 +145,13 @@ impl ByteString {
     }
 
     /// Returns the length in bytes.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let text = ByteString::from("hello");
+    /// assert_eq!(text.len(), 5);
+    /// ```
     #[inline]
     #[must_use]
     pub const fn len(&self) -> usize {
@@ -127,6 +159,13 @@ impl ByteString {
     }
 
     /// Returns true if this string is empty.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let text = ByteString::new();
+    /// assert!(text.is_empty());
+    /// ```
     #[inline]
     #[must_use]
     pub const fn is_empty(&self) -> bool {
@@ -134,6 +173,13 @@ impl ByteString {
     }
 
     /// Returns the string contents as a string slice.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let text = ByteString::from("hello");
+    /// assert_eq!(text.as_str(), "hello");
+    /// ```
     #[inline]
     #[must_use]
     pub fn as_str(&self) -> &str {
@@ -141,6 +187,13 @@ impl ByteString {
     }
 
     /// Get a reference to the underlying `Bytes` object.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let text = ByteString::from("hello");
+    /// assert_eq!(text.as_bytes(), &bytes::Bytes::from_static(b"hello"));
+    /// ```
     #[doc(alias = "as_inner")]
     #[doc(alias = "as_ref")]
     #[inline]
@@ -154,14 +207,12 @@ impl ByteString {
     /// This operation does not copy the string contents.
     ///
     /// # Panics
-    ///
     /// Panics if the range is out of bounds, reversed, or does not start and end
     /// on UTF-8 code point boundaries.
     ///
     /// # Examples
-    ///
     /// ```
-    /// use bytestring::ByteString;
+    /// # use bytestring::ByteString;
     /// let text = ByteString::from("aµz");
     /// assert_eq!(text.slice(1..3), "µ");
     /// ```
@@ -196,14 +247,12 @@ impl ByteString {
     /// This operation is `O(1)`.
     ///
     /// # Panics
-    ///
     /// Panics if `subset` is not a sub-slice of this byte string.
     ///
     /// Note that strings which are only subsets from an equality perspective do not uphold this
     /// requirement; see examples.
     ///
     /// # Examples
-    ///
     /// ```
     /// # use bytestring::ByteString;
     /// let string = ByteString::from_static(" foo ");
@@ -233,8 +282,17 @@ impl ByteString {
     /// The returned string shares storage with this string.
     ///
     /// # Panics
-    ///
     /// Panics if `at` is out of bounds or is not a UTF-8 code point boundary.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let mut text = ByteString::from("hello world");
+    /// let suffix = text.split_off(5);
+    ///
+    /// assert_eq!(text, "hello");
+    /// assert_eq!(suffix, " world");
+    /// ```
     #[inline]
     #[must_use = "use truncate if the suffix is not needed"]
     pub fn split_off(&mut self, at: usize) -> Self {
@@ -248,8 +306,17 @@ impl ByteString {
     /// The returned string shares storage with this string.
     ///
     /// # Panics
-    ///
     /// Panics if `at` is out of bounds or is not a UTF-8 code point boundary.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let mut text = ByteString::from("hello world");
+    /// let prefix = text.split_to(5);
+    ///
+    /// assert_eq!(text, " world");
+    /// assert_eq!(prefix, "hello");
+    /// ```
     #[inline]
     #[must_use = "use advance if the prefix is not needed"]
     pub fn split_to(&mut self, at: usize) -> Self {
@@ -261,9 +328,19 @@ impl ByteString {
     /// Divides one bytestring into two at an index, returning both parts.
     ///
     /// # Panics
-    ///
     /// Panics if `mid` is not on a UTF-8 code point boundary, or if it is past the end of the last
     /// code point of the bytestring.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let text = ByteString::from("hello world");
+    /// let (prefix, suffix) = text.split_at(5);
+    ///
+    /// assert_eq!(prefix, "hello");
+    /// assert_eq!(suffix, " world");
+    /// assert_eq!(text, "hello world");
+    /// ```
     #[doc(alias = "split")]
     #[must_use]
     pub fn split_at(&self, mid: usize) -> (ByteString, ByteString) {
@@ -285,8 +362,15 @@ impl ByteString {
     /// Retains the first `len` bytes. Does nothing if `len` exceeds the length.
     ///
     /// # Panics
-    ///
     /// Panics if `len` is within the string but is not a UTF-8 code point boundary.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let mut text = ByteString::from("hello world");
+    /// text.truncate(5);
+    /// assert_eq!(text, "hello");
+    /// ```
     #[inline]
     pub fn truncate(&mut self, len: usize) {
         assert!(
@@ -300,13 +384,11 @@ impl ByteString {
     /// Removes the first `cnt` bytes without copying the remaining contents.
     ///
     /// # Panics
-    ///
     /// Panics if `cnt` is out of bounds or is not a UTF-8 code point boundary.
     ///
     /// # Examples
-    ///
     /// ```
-    /// use bytestring::ByteString;
+    /// # use bytestring::ByteString;
     /// let mut text = ByteString::from("µ: value");
     /// text.advance(4);
     /// assert_eq!(text, "value");
@@ -319,6 +401,13 @@ impl ByteString {
     }
 
     /// Unwraps this `ByteString` into the underlying `Bytes` object.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let text = ByteString::from("hello");
+    /// assert_eq!(text.into_bytes(), bytes::Bytes::from_static(b"hello"));
+    /// ```
     #[doc(alias = "into_inner")]
     #[doc(alias = "unwrap")]
     #[inline]
@@ -508,14 +597,14 @@ array_impls!(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25
 impl fmt::Debug for ByteString {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        (**self).fmt(fmt)
+        fmt::Debug::fmt(&**self, fmt)
     }
 }
 
 impl fmt::Display for ByteString {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        (**self).fmt(fmt)
+        fmt::Display::fmt(&**self, fmt)
     }
 }
 
@@ -528,6 +617,14 @@ pub struct FromUtf8Error {
 
 impl FromUtf8Error {
     /// Returns the original bytes without copying them.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let bytes = bytes::Bytes::from_static(b"a\xff");
+    /// let err = ByteString::from_utf8(bytes).unwrap_err();
+    /// assert_eq!(err.into_bytes(), bytes::Bytes::from_static(b"a\xff"));
+    /// ```
     #[inline]
     #[must_use]
     pub fn into_bytes(self) -> Bytes {
@@ -535,6 +632,16 @@ impl FromUtf8Error {
     }
 
     /// Returns details of the UTF-8 validation failure.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bytestring::ByteString;
+    /// let bytes = bytes::Bytes::from_static(b"a\xff");
+    /// let err = ByteString::from_utf8(bytes).unwrap_err();
+    ///
+    /// assert_eq!(err.utf8_error().valid_up_to(), 1);
+    /// assert_eq!(err.utf8_error().error_len(), Some(1));
+    /// ```
     #[inline]
     #[must_use]
     pub const fn utf8_error(&self) -> str::Utf8Error {
@@ -544,7 +651,7 @@ impl FromUtf8Error {
 
 impl fmt::Display for FromUtf8Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.error.fmt(f)
+        fmt::Display::fmt(&self.error, f)
     }
 }
 
