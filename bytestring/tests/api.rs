@@ -2,6 +2,7 @@
 
 use std::{
     borrow::Borrow,
+    collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
     ops::Bound,
     sync::{
@@ -10,7 +11,6 @@ use std::{
     },
 };
 
-use ahash::AHasher;
 use bytes::Bytes;
 use bytestring::ByteString;
 
@@ -68,10 +68,10 @@ fn borrow() {
 
 #[test]
 fn hash() {
-    let mut hasher1 = AHasher::default();
+    let mut hasher1 = DefaultHasher::new();
     "str".hash(&mut hasher1);
 
-    let mut hasher2 = AHasher::default();
+    let mut hasher2 = DefaultHasher::new();
     let s = ByteString::from_static("str");
     s.hash(&mut hasher2);
     assert_eq!(hasher1.finish(), hasher2.finish());
