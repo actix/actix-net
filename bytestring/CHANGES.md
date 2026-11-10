@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.6.0
+
 - Add `ByteString::from_owner()` constructor to preserve existing allocations.
 - Add `ByteString::from_utf8()` constructor to recover bytes when UTF-8 conversion fails.
 - Add `ByteString::slice()` method.
