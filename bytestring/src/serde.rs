@@ -26,3 +26,13 @@ impl<'de> Deserialize<'de> for ByteString {
         String::deserialize(deserializer).map(ByteString::from)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_core::{de::DeserializeOwned, Serialize};
+    use static_assertions::assert_impl_all;
+
+    use super::*;
+
+    assert_impl_all!(ByteString: Serialize, DeserializeOwned);
+}

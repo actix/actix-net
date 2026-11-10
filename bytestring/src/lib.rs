@@ -6,13 +6,13 @@
 
 extern crate alloc;
 
+#[cfg(feature = "serde")]
+mod serde;
+
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{borrow::Borrow, fmt, hash, ops, str};
 
 use bytes::Bytes;
-
-#[cfg(feature = "serde")]
-mod serde;
 
 /// An immutable UTF-8 encoded string using [`Bytes`] as the storage.
 #[doc(alias = "BytesStr")]

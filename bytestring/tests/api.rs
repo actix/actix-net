@@ -176,6 +176,20 @@ fn debug() {
     assert_eq!(format!("{buf:?}"), r#""baz""#);
 }
 
+#[cfg(feature = "serde")]
+#[test]
+fn serialize() {
+    let s: ByteString = serde_json::from_str(r#""nice bytes""#).unwrap();
+    assert_eq!(s, "nice bytes");
+}
+
+#[cfg(feature = "serde")]
+#[test]
+fn deserialize() {
+    let s = serde_json::to_string(&ByteString::from_static("nice bytes")).unwrap();
+    assert_eq!(s, r#""nice bytes""#);
+}
+
 #[test]
 fn slice_ref() {
     let string = ByteString::from_static(" foo ");
