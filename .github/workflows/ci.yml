@@ -150,7 +150,6 @@ jobs:
         uses: taiki-e/install-action@v2.90.3
         with:
           tool: just,cargo-hack,cargo-ci-cache-clean
-          fallback: cargo-binstall
 
       - name: Generate Cargo.lock
         run: cargo generate-lockfile

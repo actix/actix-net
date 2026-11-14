@@ -126,7 +126,6 @@ jobs:
         uses: taiki-e/install-action@v2.90.3
         with:
           tool: cargo-hack,cargo-ci-cache-clean
-          fallback: cargo-binstall
 
       - name: Build libraries without default features
         run: cargo hack --workspace build --lib --no-default-features --no-dev-deps --target ${{ matrix.target.triple }}
