@@ -34,7 +34,6 @@ workflows:
         - 'nicknovitski/nix-develop@v1.2.1'
         - 'nixbuild/nix-quick-install-action@v35'
         - 'release-plz/action@v0.5.140'
-        - 'rust-lang/crates-io-auth-action@v1.0.5'
 dependencies:
     'actions-rust-lang/setup-rust-toolchain@v2.0.1':
         ref: 'v2.0.1'
@@ -119,11 +118,6 @@ dependencies:
         commit: 'sha1-da13e0b42e392e3a45d1215033a2270b849d7d36'
         owner_id: 47400
         repo_id: 479867630
-    'rust-lang/crates-io-auth-action@v1.0.5':
-        ref: 'v1.0.5'
-        commit: 'sha1-c6f97d42243bad5fab37ca0427f495c86d5b1a18'
-        owner_id: 5430905
-        repo_id: 1008931044
     'swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0':
         ref: 'v2.9.3'
         commit: 'sha1-d1527c8f67ef9af357290475d4af4b0fab8f12e0'
