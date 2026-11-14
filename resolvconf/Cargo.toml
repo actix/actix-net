@@ -1,7 +1,7 @@
 [package]
 name = "resolvconf"
 version = "0.1.0"
-description = "Read the configured system DNS resolver address"
+description = "Read the platform's configured DNS resolver address"
 authors = ["Rob Ede <robjtede@icloud.com>"]
 repository = "https://github.com/actix/actix-net/tree/main/resolvconf"
 keywords = ["dns", "resolver", "network", "configuration"]
@@ -14,22 +14,22 @@ rust-version.workspace = true
 all-features = true
 targets = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"]
 
-[target.'cfg(target_os = "linux")'.dev-dependencies]
-indoc = "2"
-
 [target.'cfg(target_os = "macos")'.dependencies]
 system-configuration = "0.8"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-ipconfig = { version = "0.3.4", default-features = false }
+ipconfig = { version = "0.3.2", default-features = false }
 
 [dev-dependencies]
-hickory-resolver = { version = "0.26.3", default-features = false, features = [
-  "https-ring",
+hickory-resolver = { version = "0.26", default-features = false, features = [
   "tokio",
-  "webpki-roots",
+  "https-aws-lc-rs",
+  "rustls-platform-verifier",
 ] }
 tokio = { version = "1.51", features = ["macros", "rt"] }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+indoc = "2"
 
 [lints]
 workspace = true

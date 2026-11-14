@@ -1,7 +1,7 @@
 //! Print the configured system DNS resolver address.
 
 fn main() {
-    let resolver = resolvconf::configured_dns_resolver();
+    let resolver = resolvconf::system_dns_resolver();
 
     println!("{resolver}");
 }

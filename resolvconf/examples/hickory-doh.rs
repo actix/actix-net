@@ -11,7 +11,7 @@ use hickory_resolver::{
 
 #[tokio::main(flavor = "local")]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let dns_server = resolvconf::configured_dns_resolver();
+    let dns_server = resolvconf::system_dns_resolver();
 
     for address in lookup(dns_server).await?.iter() {
         println!("{address}");

@@ -1,12 +1,12 @@
-use std::net::IpAddr;
+use std::{io, net::IpAddr};
 
-pub(super) fn configured_dns_resolver() -> std::io::Result<IpAddr> {
+pub(super) fn system_dns_resolver() -> io::Result<IpAddr> {
     let config = std::fs::read_to_string("/etc/resolv.conf")?;
 
     parse_resolv_conf(&config).ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "no usable nameserver in /etc/resolv.conf",
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "No usable nameserver in /etc/resolv.conf",
         )
     })
 }

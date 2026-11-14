@@ -1,7 +1,12 @@
-use std::net::{IpAddr, Ipv6Addr};
+use std::{
+    io,
+    net::{IpAddr, Ipv6Addr},
+};
 
-pub(super) fn configured_dns_resolver() -> std::io::Result<IpAddr> {
-    let adapters = ipconfig::get_adapters().map_err(std::io::Error::other)?;
+use crate::usable_address;
+
+pub(super) fn system_dns_resolver() -> io::Result<IpAddr> {
+    let adapters = ipconfig::get_adapters().map_err(io::Error::other)?;
 
     first_resolver(adapters.iter().map(|adapter| {
         (
@@ -10,9 +15,9 @@ pub(super) fn configured_dns_resolver() -> std::io::Result<IpAddr> {
         )
     }))
     .ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "no usable DNS server on an operational adapter",
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "No usable DNS server on an operational adapter",
         )
     })
 }
@@ -22,10 +27,13 @@ fn first_resolver<'a>(adapters: impl IntoIterator<Item = (bool, &'a [IpAddr])>) 
         .into_iter()
         .filter(|(up, _)| *up)
         .flat_map(|(_, servers)| servers.iter().copied())
-        .find(|&ip| crate::usable_address(ip) && !OBSOLETE_SERVERS.contains(&ip))
+        .find(|&ip| usable_address(ip) && !OBSOLETE_SERVERS.contains(&ip))
 }
 
-// These site-local placeholders are not configured DNS server endpoints.
+/// Windows can add these legacy site-local DNS addresses even when no server is present.
+///
+/// A network can provide DNS servers at them, but we exclude them because their presence alone does
+/// not indicate an explicitly configured resolver.
 const OBSOLETE_SERVERS: [IpAddr; 3] = [
     IpAddr::V6(Ipv6Addr::new(0xfec0, 0, 0, 0xffff, 0, 0, 0, 1)),
     IpAddr::V6(Ipv6Addr::new(0xfec0, 0, 0, 0xffff, 0, 0, 0, 2)),

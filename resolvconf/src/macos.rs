@@ -11,14 +11,14 @@ use system_configuration::{
     dynamic_store::SCDynamicStoreBuilder,
 };
 
-pub(super) fn configured_dns_resolver() -> io::Result<IpAddr> {
+pub(super) fn system_dns_resolver() -> io::Result<IpAddr> {
     let store = SCDynamicStoreBuilder::new("resolvconf")
         .build()
-        .ok_or_else(|| io::Error::other("cannot open the SystemConfiguration dynamic store"))?;
+        .ok_or_else(|| io::Error::other("Cannot open the SystemConfiguration dynamic store"))?;
 
     let config = store
         .get("State:/Network/Global/DNS")
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no global DNS configuration"))?;
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No global DNS configuration"))?;
 
     from_dns_config(config)
 }
@@ -39,7 +39,7 @@ fn from_dns_config(config: CFPropertyList) -> io::Result<IpAddr> {
 
     let servers = config
         .find(CFString::from_static_string("ServerAddresses"))
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no DNS ServerAddresses"))?
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No DNS ServerAddresses"))?
         .downcast::<CFArray>()
         .ok_or_else(|| {
             io::Error::new(
@@ -57,7 +57,7 @@ fn from_dns_config(config: CFPropertyList) -> io::Result<IpAddr> {
         .filter_map(|server| server.downcast::<CFString>())
         .filter_map(|server| server.to_string().parse().ok())
         .find(|&ip| crate::usable_address(ip))
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no usable global DNS server"))
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No usable global DNS server"))
 }
 
 #[cfg(test)]
