@@ -17,7 +17,9 @@
 
 Read the system's configured DNS resolver address.
 
-The [`system_dns_resolver`] function is available on Linux, macOS, and Windows.
+The [`system_dns_resolver`] function is available on Linux, BSD systems, macOS, and Windows.
+
+Supported BSD systems are DragonFly BSD, FreeBSD, NetBSD, and OpenBSD.
 
 ## Examples
 
