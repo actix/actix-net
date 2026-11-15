@@ -3,7 +3,13 @@
 Read one DNS resolver address from the system configuration on Linux, macOS, and Windows.
 
 ```rust
-let resolver = resolvconf::system_dns_resolver();
+fn main() -> std::io::Result<()> {
+    let resolver = resolvconf::system_dns_resolver()?;
+
+    println!("{resolver}");
+
+    Ok(())
+}
 ```
 
 Run the example to print the configured resolver address:
@@ -29,7 +35,7 @@ identify their upstream provider. DoH errors are returned without a retry over U
 cargo run -p resolvconf --example hickory-doh
 ```
 
-The function returns `std::net::IpAddr`. It reads the configuration on each call:
+The function returns `std::io::Result<std::net::IpAddr>`. It reads the configuration on each call:
 
 - Linux: the first usable `nameserver` in `/etc/resolv.conf`. Local stubs are preserved.
 - macOS: the first usable `ServerAddresses` entry in the global SystemConfiguration DNS state.
@@ -37,8 +43,8 @@ The function returns `std::net::IpAddr`. It reads the configuration on each call
 
 On other platforms, the crate builds without providing `system_dns_resolver`.
 
-The function is synchronous. It panics if configuration access fails or no usable address exists. It
-does not send DNS queries or test server reachability.
+The function is synchronous. It returns an error if configuration access fails or no usable address
+exists. It does not send DNS queries or test server reachability.
 
 Unspecified, multicast, IPv4 broadcast, and IPv6 link-local addresses are skipped. IPv6 link-local
 addresses need an interface scope that `IpAddr` cannot represent. Windows' obsolete site-local DNS

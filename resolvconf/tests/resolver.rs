@@ -3,6 +3,8 @@
 #![cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 
 #[test]
-fn reads_system_configuration() {
-    let _address = resolvconf::system_dns_resolver();
+fn reads_system_configuration() -> std::io::Result<()> {
+    let _address = resolvconf::system_dns_resolver()?;
+
+    Ok(())
 }

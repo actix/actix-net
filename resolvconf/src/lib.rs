@@ -7,9 +7,10 @@
 //! ```no_run
 //! # #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 //! # {
-//! let resolver = resolvconf::system_dns_resolver();
+//! let resolver = resolvconf::system_dns_resolver()?;
 //! println!("DNS resolver = {resolver}"); // E.g.: DNS resolver = 10.0.1.53
 //! # }
+//! # Ok::<(), std::io::Error>(())
 //! ```
 
 #![cfg_attr(
@@ -55,15 +56,17 @@ use self::windows as platform;
 ///   address on an operational adapter. The obsolete placeholders from `fec0:0:0:ffff::1` through
 ///   `fec0:0:0:ffff::3` are also filtered out.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if the system configuration cannot be read or contains no usable DNS resolver address.
+/// Returns an error if the system configuration cannot be read or contains no usable DNS resolver
+/// address.
 ///
 /// # Examples
 ///
 /// ```no_run
-/// let resolver = resolvconf::system_dns_resolver();
+/// let resolver = resolvconf::system_dns_resolver()?;
 /// println!("{resolver}");
+/// # Ok::<(), std::io::Error>(())
 /// ```
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 pub fn system_dns_resolver() -> io::Result<IpAddr> {

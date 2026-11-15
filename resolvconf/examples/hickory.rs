@@ -10,7 +10,7 @@ use hickory_resolver::{
 
 #[tokio::main(flavor = "local")]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let dns_server = resolvconf::system_dns_resolver();
+    let dns_server = resolvconf::system_dns_resolver()?;
 
     println!("DNS resolver: {dns_server}");
 
