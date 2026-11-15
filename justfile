@@ -13,12 +13,17 @@ check: && clippy
     cargo +nightly fmt -- --check
 
 # Format project.
-fmt:
+fmt: update-readmes
     just --unstable --fmt
     # nixpkgs-fmt .
     fd --hidden --type=file -e=md -e=yml --exec-batch prettier --write
     fd --type=file --hidden -e=toml --exec-batch taplo format
     cargo +nightly fmt
+
+# Update READMEs from crate root documentation.
+update-readmes:
+    cd ./resolvconf && cargo rdme --force
+    fd README.md --exec-batch prettier --write
 
 # Downgrade dependencies necessary to run MSRV checks/tests.
 [private]

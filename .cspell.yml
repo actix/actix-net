@@ -12,6 +12,7 @@ words:
   - oneshot
   - pemfile
   - rcgen
+  - rdme
   - Rustls
   - rustup
   - serde

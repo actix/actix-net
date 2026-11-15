@@ -1,60 +1,29 @@
 # resolvconf
 
-Read one DNS resolver address from the system configuration on Linux, macOS, and Windows.
+<!-- prettier-ignore-start -->
+
+[![crates.io](https://img.shields.io/crates/v/resolvconf?label=latest)](https://crates.io/crates/resolvconf)
+[![Documentation](https://docs.rs/resolvconf/badge.svg?version=0.1.0)](https://docs.rs/resolvconf/0.1.0)
+[![Version](https://img.shields.io/badge/rustc-1.89+-ab6000.svg)](https://blog.rust-lang.org/2025/08/07/Rust-1.89.0/)
+![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/resolvconf.svg)
+<br />
+[![Dependency Status](https://deps.rs/crate/resolvconf/0.1.0/status.svg)](https://deps.rs/crate/resolvconf/0.1.0)
+![Download](https://img.shields.io/crates/d/resolvconf.svg)
+[![Chat on Discord](https://img.shields.io/discord/771444961383153695?label=chat&logo=discord)](https://discord.gg/NWpN5mmg3x)
+
+<!-- prettier-ignore-end -->
+
+<!-- cargo-rdme start -->
+
+Read the system's configured DNS resolver address.
+
+The [`system_dns_resolver`] function is available on Linux, macOS, and Windows.
+
+## Examples
 
 ```rust
-fn main() -> std::io::Result<()> {
-    let resolver = resolvconf::system_dns_resolver()?;
-
-    println!("{resolver}");
-
-    Ok(())
-}
+let resolver = resolvconf::system_dns_resolver()?;
+println!("DNS resolver = {resolver}"); // E.g.: DNS resolver = 10.0.1.53
 ```
 
-Run the example to print the configured resolver address:
-
-```console
-cargo run -p resolvconf --example basic
-```
-
-Use that address with Hickory to look up `example.com`:
-
-```console
-cargo run -p resolvconf --example hickory
-```
-
-The DoH example checks whether the configured IP is a standard
-[Cloudflare](https://developers.cloudflare.com/1.1.1.1/ip-addresses/),
-[Google](https://developers.google.com/speed/public-dns/docs/using), or
-[Quad9](https://docs.quad9.net/services/) DNS server. A match uses that IP with the provider's HTTPS
-endpoint and certificate hostname. Other addresses use UDP/TCP. Local stubs and routers do not
-identify their upstream provider. DoH errors are returned without a retry over UDP/TCP.
-
-```console
-cargo run -p resolvconf --example hickory-doh
-```
-
-The function returns `std::io::Result<std::net::IpAddr>`. It reads the configuration on each call:
-
-- Linux: the first usable `nameserver` in `/etc/resolv.conf`. Local stubs are preserved.
-- macOS: the first usable `ServerAddresses` entry in the global SystemConfiguration DNS state.
-- Windows: the first usable DNS server on an operational adapter, in the order returned by Windows.
-
-On other platforms, the crate builds without providing `system_dns_resolver`.
-
-The function is synchronous. It returns an error if configuration access fails or no usable address
-exists. It does not send DNS queries or test server reachability.
-
-Unspecified, multicast, IPv4 broadcast, and IPv6 link-local addresses are skipped. IPv6 link-local
-addresses need an interface scope that `IpAddr` cannot represent. Windows' obsolete site-local DNS
-placeholders are also skipped.
-
-A single IP address cannot describe domain-specific DNS routing, search rules, ports, or encryption
-settings.
-
-## Platform references
-
-- [Linux resolver configuration](https://man7.org/linux/man-pages/man5/resolv.conf.5.html)
-- [Apple DNS schema](https://github.com/apple-oss-distributions/configd/blob/main/SystemConfiguration.fproj/SCSchemaDefinitions.h)
-- [Windows adapter enumeration](https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses)
+<!-- cargo-rdme end -->

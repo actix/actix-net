@@ -23,6 +23,7 @@
         devShells.default = pkgs.mkShell {
           packages = [
             config.formatter
+            pkgs.cargo-rdme
             pkgs.fd
             pkgs.just
             pkgs.prettier
