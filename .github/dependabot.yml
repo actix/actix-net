@@ -13,3 +13,13 @@ updates:
     cooldown:
       default-days: 3
     versioning-strategy: lockfile-only
+  - package-ecosystem: nix
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 3
+    groups:
+      nix:
+        patterns:
+          - "*"

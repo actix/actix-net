@@ -21,7 +21,6 @@ jobs:
           - { name: Linux, os: blacksmith-2vcpu-ubuntu-2404, triple: x86_64-unknown-linux-gnu }
           - { name: macOS, os: blacksmith-6vcpu-macos-latest, triple: x86_64-apple-darwin }
           - { name: Windows, os: blacksmith-2vcpu-windows-2025, triple: x86_64-pc-windows-msvc }
-          - { name: Windows (MinGW), os: blacksmith-2vcpu-windows-2025, triple: x86_64-pc-windows-gnu }
         version:
           - nightly
 
@@ -36,7 +35,7 @@ jobs:
         run: sudo ifconfig lo0 alias 127.0.0.3
 
       - name: Checkout
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@v1.8.2
         with:
           persist-credentials: false
 
@@ -46,11 +45,11 @@ jobs:
 
       - name: Setup mold linker
         if: runner.os == 'Linux'
-        uses: rui314/setup-mold@da13e0b42e392e3a45d1215033a2270b849d7d36 # staging
+        uses: rui314/setup-mold@main
 
       - name: Install nasm
         if: runner.os == 'Windows'
-        uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
+        uses: ilammy/setup-nasm@v1.5.2
 
       - name: Install OpenSSL
         if: runner.os == 'Windows'
@@ -62,32 +61,24 @@ jobs:
           echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
 
       - name: Install Rust (${{ matrix.version }})
-        uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+        uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
         with:
           toolchain: ${{ matrix.version }}
 
       - name: Install just, cargo-hack, cargo-nextest, cargo-ci-cache-clean
-        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        uses: taiki-e/install-action@v2.90.3
         with:
           tool: just,cargo-hack,cargo-nextest,cargo-ci-cache-clean
 
       - name: check lib
-        if: >
-          runner.os != 'Linux'
-          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        if: runner.os != 'Linux'
         run: cargo ci-check-lib
       - name: check lib
         if: runner.os == 'Linux'
         run: cargo ci-check-lib-linux
-      - name: check lib
-        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
-        run: cargo ci-check-min
 
       - name: check full
-        # TODO: compile OpenSSL and run tests on MinGW
-        if: >
-          runner.os != 'Linux'
-          && matrix.target.triple != 'x86_64-pc-windows-gnu'
+        if: runner.os != 'Linux'
         run: cargo ci-check
       - name: check all
         if: runner.os == 'Linux'
@@ -99,22 +90,68 @@ jobs:
       - name: CI cache clean
         run: cargo-ci-cache-clean
 
+  build_only_nightly:
+    strategy:
+      fail-fast: false
+      matrix:
+        # prettier-ignore
+        target:
+          - { name: Windows (MinGW), triple: x86_64-pc-windows-gnu }
+          - { name: illumos, triple: x86_64-unknown-illumos }
+        version:
+          - nightly
+
+    name: ${{ matrix.target.name }} / ${{ matrix.version }} (build only)
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+
+    steps:
+      - name: Checkout
+        uses: useblacksmith/checkout@v1.8.2
+        with:
+          persist-credentials: false
+
+      - name: Install MinGW binutils
+        if: matrix.target.triple == 'x86_64-pc-windows-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y binutils-mingw-w64-x86-64
+
+      - name: Install Rust (${{ matrix.version }})
+        uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
+        with:
+          toolchain: ${{ matrix.version }}
+          target: ${{ matrix.target.triple }}
+
+      - name: Install cargo-hack, cargo-ci-cache-clean
+        uses: taiki-e/install-action@v2.90.3
+        with:
+          tool: cargo-hack,cargo-ci-cache-clean
+
+      - name: Build libraries without default features
+        run: cargo hack --workspace build --lib --no-default-features --no-dev-deps --target ${{ matrix.target.triple }}
+
+      - name: Build libraries with default features
+        run: cargo hack --workspace build --lib --no-dev-deps --target ${{ matrix.target.triple }}
+
+      - name: CI cache clean
+        run: cargo-ci-cache-clean
+
   minimal-versions:
     name: minimal versions
     runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Checkout
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@v1.8.2
         with:
           persist-credentials: false
 
       - name: Install Rust (nightly)
-        uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+        uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
         with:
           toolchain: nightly
 
       - name: Install cargo-hack & cargo-minimal-versions
-        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        uses: taiki-e/install-action@v2.90.3
         with:
           tool: cargo-hack,cargo-minimal-versions
 
