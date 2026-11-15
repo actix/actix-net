@@ -288,12 +288,10 @@ impl Future for ArbiterRunner {
 }
 
 /// A builder for configuring and spawning a new [Arbiter] thread.
-pub struct ArbiterBuilder<
-    NF = fn(usize, usize) -> String,
-    RF = fn() -> io::Result<tokio::runtime::Runtime>,
-> {
-    name_factory: Option<NF>,
-    runtime_factory: Option<RF>,
+pub struct ArbiterBuilder {
+    name_factory: Option<Box<dyn Fn(usize, usize) -> String + 'static>>,
+    runtime_factory:
+        Option<Box<dyn FnOnce() -> io::Result<crate::runtime::Runtime> + Send + 'static>>,
 }
 
 impl ArbiterBuilder {
@@ -307,7 +305,7 @@ impl ArbiterBuilder {
     }
 }
 
-impl<NF, RF> ArbiterBuilder<NF, RF> {
+impl ArbiterBuilder {
     /// Specify a factory function for generating the name of the Arbiter thread.
     ///
     /// Defaults to `actix-rt|system:<system_id>|arbiter:<arb_id>`
@@ -322,36 +320,27 @@ impl<NF, RF> ArbiterBuilder<NF, RF> {
     ///     })
     ///     .build();
     /// ```
-    pub fn name<F>(self, name_factory: F) -> ArbiterBuilder<F, RF>
+    pub fn name<F>(mut self, name_factory: F) -> ArbiterBuilder
     where
         F: Fn(usize, usize) -> String + 'static,
     {
-        ArbiterBuilder {
-            name_factory: Some(name_factory),
-            runtime_factory: self.runtime_factory,
-        }
+        self.name_factory = Some(Box::new(name_factory));
+        self
     }
     /// Specify a factory function for generating the [Tokio Runtime](tokio-runtime) used by the Arbiter.
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
-    pub fn runtime<F, R>(self, runtime_factory: F) -> ArbiterBuilder<NF, F>
+    pub fn runtime<F, R>(mut self, runtime_factory: F) -> ArbiterBuilder
     where
         F: FnOnce() -> io::Result<R> + Send + 'static,
         R: Into<crate::runtime::Runtime> + Send + 'static,
     {
-        ArbiterBuilder {
-            name_factory: self.name_factory,
-            runtime_factory: Some(runtime_factory),
-        }
+        self.runtime_factory = Some(Box::new(move || runtime_factory().map(|rt| rt.into())));
+        self
     }
 }
 
-impl<NF, RF, R> ArbiterBuilder<NF, RF>
-where
-    NF: Fn(usize, usize) -> String + 'static,
-    RF: FnOnce() -> io::Result<R> + Send + 'static,
-    R: Into<crate::runtime::Runtime> + Send + 'static,
-{
+impl ArbiterBuilder {
     /// Spawn a new Arbiter thread and start its event loop.
     ///
     /// # Panics
@@ -371,7 +360,9 @@ where
             Some(nf) => nf(system_id, arb_id),
             None => format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id),
         };
-        let runtime_factory = self.runtime_factory;
+        let runtime_factory = self.runtime_factory.unwrap_or_else(|| {
+            Box::new(|| crate::runtime::default_tokio_runtime().map(|rt| rt.into()))
+        });
         let (tx, rx) = mpsc::unbounded_channel();
 
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<io::Result<()>>();
@@ -379,12 +370,7 @@ where
         let thread_handle = thread::Builder::new().name(name.clone()).spawn({
             let tx = tx.clone();
             move || {
-                let result = match runtime_factory {
-                    Some(rf) => rf().map(|rt| rt.into()),
-                    None => crate::runtime::default_tokio_runtime().map(|rt| rt.into()),
-                };
-
-                let rt = match result {
+                let rt = match runtime_factory() {
                     Ok(rt) => rt,
                     Err(err) => {
                         let _ = ready_tx.send(Err(err));
