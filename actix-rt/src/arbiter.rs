@@ -100,6 +100,11 @@ pub struct Arbiter {
 }
 
 impl Arbiter {
+    /// Create an [ArbiterBuilder] to configure and spawn a new Arbiter thread.
+    pub fn builder() -> ArbiterBuilder {
+        ArbiterBuilder::new()
+    }
+
     /// Spawn a new Arbiter thread and start its event loop.
     ///
     /// # Panics
@@ -160,64 +165,7 @@ impl Arbiter {
         F: FnOnce() -> io::Result<R> + Send + 'static,
         R: Into<crate::runtime::Runtime> + Send + 'static,
     {
-        let sys = System::current();
-        let system_id = sys.id();
-        let arb_id = COUNT.fetch_add(1, Ordering::Relaxed);
-
-        let name = format!("actix-rt|system:{system_id}|arbiter:{arb_id}");
-        let (tx, rx) = mpsc::unbounded_channel();
-
-        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<io::Result<()>>();
-
-        let thread_handle = thread::Builder::new().name(name.clone()).spawn({
-            let tx = tx.clone();
-            move || {
-                let rt = match runtime_factory() {
-                    Ok(rt) => rt.into(),
-                    Err(err) => {
-                        let _ = ready_tx.send(Err(err));
-                        return;
-                    }
-                };
-
-                let hnd = ArbiterHandle::new(tx);
-
-                System::set_current(sys);
-
-                HANDLE.with(|cell| *cell.borrow_mut() = Some(hnd.clone()));
-
-                // register arbiter
-                let _ = System::current()
-                    .tx()
-                    .send(SystemCommand::RegisterArbiter(arb_id, hnd));
-
-                if ready_tx.send(Ok(())).is_err() {
-                    unreachable!("Arbiter ready signal receiver should not be dropped before send");
-                }
-
-                // run arbiter event processing loop
-                rt.block_on(ArbiterRunner { rx });
-
-                // deregister arbiter
-                let _ = System::current()
-                    .tx()
-                    .send(SystemCommand::DeregisterArbiter(arb_id));
-            }
-        })?;
-
-        match ready_rx.recv() {
-            Ok(Ok(())) => Ok(Arbiter { tx, thread_handle }),
-            Ok(Err(err)) => {
-                let _ = thread_handle.join();
-                Err(err)
-            }
-            Err(_) => {
-                let _ = thread_handle.join();
-                Err(io::Error::other(format!(
-                    "Arbiter thread {name} panicked during initialization"
-                )))
-            }
-        }
+        ArbiterBuilder::new().runtime(runtime_factory).try_build()
     }
 
     /// Sets up an Arbiter runner in a new System using the environment's local set.
@@ -334,6 +282,135 @@ impl Future for ArbiterRunner {
                         tokio::task::spawn_local(task_fut);
                     }
                 },
+            }
+        }
+    }
+}
+
+/// A builder for configuring and spawning a new [Arbiter] thread.
+pub struct ArbiterBuilder {
+    name_factory: Option<Box<dyn Fn(usize, usize) -> String + 'static>>,
+    runtime_factory:
+        Option<Box<dyn FnOnce() -> io::Result<crate::runtime::Runtime> + Send + 'static>>,
+}
+
+impl ArbiterBuilder {
+    /// Create a new [ArbiterBuilder].
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Self {
+            name_factory: None,
+            runtime_factory: None,
+        }
+    }
+
+    /// Specify a factory function for generating the name of the Arbiter thread.
+    ///
+    /// Defaults to `actix-rt|system:<system_id>|arbiter:<arb_id>`
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// let _ = actix_rt::System::new();
+    /// actix_rt::ArbiterBuilder::new()
+    ///     .name(|system_id, arb_id| {
+    ///         format!("some-prefix|system:{}|arbiter:{}", system_id, arb_id)
+    ///     })
+    ///     .build();
+    /// ```
+    pub fn name<F>(mut self, name_factory: F) -> ArbiterBuilder
+    where
+        F: Fn(usize, usize) -> String + 'static,
+    {
+        self.name_factory = Some(Box::new(name_factory));
+        self
+    }
+
+    /// Specify a factory function for generating the [Tokio Runtime](tokio-runtime) used by the Arbiter.
+    ///
+    /// [tokio-runtime]: tokio::runtime::Runtime
+    pub fn runtime<F, R>(mut self, runtime_factory: F) -> ArbiterBuilder
+    where
+        F: FnOnce() -> io::Result<R> + Send + 'static,
+        R: Into<crate::runtime::Runtime> + Send + 'static,
+    {
+        self.runtime_factory = Some(Box::new(move || runtime_factory().map(|rt| rt.into())));
+        self
+    }
+
+    /// Spawn a new Arbiter thread and start its event loop.
+    ///
+    /// # Panics
+    /// Panics if a [System] is not registered on the current thread.
+    pub fn build(self) -> Arbiter {
+        self.try_build()
+            .unwrap_or_else(|err| panic!("Cannot create new Arbiter: {err:?}"))
+    }
+
+    /// Try spawning a new Arbiter thread and start its event loop.
+    pub fn try_build(self) -> io::Result<Arbiter> {
+        let sys = System::current();
+        let system_id = sys.id();
+        let arb_id = COUNT.fetch_add(1, Ordering::Relaxed);
+
+        let name = match self.name_factory {
+            Some(nf) => nf(system_id, arb_id),
+            None => format!("actix-rt|system:{}|arbiter:{}", system_id, arb_id),
+        };
+        let runtime_factory = self.runtime_factory.unwrap_or_else(|| {
+            Box::new(|| crate::runtime::default_tokio_runtime().map(|rt| rt.into()))
+        });
+        let (tx, rx) = mpsc::unbounded_channel();
+
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<io::Result<()>>();
+
+        let thread_handle = thread::Builder::new().name(name.clone()).spawn({
+            let tx = tx.clone();
+            move || {
+                let rt = match runtime_factory() {
+                    Ok(rt) => rt,
+                    Err(err) => {
+                        let _ = ready_tx.send(Err(err));
+                        return;
+                    }
+                };
+
+                let hnd = ArbiterHandle::new(tx);
+
+                System::set_current(sys);
+
+                HANDLE.with(|cell| *cell.borrow_mut() = Some(hnd.clone()));
+
+                // register arbiter
+                let _ = System::current()
+                    .tx()
+                    .send(SystemCommand::RegisterArbiter(arb_id, hnd));
+
+                if ready_tx.send(Ok(())).is_err() {
+                    unreachable!("Arbiter ready signal receiver should not be dropped before send");
+                }
+
+                // run arbiter event processing loop
+                rt.block_on(ArbiterRunner { rx });
+
+                // deregister arbiter
+                let _ = System::current()
+                    .tx()
+                    .send(SystemCommand::DeregisterArbiter(arb_id));
+            }
+        })?;
+
+        match ready_rx.recv() {
+            Ok(Ok(())) => Ok(Arbiter { tx, thread_handle }),
+            Ok(Err(err)) => {
+                let _ = thread_handle.join();
+                Err(err)
+            }
+            Err(_) => {
+                let _ = thread_handle.join();
+                Err(io::Error::other(format!(
+                    "Arbiter thread {name} panicked during initialization"
+                )))
             }
         }
     }

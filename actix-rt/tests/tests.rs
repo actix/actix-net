@@ -526,3 +526,25 @@ fn arbiter_spawn_failure_does_not_panic_creator() {
     assert!(format!("{err}").contains("panicked during initialization"));
     panic_rx.recv().unwrap();
 }
+
+#[test]
+fn arbiter_builder_name() {
+    let _ = System::new();
+
+    let arbiter = Arbiter::builder()
+        .name(|_, _| "test_thread".to_string())
+        .build();
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    arbiter.spawn(async move {
+        let current_thread = std::thread::current();
+        let thread_name = current_thread.name().unwrap().to_string();
+        tx.send(thread_name).unwrap();
+    });
+
+    let name = rx.recv().unwrap();
+    assert_eq!(name, "test_thread");
+
+    arbiter.stop();
+    arbiter.join().unwrap();
+}
