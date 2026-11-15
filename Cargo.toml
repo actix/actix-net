@@ -12,6 +12,7 @@ members = [
   "bytestring",
   "local-channel",
   "local-waker",
+  "resolvconf",
 ]
 
 [workspace.package]
@@ -32,6 +33,7 @@ actix-utils = { path = "actix-utils" }
 bytestring = { path = "bytestring" }
 local-channel = { path = "local-channel" }
 local-waker = { path = "local-waker" }
+resolvconf = { path = "resolvconf" }
 
 [profile.release]
 lto = true
