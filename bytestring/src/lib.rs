@@ -112,7 +112,6 @@ impl ByteString {
     /// assert_eq!(err.into_bytes(), Bytes::from_static(b"hello\xff"));
     /// ```
     #[inline]
-    #[must_use]
     pub fn from_utf8(bytes: Bytes) -> Result<Self, FromUtf8Error> {
         match str::from_utf8(&bytes) {
             Ok(_) => Ok(Self(bytes)),

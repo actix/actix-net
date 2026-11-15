@@ -1,37 +1,41 @@
 //! Read the system's configured DNS resolver address.
 //!
-//! The [`system_dns_resolver`] function is available on Linux, macOS, and Windows.
+//! The [`system_dns_resolver`] function is available on Linux, BSD systems, macOS, and Windows.
 //!
 //! # Examples
 //!
 //! ```no_run
-//! # #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-//! # {
 //! let resolver = resolvconf::system_dns_resolver()?;
 //! println!("DNS resolver = {resolver}"); // E.g.: DNS resolver = 10.0.1.53
-//! # }
 //! # Ok::<(), std::io::Error>(())
 //! ```
 
-#![cfg_attr(
-    not(any(target_os = "linux", target_os = "macos", target_os = "windows", test)),
-    no_std
-)]
-
-#[cfg(target_os = "linux")]
-mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(any(
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "linux",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+mod resolv_conf;
 #[cfg(target_os = "windows")]
 mod windows;
 
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[allow(unused_imports)] // platform dependent usage
 use std::{io, net::IpAddr};
 
-#[cfg(target_os = "linux")]
-use self::linux as platform;
 #[cfg(target_os = "macos")]
 use self::macos as platform;
+#[cfg(any(
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "linux",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+use self::resolv_conf as platform;
 #[cfg(target_os = "windows")]
 use self::windows as platform;
 
@@ -49,7 +53,8 @@ use self::windows as platform;
 ///
 /// # Platform Behavior
 ///
-/// - Linux: reads `nameserver` entries from `/etc/resolv.conf`, including local stub addresses.
+/// - Linux and BSD systems: read `nameserver` entries from `/etc/resolv.conf`, including local stub
+///   addresses.
 /// - macOS: reads `ServerAddresses` from `State:/Network/Global/DNS` in the SystemConfiguration
 ///   dynamic store.
 /// - Windows: reads adapters through `GetAdaptersAddresses` and selects the first usable DNS
@@ -68,7 +73,15 @@ use self::windows as platform;
 /// println!("{resolver}");
 /// # Ok::<(), std::io::Error>(())
 /// ```
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[cfg(any(
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "windows",
+))]
 pub fn system_dns_resolver() -> io::Result<IpAddr> {
     platform::system_dns_resolver()
 }
@@ -78,7 +91,15 @@ pub fn system_dns_resolver() -> io::Result<IpAddr> {
 /// Rejects unspecified and multicast addresses, `255.255.255.255`, and IPv6 link-local addresses.
 /// IPv6 link-local addresses require a scope that [`IpAddr`] cannot represent. Loopback and private
 /// addresses are accepted. Reachability is not checked.
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[cfg(any(
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "windows",
+))]
 fn usable_address(address: IpAddr) -> bool {
     if address.is_unspecified() || address.is_multicast() {
         return false;

@@ -1,3 +1,15 @@
+//! Shared `/etc/resolv.conf` reader for Linux and BSD systems.
+//!
+//! Each call reads the file and selects the first usable `nameserver` address in file order.
+//! Loopback addresses are kept so queries can use the configured local resolver.
+//!
+//! The parser accepts IPv4 and IPv6 addresses, whitespace, and `#` or `;` comments. It skips malformed
+//! entries and addresses rejected by [`crate::usable_address`]. Scoped IPv6 addresses are skipped
+//! because [`IpAddr`] cannot represent their interface scope.
+//!
+//! File read errors are returned unchanged. If no usable address is listed, the reader returns
+//! [`io::ErrorKind::NotFound`], including when the file has no `nameserver` entries.
+
 use std::{io, net::IpAddr};
 
 pub(super) fn system_dns_resolver() -> io::Result<IpAddr> {
