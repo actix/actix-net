@@ -4,7 +4,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/resolvconf?label=latest)](https://crates.io/crates/resolvconf)
 [![Documentation](https://docs.rs/resolvconf/badge.svg?version=0.1.1)](https://docs.rs/resolvconf/0.1.1)
-[![Version](https://img.shields.io/badge/rustc-1.89+-ab6000.svg)](https://blog.rust-lang.org/2025/08/07/Rust-1.89.0/)
+![Version](https://img.shields.io/badge/rustc-1.89+-ab6000.svg)
 ![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/resolvconf.svg)
 <br />
 [![Dependency Status](https://deps.rs/crate/resolvconf/0.1.1/status.svg)](https://deps.rs/crate/resolvconf/0.1.1)
