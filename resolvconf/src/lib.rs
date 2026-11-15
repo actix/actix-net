@@ -2,8 +2,6 @@
 //!
 //! The [`system_dns_resolver`] function is available on Linux, BSD systems, macOS, and Windows.
 //!
-//! Supported BSD systems are DragonFly BSD, FreeBSD, NetBSD, and OpenBSD.
-//!
 //! # Examples
 //!
 //! ```no_run

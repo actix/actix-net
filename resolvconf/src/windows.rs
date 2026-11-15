@@ -3,8 +3,6 @@ use std::{
     net::{IpAddr, Ipv6Addr},
 };
 
-use crate::usable_address;
-
 pub(super) fn system_dns_resolver() -> io::Result<IpAddr> {
     let adapters = ipconfig::get_adapters().map_err(io::Error::other)?;
 
@@ -27,7 +25,7 @@ fn first_resolver<'a>(adapters: impl IntoIterator<Item = (bool, &'a [IpAddr])>) 
         .into_iter()
         .filter(|(up, _)| *up)
         .flat_map(|(_, servers)| servers.iter().copied())
-        .find(|&ip| usable_address(ip) && !OBSOLETE_SERVERS.contains(&ip))
+        .find(|&ip| crate::usable_address(ip) && !OBSOLETE_SERVERS.contains(&ip))
 }
 
 /// Windows can add these legacy site-local DNS addresses even when no server is present.

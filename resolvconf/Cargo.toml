@@ -1,6 +1,6 @@
 [package]
 name = "resolvconf"
-version = "0.1.1"
+version = "0.1.2"
 description = "Read the platform's configured DNS resolver address"
 authors = ["Rob Ede <robjtede@icloud.com>"]
 repository = "https://github.com/actix/actix-net/tree/main/resolvconf"
