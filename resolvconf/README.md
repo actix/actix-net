@@ -3,11 +3,11 @@
 <!-- prettier-ignore-start -->
 
 [![crates.io](https://img.shields.io/crates/v/resolvconf?label=latest)](https://crates.io/crates/resolvconf)
-[![Documentation](https://docs.rs/resolvconf/badge.svg?version=0.1.0)](https://docs.rs/resolvconf/0.1.0)
+[![Documentation](https://docs.rs/resolvconf/badge.svg?version=0.1.1)](https://docs.rs/resolvconf/0.1.1)
 [![Version](https://img.shields.io/badge/rustc-1.89+-ab6000.svg)](https://blog.rust-lang.org/2025/08/07/Rust-1.89.0/)
 ![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/resolvconf.svg)
 <br />
-[![Dependency Status](https://deps.rs/crate/resolvconf/0.1.0/status.svg)](https://deps.rs/crate/resolvconf/0.1.0)
+[![Dependency Status](https://deps.rs/crate/resolvconf/0.1.1/status.svg)](https://deps.rs/crate/resolvconf/0.1.1)
 ![Download](https://img.shields.io/crates/d/resolvconf.svg)
 [![Chat on Discord](https://img.shields.io/discord/771444961383153695?label=chat&logo=discord)](https://discord.gg/NWpN5mmg3x)
 
