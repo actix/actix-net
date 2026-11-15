@@ -4,7 +4,7 @@
 
 ## 0.1.1
 
-- Generate README from crate documentation and add standard badges.
+- No significant changes since `0.1.0`.
 
 ## 0.1.0
 
