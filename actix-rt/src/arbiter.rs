@@ -303,9 +303,7 @@ impl ArbiterBuilder {
             runtime_factory: None,
         }
     }
-}
 
-impl ArbiterBuilder {
     /// Specify a factory function for generating the name of the Arbiter thread.
     ///
     /// Defaults to `actix-rt|system:<system_id>|arbiter:<arb_id>`
@@ -327,6 +325,7 @@ impl ArbiterBuilder {
         self.name_factory = Some(Box::new(name_factory));
         self
     }
+
     /// Specify a factory function for generating the [Tokio Runtime](tokio-runtime) used by the Arbiter.
     ///
     /// [tokio-runtime]: tokio::runtime::Runtime
@@ -338,9 +337,7 @@ impl ArbiterBuilder {
         self.runtime_factory = Some(Box::new(move || runtime_factory().map(|rt| rt.into())));
         self
     }
-}
 
-impl ArbiterBuilder {
     /// Spawn a new Arbiter thread and start its event loop.
     ///
     /// # Panics
