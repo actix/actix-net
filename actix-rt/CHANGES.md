@@ -2,8 +2,10 @@
 
 ## Unreleased
 
-- Minimum supported Rust version (MSRV) is now 1.89.
+## 2.16.0
+
 - Add `actix_rt::ArbiterBuilder` to allow user to configure the thread spawned for the arbiter.
+- Minimum supported Rust version (MSRV) is now 1.89.
 
 ## 2.15.0
 
