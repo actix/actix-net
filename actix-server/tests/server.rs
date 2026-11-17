@@ -966,3 +966,49 @@ async fn non_graceful_shutdown_completes_before_server_drop() {
     let _listener =
         net::TcpListener::bind(addr).expect("Listener should close before drop returns");
 }
+
+#[tokio::test]
+async fn graceful_shutdown_completes_when_last_connection_closes() {
+    let addr = unused_addr();
+    let server = Server::build()
+        .workers(1)
+        .disable_signals()
+        .shutdown_timeout(60)
+        .bind("test", addr, || {
+            fn_service(|mut stream: TcpStream| async move {
+                stream.write_all(b"ready").await.unwrap();
+                let _ = stream.read(&mut [0; 1]).await;
+                Ok::<_, ()>(())
+            })
+        })
+        .unwrap()
+        .run();
+    let handle = server.handle();
+    let server = tokio::spawn(server);
+
+    let mut client = TcpStream::connect(addr).await.unwrap();
+    let mut ready = [0; 5];
+    client
+        .read_exact(&mut ready)
+        .timeout(Duration::from_secs(5))
+        .await
+        .expect("Service should start")
+        .unwrap();
+
+    let stop = tokio::spawn(handle.stop(true));
+    sleep(Duration::from_millis(100)).await;
+    let closed = Instant::now();
+    drop(client);
+
+    stop.timeout(Duration::from_secs(5))
+        .await
+        .expect("Graceful shutdown should complete")
+        .unwrap();
+    server.await.unwrap().unwrap();
+
+    assert!(
+        closed.elapsed() < Duration::from_millis(500),
+        "Graceful shutdown should complete soon after the last connection closes, took {:?}",
+        closed.elapsed()
+    );
+}
