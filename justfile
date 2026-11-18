@@ -64,6 +64,10 @@ test:
 test-msrv: downgrade-for-msrv
     @just toolchain={{ msrv_rustup }} test
 
+# Verify local-channel proof harnesses with Kani.
+test-kani:
+    cargo kani -p local-channel --output-format terse
+
 # Test workspace docs.
 test-docs: && doc
     cargo {{ toolchain }} test --doc --workspace {{ all_crate_features }} --no-fail-fast -- --nocapture

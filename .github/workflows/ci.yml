@@ -188,6 +188,40 @@ jobs:
         env:
           CARGO_BUILD_WARNINGS: warn
 
+  kani:
+    name: Kani
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: useblacksmith/checkout@v1.8.2
+        with:
+          persist-credentials: false
+
+      - name: Install Rust (stable)
+        uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
+        with:
+          toolchain: stable
+          build-warnings: warn
+          cache: false
+
+      - name: Install just
+        uses: taiki-e/install-action@v2.90.3
+        with:
+          tool: just
+
+      - name: Install kani-verifier
+        uses: taiki-e/cache-cargo-install-action@v3.0.8
+        with:
+          tool: kani-verifier@0.68.0
+
+      - name: Set up Kani
+        run: cargo kani setup
+
+      - name: Verify local-channel
+        run: just test-kani
+
   docs:
     name: Documentation
     runs-on: blacksmith-2vcpu-ubuntu-2404

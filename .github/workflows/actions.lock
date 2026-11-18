@@ -13,6 +13,7 @@ workflows:
         - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
         - 'ilammy/setup-nasm@v1.5.2'
         - 'rui314/setup-mold@main'
+        - 'taiki-e/cache-cargo-install-action@v3.0.8'
         - 'taiki-e/install-action@v2.90.3'
         - 'useblacksmith/checkout@v1.8.2'
     '.github/workflows/coverage.yml':
