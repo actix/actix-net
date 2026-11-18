@@ -123,12 +123,12 @@ bytes = "1"
 futures-util = { version = "0.3.17", default-features = false, features = ["sink"] }
 hickory-resolver = "0.26.1"
 itertools = "0.14"
-pretty_env_logger = "0.5"
 rcgen = "0.14"
 rustls-pemfile = "2"
 tokio = { version = "1.51", features = ["macros", "rt"] }
 tokio-rustls-026 = { package = "tokio-rustls", version = "0.26" }
 tokio-test = "0.4"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 
 [[example]]
 name = "accept-rustls"

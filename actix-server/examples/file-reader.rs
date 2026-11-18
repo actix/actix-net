@@ -18,10 +18,18 @@ use actix_server::Server;
 use actix_service::{fn_service, ServiceFactoryExt as _};
 use futures_util::{SinkExt as _, StreamExt as _};
 use tokio::{fs::File, io::AsyncReadExt as _};
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::EnvFilter;
 
 async fn run() -> io::Result<()> {
-    pretty_env_logger::formatted_timed_builder()
-        .parse_env(pretty_env_logger::env_logger::Env::default().default_filter_or("info"));
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .without_time()
+        .init();
 
     let addr = ("127.0.0.1", 8080);
     tracing::info!("starting server on port: {}", &addr.0);

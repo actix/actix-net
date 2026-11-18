@@ -23,10 +23,18 @@ use actix_service::{fn_service, ServiceFactoryExt as _};
 use bytes::BytesMut;
 use futures_util::future::ok;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::EnvFilter;
 
 async fn run() -> io::Result<()> {
-    pretty_env_logger::formatted_timed_builder()
-        .parse_env(pretty_env_logger::env_logger::Env::default().default_filter_or("info"));
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .without_time()
+        .init();
 
     let count = Arc::new(AtomicUsize::new(0));
 
