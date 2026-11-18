@@ -52,7 +52,6 @@ dependencies = [
  "futures-core",
  "futures-util",
  "mio",
- "pretty_env_logger",
  "socket2",
  "static_assertions",
  "tokio",
@@ -92,7 +91,6 @@ dependencies = [
  "itertools 0.14.0",
  "openssl",
  "pin-project-lite",
- "pretty_env_logger",
  "rcgen",
  "rustls 0.21.12",
  "rustls-native-certs 0.6.3",
@@ -110,6 +108,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "tracing",
+ "tracing-subscriber",
  "webpki-roots 0.22.6",
  "webpki-roots 0.25.4",
  "webpki-roots 0.26.11",
@@ -583,19 +582,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "252afb9ae5eaa683babdc6a068b3f5726eb19e05070c731f9b2a23a7c3e8ed34"
 
 [[package]]
-name = "env_logger"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
-dependencies = [
- "humantime",
- "is-terminal",
- "log",
- "regex",
- "termcolor",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -783,12 +769,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 
 [[package]]
-name = "hermit-abi"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
-
-[[package]]
 name = "hickory-net"
 version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -886,12 +866,6 @@ dependencies = [
  "bytes",
  "itoa",
 ]
-
-[[package]]
-name = "humantime"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15cdd26707701c53297e2fa6afb323d55fbc1d0810c3aec078ae3ef0424c3c15"
 
 [[package]]
 name = "icu_collections"
@@ -1042,17 +1016,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "is-terminal"
-version = "0.4.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
-dependencies = [
- "hermit-abi",
- "libc",
- "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1547,16 +1510,6 @@ dependencies = [
  "either",
  "ipnet",
  "num-traits",
-]
-
-[[package]]
-name = "pretty_env_logger"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "865724d4dbe39d9f3dd3b52b88d859d66bcb2d6a0acfd5ea68a65fb66d4bdc1c"
-dependencies = [
- "env_logger",
- "log",
 ]
 
 [[package]]

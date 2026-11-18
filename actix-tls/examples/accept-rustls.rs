@@ -37,12 +37,19 @@ use rustls::server::ServerConfig;
 use rustls_pemfile::{certs, rsa_private_keys};
 use rustls_pki_types_1::PrivateKeyDer;
 use tokio_rustls_026::rustls;
-use tracing::info;
+use tracing::{info, level_filters::LevelFilter};
+use tracing_subscriber::EnvFilter;
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
-    pretty_env_logger::formatted_timed_builder()
-        .parse_env(pretty_env_logger::env_logger::Env::default().default_filter_or("info"));
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .without_time()
+        .init();
 
     let root_path = env!("CARGO_MANIFEST_DIR")
         .parse::<PathBuf>()
