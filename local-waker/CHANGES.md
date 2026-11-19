@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Breaking: Change `LocalWaker::register` to accept `&mut Context` instead of `&Waker`.
+
 ## 0.1.5
 
 - Avoid `Waker::clone` on second registration.
