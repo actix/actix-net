@@ -44,7 +44,7 @@ jobs:
         run: sudo ifconfig lo0 alias 127.0.0.3
 
       - name: Checkout
-        uses: useblacksmith/checkout@v1.8.2
+        uses: useblacksmith/checkout@v1.8.3
         with:
           persist-credentials: false
 
@@ -130,7 +130,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: useblacksmith/checkout@v1.8.2
+        uses: useblacksmith/checkout@v1.8.3
         with:
           persist-credentials: false
 
@@ -173,7 +173,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: useblacksmith/checkout@v1.8.2
+        uses: useblacksmith/checkout@v1.8.3
         with:
           persist-credentials: false
 
@@ -194,7 +194,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: useblacksmith/checkout@v1.8.2
+        uses: useblacksmith/checkout@v1.8.3
         with:
           persist-credentials: false
 

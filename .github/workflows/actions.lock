@@ -8,25 +8,25 @@ workflows:
         - 'ilammy/setup-nasm@v1.5.2'
         - 'rui314/setup-mold@main'
         - 'taiki-e/install-action@v2.90.3'
-        - 'useblacksmith/checkout@v1.8.2'
+        - 'useblacksmith/checkout@v1.8.3'
     '.github/workflows/ci.yml':
         - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
         - 'ilammy/setup-nasm@v1.5.2'
         - 'rui314/setup-mold@main'
         - 'taiki-e/install-action@v2.90.3'
-        - 'useblacksmith/checkout@v1.8.2'
+        - 'useblacksmith/checkout@v1.8.3'
     '.github/workflows/coverage.yml':
         - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
         - 'codecov/codecov-action@v7.1.1'
         - 'taiki-e/install-action@v2.90.3'
-        - 'useblacksmith/checkout@v1.8.2'
+        - 'useblacksmith/checkout@v1.8.3'
     '.github/workflows/lint.yml':
         - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
         - 'embarkstudios/cargo-deny-action@v2.1.1'
         - 'giraffate/clippy-action@v1.0.1'
         - 'taiki-e/cache-cargo-install-action@v3.0.8'
         - 'taiki-e/install-action@v2.90.3'
-        - 'useblacksmith/checkout@v1.8.2'
+        - 'useblacksmith/checkout@v1.8.3'
         - 'zizmorcore/zizmor-action@v0.8.1'
     '.github/workflows/release.yml':
         - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
@@ -140,9 +140,9 @@ dependencies:
         commit: 'sha1-cfdb7ed4ccc7c7dce37759eae89dc5674b469b39'
         owner_id: 43724913
         repo_id: 442947557
-    'useblacksmith/checkout@v1.8.2':
-        ref: 'v1.8.2'
-        commit: 'sha1-2b9fe87d796feea153b455ec2f3125b471a7b0e7'
+    'useblacksmith/checkout@v1.8.3':
+        ref: 'v1.8.3'
+        commit: 'sha1-75c49b6ed30ce59336e9252425796cfcfac155f8'
         owner_id: 156274793
         repo_id: 1107788336
     'zizmorcore/zizmor-action@v0.8.1':
