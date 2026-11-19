@@ -371,3 +371,49 @@ mod tests {
         assert_ready_eq!(receiver.as_mut().poll_next(&mut cx), None);
     }
 }
+
+#[cfg(kani)]
+mod proofs {
+    use std::{
+        pin::pin,
+        task::{Context, Poll, Waker},
+    };
+
+    use futures_core::Stream as _;
+
+    use super::channel;
+
+    #[kani::proof]
+    #[kani::unwind(3)]
+    fn only_implicit_closure_permits_a_new_sender() {
+        let explicitly_closed = kani::any::<bool>();
+        let (mut sender, receiver) = channel::<u8>();
+        let mut receiver = pin!(receiver);
+        let mut cx = Context::from_waker(Waker::noop());
+
+        if explicitly_closed {
+            sender.close();
+        }
+        drop(sender);
+
+        assert!(matches!(
+            receiver.as_mut().poll_next(&mut cx),
+            Poll::Ready(None)
+        ));
+
+        let new_sender = receiver.sender();
+
+        if explicitly_closed {
+            assert!(matches!(
+                receiver.as_mut().poll_next(&mut cx),
+                Poll::Ready(None)
+            ));
+        } else {
+            assert!(receiver.as_mut().poll_next(&mut cx).is_pending());
+        }
+
+        kani::cover!(explicitly_closed, "explicit close");
+        kani::cover!(!explicitly_closed, "last sender dropped");
+        drop(new_sender);
+    }
+}
