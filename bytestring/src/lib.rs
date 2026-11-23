@@ -539,17 +539,37 @@ fn validate_utf8(bytes: &[u8]) -> Result<(), str::Utf8Error> {
     validate_utf8_err(bytes)
 }
 
-/// Validates that `bytes` is valid UTF-8, returning the exact [`str::Utf8Error`] on failure.
+/// Validates that `bytes` is valid UTF-8, using a chunked ASCII fast path to avoid double-scanning
+/// an ASCII prefix before a late non-ASCII byte while preserving exact [`str::Utf8Error`] values.
 #[cfg(not(feature = "simd"))]
 fn validate_utf8(bytes: &[u8]) -> Result<(), str::Utf8Error> {
-    if bytes.is_ascii() {
+    const CHUNK_SIZE: usize = 64;
+
+    let (chunks, remainder) = bytes.as_chunks::<CHUNK_SIZE>();
+    let mut offset = 0;
+    for chunk in chunks {
+        if !chunk.is_ascii() {
+            let tail = &bytes[offset..];
+            return match str::from_utf8(tail) {
+                Ok(_) => Ok(()),
+                Err(err) if offset == 0 => Err(err),
+                Err(_) => validate_utf8_err(bytes),
+            };
+        }
+        offset += CHUNK_SIZE;
+    }
+
+    if remainder.is_ascii() {
         return Ok(());
     }
 
-    str::from_utf8(bytes).map(|_| ())
+    match str::from_utf8(remainder) {
+        Ok(_) => Ok(()),
+        Err(err) if offset == 0 => Err(err),
+        Err(_) => validate_utf8_err(bytes),
+    }
 }
 
-#[cfg(feature = "simd")]
 #[cold]
 fn validate_utf8_err(bytes: &[u8]) -> Result<(), str::Utf8Error> {
     str::from_utf8(bytes).map(|_| ())
