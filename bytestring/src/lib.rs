@@ -521,11 +521,10 @@ impl From<ByteString> for String {
 
 /// Validates that `bytes` is valid UTF-8, returning the exact [`str::Utf8Error`] on failure.
 #[cfg(feature = "simd")]
-#[inline]
 fn validate_utf8(bytes: &[u8]) -> Result<(), str::Utf8Error> {
     // `simdutf8` falls back to `core::str::from_utf8` for slices shorter than 64 bytes (its SIMD
     // chunk size). Handling short slices here avoids dispatch overhead, avoids validating invalid
-    // short inputs twice, and preserves an inline ASCII fast path for common short strings.
+    // short inputs twice, and preserves an ASCII fast path for common short strings.
     if bytes.len() < 64 {
         if bytes.is_ascii() {
             return Ok(());
@@ -533,12 +532,6 @@ fn validate_utf8(bytes: &[u8]) -> Result<(), str::Utf8Error> {
         return str::from_utf8(bytes).map(|_| ());
     }
 
-    validate_utf8_simd(bytes)
-}
-
-#[cfg(feature = "simd")]
-#[inline(never)]
-fn validate_utf8_simd(bytes: &[u8]) -> Result<(), str::Utf8Error> {
     if simdutf8::compat::from_utf8(bytes).is_ok() {
         return Ok(());
     }
@@ -548,7 +541,6 @@ fn validate_utf8_simd(bytes: &[u8]) -> Result<(), str::Utf8Error> {
 
 /// Validates that `bytes` is valid UTF-8, returning the exact [`str::Utf8Error`] on failure.
 #[cfg(not(feature = "simd"))]
-#[inline]
 fn validate_utf8(bytes: &[u8]) -> Result<(), str::Utf8Error> {
     if bytes.is_ascii() {
         return Ok(());
@@ -559,7 +551,6 @@ fn validate_utf8(bytes: &[u8]) -> Result<(), str::Utf8Error> {
 
 #[cfg(feature = "simd")]
 #[cold]
-#[inline(never)]
 fn validate_utf8_err(bytes: &[u8]) -> Result<(), str::Utf8Error> {
     str::from_utf8(bytes).map(|_| ())
 }
