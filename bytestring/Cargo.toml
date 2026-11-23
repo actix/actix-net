@@ -15,11 +15,15 @@ rust-version.workspace = true
 allowed_external_types = ["bytes::*", "serde_core::*"]
 
 [features]
+default = []
 serde = ["dep:serde_core"]
+simd = ["dep:simdutf8"]
+std = ["simdutf8?/std"]
 
 [dependencies]
 bytes = { version = "1.9", default-features = false }
 serde_core = { version = "1", optional = true }
+simdutf8 = { version = "0.1.5", optional = true, default-features = false }
 
 [dev-dependencies]
 divan = { package = "codspeed-divan-compat", version = "4" }
