@@ -71,6 +71,26 @@ test-docs: && doc
 # Test workspace.
 test-all: test test-docs
 
+# Validate benchmark outputs without collecting timings.
+bench-test:
+    cargo bench -p bytestring --bench utf8 --all-features --locked -- --test
+
+# Build benchmarks for CPU and memory reporting.
+bench-build:
+    cargo codspeed build -p bytestring --all-features --locked -m simulation -m memory
+
+# Run the benchmarks built with CodSpeed.
+bench-run:
+    cargo codspeed run
+
+# Build benchmarks for local walltime measurements.
+bench-build-walltime *args:
+    cargo codspeed build -p bytestring --locked -m walltime {{ args }}
+
+# Measure walltime and upload the results to CodSpeed.
+bench-run-walltime *args:
+    codspeed run -m walltime -- cargo codspeed run -m walltime {{ args }}
+
 # Document crates in workspace.
 doc *args: && doc-set-workspace-crates
     rm -f "$(cargo metadata --format-version=1 | jq -r '.target_directory')/doc/crates.js"
