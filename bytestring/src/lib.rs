@@ -1,6 +1,14 @@
 //! A UTF-8 encoded read-only string using `Bytes` as storage.
 //!
 //! See docs for [`ByteString`].
+//!
+//! # Crate Features
+//! - `simd`: Uses `simdutf8` (`#![no_std]`) for SIMD-accelerated UTF-8 validation (NEON on
+//!   `aarch64`, `simd128` on `wasm32` when enabled, and SSE4.2/AVX2 on `x86`/`x86_64` when enabled
+//!   at compile time or via the `std` feature).
+//! - `std`: Enables runtime CPU feature detection (AVX2/SSE4.2) in `simdutf8` on `x86`/`x86_64`
+//!   targets. `bytestring` itself remains `#![no_std]`.
+//! - `serde`: Enables `Serialize` and `Deserialize` implementations for [`ByteString`].
 
 #![no_std]
 
@@ -113,8 +121,8 @@ impl ByteString {
     /// ```
     #[inline]
     pub fn from_utf8(bytes: Bytes) -> Result<Self, FromUtf8Error> {
-        match str::from_utf8(&bytes) {
-            Ok(_) => Ok(Self(bytes)),
+        match validate_utf8(&bytes) {
+            Ok(()) => Ok(Self(bytes)),
             Err(error) => Err(FromUtf8Error { bytes, error }),
         }
     }
@@ -511,16 +519,48 @@ impl From<ByteString> for String {
     }
 }
 
+/// Validates that `bytes` is valid UTF-8, returning the exact [`str::Utf8Error`] on failure.
+#[cfg(feature = "simd")]
+fn validate_utf8(bytes: &[u8]) -> Result<(), str::Utf8Error> {
+    // `simdutf8` falls back to `core::str::from_utf8` for slices shorter than 64 bytes (its SIMD
+    // chunk size). Handling short slices here avoids dispatch overhead, avoids validating invalid
+    // short inputs twice, and preserves an ASCII fast path for common short strings.
+    if bytes.len() < 64 {
+        if bytes.is_ascii() {
+            return Ok(());
+        }
+        return str::from_utf8(bytes).map(|_| ());
+    }
+
+    if simdutf8::compat::from_utf8(bytes).is_ok() {
+        return Ok(());
+    }
+
+    validate_utf8_err(bytes)
+}
+
+/// Validates that `bytes` is valid UTF-8, returning the exact [`str::Utf8Error`] on failure.
+#[cfg(not(feature = "simd"))]
+fn validate_utf8(bytes: &[u8]) -> Result<(), str::Utf8Error> {
+    if bytes.is_ascii() {
+        return Ok(());
+    }
+
+    str::from_utf8(bytes).map(|_| ())
+}
+
+#[cfg(feature = "simd")]
+#[cold]
+fn validate_utf8_err(bytes: &[u8]) -> Result<(), str::Utf8Error> {
+    str::from_utf8(bytes).map(|_| ())
+}
+
 impl TryFrom<&[u8]> for ByteString {
     type Error = str::Utf8Error;
 
     #[inline]
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.is_ascii() {
-            return Ok(ByteString(Bytes::copy_from_slice(value)));
-        }
-
-        let _ = str::from_utf8(value)?;
+        validate_utf8(value)?;
         Ok(ByteString(Bytes::copy_from_slice(value)))
     }
 }
@@ -530,12 +570,8 @@ impl TryFrom<Vec<u8>> for ByteString {
 
     #[inline]
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        if value.is_ascii() {
-            return Ok(ByteString(Bytes::from(value)));
-        }
-
-        let buf = String::from_utf8(value).map_err(|err| err.utf8_error())?;
-        Ok(ByteString(Bytes::from(buf)))
+        validate_utf8(&value)?;
+        Ok(ByteString(Bytes::from(value)))
     }
 }
 
@@ -544,11 +580,7 @@ impl TryFrom<Bytes> for ByteString {
 
     #[inline]
     fn try_from(value: Bytes) -> Result<Self, Self::Error> {
-        if value.is_ascii() {
-            return Ok(ByteString(value));
-        }
-
-        let _ = str::from_utf8(value.as_ref())?;
+        validate_utf8(&value)?;
         Ok(ByteString(value))
     }
 }
@@ -558,11 +590,7 @@ impl TryFrom<bytes::BytesMut> for ByteString {
 
     #[inline]
     fn try_from(value: bytes::BytesMut) -> Result<Self, Self::Error> {
-        if value.is_ascii() {
-            return Ok(ByteString(value.freeze()));
-        }
-
-        let _ = str::from_utf8(&value)?;
+        validate_utf8(&value)?;
         Ok(ByteString(value.freeze()))
     }
 }

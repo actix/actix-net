@@ -323,6 +323,7 @@ dependencies = [
  "codspeed-divan-compat",
  "serde_core",
  "serde_json",
+ "simdutf8",
  "static_assertions",
 ]
 
