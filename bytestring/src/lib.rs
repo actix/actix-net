@@ -1,6 +1,6 @@
-//! A UTF-8 encoded read-only string using `Bytes` as storage.
+//! Immutable UTF-8 strings with shared or inline storage.
 //!
-//! See docs for [`ByteString`].
+//! See [`ByteString`] for shared storage and [`SmallByteString`] for inline storage.
 //!
 //! # Crate Features
 //! - `simd`: Uses `simdutf8` (`#![no_std]`) for SIMD-accelerated UTF-8 validation (NEON on
@@ -8,7 +8,7 @@
 //!   at compile time or via the `std` feature).
 //! - `std`: Enables runtime CPU feature detection (AVX2/SSE4.2) in `simdutf8` on `x86`/`x86_64`
 //!   targets. `bytestring` itself remains `#![no_std]`.
-//! - `serde`: Enables `Serialize` and `Deserialize` implementations for [`ByteString`].
+//! - `serde`: Enables `Serialize` and `Deserialize` for [`ByteString`] and [`SmallByteString`].
 
 #![no_std]
 
@@ -16,11 +16,14 @@ extern crate alloc;
 
 #[cfg(feature = "serde")]
 mod serde;
+mod small;
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{borrow::Borrow, fmt, hash, ops, str};
 
 use bytes::Bytes;
+
+pub use self::small::SmallByteString;
 
 /// An immutable UTF-8 encoded string using [`Bytes`] as the storage.
 #[doc(alias = "BytesStr")]

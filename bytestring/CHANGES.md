@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `SmallByteString` with inline storage for short strings.
+
 ## 1.6.1
 
 - Add `simd` crate feature, disabled by default.
