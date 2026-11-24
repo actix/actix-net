@@ -236,7 +236,7 @@ fn try_from_vec_multibyte(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_vec(b, Corpus::Multibyte, size);
 }
 
-bench_sizes!(try_from_vec_invalid_early, [64, 32, 32, 4]);
+bench_sizes!(try_from_vec_invalid_early, [64, 32, 32, 8]);
 fn try_from_vec_invalid_early(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_vec(b, Corpus::InvalidEarly, size);
 }
@@ -261,7 +261,7 @@ fn try_from_bytes_mut_multibyte(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes_mut(b, Corpus::Multibyte, size);
 }
 
-bench_sizes!(try_from_bytes_mut_invalid_early, [64, 32, 16, 4]);
+bench_sizes!(try_from_bytes_mut_invalid_early, [64, 32, 16, 8]);
 fn try_from_bytes_mut_invalid_early(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes_mut(b, Corpus::InvalidEarly, size);
 }
