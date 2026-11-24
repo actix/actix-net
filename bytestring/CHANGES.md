@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.6.1
+
+- Add `simd` crate feature, disabled by default.
+- Improve performance of UTF-8 validation by 3-4x when `simd` crate feature is enabled.
+
 ## 1.6.0
 
 - Add `ByteString::from_owner()` constructor to preserve existing allocations.
