@@ -9,6 +9,9 @@ use divan::{black_box, counter::BytesCount, AllocProfiler, Bencher};
 #[global_allocator]
 static ALLOC: AllocProfiler = AllocProfiler::system();
 
+const SIZES: &[usize] = &[16, 64, 1024, 65_536];
+const SAMPLE_SIZE: u32 = 8;
+
 #[derive(Clone, Copy)]
 enum Corpus {
     Ascii,
@@ -129,144 +132,127 @@ fn bench_try_from_bytes_mut(b: Bencher<'_, '_>, corpus: Corpus, size: usize) {
         .bench_values(|buf| ByteString::try_from(black_box(buf)));
 }
 
-macro_rules! bench_sizes {
-    ($name:ident, [$n16:literal, $n64:literal, $n1024:literal, $n65536:literal]) => {
-        bench_sizes!(@case $name, 16, $n16);
-        bench_sizes!(@case $name, 64, $n64);
-        bench_sizes!(@case $name, 1024, $n1024);
-        bench_sizes!(@case $name, 65_536, $n65536);
-    };
-    (@case $name:ident, $size:literal, $samples:literal) => {
-        const _: () = {
-            #[divan::bench(name = stringify!($name), args = [$size], sample_size = $samples)]
-            fn case(b: Bencher<'_, '_>, size: usize) {
-                $name(b, size);
-            }
-        };
-    };
-}
-
-bench_sizes!(from_utf8_ascii, [128, 128, 32, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn from_utf8_ascii(b: Bencher<'_, '_>, size: usize) {
     bench_from_utf8(b, Corpus::Ascii, size);
 }
 
-bench_sizes!(from_utf8_ascii_late_non_ascii, [64, 64, 32, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn from_utf8_ascii_late_non_ascii(b: Bencher<'_, '_>, size: usize) {
     bench_from_utf8(b, Corpus::AsciiLateNonAscii, size);
 }
 
-bench_sizes!(from_utf8_multibyte, [64, 64, 4, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn from_utf8_multibyte(b: Bencher<'_, '_>, size: usize) {
     bench_from_utf8(b, Corpus::Multibyte, size);
 }
 
-bench_sizes!(from_utf8_invalid_early, [128, 32, 32, 32]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn from_utf8_invalid_early(b: Bencher<'_, '_>, size: usize) {
     bench_from_utf8(b, Corpus::InvalidEarly, size);
 }
 
-bench_sizes!(from_utf8_invalid_late, [64, 16, 1, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn from_utf8_invalid_late(b: Bencher<'_, '_>, size: usize) {
     bench_from_utf8(b, Corpus::InvalidLate, size);
 }
 
-bench_sizes!(try_from_bytes_ascii, [128, 128, 32, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_bytes_ascii(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes(b, Corpus::Ascii, size);
 }
 
-bench_sizes!(try_from_bytes_ascii_late_non_ascii, [64, 64, 32, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_bytes_ascii_late_non_ascii(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes(b, Corpus::AsciiLateNonAscii, size);
 }
 
-bench_sizes!(try_from_bytes_multibyte, [64, 64, 4, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_bytes_multibyte(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes(b, Corpus::Multibyte, size);
 }
 
-bench_sizes!(try_from_bytes_invalid_early, [64, 32, 32, 32]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_bytes_invalid_early(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes(b, Corpus::InvalidEarly, size);
 }
 
-bench_sizes!(try_from_bytes_invalid_late, [64, 16, 1, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_bytes_invalid_late(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes(b, Corpus::InvalidLate, size);
 }
 
-bench_sizes!(try_from_slice_ascii, [32, 32, 8, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_slice_ascii(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_slice(b, Corpus::Ascii, size);
 }
 
-bench_sizes!(try_from_slice_ascii_late_non_ascii, [32, 16, 8, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_slice_ascii_late_non_ascii(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_slice(b, Corpus::AsciiLateNonAscii, size);
 }
 
-bench_sizes!(try_from_slice_multibyte, [32, 16, 4, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_slice_multibyte(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_slice(b, Corpus::Multibyte, size);
 }
 
-bench_sizes!(try_from_slice_invalid_early, [128, 32, 32, 32]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_slice_invalid_early(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_slice(b, Corpus::InvalidEarly, size);
 }
 
-bench_sizes!(try_from_slice_invalid_late, [64, 16, 1, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_slice_invalid_late(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_slice(b, Corpus::InvalidLate, size);
 }
 
-bench_sizes!(try_from_vec_ascii, [128, 128, 32, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_vec_ascii(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_vec(b, Corpus::Ascii, size);
 }
 
-bench_sizes!(try_from_vec_ascii_late_non_ascii, [64, 64, 16, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_vec_ascii_late_non_ascii(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_vec(b, Corpus::AsciiLateNonAscii, size);
 }
 
-bench_sizes!(try_from_vec_multibyte, [64, 64, 4, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_vec_multibyte(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_vec(b, Corpus::Multibyte, size);
 }
 
-bench_sizes!(try_from_vec_invalid_early, [64, 32, 32, 8]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_vec_invalid_early(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_vec(b, Corpus::InvalidEarly, size);
 }
 
-bench_sizes!(try_from_vec_invalid_late, [32, 8, 1, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_vec_invalid_late(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_vec(b, Corpus::InvalidLate, size);
 }
 
-bench_sizes!(try_from_bytes_mut_ascii, [128, 64, 32, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_bytes_mut_ascii(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes_mut(b, Corpus::Ascii, size);
 }
 
-bench_sizes!(try_from_bytes_mut_ascii_late_non_ascii, [128, 32, 16, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_bytes_mut_ascii_late_non_ascii(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes_mut(b, Corpus::AsciiLateNonAscii, size);
 }
 
-bench_sizes!(try_from_bytes_mut_multibyte, [64, 32, 4, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_bytes_mut_multibyte(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes_mut(b, Corpus::Multibyte, size);
 }
 
-bench_sizes!(try_from_bytes_mut_invalid_early, [64, 32, 16, 8]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_bytes_mut_invalid_early(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes_mut(b, Corpus::InvalidEarly, size);
 }
 
-bench_sizes!(try_from_bytes_mut_invalid_late, [32, 8, 1, 1]);
+#[divan::bench(args = SIZES, sample_size = SAMPLE_SIZE)]
 fn try_from_bytes_mut_invalid_late(b: Bencher<'_, '_>, size: usize) {
     bench_try_from_bytes_mut(b, Corpus::InvalidLate, size);
 }
