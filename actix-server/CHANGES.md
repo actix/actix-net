@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Complete a graceful worker shutdown as soon as its last connection closes, instead of at the next one-second check.
 - Reject a zero connection limit in `ServerBuilder::max_concurrent_connections()` with a panic.
 
 ## 2.10.0

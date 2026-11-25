@@ -1,4 +1,5 @@
 use std::{
+    cell::Cell,
     future::Future,
     io, mem,
     num::NonZeroUsize,
@@ -8,7 +9,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         mpsc, Arc,
     },
-    task::{Context, Poll},
+    task::{Context, Poll, Waker},
     time::Duration,
 };
 
@@ -143,6 +144,8 @@ impl Counter {
 pub(crate) struct WorkerCounter {
     idx: usize,
     inner: Rc<(WakerQueue, Counter)>,
+    /// Woken when the last connection closes during graceful shutdown.
+    drained: Rc<Cell<Option<Waker>>>,
 }
 
 impl Clone for WorkerCounter {
@@ -150,6 +153,7 @@ impl Clone for WorkerCounter {
         Self {
             idx: self.idx,
             inner: self.inner.clone(),
+            drained: self.drained.clone(),
         }
     }
 }
@@ -159,6 +163,7 @@ impl WorkerCounter {
         Self {
             idx,
             inner: Rc::new((waker_queue, counter)),
+            drained: Rc::new(Cell::new(None)),
         }
     }
 
@@ -170,6 +175,11 @@ impl WorkerCounter {
     fn total(&self) -> usize {
         self.inner.1.total()
     }
+
+    /// Registers a waker to be woken when the last connection closes.
+    fn wake_when_drained(&self, waker: &Waker) {
+        self.drained.set(Some(waker.clone()));
+    }
 }
 
 pub(crate) struct WorkerCounterGuard(WorkerCounter);
@@ -179,6 +189,12 @@ impl Drop for WorkerCounterGuard {
         let (waker_queue, counter) = &*self.0.inner;
         if counter.dec() {
             waker_queue.wake(WakerInterest::WorkerAvailable(self.0.idx));
+        }
+
+        if counter.total() == 0 {
+            if let Some(waker) = self.0.drained.take() {
+                waker.wake();
+            }
         }
     }
 }
@@ -675,8 +691,11 @@ impl Future for ServerWorker {
                     drop((conn, guard));
                 }
 
-                // Wait until the next shutdown check.
-                ready!(shutdown.timer.as_mut().poll(cx));
+                // Wait until the last connection closes or the next shutdown check.
+                this.counter.wake_when_drained(cx.waker());
+                if this.counter.total() > 0 {
+                    ready!(shutdown.timer.as_mut().poll(cx));
+                }
 
                 if this.counter.total() == 0 {
                     // graceful shutdown
