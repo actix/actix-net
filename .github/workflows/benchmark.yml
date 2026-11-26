@@ -30,7 +30,7 @@ jobs:
           toolchain: nightly
 
       - name: Install cargo-codspeed
-        uses: taiki-e/install-action@v2.90.5
+        uses: taiki-e/install-action@v2.90.8
         with:
           tool: cargo-codspeed
 

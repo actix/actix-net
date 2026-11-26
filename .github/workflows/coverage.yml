@@ -26,7 +26,7 @@ jobs:
           components: llvm-tools-preview
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2.90.5
+        uses: taiki-e/install-action@v2.90.8
         with:
           tool: cargo-llvm-cov
 
