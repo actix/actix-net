@@ -38,7 +38,7 @@ jobs:
         run: cargo codspeed build -p bytestring --all-features --locked --measurement-mode walltime --measurement-mode memory
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v5.6.3
+        uses: CodSpeedHQ/action@v5.8.0
         env:
           DIVAN_MIN_TIME: "1"
           DIVAN_MAX_TIME: "1"
