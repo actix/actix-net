@@ -4,7 +4,12 @@
 
 #![no_std]
 
-use core::{cell::UnsafeCell, fmt, marker::PhantomData, task::Waker};
+use core::{
+    cell::UnsafeCell,
+    fmt,
+    marker::PhantomData,
+    task::{Context, Waker},
+};
 
 /// A synchronization primitive for task wakeup.
 ///
@@ -40,7 +45,8 @@ impl LocalWaker {
     ///
     /// Returns `true` if a waker was registered before.
     #[inline]
-    pub fn register(&self, waker: &Waker) -> bool {
+    pub fn register(&self, cx: &mut Context<'_>) -> bool {
+        let waker = cx.waker();
         let mut registered = false;
 
         // SAFETY: `LocalWaker` is `!Send`, threfore this cannot be called from a separate thread.
